@@ -1,32 +1,30 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string;
-const health = ref<string>("loading...");
-
-onMounted(async () => {
-    try {
-        const res = await fetch(`${apiBaseUrl}/health`);
-        const data = await res.json();
-        health.value = data?.status ?? "unknown";
-    } catch (e) {
-        health.value = "error";
-    }
-});
+import { RouterLink, RouterView } from "vue-router";
 </script>
 
 <template>
-    <div class="min-h-screen p-6">
-        <div class="max-w-xl space-y-4">
-            <h1 class="text-2xl font-semibold">Tripflow</h1>
+    <div class="min-h-screen bg-slate-50 text-slate-900">
+      <!-- Header -->
+        <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
+                <div class="leading-tight">
+                    <div class="text-base font-semibold">Tripflow</div>
+                    <div class="text-[11px] uppercase tracking-wide text-slate-500">
+                        Sprint 1
+                    </div>
+                </div>
 
-            <div class="rounded border p-4">
-                <div class="text-sm text-zinc-600">API Base URL</div>
-                <div class="font-mono text-sm">{{ apiBaseUrl }}</div>
-
-                <div class="mt-3 text-sm text-zinc-600">Health</div>
-                <div class="text-lg">{{ health }}</div>
+                <nav class="flex items-center gap-3 text-sm text-slate-600">
+                    <RouterLink class="hover:text-slate-900" to="/admin/tours">
+                        Tours
+                    </RouterLink>
+                </nav>
             </div>
-        </div>
+        </header>
+
+        <!-- Content -->
+        <main class="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
+            <RouterView />
+        </main>
     </div>
 </template>
