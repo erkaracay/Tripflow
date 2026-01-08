@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "apps", "apps", "{FFA44EB5-1D68-4F51-BA84-90323A9E5386}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{F550AA79-8709-4514-8F8B-D4D6ADFA8480}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tripflow.Api", "apps\api\Tripflow.Api\Tripflow.Api.csproj", "{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F550AA79-8709-4514-8F8B-D4D6ADFA8480} = {FFA44EB5-1D68-4F51-BA84-90323A9E5386}
+		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984} = {F550AA79-8709-4514-8F8B-D4D6ADFA8480}
+	EndGlobalSection
+EndGlobal
