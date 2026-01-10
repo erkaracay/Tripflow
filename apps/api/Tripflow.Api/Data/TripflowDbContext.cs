@@ -1,0 +1,76 @@
+using Microsoft.EntityFrameworkCore;
+using Tripflow.Api.Data.Entities;
+
+namespace Tripflow.Api.Data;
+
+public sealed class TripflowDbContext : DbContext
+{
+    public DbSet<TourEntity> Tours => Set<TourEntity>();
+    public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
+    public DbSet<TourPortalEntity> TourPortals => Set<TourPortalEntity>();
+    public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
+
+    public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TourEntity>(b =>
+        {
+            b.ToTable("tours");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasMany(x => x.Participants)
+                .WithOne(x => x.Tour)
+                .HasForeignKey(x => x.TourId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Portal)
+                .WithOne(x => x.Tour)
+                .HasForeignKey<TourPortalEntity>(x => x.TourId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ParticipantEntity>(b =>
+        {
+            b.ToTable("participants");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Email).HasMaxLength(200);
+            b.Property(x => x.Phone).HasMaxLength(50);
+
+            b.Property(x => x.CheckInCode).HasMaxLength(64).IsRequired();
+            b.HasIndex(x => x.CheckInCode).IsUnique();
+
+            b.Property(x => x.CreatedAt).IsRequired();
+            b.HasIndex(x => x.TourId);
+        });
+
+        modelBuilder.Entity<TourPortalEntity>(b =>
+        {
+            b.ToTable("tour_portals");
+            b.HasKey(x => x.TourId);
+
+            b.Property(x => x.PortalJson).HasColumnType("jsonb").IsRequired();
+            b.Property(x => x.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<CheckInEntity>(b =>
+        {
+            b.ToTable("checkins");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Method).HasMaxLength(16).IsRequired();
+            b.Property(x => x.CheckedInAt).IsRequired();
+
+            b.HasIndex(x => x.TourId);
+            b.HasIndex(x => x.ParticipantId);
+            b.HasIndex(x => new { x.TourId, x.ParticipantId }).IsUnique();
+        });
+    }
+}

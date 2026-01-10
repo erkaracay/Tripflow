@@ -1,9 +1,19 @@
 using Tripflow.Api.Features.Tours;
+using Microsoft.EntityFrameworkCore;
+using Tripflow.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+var connectionString = builder.Configuration["CONNECTION_STRING"];
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("CONNECTION_STRING missing. Export it in your shell.");
+}
+
+builder.Services.AddDbContext<TripflowDbContext>(opt => opt.UseNpgsql(connectionString));
 
 // CORS
 const string WebCorsPolicy = "WebCors";
