@@ -7,10 +7,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var connectionString = builder.Configuration["CONNECTION_STRING"];
+var connectionString = builder.Configuration.GetConnectionString("TripflowDb") ?? builder.Configuration["CONNECTION_STRING"];
+
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    throw new InvalidOperationException("CONNECTION_STRING missing. Export it in your shell.");
+    throw new InvalidOperationException(
+        "Database connection string missing. Set 'ConnectionStrings:TripflowDb' via user-secrets or set CONNECTION_STRING env var.");
 }
 
 builder.Services.AddDbContext<TripflowDbContext>(opt => opt.UseNpgsql(connectionString));
