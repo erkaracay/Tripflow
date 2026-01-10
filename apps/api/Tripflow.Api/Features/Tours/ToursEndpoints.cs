@@ -1,278 +1,169 @@
-using System.Collections.Concurrent;
-using System.Globalization;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Models;
 
 namespace Tripflow.Api.Features.Tours;
 
 public static class ToursEndpoints
 {
-    private static readonly ConcurrentDictionary<Guid, Tour> Tours = new();
-    private static readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, Participant>> ParticipantsByTour = new();
-    private static readonly ConcurrentDictionary<Guid, TourPortalInfo> PortalByTour = new();
-
     public static IEndpointRouteBuilder MapToursEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api")
-            .WithTags("Tours");
+        var group = app.MapGroup("/api").WithTags("Tours");
 
-        group.MapGet("/tours", () =>
-            {
-                var list = Tours.Values
-                    .OrderBy(t => t.StartDate)
-                    .ThenBy(t => t.Name)
-                    .ToArray();
-
-                return Results.Ok(list);
-            })
+        group.MapGet("/tours", ToursHandlers.GetTours)
             .WithSummary("List tours")
-            .WithDescription("Returns all tours in the in-memory store.")
-            .WithOpenApi();
+            .WithDescription("Returns all tours.")
+            .Produces<TourDto[]>(StatusCodes.Status200OK);
 
-        group.MapPost("/tours", (CreateTourRequest request) =>
-            {
-                if (request is null)
-                {
-                    return ValidationError("Request body is required.");
-                }
-
-                var name = request.Name?.Trim();
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    return ValidationError("Name is required.");
-                }
-
-                if (!TryParseDate(request.StartDate, out var startDate))
-                {
-                    return ValidationError("Start date must be in YYYY-MM-DD format.");
-                }
-
-                if (!TryParseDate(request.EndDate, out var endDate))
-                {
-                    return ValidationError("End date must be in YYYY-MM-DD format.");
-                }
-
-                if (endDate < startDate)
-                {
-                    return ValidationError("End date must be on or after start date.");
-                }
-
-                var tour = new Tour(Guid.NewGuid(), name, request.StartDate!, request.EndDate!);
-                if (!Tours.TryAdd(tour.Id, tour))
-                {
-                    return Results.StatusCode(StatusCodes.Status500InternalServerError);
-                }
-
-                ParticipantsByTour.TryAdd(tour.Id, new ConcurrentDictionary<Guid, Participant>());
-                PortalByTour.TryAdd(tour.Id, CreateDefaultPortalInfo(tour));
-
-                return Results.Created($"/api/tours/{tour.Id}", tour);
-            })
+        group.MapPost("/tours", ToursHandlers.CreateTour)
             .WithSummary("Create tour")
-            .WithDescription("Creates a new tour with a name and date range.")
-            .WithOpenApi();
-
-        group.MapGet("/tours/{tourId}", (string tourId) =>
+            .WithDescription("Creates a new tour. Dates must be in YYYY-MM-DD format.")
+            .Produces<TourDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .WithOpenApi(op =>
             {
-                if (!TryGetTour(tourId, out var tour, out var error))
-                {
-                    return error!;
-                }
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["name"] = new OpenApiString("Demo Tour"),
+                        ["startDate"] = new OpenApiString("2026-01-10"),
+                        ["endDate"] = new OpenApiString("2026-01-12")
+                    },
+                    "Dates must be in YYYY-MM-DD format."
+                );
+                return op;
+            });
 
-                return Results.Ok(tour);
-            })
+        group.MapGet("/tours/{tourId}", ToursHandlers.GetTour)
             .WithSummary("Get tour")
-            .WithDescription("Returns a tour by id.")
-            .WithOpenApi();
+            .WithDescription("Returns tour details by id.")
+            .Produces<TourDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
-        group.MapGet("/tours/{tourId}/portal", (string tourId) =>
+        group.MapGet("/tours/{tourId}/portal", ToursHandlers.GetPortal)
+            .WithSummary("Get portal content")
+            .WithDescription("Returns portal JSON for a tour. If none exists, returns a default template.")
+            .Produces<TourPortalInfo>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPut("/tours/{tourId}/portal", ToursHandlers.SavePortal)
+            .WithSummary("Save portal content")
+            .WithDescription("Upserts portal JSON for a tour.")
+            .Produces<TourPortalInfo>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .WithOpenApi(op =>
             {
-                if (!TryGetTour(tourId, out var tour, out var error))
-                {
-                    return error!;
-                }
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["meeting"] = new OpenApiObject
+                        {
+                            ["time"] = new OpenApiString("09:00"),
+                            ["place"] = new OpenApiString("Lobby"),
+                            ["mapsUrl"] = new OpenApiString("https://maps.google.com/?q=Lobby"),
+                            ["note"] = new OpenApiString("15 dk erken gel.")
+                        },
+                        ["links"] = new OpenApiArray
+                        {
+                            new OpenApiObject
+                            {
+                                ["label"] = new OpenApiString("Info"),
+                                ["url"] = new OpenApiString("https://example.com/info")
+                            }
+                        },
+                        ["days"] = new OpenApiArray
+                        {
+                            new OpenApiObject
+                            {
+                                ["day"] = new OpenApiInteger(1),
+                                ["title"] = new OpenApiString("Day 1"),
+                                ["items"] = new OpenApiArray
+                                {
+                                    new OpenApiString("Start"),
+                                    new OpenApiString("Walk")
+                                }
+                            }
+                        },
+                        ["notes"] = new OpenApiArray
+                        {
+                            new OpenApiString("Su al"),
+                            new OpenApiString("Rahat ayakkabı")
+                        }
+                    }
+                );
+                return op;
+            });
 
-                var portal = PortalByTour.GetOrAdd(tour.Id, _ => CreateDefaultPortalInfo(tour));
-
-                return Results.Ok(portal);
-            })
-            .WithSummary("Get tour portal")
-            .WithDescription("Returns portal content for a tour.")
-            .WithOpenApi();
-
-        group.MapPut("/tours/{tourId}/portal", (string tourId, TourPortalInfo request) =>
-            {
-                if (!TryGetTour(tourId, out var tour, out var error))
-                {
-                    return error!;
-                }
-
-                if (request is null)
-                {
-                    return ValidationError("Request body is required.");
-                }
-
-                if (request.Meeting is null)
-                {
-                    return ValidationError("Meeting details are required.");
-                }
-
-                if (string.IsNullOrWhiteSpace(request.Meeting.Time))
-                {
-                    return ValidationError("Meeting time is required.");
-                }
-
-                if (string.IsNullOrWhiteSpace(request.Meeting.Place))
-                {
-                    return ValidationError("Meeting place is required.");
-                }
-
-                if (string.IsNullOrWhiteSpace(request.Meeting.MapsUrl))
-                {
-                    return ValidationError("Meeting maps URL is required.");
-                }
-
-                PortalByTour[tour.Id] = request;
-
-                return Results.Ok(request);
-            })
-            .WithSummary("Update tour portal")
-            .WithDescription("Updates portal content for a tour.")
-            .WithOpenApi();
-
-        group.MapGet("/tours/{tourId}/participants", (string tourId) =>
-            {
-                if (!TryGetTour(tourId, out var tour, out var error))
-                {
-                    return error!;
-                }
-
-                var participants = ParticipantsByTour
-                    .GetOrAdd(tour.Id, _ => new ConcurrentDictionary<Guid, Participant>())
-                    .Values
-                    .OrderBy(p => p.FullName)
-                    .ToArray();
-
-                return Results.Ok(participants);
-            })
+        group.MapGet("/tours/{tourId}/participants", ToursHandlers.GetParticipants)
             .WithSummary("List participants")
-            .WithDescription("Returns all participants for a tour.")
-            .WithOpenApi();
+            .WithDescription("Returns participants for a tour (includes checkInCode).")
+            .Produces<ParticipantDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
-        group.MapPost("/tours/{tourId}/participants", (string tourId, CreateParticipantRequest request) =>
+        group.MapPost("/tours/{tourId}/participants", ToursHandlers.CreateParticipant)
+            .WithSummary("Create participant")
+            .WithDescription("Creates a participant and generates a checkInCode.")
+            .Produces<ParticipantDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .WithOpenApi(op =>
             {
-                if (!TryGetTour(tourId, out var tour, out var error))
-                {
-                    return error!;
-                }
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["fullName"] = new OpenApiString("Ayse Kaya"),
+                        ["email"] = new OpenApiString("ayse@example.com"),
+                        ["phone"] = new OpenApiString("+905551234567")
+                    }
+                );
+                return op;
+            });
 
-                if (request is null)
-                {
-                    return ValidationError("Request body is required.");
-                }
-
-                var fullName = request.FullName?.Trim();
-                if (string.IsNullOrWhiteSpace(fullName))
-                {
-                    return ValidationError("Full name is required.");
-                }
-
-                var participant = new Participant(Guid.NewGuid(), fullName, request.Email?.Trim(), request.Phone?.Trim());
-                var participants = ParticipantsByTour.GetOrAdd(tour.Id, _ => new ConcurrentDictionary<Guid, Participant>());
-                participants.TryAdd(participant.Id, participant);
-
-                return Results.Created($"/api/tours/{tour.Id}/participants/{participant.Id}", participant);
-            })
-            .WithSummary("Add participant")
-            .WithDescription("Adds a participant to a tour.")
-            .WithOpenApi();
+        group.MapPost("/tours/{tourId}/checkin", ToursHandlers.CheckIn)
+            .WithSummary("Check-in participant")
+            .WithDescription("Marks participant as arrived (idempotent). Provide either participantId or code.")
+            .Produces<CheckInResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .WithOpenApi(op =>
+            {
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["code"] = new OpenApiString("A7K3Q9ZP"),
+                        ["method"] = new OpenApiString("manual")
+                    }
+                );
+                return op;
+            });
 
         return app;
     }
 
-    private static bool TryParseDate(string? value, out DateOnly date)
+    private static void AddJsonExample(OpenApiOperation op, IOpenApiAny example, string? extraDescription = null)
     {
-        return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
-    }
-
-    private static bool TryGetTour(string tourIdValue, out Tour tour, out IResult? error)
-    {
-        if (!Guid.TryParse(tourIdValue, out var tourId))
+        if (op.RequestBody is null)
         {
-            tour = default!;
-            error = ValidationError("Invalid tour id.");
-            return false;
+            op.RequestBody = new OpenApiRequestBody();
         }
 
-        if (!Tours.TryGetValue(tourId, out tour))
+        if (extraDescription is not null)
         {
-            error = Results.NotFound(new { message = "Tour not found." });
-            return false;
+            op.RequestBody.Description = extraDescription;
         }
 
-        error = null;
-        return true;
-    }
-
-    private static IResult ValidationError(string message)
-    {
-        return Results.BadRequest(new { message });
-    }
-
-    private static TourPortalInfo CreateDefaultPortalInfo(Tour tour)
-    {
-        var meeting = new MeetingInfo(
-            "08:30",
-            "Hotel lobby - Grand Central Hotel",
-            "https://maps.google.com/?q=Grand+Central+Hotel",
-            $"Welcome to {tour.Name}. Please arrive 15 minutes early.");
-
-        var links = new[]
+        if (!op.RequestBody.Content.TryGetValue("application/json", out var mediaType))
         {
-            new LinkInfo("Tour info pack", "https://example.com/tripflow/tour-pack"),
-            new LinkInfo("Emergency contacts", "https://example.com/tripflow/emergency"),
-            new LinkInfo("Feedback form", "https://example.com/tripflow/feedback")
-        };
+            mediaType = new OpenApiMediaType();
+            op.RequestBody.Content["application/json"] = mediaType;
+        }
 
-        var days = new[]
-        {
-            new DayPlan(1, "Arrival and orientation", new[]
-            {
-                "Hotel check-in and welcome briefing",
-                "City center walk",
-                "Group dinner"
-            }),
-            new DayPlan(2, "Signature sights", new[]
-            {
-                "Morning guided tour",
-                "Free time for lunch",
-                "Museum visit"
-            }),
-            new DayPlan(3, "Local experiences", new[]
-            {
-                "Market visit",
-                "Optional activities",
-                "Closing meetup"
-            })
-        };
-
-        var notes = new[]
-        {
-            "Bring a reusable water bottle.",
-            "Wear comfortable walking shoes.",
-            "Share dietary restrictions with the guide."
-        };
-
-        return new TourPortalInfo(meeting, links, days, notes);
+        mediaType.Example = example;
     }
-
-    public sealed record CreateTourRequest(string? Name, string? StartDate, string? EndDate);
-    public sealed record Tour(Guid Id, string Name, string StartDate, string EndDate);
-    public sealed record TourPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
-    public sealed record MeetingInfo(string Time, string Place, string MapsUrl, string Note);
-    public sealed record LinkInfo(string Label, string Url);
-    public sealed record DayPlan(int Day, string Title, string[] Items);
-    public sealed record CreateParticipantRequest(string? FullName, string? Email, string? Phone);
-    public sealed record Participant(Guid Id, string FullName, string? Email, string? Phone);
 }

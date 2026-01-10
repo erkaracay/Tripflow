@@ -1,6 +1,7 @@
 using Tripflow.Api.Features.Tours;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
+using Tripflow.Api.Data.Dev;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,17 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapPost("/api/dev/seed", async (TripflowDbContext db, CancellationToken ct) =>
+        {
+            var (seeded, message) = await DevSeed.SeedAsync(db, ct);
+            return Results.Ok(new { seeded, message });
+        })
+        .WithTags("Dev")
+        .ExcludeFromDescription();
+    }
 }
 
 if (!app.Environment.IsDevelopment())
