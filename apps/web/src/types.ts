@@ -51,3 +51,12 @@ export type CheckInResponse = {
   arrivedCount: number
   totalCount: number
 }
+
+export type UserRole = 'Admin' | 'Guide'
+
+export type LoginResponse = {
+  accessToken: string
+  role: UserRole
+  userId: string
+  fullName?: string | null
+}

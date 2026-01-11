@@ -1,3 +1,5 @@
+import { clearToken, getToken, isTokenExpired } from './auth'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
 const buildUrl = (path: string) => {
@@ -26,6 +28,13 @@ const parseBody = async (response: Response) => {
 const handleResponse = async <T>(response: Response): Promise<T> => {
   const data = await parseBody(response)
 
+  if (response.status === 401) {
+    clearToken()
+    if (globalThis.location?.pathname !== '/login') {
+      globalThis.location?.assign('/login')
+    }
+  }
+
   if (!response.ok) {
     const message =
       data && typeof data === 'object' && 'message' in data
@@ -38,11 +47,26 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return data as T
 }
 
+const buildHeaders = (contentType?: string) => {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  }
+
+  if (contentType) {
+    headers['Content-Type'] = contentType
+  }
+
+  const token = getToken()
+  if (token && !isTokenExpired(token)) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  return headers
+}
+
 export const apiGet = async <T>(path: string): Promise<T> => {
   const response = await fetch(buildUrl(path), {
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: buildHeaders(),
   })
 
   return handleResponse<T>(response)
@@ -51,10 +75,7 @@ export const apiGet = async <T>(path: string): Promise<T> => {
 export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
 
@@ -64,10 +85,7 @@ export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
 export const apiPut = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'PUT',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
 
