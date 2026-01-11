@@ -9,14 +9,15 @@ public static class ToursEndpoints
 {
     public static IEndpointRouteBuilder MapToursEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api").WithTags("Tours");
+        var group = app.MapGroup("/api/tours").WithTags("Tours");
+        var admin = group.RequireAuthorization("AdminOnly");
 
-        group.MapGet("/tours", ToursHandlers.GetTours)
+        admin.MapGet("", ToursHandlers.GetTours)
             .WithSummary("List tours")
             .WithDescription("Returns all tours.")
             .Produces<TourDto[]>(StatusCodes.Status200OK);
 
-        group.MapPost("/tours", ToursHandlers.CreateTour)
+        admin.MapPost("", ToursHandlers.CreateTour)
             .WithSummary("Create tour")
             .WithDescription("Creates a new tour. Dates must be in YYYY-MM-DD format.")
             .Produces<TourDto>(StatusCodes.Status201Created)
@@ -35,21 +36,23 @@ public static class ToursEndpoints
                 return op;
             });
 
-        group.MapGet("/tours/{tourId}", ToursHandlers.GetTour)
+        group.MapGet("/{tourId}", ToursHandlers.GetTour)
             .WithSummary("Get tour")
             .WithDescription("Returns tour details by id.")
             .Produces<TourDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .AllowAnonymous();
 
-        group.MapGet("/tours/{tourId}/portal", ToursHandlers.GetPortal)
+        group.MapGet("/{tourId}/portal", ToursHandlers.GetPortal)
             .WithSummary("Get portal content")
             .WithDescription("Returns portal JSON for a tour. If none exists, returns a default template.")
             .Produces<TourPortalInfo>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .AllowAnonymous();
 
-        group.MapPut("/tours/{tourId}/portal", ToursHandlers.SavePortal)
+        admin.MapPut("/{tourId}/portal", ToursHandlers.SavePortal)
             .WithSummary("Save portal content")
             .WithDescription("Upserts portal JSON for a tour.")
             .Produces<TourPortalInfo>(StatusCodes.Status200OK)
@@ -98,21 +101,21 @@ public static class ToursEndpoints
                 return op;
             });
 
-        group.MapGet("/tours/{tourId}/participants", ToursHandlers.GetParticipants)
+        admin.MapGet("/{tourId}/participants", ToursHandlers.GetParticipants)
             .WithSummary("List participants")
             .WithDescription("Returns participants for a tour (includes checkInCode and arrived flag).")
             .Produces<ParticipantDto[]>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapGet("/tours/{tourId}/checkins/summary", ToursHandlers.GetCheckInSummary)
+        admin.MapGet("/{tourId}/checkins/summary", ToursHandlers.GetCheckInSummary)
             .WithSummary("Check-in summary")
             .WithDescription("Returns arrived/total counts for a tour.")
             .Produces<CheckInSummary>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapPost("/tours/{tourId}/checkins", ToursHandlers.CheckInByCode)
+        admin.MapPost("/{tourId}/checkins", ToursHandlers.CheckInByCode)
             .WithSummary("Check-in by code")
             .WithDescription("Marks participant as arrived using checkInCode.")
             .Produces<CheckInResponse>(StatusCodes.Status200OK)
@@ -129,7 +132,7 @@ public static class ToursEndpoints
                 return op;
             });
 
-        group.MapPost("/tours/{tourId}/participants", ToursHandlers.CreateParticipant)
+        admin.MapPost("/{tourId}/participants", ToursHandlers.CreateParticipant)
             .WithSummary("Create participant")
             .WithDescription("Creates a participant and generates a checkInCode.")
             .Produces<ParticipantDto>(StatusCodes.Status201Created)
@@ -149,7 +152,7 @@ public static class ToursEndpoints
                 return op;
             });
 
-        group.MapPost("/tours/{tourId}/checkin", ToursHandlers.CheckIn)
+        admin.MapPost("/{tourId}/checkin", ToursHandlers.CheckIn)
             .WithSummary("Check-in participant")
             .WithDescription("Marks participant as arrived (idempotent). Provide either participantId or code.")
             .Produces<CheckInResponse>(StatusCodes.Status200OK)

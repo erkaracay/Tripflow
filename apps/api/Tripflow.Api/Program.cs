@@ -1,7 +1,13 @@
-using Tripflow.Api.Features.Tours;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Dev;
+using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Auth;
+using Tripflow.Api.Features.Tours;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +23,33 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDbContext<TripflowDbContext>(opt => opt.UseNpgsql(connectionString));
+
+var jwtOptions = JwtOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(jwtOptions);
+
+builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            RoleClaimType = "role",
+            NameClaimType = "sub"
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("GuideOnly", policy => policy.RequireRole("Guide"));
+});
 
 // CORS
 const string WebCorsPolicy = "WebCors";
@@ -69,12 +102,16 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseCors(WebCorsPolicy);
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Health
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
    .WithName("Health")
    .WithOpenApi();
 
+app.MapAuthEndpoints();
+app.MapGuideEndpoints();
 app.MapToursEndpoints();
 
 app.Run();
