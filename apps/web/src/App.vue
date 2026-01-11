@@ -21,7 +21,7 @@ const handleLogout = async () => {
                 <div class="leading-tight">
                     <div class="text-base font-semibold">Tripflow</div>
                     <div class="text-[11px] uppercase tracking-wide text-slate-500">
-                        Sprint 1
+                        Sprint 2
                     </div>
                 </div>
 

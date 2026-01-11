@@ -48,6 +48,46 @@ Windows PowerShell:
 - User: tripflow
 - Password: .env içindeki POSTGRES_PASSWORD
 
+## Local Setup
+
+1) Docker Compose
+
+    docker compose up -d
+
+2) API user-secrets (ConnectionStrings + JWT)
+
+    cd apps/api/Tripflow.Api
+    dotnet user-secrets init
+    dotnet user-secrets set "ConnectionStrings:TripflowDb" "Host=localhost;Port=5432;Database=tripflow;Username=tripflow;Password=YOUR_PASSWORD"
+    dotnet user-secrets set "JWT_ISSUER" "tripflow-dev"
+    dotnet user-secrets set "JWT_AUDIENCE" "tripflow-dev"
+    dotnet user-secrets set "JWT_SECRET" "YOUR_LONG_RANDOM_SECRET"
+
+3) EF migration
+
+    dotnet ef database update
+
+4) Dev seed (Development only)
+
+API'yi bir terminalde çalıştır:
+
+    dotnet run
+
+Başka bir terminalde seed at:
+
+    curl -X POST http://localhost:5051/api/dev/seed
+
+5) Web
+
+    cd ../../..
+    npm install
+    npm --workspace apps/web run dev
+
+Demo hesapları (dev seed):
+
+- admin@demo.local / admin123
+- guide@demo.local / guide123
+
 ## API (.NET 8) çalıştırma
 
 Not: root .env dosyasını "source" etmek sadece o terminal için geçerlidir; dotnet run başka terminalde env değerlerini görmeyebilir. Bu yüzden user-secrets kullan.
@@ -57,6 +97,9 @@ Adımlar:
     cd apps/api/Tripflow.Api
     dotnet user-secrets init
     dotnet user-secrets set "ConnectionStrings:TripflowDb" "Host=localhost;Port=5432;Database=tripflow;Username=tripflow;Password=YOUR_PASSWORD"
+    dotnet user-secrets set "JWT_ISSUER" "tripflow-dev"
+    dotnet user-secrets set "JWT_AUDIENCE" "tripflow-dev"
+    dotnet user-secrets set "JWT_SECRET" "YOUR_LONG_RANDOM_SECRET"
 
 Projede farklı bir bağlantı adı kullanılıyorsa (ConnectionStrings:TripflowDb yerine), o anahtarı set et.
 
@@ -88,4 +131,4 @@ API base URL için apps/web/.env.local (veya apps/web/.env) kullan:
 ## Güvenlik notu
 
 - appsettings.json içine secret koyulmuyor
-- Local'de user-secrets, CI'da environment variables tercih edilir.
+- Local'de user-secrets, prod/CI tarafında environment variables tercih edilir.
