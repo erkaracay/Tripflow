@@ -2,13 +2,16 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
-import type { Tour } from '../../types'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
+import type { TourListItem } from '../../types'
 
 const router = useRouter()
-const tours = ref<Tour[]>([])
+const tours = ref<TourListItem[]>([])
 const loading = ref(true)
 const submitting = ref(false)
-const error = ref<string | null>(null)
+const listError = ref<string | null>(null)
+const formError = ref<string | null>(null)
 
 const form = reactive({
   name: '',
@@ -18,26 +21,26 @@ const form = reactive({
 
 const loadTours = async () => {
   loading.value = true
-  error.value = null
+  listError.value = null
   try {
-    tours.value = await apiGet<Tour[]>('/api/tours')
+    tours.value = await apiGet<TourListItem[]>('/api/tours')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load tours.'
+    listError.value = err instanceof Error ? err.message : 'Failed to load tours.'
   } finally {
     loading.value = false
   }
 }
 
 const createTour = async () => {
-  error.value = null
+  formError.value = null
 
   if (!form.name.trim()) {
-    error.value = 'Tour name is required.'
+    formError.value = 'Tour name is required.'
     return
   }
 
   if (!form.startDate || !form.endDate) {
-    error.value = 'Start and end dates are required.'
+    formError.value = 'Start and end dates are required.'
     return
   }
 
@@ -51,7 +54,7 @@ const createTour = async () => {
 
     await router.push(`/admin/tours/${created.id}`)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to create tour.'
+    formError.value = err instanceof Error ? err.message : 'Failed to create tour.'
   } finally {
     submitting.value = false
   }
@@ -117,7 +120,7 @@ onMounted(loadTours)
         </div>
       </form>
 
-      <p v-if="error" class="mt-3 text-sm text-rose-600">{{ error }}</p>
+      <p v-if="formError" class="mt-3 text-sm text-rose-600">{{ formError }}</p>
     </section>
 
     <section class="space-y-4">
@@ -126,9 +129,9 @@ onMounted(loadTours)
         <span class="text-xs text-slate-500">{{ tours.length }} total</span>
       </div>
 
-      <div v-if="loading" class="rounded border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Loading tours...
-      </div>
+      <LoadingState v-if="loading" message="Loading tours..." />
+
+      <ErrorState v-else-if="listError" :message="listError" @retry="loadTours" />
 
       <div
         v-else-if="tours.length === 0"
@@ -146,6 +149,9 @@ onMounted(loadTours)
           <div>
             <div class="font-medium">{{ tour.name }}</div>
             <div class="text-xs text-slate-500">{{ tour.startDate }} to {{ tour.endDate }}</div>
+            <div class="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+              Arrived {{ tour.arrivedCount }} / {{ tour.totalCount }}
+            </div>
           </div>
           <div class="flex items-center gap-4 text-sm">
             <RouterLink

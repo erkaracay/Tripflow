@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
+import { useToast } from '../../lib/toast'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
 import type { CheckInResponse, CheckInSummary, Participant, Tour } from '../../types'
 
 const route = useRoute()
@@ -21,6 +24,10 @@ const actionError = ref<string | null>(null)
 const isCheckingIn = ref(false)
 const dataLoaded = ref(false)
 const lastAutoCode = ref('')
+const lastResult = ref<CheckInResponse | null>(null)
+const codeInput = ref<HTMLInputElement | null>(null)
+
+const { pushToast } = useToast()
 
 const filteredParticipants = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
@@ -75,10 +82,12 @@ const updateFromCheckIn = (response: CheckInResponse) => {
 const submitCheckIn = async (code: string) => {
   actionMessage.value = null
   actionError.value = null
+  lastResult.value = null
 
   const normalized = code.trim().toUpperCase()
   if (!normalized) {
     actionError.value = 'Check-in code is required.'
+    pushToast('Invalid code / not found', 'error')
     return false
   }
 
@@ -90,10 +99,14 @@ const submitCheckIn = async (code: string) => {
 
     updateFromCheckIn(response)
     actionMessage.value = response.alreadyArrived ? 'Already checked in.' : 'Check-in successful.'
+    pushToast(response.alreadyArrived ? 'Already arrived' : 'Checked in', 'success')
     checkInCode.value = ''
+    lastResult.value = response
     return true
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : 'Check-in failed.'
+    const message = err instanceof Error ? err.message : 'Check-in failed.'
+    actionError.value = message
+    pushToast('Invalid code / not found', 'error')
     return false
   } finally {
     isCheckingIn.value = false
@@ -164,6 +177,8 @@ const resolveQueryCode = async () => {
 const initialize = async () => {
   await loadData()
   await resolveQueryCode()
+  await nextTick()
+  codeInput.value?.focus()
 }
 
 watch(
@@ -198,11 +213,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
-
-    <div v-if="loading" class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-      Loading check-in data...
-    </div>
+    <LoadingState v-if="loading" message="Loading check-in data..." />
+    <ErrorState v-else-if="error" :message="error" @retry="initialize" />
 
     <template v-else>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -210,6 +222,8 @@ onMounted(() => {
         <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
           <input
             v-model.trim="checkInCode"
+            ref="codeInput"
+            autofocus
             class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
             placeholder="8-character code"
             type="text"
@@ -226,6 +240,12 @@ onMounted(() => {
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
           <span v-if="actionMessage" class="text-emerald-600">{{ actionMessage }}</span>
           <span v-if="actionError" class="text-rose-600">{{ actionError }}</span>
+        </div>
+        <div v-if="lastResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+          <div class="font-semibold text-emerald-800">
+            {{ lastResult.alreadyArrived ? 'Already arrived' : 'Checked in' }}
+          </div>
+          <div class="mt-1 text-emerald-700">{{ lastResult.participantName }}</div>
         </div>
       </section>
 

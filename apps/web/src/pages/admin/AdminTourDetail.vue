@@ -2,7 +2,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiGet, apiPost, apiPut } from '../../lib/api'
-import type { DayPlan, LinkInfo, Participant, Tour, TourPortalInfo } from '../../types'
+import { useToast } from '../../lib/toast'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
+import type { DayPlan, LinkInfo, Participant, Tour, TourPortalInfo, UserListItem } from '../../types'
 
 const route = useRoute()
 const tourId = computed(() => route.params.tourId as string)
@@ -13,10 +16,18 @@ const portal = ref<TourPortalInfo | null>(null)
 const portalDays = ref<DayPlan[]>([])
 const loading = ref(true)
 const submitting = ref(false)
-const error = ref<string | null>(null)
+const loadError = ref<string | null>(null)
+const formError = ref<string | null>(null)
 const portalSaving = ref(false)
 const portalMessage = ref<string | null>(null)
 const portalError = ref<string | null>(null)
+const guideSaving = ref(false)
+const guideError = ref<string | null>(null)
+const guideLoading = ref(true)
+const guides = ref<UserListItem[]>([])
+const guideId = ref('')
+
+const { pushToast } = useToast()
 
 const form = reactive({
   fullName: '',
@@ -52,9 +63,12 @@ const setPortalForm = (data: TourPortalInfo) => {
 
 const loadTour = async () => {
   loading.value = true
-  error.value = null
+  loadError.value = null
   portalMessage.value = null
   portalError.value = null
+  formError.value = null
+  guideError.value = null
+  guideLoading.value = true
 
   try {
     const [tourData, participantsData, portalData] = await Promise.all([
@@ -67,19 +81,29 @@ const loadTour = async () => {
     participants.value = participantsData
     portal.value = portalData
     portalDays.value = portalData.days
+    guideId.value = tourData.guideUserId ?? ''
     setPortalForm(portalData)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load tour.'
+    loadError.value = err instanceof Error ? err.message : 'Failed to load tour.'
+    return
   } finally {
     loading.value = false
+  }
+
+  try {
+    guides.value = await apiGet<UserListItem[]>('/api/users?role=Guide')
+  } catch (err) {
+    guideError.value = err instanceof Error ? err.message : 'Failed to load guides.'
+  } finally {
+    guideLoading.value = false
   }
 }
 
 const addParticipant = async () => {
-  error.value = null
+  formError.value = null
 
   if (!form.fullName.trim()) {
-    error.value = 'Full name is required.'
+    formError.value = 'Full name is required.'
     return
   }
 
@@ -96,7 +120,7 @@ const addParticipant = async () => {
     form.email = ''
     form.phone = ''
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to add participant.'
+    formError.value = err instanceof Error ? err.message : 'Failed to add participant.'
   } finally {
     submitting.value = false
   }
@@ -153,10 +177,37 @@ const savePortal = async () => {
     portal.value = saved
     portalDays.value = saved.days
     portalMessage.value = 'Saved.'
+    pushToast('Saved', 'success')
   } catch (err) {
     portalError.value = err instanceof Error ? err.message : 'Failed to save portal.'
+    pushToast(portalError.value, 'error')
   } finally {
     portalSaving.value = false
+  }
+}
+
+const saveGuide = async () => {
+  guideError.value = null
+
+  if (!guideId.value) {
+    guideError.value = 'Select a guide.'
+    return
+  }
+
+  guideSaving.value = true
+  try {
+    await apiPut(`/api/tours/${tourId.value}/guide`, {
+      guideUserId: guideId.value,
+    })
+    if (tour.value) {
+      tour.value = { ...tour.value, guideUserId: guideId.value }
+    }
+    pushToast('Guide assigned', 'success')
+  } catch (err) {
+    guideError.value = err instanceof Error ? err.message : 'Failed to assign guide.'
+    pushToast(guideError.value, 'error')
+  } finally {
+    guideSaving.value = false
   }
 }
 
@@ -189,13 +240,43 @@ onMounted(loadTour)
       </div>
     </div>
 
-    <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
-
-    <div v-if="loading" class="rounded border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500">
-      Loading tour details...
-    </div>
+    <LoadingState v-if="loading" message="Loading tour details..." />
+    <ErrorState v-else-if="loadError" :message="loadError" @retry="loadTour" />
 
     <template v-else>
+      <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold">Guide Assignment</h2>
+            <p class="text-sm text-slate-500">Assign a guide to run check-ins for this tour.</p>
+          </div>
+        </div>
+
+        <div v-if="guideLoading" class="mt-4 text-sm text-slate-500">Loading guides...</div>
+        <div v-else-if="guides.length === 0" class="mt-4 text-sm text-slate-500">
+          No guide users found.
+        </div>
+        <form v-else class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="saveGuide">
+          <select
+            v-model="guideId"
+            class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none sm:w-auto"
+          >
+            <option value="" disabled>Select a guide</option>
+            <option v-for="guide in guides" :key="guide.id" :value="guide.id">
+              {{ guide.fullName || guide.email }}
+            </option>
+          </select>
+          <button
+            class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            :disabled="guideSaving"
+            type="submit"
+          >
+            {{ guideSaving ? 'Saving...' : 'Save guide' }}
+          </button>
+          <span v-if="guideError" class="text-xs text-rose-600">{{ guideError }}</span>
+        </form>
+      </section>
+
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-lg font-semibold">Add participant</h2>
         <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="addParticipant">
@@ -236,6 +317,7 @@ onMounted(loadTour)
             </button>
           </div>
         </form>
+        <p v-if="formError" class="mt-3 text-sm text-rose-600">{{ formError }}</p>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
