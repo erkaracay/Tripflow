@@ -5,6 +5,7 @@ namespace Tripflow.Api.Data;
 
 public sealed class TripflowDbContext : DbContext
 {
+    public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<TourEntity> Tours => Set<TourEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<TourPortalEntity> TourPortals => Set<TourPortalEntity>();
@@ -14,6 +15,20 @@ public sealed class TripflowDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserEntity>(b =>
+        {
+            b.ToTable("users");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Email).HasMaxLength(200).IsRequired();
+            b.HasIndex(x => x.Email).IsUnique();
+
+            b.Property(x => x.FullName).HasMaxLength(200);
+            b.Property(x => x.PasswordHash).IsRequired();
+            b.Property(x => x.Role).HasMaxLength(32).IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+        });
+
         modelBuilder.Entity<TourEntity>(b =>
         {
             b.ToTable("tours");
@@ -23,6 +38,11 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
             b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
             b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasOne(x => x.GuideUser)
+                .WithMany(x => x.GuidedTours)
+                .HasForeignKey(x => x.GuideUserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             b.HasMany(x => x.Participants)
                 .WithOne(x => x.Tour)

@@ -8,6 +8,9 @@ public sealed class TourEntity
     public DateOnly EndDate { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    public Guid? GuideUserId { get; set; }
+    public UserEntity? GuideUser { get; set; }
+
     public List<ParticipantEntity> Participants { get; set; } = new();
     public TourPortalEntity? Portal { get; set; }
 }

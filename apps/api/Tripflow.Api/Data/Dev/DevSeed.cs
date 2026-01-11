@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data.Entities;
 
@@ -18,13 +19,35 @@ public static class DevSeed
 
         var now = DateTime.UtcNow;
 
+        var hasher = new PasswordHasher<UserEntity>();
+        var adminUser = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            Email = "admin@demo.local",
+            FullName = "Demo Admin",
+            Role = "Admin",
+            CreatedAt = now
+        };
+        adminUser.PasswordHash = hasher.HashPassword(adminUser, "admin123");
+
+        var guideUser = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            Email = "guide@demo.local",
+            FullName = "Demo Guide",
+            Role = "Guide",
+            CreatedAt = now
+        };
+        guideUser.PasswordHash = hasher.HashPassword(guideUser, "guide123");
+
         var tour1 = new TourEntity
         {
             Id = Guid.NewGuid(),
             Name = "Sprint 2 Demo Tour (Istanbul)",
             StartDate = new DateOnly(2026, 1, 10),
             EndDate = new DateOnly(2026, 1, 12),
-            CreatedAt = now
+            CreatedAt = now,
+            GuideUserId = guideUser.Id
         };
 
         var tour2 = new TourEntity
@@ -33,9 +56,11 @@ public static class DevSeed
             Name = "Sprint 2 Demo Tour (Ankara)",
             StartDate = new DateOnly(2026, 2, 1),
             EndDate = new DateOnly(2026, 2, 2),
-            CreatedAt = now
+            CreatedAt = now,
+            GuideUserId = guideUser.Id
         };
 
+        db.Users.AddRange(adminUser, guideUser);
         db.Tours.AddRange(tour1, tour2);
         await db.SaveChangesAsync(ct);
 
@@ -106,7 +131,7 @@ public static class DevSeed
 
         await db.SaveChangesAsync(ct);
 
-        return (true, "Seed tamam: 2 tour, 2 portal, 30 participant, tour1 için 5 check-in (5/20).");
+        return (true, "Seed tamam: 2 user, 2 tour, 2 portal, 30 participant, tour1 için 5 check-in (5/20).");
     }
 
     private static string CreatePortalJson(string tourName, string time, string place, string mapsUrl)
