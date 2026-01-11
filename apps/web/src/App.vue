@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from "vue-router";
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { clearToken } from './lib/auth'
+
+const route = useRoute()
+const router = useRouter()
+const showAuthActions = computed(() => Boolean(route.meta?.requiresAuth))
+
+const handleLogout = async () => {
+  clearToken()
+  await router.push('/login')
+}
 </script>
 
 <template>
@@ -18,6 +29,14 @@ import { RouterLink, RouterView } from "vue-router";
                     <RouterLink class="hover:text-slate-900" to="/admin/tours">
                         Tours
                     </RouterLink>
+                    <button
+                        v-if="showAuthActions"
+                        class="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                        type="button"
+                        @click="handleLogout"
+                    >
+                        Logout
+                    </button>
                 </nav>
             </div>
         </header>
