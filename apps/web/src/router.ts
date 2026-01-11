@@ -3,6 +3,8 @@ import { clearToken, getToken, getTokenRole, isTokenExpired } from './lib/auth'
 import AdminTours from './pages/admin/AdminTours.vue'
 import AdminTourDetail from './pages/admin/AdminTourDetail.vue'
 import AdminTourCheckIn from './pages/admin/AdminTourCheckIn.vue'
+import GuideTours from './pages/guide/GuideTours.vue'
+import GuideTourCheckIn from './pages/guide/GuideTourCheckIn.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
 import TourPortal from './pages/portal/TourPortal.vue'
@@ -30,6 +32,17 @@ const router = createRouter({
       component: AdminTourCheckIn,
       props: true,
       meta: { requiresAuth: true, roles: ['Admin'] },
+    },
+    {
+      path: '/guide/tours',
+      component: GuideTours,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
+      path: '/guide/tours/:tourId/checkin',
+      component: GuideTourCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
     },
     { path: '/t/:tourId', component: TourPortal, props: true },
   ],
