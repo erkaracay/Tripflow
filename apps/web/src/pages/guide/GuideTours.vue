@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { apiGet } from '../../lib/api'
-import type { Tour } from '../../types'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
+import type { TourListItem } from '../../types'
 
-const tours = ref<Tour[]>([])
+const tours = ref<TourListItem[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -11,7 +13,7 @@ const loadTours = async () => {
   loading.value = true
   error.value = null
   try {
-    tours.value = await apiGet<Tour[]>('/api/guide/tours')
+    tours.value = await apiGet<TourListItem[]>('/api/guide/tours')
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load tours.'
   } finally {
@@ -36,11 +38,8 @@ onMounted(loadTours)
       </button>
     </section>
 
-    <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
-
-    <div v-if="loading" class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-      Loading tours...
-    </div>
+    <LoadingState v-if="loading" message="Loading tours..." />
+    <ErrorState v-else-if="error" :message="error" @retry="loadTours" />
 
     <div
       v-else-if="tours.length === 0"
@@ -58,6 +57,9 @@ onMounted(loadTours)
         <div>
           <div class="text-base font-medium">{{ tour.name }}</div>
           <div class="text-xs text-slate-500">{{ tour.startDate }} to {{ tour.endDate }}</div>
+          <div class="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            Arrived {{ tour.arrivedCount }} / {{ tour.totalCount }}
+          </div>
         </div>
         <RouterLink
           class="w-full rounded-xl bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
