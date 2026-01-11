@@ -35,13 +35,22 @@ const checkInCode = ref('')
 
 const qrDataUrl = ref<string | null>(null)
 
+const resolvePublicBase = () => {
+  const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim()
+  if (envBase) {
+    return envBase.replace(/\/$/, '')
+  }
+
+  return globalThis.location?.origin ?? ''
+}
+
 const buildCheckInLink = (code: string) => {
-  const origin = globalThis.location?.origin
-  if (!origin) {
+  const base = resolvePublicBase()
+  if (!base) {
     return ''
   }
 
-  return `${origin}/admin/tours/${tourId.value}/checkin?code=${encodeURIComponent(code)}`
+  return `${base}/guide/tours/${tourId.value}/checkin?code=${encodeURIComponent(code)}`
 }
 
 const loadPortal = async () => {
