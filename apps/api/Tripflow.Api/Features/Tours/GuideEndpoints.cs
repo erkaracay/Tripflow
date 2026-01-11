@@ -15,7 +15,7 @@ public static class GuideEndpoints
         group.MapGet("/tours", GuideHandlers.GetTours)
             .WithSummary("Guide tours")
             .WithDescription("Returns tours assigned to the current guide.")
-            .Produces<TourDto[]>(StatusCodes.Status200OK);
+            .Produces<TourListItemDto[]>(StatusCodes.Status200OK);
 
         group.MapGet("/tours/{tourId}/participants", GuideHandlers.GetParticipants)
             .WithSummary("Guide participants")

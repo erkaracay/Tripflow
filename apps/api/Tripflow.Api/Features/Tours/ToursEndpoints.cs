@@ -15,7 +15,7 @@ public static class ToursEndpoints
         admin.MapGet("", ToursHandlers.GetTours)
             .WithSummary("List tours")
             .WithDescription("Returns all tours.")
-            .Produces<TourDto[]>(StatusCodes.Status200OK);
+            .Produces<TourListItemDto[]>(StatusCodes.Status200OK);
 
         admin.MapPost("", ToursHandlers.CreateTour)
             .WithSummary("Create tour")
@@ -96,6 +96,23 @@ public static class ToursEndpoints
                             new OpenApiString("Su al"),
                             new OpenApiString("Rahat ayakkabı")
                         }
+                    }
+                );
+                return op;
+            });
+
+        admin.MapPut("/{tourId}/guide", ToursHandlers.AssignGuide)
+            .WithSummary("Assign guide")
+            .WithDescription("Assigns a guide user to the tour.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .WithOpenApi(op =>
+            {
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["guideUserId"] = new OpenApiString("00000000-0000-0000-0000-000000000000")
                     }
                 );
                 return op;

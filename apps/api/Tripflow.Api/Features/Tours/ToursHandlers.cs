@@ -11,7 +11,14 @@ internal static class ToursHandlers
     {
         var tours = await db.Tours.AsNoTracking()
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
-            .Select(x => ToursHelpers.ToDto(x))
+            .Select(x => new TourListItemDto(
+                x.Id,
+                x.Name,
+                x.StartDate.ToString("yyyy-MM-dd"),
+                x.EndDate.ToString("yyyy-MM-dd"),
+                db.CheckIns.Count(c => c.TourId == x.Id),
+                db.Participants.Count(p => p.TourId == x.Id),
+                x.GuideUserId))
             .ToArrayAsync(ct);
 
         return Results.Ok(tours);
@@ -170,6 +177,39 @@ internal static class ToursHandlers
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(request);
+    }
+
+    internal static async Task<IResult> AssignGuide(string tourId, AssignGuideRequest request, TripflowDbContext db, CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (request is null || !request.GuideUserId.HasValue || request.GuideUserId == Guid.Empty)
+        {
+            return ToursHelpers.BadRequest("Guide user id is required.");
+        }
+
+        var tour = await db.Tours.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (tour is null)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        var guideId = request.GuideUserId.Value;
+        var guideExists = await db.Users.AsNoTracking()
+            .AnyAsync(x => x.Id == guideId && x.Role == "Guide", ct);
+
+        if (!guideExists)
+        {
+            return ToursHelpers.BadRequest("Guide user not found.");
+        }
+
+        tour.GuideUserId = guideId;
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new { tourId = id, guideUserId = guideId });
     }
 
     internal static async Task<IResult> GetParticipants(string tourId, string? query, TripflowDbContext db, CancellationToken ct)

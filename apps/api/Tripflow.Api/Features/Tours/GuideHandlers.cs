@@ -17,7 +17,14 @@ internal static class GuideHandlers
         var tours = await db.Tours.AsNoTracking()
             .Where(x => x.GuideUserId == userId)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
-            .Select(x => ToursHelpers.ToDto(x))
+            .Select(x => new TourListItemDto(
+                x.Id,
+                x.Name,
+                x.StartDate.ToString("yyyy-MM-dd"),
+                x.EndDate.ToString("yyyy-MM-dd"),
+                db.CheckIns.Count(c => c.TourId == x.Id),
+                db.Participants.Count(p => p.TourId == x.Id),
+                x.GuideUserId))
             .ToArrayAsync(ct);
 
         return Results.Ok(tours);

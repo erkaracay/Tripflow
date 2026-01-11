@@ -30,7 +30,11 @@ internal static class ToursHelpers
     }
 
     internal static TourDto ToDto(TourEntity entity)
-        => new(entity.Id, entity.Name, entity.StartDate.ToString("yyyy-MM-dd"), entity.EndDate.ToString("yyyy-MM-dd"));
+        => new(entity.Id,
+            entity.Name,
+            entity.StartDate.ToString("yyyy-MM-dd"),
+            entity.EndDate.ToString("yyyy-MM-dd"),
+            entity.GuideUserId);
 
     internal static TourPortalInfo? TryDeserializePortal(string json)
     {

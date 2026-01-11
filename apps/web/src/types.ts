@@ -3,6 +3,24 @@ export type Tour = {
   name: string
   startDate: string
   endDate: string
+  guideUserId?: string | null
+}
+
+export type TourListItem = {
+  id: string
+  name: string
+  startDate: string
+  endDate: string
+  arrivedCount: number
+  totalCount: number
+  guideUserId?: string | null
+}
+
+export type UserListItem = {
+  id: string
+  email: string
+  fullName?: string | null
+  role: string
 }
 
 export type Participant = {
