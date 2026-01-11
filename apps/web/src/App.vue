@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import ToastHost from './components/ui/ToastHost.vue'
 import { clearToken } from './lib/auth'
 
 const route = useRoute()
@@ -21,7 +22,7 @@ const handleLogout = async () => {
                 <div class="leading-tight">
                     <div class="text-base font-semibold">Tripflow</div>
                     <div class="text-[11px] uppercase tracking-wide text-slate-500">
-                        Sprint 2
+                        Sprint 2 Demo
                     </div>
                 </div>
 
@@ -46,4 +47,5 @@ const handleLogout = async () => {
             <RouterView />
         </main>
     </div>
+    <ToastHost />
 </template>
