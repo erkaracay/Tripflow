@@ -53,16 +53,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    if (app.Environment.IsDevelopment())
+    app.MapPost("/api/dev/seed", async (TripflowDbContext db, CancellationToken ct) =>
     {
-        app.MapPost("/api/dev/seed", async (TripflowDbContext db, CancellationToken ct) =>
-        {
-            var (seeded, message) = await DevSeed.SeedAsync(db, ct);
-            return Results.Ok(new { seeded, message });
-        })
-        .WithTags("Dev")
-        .ExcludeFromDescription();
-    }
+        var (seeded, message) = await DevSeed.SeedAsync(db, ct);
+        return Results.Ok(new { seeded, message });
+    })
+    .WithTags("Dev")
+    .WithSummary("Dev seed (Development only)")
+    .WithDescription("Seeds demo data for local development.")
+    .WithOpenApi();
 }
 
 if (!app.Environment.IsDevelopment())

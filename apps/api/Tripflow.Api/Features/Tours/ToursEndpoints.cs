@@ -100,10 +100,34 @@ public static class ToursEndpoints
 
         group.MapGet("/tours/{tourId}/participants", ToursHandlers.GetParticipants)
             .WithSummary("List participants")
-            .WithDescription("Returns participants for a tour (includes checkInCode).")
+            .WithDescription("Returns participants for a tour (includes checkInCode and arrived flag).")
             .Produces<ParticipantDto[]>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/tours/{tourId}/checkins/summary", ToursHandlers.GetCheckInSummary)
+            .WithSummary("Check-in summary")
+            .WithDescription("Returns arrived/total counts for a tour.")
+            .Produces<CheckInSummary>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/tours/{tourId}/checkins", ToursHandlers.CheckInByCode)
+            .WithSummary("Check-in by code")
+            .WithDescription("Marks participant as arrived using checkInCode.")
+            .Produces<CheckInResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .WithOpenApi(op =>
+            {
+                AddJsonExample(op,
+                    new OpenApiObject
+                    {
+                        ["checkInCode"] = new OpenApiString("QQTL4S88")
+                    }
+                );
+                return op;
+            });
 
         group.MapPost("/tours/{tourId}/participants", ToursHandlers.CreateParticipant)
             .WithSummary("Create participant")

@@ -49,7 +49,17 @@ internal static class ToursHandlers
             CreatedAt = DateTime.UtcNow
         };
 
+        var portalJson = System.Text.Json.JsonSerializer.Serialize(
+            ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(entity)),
+            ToursHelpers.JsonOptions);
+
         db.Tours.Add(entity);
+        db.TourPortals.Add(new TourPortalEntity
+        {
+            TourId = entity.Id,
+            PortalJson = portalJson,
+            UpdatedAt = DateTime.UtcNow
+        });
         await db.SaveChangesAsync(ct);
 
         var dto = ToursHelpers.ToDto(entity);
@@ -85,14 +95,31 @@ internal static class ToursHandlers
             return Results.NotFound(new { message = "Tour not found." });
         }
 
-        var portalEntity = await db.TourPortals.AsNoTracking().FirstOrDefaultAsync(x => x.TourId == id, ct);
+        var portalEntity = await db.TourPortals.FirstOrDefaultAsync(x => x.TourId == id, ct);
         if (portalEntity is null)
         {
-            return Results.Ok(ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour)));
+            var fallback = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
+            var json = System.Text.Json.JsonSerializer.Serialize(fallback, ToursHelpers.JsonOptions);
+
+            db.TourPortals.Add(new TourPortalEntity
+            {
+                TourId = id,
+                PortalJson = json,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(fallback);
         }
 
-        var portal = ToursHelpers.TryDeserializePortal(portalEntity.PortalJson)
-            ?? ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
+        var portal = ToursHelpers.TryDeserializePortal(portalEntity.PortalJson);
+        if (portal is null)
+        {
+            portal = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
+            portalEntity.PortalJson = System.Text.Json.JsonSerializer.Serialize(portal, ToursHelpers.JsonOptions);
+            portalEntity.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
 
         return Results.Ok(portal);
     }
@@ -145,7 +172,7 @@ internal static class ToursHandlers
         return Results.Ok(request);
     }
 
-    internal static async Task<IResult> GetParticipants(string tourId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetParticipants(string tourId, string? query, TripflowDbContext db, CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
@@ -158,10 +185,34 @@ internal static class ToursHandlers
             return Results.NotFound(new { message = "Tour not found." });
         }
 
-        var participants = await db.Participants.AsNoTracking()
-            .Where(x => x.TourId == id)
+        var participantsQuery = db.Participants.AsNoTracking()
+            .Where(x => x.TourId == id);
+
+        var search = query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            participantsQuery = participantsQuery.Where(x =>
+                EF.Functions.ILike(x.FullName, pattern)
+                || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
+                || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)));
+        }
+
+        var checkinsQuery = db.CheckIns.AsNoTracking().Where(x => x.TourId == id);
+
+        var participants = await participantsQuery
             .OrderBy(x => x.FullName)
-            .Select(x => new ParticipantDto(x.Id, x.FullName, x.Email, x.Phone, x.CheckInCode))
+            .GroupJoin(
+                checkinsQuery,
+                participant => participant.Id,
+                checkIn => checkIn.ParticipantId,
+                (participant, checkIns) => new ParticipantDto(
+                    participant.Id,
+                    participant.FullName,
+                    participant.Email,
+                    participant.Phone,
+                    participant.CheckInCode,
+                    checkIns.Any()))
             .ToArrayAsync(ct);
 
         return Results.Ok(participants);
@@ -215,7 +266,7 @@ internal static class ToursHandlers
         }
 
         return Results.Created($"/api/tours/{id}/participants/{entity.Id}",
-            new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode));
+            new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, false));
     }
 
     internal static async Task<IResult> CheckIn(string tourId, CheckInRequest request, TripflowDbContext db, CancellationToken ct)
@@ -285,6 +336,46 @@ internal static class ToursHandlers
         var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
         var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
 
-        return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, arrivedCount, totalCount));
+        return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, alreadyCheckedIn, arrivedCount, totalCount));
+    }
+
+    internal static async Task<IResult> CheckInByCode(string tourId, CheckInCodeRequest request, TripflowDbContext db, CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return ToursHelpers.BadRequest("Request body is required.");
+        }
+
+        var code = request.CheckInCode?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return ToursHelpers.BadRequest("Check-in code is required.");
+        }
+
+        if (code.Length != 8)
+        {
+            return ToursHelpers.BadRequest("Check-in code must be 8 characters.");
+        }
+
+        return await CheckIn(tourId, new CheckInRequest(code, null, "qr"), db, ct);
+    }
+
+    internal static async Task<IResult> GetCheckInSummary(string tourId, TripflowDbContext db, CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!tourExists)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+        var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+
+        return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }
 }
