@@ -171,14 +171,22 @@ onMounted(loadTour)
         <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? 'Tour' }}</h1>
         <p class="text-sm text-slate-500" v-if="tour">{{ tour.startDate }} to {{ tour.endDate }}</p>
       </div>
-      <a
-        class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-        :href="`/t/${tourId}`"
-        rel="noreferrer"
-        target="_blank"
-      >
-        Open portal
-      </a>
+      <div class="flex flex-wrap items-center gap-2">
+        <RouterLink
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          :to="`/admin/tours/${tourId}/checkin`"
+        >
+          Check-in
+        </RouterLink>
+        <a
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          :href="`/t/${tourId}`"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Open portal
+        </a>
+      </div>
     </div>
 
     <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
@@ -271,7 +279,7 @@ onMounted(loadTour)
                 <span class="text-slate-600">Note</span>
                 <textarea
                   v-model.trim="portalForm.meetingNote"
-                  class="min-h-[90px] rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  class="min-h-22.5 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                   placeholder="Arrive 15 minutes early."
                 ></textarea>
               </label>
@@ -310,7 +318,7 @@ onMounted(loadTour)
               <span class="text-slate-600">One note per line</span>
               <textarea
                 v-model="portalForm.notesText"
-                class="min-h-[120px] rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                class="min-h-30 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                 placeholder="Bring a reusable water bottle."
               ></textarea>
             </label>

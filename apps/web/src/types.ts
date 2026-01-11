@@ -10,6 +10,8 @@ export type Participant = {
   fullName: string
   email?: string | null
   phone?: string | null
+  checkInCode: string
+  arrived: boolean
 }
 
 export type MeetingInfo = {
@@ -35,4 +37,17 @@ export type TourPortalInfo = {
   links: LinkInfo[]
   days: DayPlan[]
   notes: string[]
+}
+
+export type CheckInSummary = {
+  arrivedCount: number
+  totalCount: number
+}
+
+export type CheckInResponse = {
+  participantId: string
+  participantName: string
+  alreadyArrived: boolean
+  arrivedCount: number
+  totalCount: number
 }
