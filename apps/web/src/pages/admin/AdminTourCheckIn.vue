@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
 import type { CheckInResponse, CheckInSummary, Participant, Tour } from '../../types'
 
@@ -131,7 +131,7 @@ const copyCode = async (code: string) => {
 }
 
 const clearCheckInQuery = async () => {
-  const nextQuery = { ...route.query } as Record<string, unknown>
+  const nextQuery: LocationQueryRaw = { ...route.query }
   delete nextQuery.code
   delete nextQuery.checkInCode
   await router.replace({ query: nextQuery })
