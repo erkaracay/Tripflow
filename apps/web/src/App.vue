@@ -1,12 +1,30 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import ToastHost from './components/ui/ToastHost.vue'
-import { clearToken } from './lib/auth'
+import { clearToken, getToken, getTokenRole, isTokenExpired } from './lib/auth'
 
-const route = useRoute()
 const router = useRouter()
-const showAuthActions = computed(() => Boolean(route.meta?.requiresAuth))
+const userRole = computed(() => {
+  const token = getToken()
+  if (!token || isTokenExpired(token)) {
+    return null
+  }
+
+  return getTokenRole(token)
+})
+const showAuthActions = computed(() => Boolean(userRole.value))
+const toursPath = computed(() => {
+  if (userRole.value === 'Guide') {
+    return '/guide/tours'
+  }
+
+  if (userRole.value === 'Admin') {
+    return '/admin/tours'
+  }
+
+  return ''
+})
 
 const handleLogout = async () => {
   clearToken()
@@ -27,7 +45,7 @@ const handleLogout = async () => {
                 </div>
 
                 <nav class="flex items-center gap-3 text-sm text-slate-600">
-                    <RouterLink class="hover:text-slate-900" to="/admin/tours">
+                    <RouterLink v-if="toursPath" class="hover:text-slate-900" :to="toursPath">
                         Tours
                     </RouterLink>
                     <button
