@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { apiGet } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Tour, TourPortalInfo } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
@@ -17,6 +19,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const copyStatus = ref<string | null>(null)
 const codeCopyStatus = ref<string | null>(null)
+const linkCopyStatus = ref<string | null>(null)
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
@@ -32,6 +35,7 @@ const days = computed(() => portal.value?.days ?? [])
 const selectedDay = computed(() => days.value[selectedDayIndex.value] ?? null)
 
 const checkInCode = ref('')
+const manualCode = ref('')
 
 const qrDataUrl = ref<string | null>(null)
 
@@ -42,6 +46,16 @@ const resolvePublicBase = () => {
   }
 
   return globalThis.location?.origin ?? ''
+}
+
+const storageKey = computed(() => `tripflow.checkin.${tourId.value}`)
+
+const persistCheckInCode = (code: string) => {
+  if (!code) {
+    return
+  }
+
+  globalThis.localStorage?.setItem(storageKey.value, code)
 }
 
 const buildCheckInLink = (code: string) => {
@@ -140,15 +154,14 @@ const setActiveTab = (value: string) => {
 const resolveCheckInCode = () => {
   const raw = route.query.code ?? route.query.checkInCode
   const queryCode = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
-  const storageKey = `tripflow.checkin.${tourId.value}`
 
   if (queryCode) {
     checkInCode.value = queryCode
-    globalThis.localStorage?.setItem(storageKey, queryCode)
+    persistCheckInCode(queryCode)
     return
   }
 
-  const stored = globalThis.localStorage?.getItem(storageKey)
+  const stored = globalThis.localStorage?.getItem(storageKey.value)
   checkInCode.value = stored ?? ''
 }
 
@@ -196,12 +209,54 @@ const copyCheckInCode = async () => {
   }
 }
 
+const applyManualCode = () => {
+  const normalized = manualCode.value.trim().toUpperCase()
+  if (!normalized) {
+    codeCopyStatus.value = 'Enter a code first.'
+    return
+  }
+
+  checkInCode.value = normalized
+  persistCheckInCode(normalized)
+  manualCode.value = ''
+}
+
+const copyCheckInLink = async () => {
+  linkCopyStatus.value = null
+  if (!checkInCode.value) {
+    linkCopyStatus.value = 'Add a code to generate the link.'
+    return
+  }
+
+  const link = buildCheckInLink(checkInCode.value)
+  if (!link) {
+    linkCopyStatus.value = 'Unable to generate link.'
+    return
+  }
+
+  const clipboard = globalThis.navigator?.clipboard
+  if (!clipboard?.writeText) {
+    linkCopyStatus.value = 'Copy not supported.'
+    return
+  }
+
+  try {
+    await clipboard.writeText(link)
+    linkCopyStatus.value = 'Link copied.'
+  } catch {
+    linkCopyStatus.value = 'Copy failed.'
+  }
+}
+
 watch([checkInCode, () => tourId.value], async ([value]) => {
   codeCopyStatus.value = null
+  linkCopyStatus.value = null
   if (!value) {
     qrDataUrl.value = null
     return
   }
+
+  persistCheckInCode(value)
 
   try {
     const deepLink = buildCheckInLink(value)
@@ -253,7 +308,7 @@ onMounted(loadPortal)
         </div>
       </section>
 
-      <div class="hidden items-center gap-6 border-b border-slate-200 px-1 md:flex">
+      <div class="sticky top-16 z-10 hidden items-center gap-6 border-b border-slate-200 bg-slate-50/90 px-1 backdrop-blur md:flex">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -270,11 +325,8 @@ onMounted(loadPortal)
         </button>
       </div>
 
-      <div v-if="loading" class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-        Loading tour details...
-      </div>
-
-      <p v-else-if="error" class="text-sm text-rose-600">{{ error }}</p>
+      <LoadingState v-if="loading" message="Loading tour details..." />
+      <ErrorState v-else-if="error" :message="error" @retry="loadPortal" />
 
       <template v-else>
         <div v-if="portal" class="space-y-6 sm:space-y-8">
@@ -345,6 +397,30 @@ onMounted(loadPortal)
                   </button>
                 </div>
                 <p v-if="codeCopyStatus" class="mt-2 text-xs text-slate-500">{{ codeCopyStatus }}</p>
+                <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
+                  <p>
+                    No code is stored yet. Paste the check-in code you received from your guide to generate the QR.
+                  </p>
+                  <div class="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      v-model.trim="manualCode"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
+                      placeholder="Enter code"
+                      type="text"
+                      maxlength="8"
+                    />
+                    <button
+                      class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+                      type="button"
+                      @click="applyManualCode"
+                    >
+                      Save code
+                    </button>
+                  </div>
+                  <p class="text-xs text-slate-500">
+                    The QR links to the guide check-in screen with your code prefilled.
+                  </p>
+                </div>
               </div>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -357,6 +433,16 @@ onMounted(loadPortal)
                   <div v-else class="text-sm text-slate-500">
                     Add your check-in code to generate the QR.
                   </div>
+                </div>
+                <div class="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <button
+                    class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
+                    type="button"
+                    @click="copyCheckInLink"
+                  >
+                    Copy guide link
+                  </button>
+                  <p v-if="linkCopyStatus" class="text-xs text-slate-500">{{ linkCopyStatus }}</p>
                 </div>
               </div>
             </div>
