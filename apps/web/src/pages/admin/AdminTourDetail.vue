@@ -2,6 +2,13 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiGet, apiPost, apiPut } from '../../lib/api'
+import {
+  formatPhoneDisplay,
+  normalizeEmail,
+  normalizeName,
+  normalizePhone,
+  sanitizePhoneInput,
+} from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -26,6 +33,8 @@ const guideError = ref<string | null>(null)
 const guideLoading = ref(true)
 const guides = ref<UserListItem[]>([])
 const guideId = ref('')
+const phoneError = ref<string | null>(null)
+const nameInput = ref<HTMLInputElement | null>(null)
 
 const { pushToast } = useToast()
 
@@ -34,6 +43,23 @@ const form = reactive({
   email: '',
   phone: '',
 })
+
+const handlePhoneInput = () => {
+  phoneError.value = null
+  const sanitized = sanitizePhoneInput(form.phone)
+  form.phone = sanitized.slice(0, 15)
+}
+
+const handlePhoneBlur = () => {
+  const { normalized, error } = normalizePhone(form.phone)
+  if (error) {
+    phoneError.value = error
+    return
+  }
+
+  phoneError.value = null
+  form.phone = normalized
+}
 
 const portalForm = reactive({
   meetingTime: '',
@@ -101,26 +127,37 @@ const loadTour = async () => {
 
 const addParticipant = async () => {
   formError.value = null
+  phoneError.value = null
 
-  if (!form.fullName.trim()) {
+  const fullName = normalizeName(form.fullName)
+  if (fullName.length < 2) {
     formError.value = 'Full name is required.'
+    return
+  }
+
+  const { normalized: normalizedPhone, error: phoneErr } = normalizePhone(form.phone)
+  if (phoneErr) {
+    phoneError.value = phoneErr
     return
   }
 
   submitting.value = true
   try {
     const created = await apiPost<Participant>(`/api/tours/${tourId.value}/participants`, {
-      fullName: form.fullName,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
+      fullName,
+      email: normalizeEmail(form.email) || undefined,
+      phone: normalizedPhone || undefined,
     })
 
     participants.value = [...participants.value, created]
     form.fullName = ''
     form.email = ''
     form.phone = ''
+    pushToast('Participant added', 'success')
+    nameInput.value?.focus()
   } catch (err) {
     formError.value = err instanceof Error ? err.message : 'Failed to add participant.'
+    pushToast(formError.value, 'error')
   } finally {
     submitting.value = false
   }
@@ -177,7 +214,7 @@ const savePortal = async () => {
     portal.value = saved
     portalDays.value = saved.days
     portalMessage.value = 'Saved.'
-    pushToast('Saved', 'success')
+    pushToast('Portal Saved', 'success')
   } catch (err) {
     portalError.value = err instanceof Error ? err.message : 'Failed to save portal.'
     pushToast(portalError.value, 'error')
@@ -284,6 +321,7 @@ onMounted(loadTour)
             <span class="text-slate-600">Full name</span>
             <input
               v-model.trim="form.fullName"
+              ref="nameInput"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
               placeholder="Ayse Kaya"
               type="text"
@@ -302,9 +340,14 @@ onMounted(loadTour)
             <span class="text-slate-600">Phone (optional)</span>
             <input
               v-model.trim="form.phone"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              :class="phoneError ? 'border-rose-300' : 'border-slate-200'"
               placeholder="+90 555 123 45 67"
+              inputmode="tel"
+              maxlength="15"
               type="tel"
+              @input="handlePhoneInput"
+              @blur="handlePhoneBlur"
             />
           </label>
           <div class="md:col-span-3">
@@ -317,6 +360,7 @@ onMounted(loadTour)
             </button>
           </div>
         </form>
+        <p v-if="phoneError" class="mt-2 text-sm text-rose-600">{{ phoneError }}</p>
         <p v-if="formError" class="mt-3 text-sm text-rose-600">{{ formError }}</p>
       </section>
 
@@ -443,7 +487,7 @@ onMounted(loadTour)
             <div class="mt-1 text-xs text-slate-500" v-if="participant.email || participant.phone">
               <span v-if="participant.email">{{ participant.email }}</span>
               <span v-if="participant.email && participant.phone"> | </span>
-              <span v-if="participant.phone">{{ participant.phone }}</span>
+              <span v-if="participant.phone">{{ formatPhoneDisplay(participant.phone) }}</span>
             </div>
           </li>
         </ul>

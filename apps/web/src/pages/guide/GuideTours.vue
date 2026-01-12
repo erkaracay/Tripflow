@@ -38,17 +38,17 @@ onMounted(loadTours)
       </button>
     </section>
 
-    <LoadingState v-if="loading" message="Loading tours..." />
-    <ErrorState v-else-if="error" :message="error" @retry="loadTours" />
+    <LoadingState v-if="loading && tours.length === 0" message="Loading tours..." />
+    <ErrorState v-if="error" :message="error" @retry="loadTours" />
 
     <div
-      v-else-if="tours.length === 0"
+      v-if="!loading && tours.length === 0"
       class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500"
     >
       No tours assigned yet.
     </div>
 
-    <ul v-else class="space-y-3">
+    <ul v-if="tours.length > 0" class="space-y-3">
       <li
         v-for="tour in tours"
         :key="tour.id"

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
+import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -27,6 +28,8 @@ const lastAutoCode = ref('')
 const lastResult = ref<CheckInResponse | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckIn = ref(true)
+const highlightParticipantId = ref<string | null>(null)
+let highlightTimer: number | undefined
 
 const { pushToast } = useToast()
 
@@ -44,6 +47,8 @@ const filteredParticipants = computed(() => {
     return haystack.includes(query)
   })
 })
+
+const hasData = computed(() => Boolean(tour.value))
 
 const loadData = async () => {
   loading.value = true
@@ -85,10 +90,10 @@ const submitCheckIn = async (code: string) => {
   actionError.value = null
   lastResult.value = null
 
-  const normalized = code.trim().toUpperCase()
+  const normalized = normalizeCheckInCode(code).slice(0, 8)
   if (!normalized) {
     actionError.value = 'Check-in code is required.'
-    pushToast('Invalid code / not found', 'error')
+    pushToast('Kod bulunamadı', 'error')
     return false
   }
 
@@ -100,14 +105,27 @@ const submitCheckIn = async (code: string) => {
 
     updateFromCheckIn(response)
     actionMessage.value = response.alreadyArrived ? 'Already checked in.' : 'Check-in successful.'
-    pushToast(response.alreadyArrived ? 'Already arrived' : 'Checked in', 'success')
+    if (response.alreadyArrived) {
+      pushToast('Zaten check-in yapılmış', 'info')
+    } else {
+      pushToast('Check-in tamamlandı', 'success')
+    }
     checkInCode.value = ''
     lastResult.value = response
+    highlightParticipantId.value = response.participantId
+    if (highlightTimer) {
+      globalThis.clearTimeout(highlightTimer)
+    }
+    highlightTimer = globalThis.setTimeout(() => {
+      highlightParticipantId.value = null
+    }, 2000)
+    await nextTick()
+    codeInput.value?.focus()
     return true
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Check-in failed.'
     actionError.value = message
-    pushToast('Invalid code / not found', 'error')
+    pushToast('Kod bulunamadı', 'error')
     return false
   } finally {
     isCheckingIn.value = false
@@ -116,6 +134,11 @@ const submitCheckIn = async (code: string) => {
 
 const handleCheckInSubmit = async () => {
   await submitCheckIn(checkInCode.value)
+}
+
+const handleCodeInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  checkInCode.value = normalizeCheckInCode(target.value).slice(0, 8)
 }
 
 const markArrived = async (participant: Participant) => {
@@ -157,7 +180,7 @@ const resolveQueryCode = async () => {
   }
 
   const raw = route.query.code ?? route.query.checkInCode
-  const queryCode = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
+  const queryCode = typeof raw === 'string' ? normalizeCheckInCode(raw).slice(0, 8) : ''
   if (!queryCode) {
     return
   }
@@ -216,10 +239,13 @@ onMounted(() => {
       </div>
     </div>
 
-    <LoadingState v-if="loading" message="Loading check-in data..." />
-    <ErrorState v-else-if="error" :message="error" @retry="initialize" />
+    <LoadingState v-if="loading && !dataLoaded" message="Loading check-in data..." />
+    <ErrorState v-else-if="error && !dataLoaded" :message="error" @retry="initialize" />
 
     <template v-else>
+      <ErrorState v-if="error" :message="error" @retry="initialize" />
+      <div v-if="!hasData" class="text-sm text-slate-500">No data available.</div>
+      <template v-else>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold">Check-in</h2>
         <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
@@ -231,6 +257,7 @@ onMounted(() => {
             placeholder="8-character code"
             type="text"
             maxlength="8"
+            @input="handleCodeInput"
           />
           <button
             class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
@@ -282,7 +309,8 @@ onMounted(() => {
           <li
             v-for="participant in filteredParticipants"
             :key="participant.id"
-            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            class="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition"
+            :class="highlightParticipantId === participant.id ? 'ring-2 ring-emerald-300' : ''"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -290,7 +318,7 @@ onMounted(() => {
                 <div class="mt-1 text-xs text-slate-500" v-if="participant.email || participant.phone">
                   <span v-if="participant.email">{{ participant.email }}</span>
                   <span v-if="participant.email && participant.phone"> | </span>
-                  <span v-if="participant.phone">{{ participant.phone }}</span>
+                  <span v-if="participant.phone">{{ formatPhoneDisplay(participant.phone) }}</span>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                   <span
@@ -333,6 +361,7 @@ onMounted(() => {
           </li>
         </ul>
       </section>
+      </template>
     </template>
   </div>
 </template>

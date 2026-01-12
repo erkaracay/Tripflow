@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
+import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -43,6 +44,8 @@ const filteredParticipants = computed(() => {
     return haystack.includes(query)
   })
 })
+
+const hasData = computed(() => Boolean(tour.value))
 
 const loadData = async () => {
   loading.value = true
@@ -115,6 +118,11 @@ const submitCheckIn = async (code: string) => {
 
 const handleCheckInSubmit = async () => {
   await submitCheckIn(checkInCode.value)
+}
+
+const handleCodeInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  checkInCode.value = normalizeCheckInCode(target.value).slice(0, 8)
 }
 
 const markArrived = async (participant: Participant) => {
@@ -213,10 +221,13 @@ onMounted(() => {
       </div>
     </div>
 
-    <LoadingState v-if="loading" message="Loading check-in data..." />
-    <ErrorState v-else-if="error" :message="error" @retry="initialize" />
+    <LoadingState v-if="loading && !dataLoaded" message="Loading check-in data..." />
+    <ErrorState v-else-if="error && !dataLoaded" :message="error" @retry="initialize" />
 
     <template v-else>
+      <ErrorState v-if="error" :message="error" @retry="initialize" />
+      <div v-if="!hasData" class="text-sm text-slate-500">No data available.</div>
+      <template v-else>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold">Check-in</h2>
         <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
@@ -228,6 +239,7 @@ onMounted(() => {
             placeholder="8-character code"
             type="text"
             maxlength="8"
+            @input="handleCodeInput"
           />
           <button
             class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
@@ -283,7 +295,7 @@ onMounted(() => {
                 <div class="mt-1 text-xs text-slate-500" v-if="participant.email || participant.phone">
                   <span v-if="participant.email">{{ participant.email }}</span>
                   <span v-if="participant.email && participant.phone"> | </span>
-                  <span v-if="participant.phone">{{ participant.phone }}</span>
+                  <span v-if="participant.phone">{{ formatPhoneDisplay(participant.phone) }}</span>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                   <span
@@ -326,6 +338,7 @@ onMounted(() => {
           </li>
         </ul>
       </section>
+      </template>
     </template>
   </div>
 </template>

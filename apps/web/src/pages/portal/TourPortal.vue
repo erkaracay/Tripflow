@@ -58,6 +58,12 @@ const persistCheckInCode = (code: string) => {
   globalThis.localStorage?.setItem(storageKey.value, code)
 }
 
+const clearStoredCode = () => {
+  globalThis.localStorage?.removeItem(storageKey.value)
+  checkInCode.value = ''
+  codeCopyStatus.value = 'Kod temizlendi.'
+}
+
 const buildCheckInLink = (code: string) => {
   const base = resolvePublicBase()
   if (!base) {
@@ -170,49 +176,50 @@ const copyShareLink = async () => {
   const url = globalThis.location?.href
 
   if (!url) {
-    copyStatus.value = 'Unable to copy link.'
+    copyStatus.value = 'Link kopyalanamadı.'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    copyStatus.value = 'Copy not supported.'
+    copyStatus.value = 'Kopyalama desteklenmiyor.'
     return
   }
 
   try {
     await clipboard.writeText(url)
-    copyStatus.value = 'Link copied.'
+    copyStatus.value = 'Link kopyalandı.'
   } catch {
-    copyStatus.value = 'Copy failed.'
+    copyStatus.value = 'Kopyalama başarısız.'
   }
 }
+
 
 const copyCheckInCode = async () => {
   codeCopyStatus.value = null
   if (!checkInCode.value) {
-    codeCopyStatus.value = 'No check-in code available.'
+    codeCopyStatus.value = 'Kod yok.'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    codeCopyStatus.value = 'Copy not supported.'
+    codeCopyStatus.value = 'Kopyalama desteklenmiyor.'
     return
   }
 
   try {
     await clipboard.writeText(checkInCode.value)
-    codeCopyStatus.value = 'Code copied.'
+    codeCopyStatus.value = 'Kod kopyalandı.'
   } catch {
-    codeCopyStatus.value = 'Copy failed.'
+    codeCopyStatus.value = 'Kopyalama başarısız.'
   }
 }
 
 const applyManualCode = () => {
   const normalized = manualCode.value.trim().toUpperCase()
   if (!normalized) {
-    codeCopyStatus.value = 'Enter a code first.'
+    codeCopyStatus.value = 'Önce kod girin.'
     return
   }
 
@@ -224,27 +231,27 @@ const applyManualCode = () => {
 const copyCheckInLink = async () => {
   linkCopyStatus.value = null
   if (!checkInCode.value) {
-    linkCopyStatus.value = 'Add a code to generate the link.'
+    linkCopyStatus.value = 'Link için kod ekleyin.'
     return
   }
 
   const link = buildCheckInLink(checkInCode.value)
   if (!link) {
-    linkCopyStatus.value = 'Unable to generate link.'
+    linkCopyStatus.value = 'Link oluşturulamadı.'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    linkCopyStatus.value = 'Copy not supported.'
+    linkCopyStatus.value = 'Kopyalama desteklenmiyor.'
     return
   }
 
   try {
     await clipboard.writeText(link)
-    linkCopyStatus.value = 'Link copied.'
+    linkCopyStatus.value = 'Link kopyalandı.'
   } catch {
-    linkCopyStatus.value = 'Copy failed.'
+    linkCopyStatus.value = 'Kopyalama başarısız.'
   }
 }
 
@@ -388,24 +395,34 @@ onMounted(loadPortal)
                 <p class="text-xs uppercase tracking-wide text-slate-400">Check-in code</p>
                 <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-mono text-slate-800">
-                    {{ checkInCode || 'No code yet' }}
+                    {{ checkInCode || 'Kod yok' }}
                   </div>
-                  <button
-                    class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-                    type="button" @click="copyCheckInCode">
-                    Copy code
-                  </button>
+                  <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <button
+                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
+                      type="button"
+                      @click="copyCheckInCode"
+                    >
+                      Kodu kopyala
+                    </button>
+                    <button
+                      v-if="checkInCode"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
+                      type="button"
+                      @click="clearStoredCode"
+                    >
+                      Kodu temizle
+                    </button>
+                  </div>
                 </div>
                 <p v-if="codeCopyStatus" class="mt-2 text-xs text-slate-500">{{ codeCopyStatus }}</p>
                 <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
-                  <p>
-                    No code is stored yet. Paste the check-in code you received from your guide to generate the QR.
-                  </p>
+                  <p>Kod henüz kayıtlı değil. Rehberinden aldığın kodu buraya yapıştır.</p>
                   <div class="flex flex-col gap-2 sm:flex-row">
                     <input
                       v-model.trim="manualCode"
                       class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-                      placeholder="Enter code"
+                      placeholder="Kodu yapıştır"
                       type="text"
                       maxlength="8"
                     />
@@ -414,12 +431,10 @@ onMounted(loadPortal)
                       type="button"
                       @click="applyManualCode"
                     >
-                      Save code
+                      Kaydet
                     </button>
                   </div>
-                  <p class="text-xs text-slate-500">
-                    The QR links to the guide check-in screen with your code prefilled.
-                  </p>
+                  <p class="text-xs text-slate-500">QR, rehber check-in ekranına kodu hazır şekilde götürür.</p>
                 </div>
               </div>
 
@@ -431,7 +446,7 @@ onMounted(loadPortal)
                     <img :src="qrDataUrl" alt="QR" class="h-40 w-40" />
                   </div>
                   <div v-else class="text-sm text-slate-500">
-                    Add your check-in code to generate the QR.
+                    QR oluşturmak için kod ekleyin.
                   </div>
                 </div>
                 <div class="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -440,7 +455,7 @@ onMounted(loadPortal)
                     type="button"
                     @click="copyCheckInLink"
                   >
-                    Copy guide link
+                    Rehber linkini kopyala
                   </button>
                   <p v-if="linkCopyStatus" class="text-xs text-slate-500">{{ linkCopyStatus }}</p>
                 </div>

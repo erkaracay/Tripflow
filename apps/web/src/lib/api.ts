@@ -1,4 +1,5 @@
 import { clearToken, getToken, isTokenExpired } from './auth'
+import { pushToast } from './toast'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
@@ -29,9 +30,14 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   const data = await parseBody(response)
 
   if (response.status === 401) {
+    const path = globalThis.location?.pathname ?? ''
+    const isPortal = path.startsWith('/t/')
     clearToken()
-    if (globalThis.location?.pathname !== '/login') {
-      globalThis.location?.assign('/login')
+    if (!isPortal) {
+      pushToast('Oturum süren doldu, tekrar giriş yap', 'error')
+      if (path !== '/login') {
+        globalThis.location?.assign('/login')
+      }
     }
   }
 
