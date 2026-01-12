@@ -97,3 +97,12 @@ export const apiPut = async <T>(path: string, body: unknown): Promise<T> => {
 
   return handleResponse<T>(response)
 }
+
+export const apiDelete = async <T>(path: string): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+
+  return handleResponse<T>(response)
+}
