@@ -24,11 +24,12 @@ export const clearToken = () => {
 
 export const getTokenPayload = (token: string): JwtPayload | null => {
   const parts = token.split('.')
-  if (parts.length < 2) {
+  const payloadPart = parts[1]
+  if (!payloadPart) {
     return null
   }
 
-  const decoded = decodeBase64Url(parts[1])
+  const decoded = decodeBase64Url(payloadPart)
   if (!decoded) {
     return null
   }

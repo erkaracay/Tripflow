@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { TourListItem } from '../../types'
+import type { Tour, TourListItem } from '../../types'
 
 const router = useRouter()
 const tours = ref<TourListItem[]>([])
