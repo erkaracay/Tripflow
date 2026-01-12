@@ -36,7 +36,7 @@ const handleAction = (toast: { id: string; action?: { onClick: () => void } }) =
         <div class="flex items-center gap-2">
           <button
             v-if="toast.action"
-            class="text-xs font-semibold text-slate-700 hover:text-slate-900"
+            class="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-400 hover:text-slate-900"
             type="button"
             @click="handleAction(toast)"
           >

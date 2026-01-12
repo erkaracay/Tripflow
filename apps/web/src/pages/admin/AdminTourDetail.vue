@@ -126,10 +126,7 @@ const removePortalLink = (index: number) => {
 }
 
 const updateDayItems = (index: number, value: string) => {
-  const items = value
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const items = value.split(/\r?\n/)
 
   portalDays.value = portalDays.value.map((day, idx) =>
     idx === index ? { ...day, items } : day
@@ -152,7 +149,14 @@ const moveDay = (index: number, direction: number) => {
     return
   }
 
-  ;[next[index], next[target]] = [next[target], next[index]]
+  const current = next[index]
+  const swap = next[target]
+  if (!current || !swap) {
+    return
+  }
+
+  next[index] = swap
+  next[target] = current
   portalDays.value = normalizeDays(next)
 }
 
