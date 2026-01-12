@@ -16,6 +16,11 @@ const toneClass = (tone: string) => {
 }
 
 const stackedToasts = computed(() => toasts.value.slice(-4))
+
+const handleAction = (toast: { id: string; action?: { onClick: () => void } }) => {
+  toast.action?.onClick()
+  removeToast(toast.id)
+}
 </script>
 
 <template>
@@ -27,14 +32,24 @@ const stackedToasts = computed(() => toasts.value.slice(-4))
         class="pointer-events-auto flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm"
         :class="toneClass(toast.tone)"
       >
-        <span>{{ toast.message }}</span>
-        <button
-          class="text-xs font-medium text-slate-500 hover:text-slate-700"
-          type="button"
-          @click="removeToast(toast.id)"
-        >
-          Dismiss
-        </button>
+        <span class="flex-1">{{ toast.message }}</span>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="toast.action"
+            class="text-xs font-semibold text-slate-700 hover:text-slate-900"
+            type="button"
+            @click="handleAction(toast)"
+          >
+            {{ toast.action.label }}
+          </button>
+          <button
+            class="text-xs font-medium text-slate-500 hover:text-slate-700"
+            type="button"
+            @click="removeToast(toast.id)"
+          >
+            Dismiss
+          </button>
+        </div>
       </div>
     </div>
   </div>

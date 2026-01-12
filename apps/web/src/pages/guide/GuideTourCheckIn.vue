@@ -6,7 +6,7 @@ import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { CheckInResponse, CheckInSummary, Participant, Tour } from '../../types'
+import type { CheckInResponse, CheckInSummary, CheckInUndoResponse, Participant, Tour } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +29,7 @@ const lastResult = ref<CheckInResponse | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckIn = ref(true)
 const highlightParticipantId = ref<string | null>(null)
+const undoingParticipantId = ref<string | null>(null)
 let highlightTimer: number | undefined
 
 const { pushToast } = useToast()
@@ -85,6 +86,37 @@ const updateFromCheckIn = (response: CheckInResponse) => {
   )
 }
 
+const updateFromUndo = (response: CheckInUndoResponse) => {
+  summary.value = {
+    arrivedCount: response.arrivedCount,
+    totalCount: response.totalCount,
+  }
+
+  participants.value = participants.value.map((participant) =>
+    participant.id === response.participantId
+      ? { ...participant, arrived: false }
+      : participant
+  )
+}
+
+const undoCheckIn = async (participantId: string) => {
+  undoingParticipantId.value = participantId
+  try {
+    const response = await apiPost<CheckInUndoResponse>(
+      `/api/guide/tours/${tourId.value}/checkins/undo`,
+      { participantId }
+    )
+    updateFromUndo(response)
+    const tone = response.alreadyUndone ? 'info' : 'success'
+    pushToast(response.alreadyUndone ? 'Zaten geri alınmış' : 'Check-in geri alındı', tone)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Undo failed.'
+    pushToast(message, 'error')
+  } finally {
+    undoingParticipantId.value = null
+  }
+}
+
 const submitCheckIn = async (code: string) => {
   actionMessage.value = null
   actionError.value = null
@@ -108,7 +140,15 @@ const submitCheckIn = async (code: string) => {
     if (response.alreadyArrived) {
       pushToast('Zaten check-in yapılmış', 'info')
     } else {
-      pushToast('Check-in tamamlandı', 'success')
+      pushToast('Check-in tamamlandı', 'success', {
+        timeout: 10000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void undoCheckIn(response.participantId)
+          },
+        },
+      })
     }
     checkInCode.value = ''
     lastResult.value = response
@@ -338,6 +378,15 @@ onMounted(() => {
                     @click="markArrived(participant)"
                   >
                     Mark arrived
+                  </button>
+                  <button
+                    v-else
+                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    :disabled="undoingParticipantId === participant.id"
+                    type="button"
+                    @click="undoCheckIn(participant.id)"
+                  >
+                    {{ undoingParticipantId === participant.id ? 'Undoing...' : 'Undo' }}
                   </button>
                 </div>
               </div>

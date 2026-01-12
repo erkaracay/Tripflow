@@ -70,6 +70,13 @@ export type CheckInResponse = {
   totalCount: number
 }
 
+export type CheckInUndoResponse = {
+  participantId: string
+  alreadyUndone: boolean
+  arrivedCount: number
+  totalCount: number
+}
+
 export type UserRole = 'Admin' | 'Guide'
 
 export type LoginResponse = {

@@ -2,10 +2,21 @@ import { ref } from 'vue'
 
 export type ToastTone = 'success' | 'error' | 'info'
 
+export type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
+export type ToastOptions = {
+  timeout?: number
+  action?: ToastAction
+}
+
 export type ToastItem = {
   id: string
   message: string
   tone: ToastTone
+  action?: ToastAction
 }
 
 const toasts = ref<ToastItem[]>([])
@@ -15,15 +26,24 @@ const createId = () => {
   return random ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-export const pushToast = (message: string, tone: ToastTone = 'info', timeout = 2600) => {
+export const pushToast = (
+  message: string,
+  tone: ToastTone = 'info',
+  timeoutOrOptions: number | ToastOptions = 2600
+) => {
   const id = createId()
-  toasts.value = [...toasts.value, { id, message, tone }]
+  const options = typeof timeoutOrOptions === 'number' ? { timeout: timeoutOrOptions } : timeoutOrOptions
+  const timeout = options.timeout ?? 2600
+
+  toasts.value = [...toasts.value, { id, message, tone, action: options.action }]
 
   if (timeout > 0) {
     globalThis.setTimeout(() => {
       removeToast(id)
     }, timeout)
   }
+
+  return id
 }
 
 export const removeToast = (id: string) => {
