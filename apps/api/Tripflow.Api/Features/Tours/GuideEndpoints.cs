@@ -38,6 +38,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapPost("/tours/{tourId}/checkins/undo", GuideHandlers.UndoCheckIn)
+            .WithSummary("Guide undo check-in")
+            .WithDescription("Reverts a participant check-in for a guide tour.")
+            .Produces<CheckInUndoResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 }

@@ -36,6 +36,13 @@ public static class ToursEndpoints
                 return op;
             });
 
+        admin.MapPut("/{tourId}", ToursHandlers.UpdateTour)
+            .WithSummary("Update tour")
+            .WithDescription("Updates tour name and dates.")
+            .Produces<TourDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/{tourId}", ToursHandlers.GetTour)
             .WithSummary("Get tour")
             .WithDescription("Returns tour details by id.")
@@ -149,6 +156,13 @@ public static class ToursEndpoints
                 return op;
             });
 
+        admin.MapPost("/{tourId}/checkins/undo", ToursHandlers.UndoCheckIn)
+            .WithSummary("Undo check-in")
+            .WithDescription("Reverts a participant check-in.")
+            .Produces<CheckInUndoResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{tourId}/participants", ToursHandlers.CreateParticipant)
             .WithSummary("Create participant")
             .WithDescription("Creates a participant and generates a checkInCode.")
@@ -168,6 +182,20 @@ public static class ToursEndpoints
                 );
                 return op;
             });
+
+        admin.MapPut("/{tourId}/participants/{participantId}", ToursHandlers.UpdateParticipant)
+            .WithSummary("Update participant")
+            .WithDescription("Updates participant details.")
+            .Produces<ParticipantDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{tourId}/participants/{participantId}", ToursHandlers.DeleteParticipant)
+            .WithSummary("Delete participant")
+            .WithDescription("Removes a participant from the tour.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
 
         admin.MapPost("/{tourId}/checkin", ToursHandlers.CheckIn)
             .WithSummary("Check-in participant")

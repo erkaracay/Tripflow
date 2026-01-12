@@ -73,6 +73,53 @@ internal static class ToursHandlers
         return Results.Created($"/api/tours/{dto.Id}", dto);
     }
 
+    internal static async Task<IResult> UpdateTour(string tourId, UpdateTourRequest request, TripflowDbContext db, CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (request is null)
+        {
+            return ToursHelpers.BadRequest("Request body is required.");
+        }
+
+        var name = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return ToursHelpers.BadRequest("Name is required.");
+        }
+
+        if (!ToursHelpers.TryParseDate(request.StartDate, out var startDate))
+        {
+            return ToursHelpers.BadRequest("Start date must be in YYYY-MM-DD format.");
+        }
+
+        if (!ToursHelpers.TryParseDate(request.EndDate, out var endDate))
+        {
+            return ToursHelpers.BadRequest("End date must be in YYYY-MM-DD format.");
+        }
+
+        if (endDate < startDate)
+        {
+            return ToursHelpers.BadRequest("End date must be on or after start date.");
+        }
+
+        var entity = await db.Tours.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        entity.Name = name;
+        entity.StartDate = startDate;
+        entity.EndDate = endDate;
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(ToursHelpers.ToDto(entity));
+    }
+
     internal static async Task<IResult> GetTour(string tourId, TripflowDbContext db, CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
@@ -309,6 +356,106 @@ internal static class ToursHandlers
             new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, false));
     }
 
+    internal static async Task<IResult> UpdateParticipant(
+        string tourId,
+        string participantId,
+        UpdateParticipantRequest request,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return ToursHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (request is null)
+        {
+            return ToursHelpers.BadRequest("Request body is required.");
+        }
+
+        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!tourExists)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        var entity = await db.Participants.FirstOrDefaultAsync(
+            x => x.Id == participantGuid && x.TourId == id, ct);
+
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var fullName = request.FullName?.Trim();
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return ToursHelpers.BadRequest("Full name is required.");
+        }
+
+        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+        var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+
+        entity.FullName = fullName;
+        entity.Email = email;
+        entity.Phone = phone;
+
+        await db.SaveChangesAsync(ct);
+
+        var arrived = await db.CheckIns.AsNoTracking()
+            .AnyAsync(x => x.TourId == id && x.ParticipantId == entity.Id, ct);
+
+        return Results.Ok(new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, arrived));
+    }
+
+    internal static async Task<IResult> DeleteParticipant(
+        string tourId,
+        string participantId,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return ToursHelpers.BadRequest("Invalid participant id.");
+        }
+
+        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!tourExists)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        var entity = await db.Participants.FirstOrDefaultAsync(
+            x => x.Id == participantGuid && x.TourId == id, ct);
+
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var checkIn = await db.CheckIns.FirstOrDefaultAsync(
+            x => x.TourId == id && x.ParticipantId == participantGuid, ct);
+        if (checkIn is not null)
+        {
+            db.CheckIns.Remove(checkIn);
+        }
+
+        db.Participants.Remove(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+
     internal static async Task<IResult> CheckIn(string tourId, CheckInRequest request, TripflowDbContext db, CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
@@ -377,6 +524,72 @@ internal static class ToursHandlers
         var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
 
         return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, alreadyCheckedIn, arrivedCount, totalCount));
+    }
+
+    internal static async Task<IResult> UndoCheckIn(
+        string tourId,
+        CheckInUndoRequest request,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (request is null)
+        {
+            return ToursHelpers.BadRequest("Request body is required.");
+        }
+
+        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!tourExists)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        ParticipantEntity? participant = null;
+
+        if (request.ParticipantId.HasValue)
+        {
+            participant = await db.Participants.FirstOrDefaultAsync(
+                x => x.Id == request.ParticipantId.Value && x.TourId == id, ct);
+        }
+        else if (!string.IsNullOrWhiteSpace(request.CheckInCode))
+        {
+            var code = request.CheckInCode.Trim().ToUpperInvariant();
+            if (code.Length != 8)
+            {
+                return ToursHelpers.BadRequest("Check-in code must be 8 characters.");
+            }
+
+            participant = await db.Participants.FirstOrDefaultAsync(
+                x => x.TourId == id && x.CheckInCode == code, ct);
+        }
+        else
+        {
+            return ToursHelpers.BadRequest("Provide participantId or checkInCode.");
+        }
+
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var checkIn = await db.CheckIns.FirstOrDefaultAsync(
+            x => x.TourId == id && x.ParticipantId == participant.Id, ct);
+
+        var alreadyUndone = checkIn is null;
+        if (!alreadyUndone)
+        {
+            db.CheckIns.Remove(checkIn!);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+        var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+
+        return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> CheckInByCode(string tourId, CheckInCodeRequest request, TripflowDbContext db, CancellationToken ct)

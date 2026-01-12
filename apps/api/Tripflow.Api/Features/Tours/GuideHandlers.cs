@@ -143,6 +143,33 @@ internal static class GuideHandlers
         return await ToursHandlers.CheckInByCode(tourId, request, db, ct);
     }
 
+    internal static async Task<IResult> UndoCheckIn(
+        string tourId,
+        CheckInUndoRequest request,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        var hasAccess = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        return await ToursHandlers.UndoCheckIn(tourId, request, db, ct);
+    }
+
     private static bool TryGetUserId(ClaimsPrincipal user, out Guid userId, out IResult? error)
     {
         var raw = user.FindFirstValue("sub");
