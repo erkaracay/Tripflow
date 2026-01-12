@@ -83,6 +83,15 @@ builder.Services.AddAuthorization(options =>
 
 // CORS
 const string WebCorsPolicy = "WebCors";
+var allowedOriginsValue = builder.Configuration["CORS_ALLOWED_ORIGINS"];
+var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+if (!string.IsNullOrWhiteSpace(allowedOriginsValue))
+{
+    foreach (var origin in allowedOriginsValue.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        allowedOrigins.Add(origin.TrimEnd('/'));
+    }
+}
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(WebCorsPolicy, policy =>
@@ -90,6 +99,7 @@ builder.Services.AddCors(options =>
         policy
             .SetIsOriginAllowed(origin =>
             {
+                var normalizedOrigin = origin.TrimEnd('/');
                 if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
                 {
                     return false;
@@ -97,11 +107,16 @@ builder.Services.AddCors(options =>
 
                 if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
                 {
-                    return false;
+                    return allowedOrigins.Contains(normalizedOrigin);
                 }
 
-                return string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase);
+                if (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                return allowedOrigins.Contains(normalizedOrigin);
             })
             .AllowAnyHeader()
             .AllowAnyMethod();
