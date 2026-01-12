@@ -126,11 +126,11 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Swagger
+app.UseSwagger();
+app.UseSwaggerUI();
+
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-
     app.MapPost("/api/dev/seed", async (TripflowDbContext db, CancellationToken ct) =>
     {
         var (seeded, message) = await DevSeed.SeedAsync(db, ct);
