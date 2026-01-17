@@ -8,16 +8,21 @@ namespace Tripflow.Api.Data.Dev;
 
 public static class DevSeed
 {
+    private sealed class SeedState
+    {
+        public bool Seeded { get; set; }
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static async Task<(bool Seeded, string Message)> SeedAsync(TripflowDbContext db, CancellationToken ct)
     {
-        var seeded = false;
+        var state = new SeedState();
         var now = DateTime.UtcNow;
         var hasher = new PasswordHasher<UserEntity>();
 
-        var orgA = await GetOrCreateOrg(db, "Org A Travel", "org-a", now, ct, ref seeded);
-        var orgB = await GetOrCreateOrg(db, "Org B Travel", "org-b", now, ct, ref seeded);
+        var orgA = await GetOrCreateOrg(db, "Org A Travel", "org-a", now, ct, state);
+        var orgB = await GetOrCreateOrg(db, "Org B Travel", "org-b", now, ct, state);
 
         var superAdmin = await UpsertUser(
             db,
@@ -29,7 +34,7 @@ public static class DevSeed
             "admin123",
             now,
             ct,
-            ref seeded);
+            state);
 
         var adminA = await UpsertUser(
             db,
@@ -41,7 +46,7 @@ public static class DevSeed
             "admin123",
             now,
             ct,
-            ref seeded);
+            state);
 
         var guideA = await UpsertUser(
             db,
@@ -53,7 +58,7 @@ public static class DevSeed
             "guide123",
             now,
             ct,
-            ref seeded);
+            state);
 
         var adminB = await UpsertUser(
             db,
@@ -65,7 +70,7 @@ public static class DevSeed
             "admin123",
             now,
             ct,
-            ref seeded);
+            state);
 
         var guideB = await UpsertUser(
             db,
@@ -77,38 +82,38 @@ public static class DevSeed
             "guide123",
             now,
             ct,
-            ref seeded);
+            state);
 
         await db.SaveChangesAsync(ct);
 
-        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 1", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, ref seeded);
-        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 2", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, ref seeded);
+        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 1", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, state);
+        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 2", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, state);
 
-        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 1", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, ref seeded);
-        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 2", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, ref seeded);
-
-        await db.SaveChangesAsync(ct);
-
-        await EnsurePortalAsync(db, tourA1, orgA.Id, now, ct, ref seeded);
-        await EnsurePortalAsync(db, tourA2, orgA.Id, now, ct, ref seeded);
-        await EnsurePortalAsync(db, tourB1, orgB.Id, now, ct, ref seeded);
-        await EnsurePortalAsync(db, tourB2, orgB.Id, now, ct, ref seeded);
-
-        await EnsureParticipantsAsync(db, tourA1, orgA.Id, "A1", 30, now, ct, ref seeded);
-        await EnsureParticipantsAsync(db, tourA2, orgA.Id, "A2", 30, now, ct, ref seeded);
-        await EnsureParticipantsAsync(db, tourB1, orgB.Id, "B1", 30, now, ct, ref seeded);
-        await EnsureParticipantsAsync(db, tourB2, orgB.Id, "B2", 30, now, ct, ref seeded);
-
-        await EnsureCheckInsAsync(db, tourA1, orgA.Id, now, ct, ref seeded);
-        await EnsureCheckInsAsync(db, tourB1, orgB.Id, now, ct, ref seeded);
+        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 1", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, state);
+        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 2", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, state);
 
         await db.SaveChangesAsync(ct);
 
-        var message = seeded
+        await EnsurePortalAsync(db, tourA1, orgA.Id, now, ct, state);
+        await EnsurePortalAsync(db, tourA2, orgA.Id, now, ct, state);
+        await EnsurePortalAsync(db, tourB1, orgB.Id, now, ct, state);
+        await EnsurePortalAsync(db, tourB2, orgB.Id, now, ct, state);
+
+        await EnsureParticipantsAsync(db, tourA1, orgA.Id, "A1", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, tourA2, orgA.Id, "A2", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, tourB1, orgB.Id, "B1", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, tourB2, orgB.Id, "B2", 30, now, ct, state);
+
+        await EnsureCheckInsAsync(db, tourA1, orgA.Id, now, ct, state);
+        await EnsureCheckInsAsync(db, tourB1, orgB.Id, now, ct, state);
+
+        await db.SaveChangesAsync(ct);
+
+        var message = state.Seeded
             ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 tour, 120 participant, check-in örnekleri."
             : "Seed zaten yapılmış. Mevcut demo kayıtları korundu.";
 
-        return (seeded, message);
+        return (state.Seeded, message);
     }
 
     private static async Task<OrganizationEntity> GetOrCreateOrg(
@@ -117,7 +122,7 @@ public static class DevSeed
         string slug,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var org = await db.Organizations.FirstOrDefaultAsync(x => x.Slug == slug, ct);
         if (org is not null)
@@ -134,7 +139,7 @@ public static class DevSeed
         };
 
         db.Organizations.Add(org);
-        seeded = true;
+        state.Seeded = true;
         return org;
     }
 
@@ -148,7 +153,7 @@ public static class DevSeed
         string password,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await db.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail, ct);
@@ -165,7 +170,7 @@ public static class DevSeed
             };
             user.PasswordHash = hasher.HashPassword(user, password);
             db.Users.Add(user);
-            seeded = true;
+            state.Seeded = true;
             return user;
         }
 
@@ -194,7 +199,7 @@ public static class DevSeed
         if (updated)
         {
             db.Users.Update(user);
-            seeded = true;
+            state.Seeded = true;
         }
 
         return user;
@@ -209,7 +214,7 @@ public static class DevSeed
         Guid guideUserId,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var tour = await db.Tours.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
         if (tour is not null)
@@ -218,7 +223,7 @@ public static class DevSeed
             {
                 tour.GuideUserId = guideUserId;
                 db.Tours.Update(tour);
-                seeded = true;
+                state.Seeded = true;
             }
             return tour;
         }
@@ -235,7 +240,7 @@ public static class DevSeed
         };
 
         db.Tours.Add(tour);
-        seeded = true;
+        state.Seeded = true;
         return tour;
     }
 
@@ -245,7 +250,7 @@ public static class DevSeed
         Guid organizationId,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var portalExists = await db.TourPortals.AnyAsync(x => x.TourId == tour.Id, ct);
         if (portalExists)
@@ -260,7 +265,7 @@ public static class DevSeed
             PortalJson = CreatePortalJson(tour.Name, "09:00", "Lobby", "https://maps.google.com/?q=Lobby"),
             UpdatedAt = now
         });
-        seeded = true;
+        state.Seeded = true;
     }
 
     private static async Task EnsureParticipantsAsync(
@@ -271,7 +276,7 @@ public static class DevSeed
         int count,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var existing = await db.Participants.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
         if (existing)
@@ -297,7 +302,7 @@ public static class DevSeed
         }
 
         db.Participants.AddRange(participants);
-        seeded = true;
+        state.Seeded = true;
     }
 
     private static async Task EnsureCheckInsAsync(
@@ -306,7 +311,7 @@ public static class DevSeed
         Guid organizationId,
         DateTime now,
         CancellationToken ct,
-        ref bool seeded)
+        SeedState state)
     {
         var alreadyCheckedIn = await db.CheckIns.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
         if (alreadyCheckedIn)
@@ -336,7 +341,7 @@ public static class DevSeed
 
         if (participants.Count > 0)
         {
-            seeded = true;
+            state.Seeded = true;
         }
     }
 
