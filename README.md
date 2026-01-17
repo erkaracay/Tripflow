@@ -85,8 +85,16 @@ Başka bir terminalde seed at:
 
 Demo hesapları (dev seed):
 
-- admin@demo.local / admin123
-- guide@demo.local / guide123
+- superadmin@demo.local / admin123
+- adminA@demo.local / admin123
+- guideA@demo.local / guide123
+- adminB@demo.local / admin123
+- guideB@demo.local / guide123
+
+SuperAdmin notu:
+
+- Web tarafında önce /admin/orgs üzerinden org seçilir.
+- API'yi manuel test ederken SuperAdmin için X-Org-Id header'ı zorunludur.
 
 ## API (.NET 8) çalıştırma
 
