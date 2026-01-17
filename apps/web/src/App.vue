@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import ToastHost from './components/ui/ToastHost.vue'
-import { clearToken, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
 
 const router = useRouter()
 const userRole = computed(() => {
@@ -19,8 +19,12 @@ const toursPath = computed(() => {
     return '/guide/tours'
   }
 
-  if (userRole.value === 'Admin') {
+  if (userRole.value === 'AgencyAdmin') {
     return '/admin/tours'
+  }
+
+  if (userRole.value === 'SuperAdmin') {
+    return getSelectedOrgId() ? '/admin/tours' : '/admin/orgs'
   }
 
   return ''

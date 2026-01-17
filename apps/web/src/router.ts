@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { clearToken, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
 import AdminTours from './pages/admin/AdminTours.vue'
 import AdminTourDetail from './pages/admin/AdminTourDetail.vue'
 import AdminTourCheckIn from './pages/admin/AdminTourCheckIn.vue'
+import SuperAdminOrgSelect from './pages/admin/SuperAdminOrgSelect.vue'
 import GuideTours from './pages/guide/GuideTours.vue'
 import GuideTourCheckIn from './pages/guide/GuideTourCheckIn.vue'
 import Login from './pages/Login.vue'
@@ -19,19 +20,24 @@ const router = createRouter({
     {
       path: '/admin/tours',
       component: AdminTours,
-      meta: { requiresAuth: true, roles: ['Admin'] },
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/tours/:tourId',
       component: AdminTourDetail,
       props: true,
-      meta: { requiresAuth: true, roles: ['Admin'] },
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/tours/:tourId/checkin',
       component: AdminTourCheckIn,
       props: true,
-      meta: { requiresAuth: true, roles: ['Admin'] },
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/orgs',
+      component: SuperAdminOrgSelect,
+      meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {
       path: '/guide/tours',
@@ -66,6 +72,14 @@ router.beforeEach((to) => {
     const role = getTokenRole(token)
     if (!role || !roles.includes(role as UserRole)) {
       return { path: '/forbidden' }
+    }
+  }
+
+  const role = getTokenRole(token)
+  if (role === 'SuperAdmin') {
+    const hasOrg = Boolean(getSelectedOrgId())
+    if (!hasOrg && to.path.startsWith('/admin') && to.path !== '/admin/orgs') {
+      return { path: '/admin/orgs' }
     }
   }
 

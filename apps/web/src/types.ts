@@ -23,6 +23,12 @@ export type UserListItem = {
   role: string
 }
 
+export type Organization = {
+  id: string
+  name: string
+  slug: string
+}
+
 export type Participant = {
   id: string
   fullName: string
@@ -77,7 +83,7 @@ export type CheckInUndoResponse = {
   totalCount: number
 }
 
-export type UserRole = 'Admin' | 'Guide'
+export type UserRole = 'SuperAdmin' | 'AgencyAdmin' | 'Guide'
 
 export type LoginResponse = {
   accessToken: string

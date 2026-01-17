@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'tripflow_token'
+const ORG_KEY = 'tripflow_org'
 
 const decodeBase64Url = (value: string) => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
@@ -20,6 +21,7 @@ export const setToken = (token: string) => {
 
 export const clearToken = () => {
   globalThis.localStorage?.removeItem(TOKEN_KEY)
+  globalThis.localStorage?.removeItem(ORG_KEY)
 }
 
 export const getTokenPayload = (token: string): JwtPayload | null => {
@@ -59,6 +61,16 @@ export const getTokenRole = (token: string): string | null => {
   return typeof role === 'string' ? role : null
 }
 
+export const getTokenOrgId = (token: string): string | null => {
+  const payload = getTokenPayload(token)
+  if (!payload) {
+    return null
+  }
+
+  const orgId = payload.orgId
+  return typeof orgId === 'string' ? orgId : null
+}
+
 export const isTokenExpired = (token: string): boolean => {
   const payload = getTokenPayload(token)
   const exp = payload?.exp
@@ -68,4 +80,14 @@ export const isTokenExpired = (token: string): boolean => {
 
   const now = Math.floor(Date.now() / 1000)
   return exp <= now
+}
+
+export const getSelectedOrgId = () => globalThis.localStorage?.getItem(ORG_KEY) ?? ''
+
+export const setSelectedOrgId = (orgId: string) => {
+  globalThis.localStorage?.setItem(ORG_KEY, orgId)
+}
+
+export const clearSelectedOrgId = () => {
+  globalThis.localStorage?.removeItem(ORG_KEY)
 }

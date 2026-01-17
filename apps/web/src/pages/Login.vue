@@ -29,7 +29,13 @@ const submit = async () => {
     })
 
     setToken(response.accessToken)
-    const target = response.role === 'Guide' ? '/guide/tours' : '/admin/tours'
+    let target = '/admin/tours'
+    if (response.role === 'Guide') {
+      target = '/guide/tours'
+    } else if (response.role === 'SuperAdmin') {
+      target = '/admin/orgs'
+    }
+
     await router.replace(target)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Login failed.'

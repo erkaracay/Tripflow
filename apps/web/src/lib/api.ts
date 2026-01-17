@@ -1,4 +1,4 @@
-import { clearToken, getToken, isTokenExpired } from './auth'
+import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './auth'
 import { pushToast } from './toast'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
@@ -65,6 +65,14 @@ const buildHeaders = (contentType?: string) => {
   const token = getToken()
   if (token && !isTokenExpired(token)) {
     headers.Authorization = `Bearer ${token}`
+
+    const role = getTokenRole(token)
+    if (role === 'SuperAdmin') {
+      const orgId = getSelectedOrgId()
+      if (orgId) {
+        headers['X-Org-Id'] = orgId
+      }
+    }
   }
 
   return headers
