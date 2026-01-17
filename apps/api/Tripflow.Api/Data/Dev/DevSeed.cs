@@ -12,126 +12,332 @@ public static class DevSeed
 
     public static async Task<(bool Seeded, string Message)> SeedAsync(TripflowDbContext db, CancellationToken ct)
     {
-        if (await db.Tours.AsNoTracking().AnyAsync(ct))
-        {
-            return (false, "DB dolu. Seed atlandı. Tekrar seed için docker volume’u sıfırla (docker compose down -v).");
-        }
-
+        var seeded = false;
         var now = DateTime.UtcNow;
-
         var hasher = new PasswordHasher<UserEntity>();
-        var adminUser = new UserEntity
-        {
-            Id = Guid.NewGuid(),
-            Email = "admin@demo.local",
-            FullName = "Demo Admin",
-            Role = "Admin",
-            CreatedAt = now
-        };
-        adminUser.PasswordHash = hasher.HashPassword(adminUser, "admin123");
 
-        var guideUser = new UserEntity
-        {
-            Id = Guid.NewGuid(),
-            Email = "guide@demo.local",
-            FullName = "Demo Guide",
-            Role = "Guide",
-            CreatedAt = now
-        };
-        guideUser.PasswordHash = hasher.HashPassword(guideUser, "guide123");
+        var orgA = await GetOrCreateOrg(db, "Org A Travel", "org-a", now, ct, ref seeded);
+        var orgB = await GetOrCreateOrg(db, "Org B Travel", "org-b", now, ct, ref seeded);
 
-        var tour1 = new TourEntity
-        {
-            Id = Guid.NewGuid(),
-            Name = "Sprint 2 Demo Tour (Istanbul)",
-            StartDate = new DateOnly(2026, 1, 10),
-            EndDate = new DateOnly(2026, 1, 12),
-            CreatedAt = now,
-            GuideUserId = guideUser.Id
-        };
+        var superAdmin = await UpsertUser(
+            db,
+            hasher,
+            "superadmin@demo.local",
+            "Super Admin",
+            "SuperAdmin",
+            null,
+            "admin123",
+            now,
+            ct,
+            ref seeded);
 
-        var tour2 = new TourEntity
-        {
-            Id = Guid.NewGuid(),
-            Name = "Sprint 2 Demo Tour (Ankara)",
-            StartDate = new DateOnly(2026, 2, 1),
-            EndDate = new DateOnly(2026, 2, 2),
-            CreatedAt = now,
-            GuideUserId = guideUser.Id
-        };
+        var adminA = await UpsertUser(
+            db,
+            hasher,
+            "adminA@demo.local",
+            "Org A Admin",
+            "AgencyAdmin",
+            orgA.Id,
+            "admin123",
+            now,
+            ct,
+            ref seeded);
 
-        db.Users.AddRange(adminUser, guideUser);
-        db.Tours.AddRange(tour1, tour2);
+        var guideA = await UpsertUser(
+            db,
+            hasher,
+            "guideA@demo.local",
+            "Org A Guide",
+            "Guide",
+            orgA.Id,
+            "guide123",
+            now,
+            ct,
+            ref seeded);
+
+        var adminB = await UpsertUser(
+            db,
+            hasher,
+            "adminB@demo.local",
+            "Org B Admin",
+            "AgencyAdmin",
+            orgB.Id,
+            "admin123",
+            now,
+            ct,
+            ref seeded);
+
+        var guideB = await UpsertUser(
+            db,
+            hasher,
+            "guideB@demo.local",
+            "Org B Guide",
+            "Guide",
+            orgB.Id,
+            "guide123",
+            now,
+            ct,
+            ref seeded);
+
         await db.SaveChangesAsync(ct);
 
-        db.TourPortals.AddRange(
-            new TourPortalEntity
+        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 1", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, ref seeded);
+        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 2", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, ref seeded);
+
+        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 1", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, ref seeded);
+        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 2", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, ref seeded);
+
+        await db.SaveChangesAsync(ct);
+
+        await EnsurePortalAsync(db, tourA1, orgA.Id, now, ct, ref seeded);
+        await EnsurePortalAsync(db, tourA2, orgA.Id, now, ct, ref seeded);
+        await EnsurePortalAsync(db, tourB1, orgB.Id, now, ct, ref seeded);
+        await EnsurePortalAsync(db, tourB2, orgB.Id, now, ct, ref seeded);
+
+        await EnsureParticipantsAsync(db, tourA1, orgA.Id, "A1", 30, now, ct, ref seeded);
+        await EnsureParticipantsAsync(db, tourA2, orgA.Id, "A2", 30, now, ct, ref seeded);
+        await EnsureParticipantsAsync(db, tourB1, orgB.Id, "B1", 30, now, ct, ref seeded);
+        await EnsureParticipantsAsync(db, tourB2, orgB.Id, "B2", 30, now, ct, ref seeded);
+
+        await EnsureCheckInsAsync(db, tourA1, orgA.Id, now, ct, ref seeded);
+        await EnsureCheckInsAsync(db, tourB1, orgB.Id, now, ct, ref seeded);
+
+        await db.SaveChangesAsync(ct);
+
+        var message = seeded
+            ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 tour, 120 participant, check-in örnekleri."
+            : "Seed zaten yapılmış. Mevcut demo kayıtları korundu.";
+
+        return (seeded, message);
+    }
+
+    private static async Task<OrganizationEntity> GetOrCreateOrg(
+        TripflowDbContext db,
+        string name,
+        string slug,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Slug == slug, ct);
+        if (org is not null)
+        {
+            return org;
+        }
+
+        org = new OrganizationEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Slug = slug,
+            CreatedAt = now
+        };
+
+        db.Organizations.Add(org);
+        seeded = true;
+        return org;
+    }
+
+    private static async Task<UserEntity> UpsertUser(
+        TripflowDbContext db,
+        PasswordHasher<UserEntity> hasher,
+        string email,
+        string fullName,
+        string role,
+        Guid? organizationId,
+        string password,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail, ct);
+        if (user is null)
+        {
+            user = new UserEntity
             {
-                TourId = tour1.Id,
-                PortalJson = CreatePortalJson(tour1.Name, "09:00", "Taksim - Lobby", "https://maps.google.com/?q=Taksim"),
-                UpdatedAt = now
-            },
-            new TourPortalEntity
+                Id = Guid.NewGuid(),
+                Email = normalizedEmail,
+                FullName = fullName,
+                Role = role,
+                OrganizationId = organizationId,
+                CreatedAt = now
+            };
+            user.PasswordHash = hasher.HashPassword(user, password);
+            db.Users.Add(user);
+            seeded = true;
+            return user;
+        }
+
+        var updated = false;
+        if (!string.Equals(user.FullName, fullName, StringComparison.Ordinal))
+        {
+            user.FullName = fullName;
+            updated = true;
+        }
+
+        if (!string.Equals(user.Role, role, StringComparison.Ordinal))
+        {
+            user.Role = role;
+            updated = true;
+        }
+
+        if (user.OrganizationId != organizationId)
+        {
+            user.OrganizationId = organizationId;
+            updated = true;
+        }
+
+        user.PasswordHash = hasher.HashPassword(user, password);
+        updated = true;
+
+        if (updated)
+        {
+            db.Users.Update(user);
+            seeded = true;
+        }
+
+        return user;
+    }
+
+    private static async Task<TourEntity> GetOrCreateTour(
+        TripflowDbContext db,
+        Guid organizationId,
+        string name,
+        DateOnly startDate,
+        DateOnly endDate,
+        Guid guideUserId,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var tour = await db.Tours.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
+        if (tour is not null)
+        {
+            if (tour.GuideUserId != guideUserId)
             {
-                TourId = tour2.Id,
-                PortalJson = CreatePortalJson(tour2.Name, "10:00", "Kızılay - Lobby", "https://maps.google.com/?q=Kizilay"),
-                UpdatedAt = now
+                tour.GuideUserId = guideUserId;
+                db.Tours.Update(tour);
+                seeded = true;
             }
-        );
+            return tour;
+        }
 
-        await db.SaveChangesAsync(ct);
-
-        var tour1Participants = new List<ParticipantEntity>();
-        for (var i = 1; i <= 20; i++)
+        tour = new TourEntity
         {
-            tour1Participants.Add(new ParticipantEntity
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
+            Name = name,
+            StartDate = startDate,
+            EndDate = endDate,
+            CreatedAt = now,
+            GuideUserId = guideUserId
+        };
+
+        db.Tours.Add(tour);
+        seeded = true;
+        return tour;
+    }
+
+    private static async Task EnsurePortalAsync(
+        TripflowDbContext db,
+        TourEntity tour,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var portalExists = await db.TourPortals.AnyAsync(x => x.TourId == tour.Id, ct);
+        if (portalExists)
+        {
+            return;
+        }
+
+        db.TourPortals.Add(new TourPortalEntity
+        {
+            TourId = tour.Id,
+            OrganizationId = organizationId,
+            PortalJson = CreatePortalJson(tour.Name, "09:00", "Lobby", "https://maps.google.com/?q=Lobby"),
+            UpdatedAt = now
+        });
+        seeded = true;
+    }
+
+    private static async Task EnsureParticipantsAsync(
+        TripflowDbContext db,
+        TourEntity tour,
+        Guid organizationId,
+        string prefix,
+        int count,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var existing = await db.Participants.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
+        if (existing)
+        {
+            return;
+        }
+
+        var participants = new List<ParticipantEntity>();
+        for (var i = 1; i <= count; i++)
+        {
+            var code = await GenerateUniqueCheckInCodeAsync(db, ct);
+            participants.Add(new ParticipantEntity
             {
                 Id = Guid.NewGuid(),
-                TourId = tour1.Id,
-                FullName = $"Participant {i:00}",
-                Email = $"p{i:00}@demo.local",
+                TourId = tour.Id,
+                OrganizationId = organizationId,
+                FullName = $"{prefix} Participant {i:00}",
+                Email = $"{prefix.ToLowerInvariant()}{i:00}@demo.local",
                 Phone = $"+90555{i:000000}",
-                CheckInCode = GenerateCheckInCode(8),
+                CheckInCode = code,
                 CreatedAt = now
             });
         }
 
-        var tour2Participants = new List<ParticipantEntity>();
-        for (var i = 1; i <= 10; i++)
+        db.Participants.AddRange(participants);
+        seeded = true;
+    }
+
+    private static async Task EnsureCheckInsAsync(
+        TripflowDbContext db,
+        TourEntity tour,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        ref bool seeded)
+    {
+        var alreadyCheckedIn = await db.CheckIns.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
+        if (alreadyCheckedIn)
         {
-            tour2Participants.Add(new ParticipantEntity
-            {
-                Id = Guid.NewGuid(),
-                TourId = tour2.Id,
-                FullName = $"Ankara Participant {i:00}",
-                Email = $"a{i:00}@demo.local",
-                Phone = $"+90544{i:000000}",
-                CheckInCode = GenerateCheckInCode(8),
-                CreatedAt = now
-            });
+            return;
         }
 
-        db.Participants.AddRange(tour1Participants);
-        db.Participants.AddRange(tour2Participants);
-        await db.SaveChangesAsync(ct);
+        var participants = await db.Participants.AsNoTracking()
+            .Where(x => x.TourId == tour.Id)
+            .OrderBy(x => x.FullName)
+            .Take(5)
+            .ToListAsync(ct);
 
-        // tour1: ilk 5 kişi check-in yapılmış olsun -> 5/20 demo hazır
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < participants.Count; i++)
         {
-            var p = tour1Participants[i];
+            var participant = participants[i];
             db.CheckIns.Add(new CheckInEntity
             {
                 Id = Guid.NewGuid(),
-                TourId = tour1.Id,
-                ParticipantId = p.Id,
+                TourId = tour.Id,
+                ParticipantId = participant.Id,
+                OrganizationId = organizationId,
                 CheckedInAt = now.AddMinutes(-(i + 1)),
                 Method = "manual"
             });
         }
 
-        await db.SaveChangesAsync(ct);
-
-        return (true, "Seed tamam: 2 user, 2 tour, 2 portal, 30 participant, tour1 için 5 check-in (5/20).");
+        if (participants.Count > 0)
+        {
+            seeded = true;
+        }
     }
 
     private static string CreatePortalJson(string tourName, string time, string place, string mapsUrl)
@@ -159,6 +365,21 @@ public static class DevSeed
         };
 
         return JsonSerializer.Serialize(obj, JsonOptions);
+    }
+
+    private static async Task<string> GenerateUniqueCheckInCodeAsync(TripflowDbContext db, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var code = GenerateCheckInCode(8);
+            var exists = await db.Participants.AsNoTracking().AnyAsync(x => x.CheckInCode == code, ct);
+            if (!exists)
+            {
+                return code;
+            }
+        }
+
+        return GenerateCheckInCode(8);
     }
 
     private static string GenerateCheckInCode(int length)
