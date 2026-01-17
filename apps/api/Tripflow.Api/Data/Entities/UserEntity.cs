@@ -3,6 +3,8 @@ namespace Tripflow.Api.Data.Entities;
 public sealed class UserEntity
 {
     public Guid Id { get; set; }
+    public Guid? OrganizationId { get; set; }
+    public OrganizationEntity? Organization { get; set; }
     public string Email { get; set; } = default!;
     public string? FullName { get; set; }
     public string PasswordHash { get; set; } = default!;

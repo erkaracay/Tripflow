@@ -6,6 +6,8 @@ public sealed class ParticipantEntity
 
     public Guid TourId { get; set; }
     public TourEntity Tour { get; set; } = default!;
+    public Guid OrganizationId { get; set; }
+    public OrganizationEntity Organization { get; set; } = default!;
 
     public string FullName { get; set; } = default!;
     public string? Email { get; set; }

@@ -5,6 +5,7 @@ namespace Tripflow.Api.Data;
 
 public sealed class TripflowDbContext : DbContext
 {
+    public DbSet<OrganizationEntity> Organizations => Set<OrganizationEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<TourEntity> Tours => Set<TourEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
@@ -15,11 +16,24 @@ public sealed class TripflowDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<OrganizationEntity>(b =>
+        {
+            b.ToTable("organizations");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Slug).HasMaxLength(64).IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasIndex(x => x.Slug).IsUnique();
+        });
+
         modelBuilder.Entity<UserEntity>(b =>
         {
             b.ToTable("users");
             b.HasKey(x => x.Id);
 
+            b.Property(x => x.OrganizationId);
             b.Property(x => x.Email).HasMaxLength(200).IsRequired();
             b.HasIndex(x => x.Email).IsUnique();
 
@@ -27,6 +41,11 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.PasswordHash).IsRequired();
             b.Property(x => x.Role).HasMaxLength(32).IsRequired();
             b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TourEntity>(b =>
@@ -34,10 +53,18 @@ public sealed class TripflowDbContext : DbContext
             b.ToTable("tours");
             b.HasKey(x => x.Id);
 
+            b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
             b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
             b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasIndex(x => new { x.OrganizationId, x.StartDate });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.Tours)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             b.HasOne(x => x.GuideUser)
                 .WithMany(x => x.GuidedTours)
@@ -60,6 +87,7 @@ public sealed class TripflowDbContext : DbContext
             b.ToTable("participants");
             b.HasKey(x => x.Id);
 
+            b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
             b.Property(x => x.Email).HasMaxLength(200);
             b.Property(x => x.Phone).HasMaxLength(50);
@@ -69,6 +97,12 @@ public sealed class TripflowDbContext : DbContext
 
             b.Property(x => x.CreatedAt).IsRequired();
             b.HasIndex(x => x.TourId);
+            b.HasIndex(x => x.OrganizationId);
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.Participants)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TourPortalEntity>(b =>
@@ -76,8 +110,16 @@ public sealed class TripflowDbContext : DbContext
             b.ToTable("tour_portals");
             b.HasKey(x => x.TourId);
 
+            b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.PortalJson).HasColumnType("jsonb").IsRequired();
             b.Property(x => x.UpdatedAt).IsRequired();
+
+            b.HasIndex(x => x.OrganizationId);
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.Portals)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CheckInEntity>(b =>
@@ -85,12 +127,19 @@ public sealed class TripflowDbContext : DbContext
             b.ToTable("checkins");
             b.HasKey(x => x.Id);
 
+            b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.Method).HasMaxLength(16).IsRequired();
             b.Property(x => x.CheckedInAt).IsRequired();
 
             b.HasIndex(x => x.TourId);
             b.HasIndex(x => x.ParticipantId);
+            b.HasIndex(x => x.OrganizationId);
             b.HasIndex(x => new { x.TourId, x.ParticipantId }).IsUnique();
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.CheckIns)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
