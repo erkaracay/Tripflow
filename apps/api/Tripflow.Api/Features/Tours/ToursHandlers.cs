@@ -2,14 +2,21 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Organizations;
 
 namespace Tripflow.Api.Features.Tours;
 
 internal static class ToursHandlers
 {
-    internal static async Task<IResult> GetTours(TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetTours(HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
     {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var error))
+        {
+            return error!;
+        }
+
         var tours = await db.Tours.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
             .Select(x => new TourListItemDto(
                 x.Id,
@@ -24,8 +31,17 @@ internal static class ToursHandlers
         return Results.Ok(tours);
     }
 
-    internal static async Task<IResult> CreateTour(CreateTourRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> CreateTour(
+        CreateTourRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -50,6 +66,7 @@ internal static class ToursHandlers
         var entity = new TourEntity
         {
             Id = Guid.NewGuid(),
+            OrganizationId = orgId,
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
@@ -64,6 +81,7 @@ internal static class ToursHandlers
         db.TourPortals.Add(new TourPortalEntity
         {
             TourId = entity.Id,
+            OrganizationId = orgId,
             PortalJson = portalJson,
             UpdatedAt = DateTime.UtcNow
         });
@@ -73,11 +91,21 @@ internal static class ToursHandlers
         return Results.Created($"/api/tours/{dto.Id}", dto);
     }
 
-    internal static async Task<IResult> UpdateTour(string tourId, UpdateTourRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> UpdateTour(
+        string tourId,
+        UpdateTourRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
         }
 
         if (request is null)
@@ -106,7 +134,7 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("End date must be on or after start date.");
         }
 
-        var entity = await db.Tours.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var entity = await db.Tours.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (entity is null)
         {
             return Results.NotFound(new { message = "Tour not found." });
@@ -158,6 +186,7 @@ internal static class ToursHandlers
             db.TourPortals.Add(new TourPortalEntity
             {
                 TourId = id,
+                OrganizationId = tour.OrganizationId,
                 PortalJson = json,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -178,15 +207,26 @@ internal static class ToursHandlers
         return Results.Ok(portal);
     }
 
-    internal static async Task<IResult> SavePortal(string tourId, TourPortalInfo request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> SavePortal(
+        string tourId,
+        TourPortalInfo request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
-        if (!tourExists)
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tour = await db.Tours.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (tour is null)
         {
             return Results.NotFound(new { message = "Tour not found." });
         }
@@ -205,12 +245,14 @@ internal static class ToursHandlers
 
         var json = System.Text.Json.JsonSerializer.Serialize(request, ToursHelpers.JsonOptions);
 
-        var portalEntity = await db.TourPortals.FirstOrDefaultAsync(x => x.TourId == id, ct);
+        var portalEntity = await db.TourPortals
+            .FirstOrDefaultAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
         if (portalEntity is null)
         {
             portalEntity = new TourPortalEntity
             {
                 TourId = id,
+                OrganizationId = orgId,
                 PortalJson = json,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -226,11 +268,21 @@ internal static class ToursHandlers
         return Results.Ok(request);
     }
 
-    internal static async Task<IResult> AssignGuide(string tourId, AssignGuideRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> AssignGuide(
+        string tourId,
+        AssignGuideRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
         }
 
         if (request is null || !request.GuideUserId.HasValue || request.GuideUserId == Guid.Empty)
@@ -238,7 +290,7 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Guide user id is required.");
         }
 
-        var tour = await db.Tours.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var tour = await db.Tours.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (tour is null)
         {
             return Results.NotFound(new { message = "Tour not found." });
@@ -246,7 +298,7 @@ internal static class ToursHandlers
 
         var guideId = request.GuideUserId.Value;
         var guideExists = await db.Users.AsNoTracking()
-            .AnyAsync(x => x.Id == guideId && x.Role == "Guide", ct);
+            .AnyAsync(x => x.Id == guideId && x.Role == "Guide" && x.OrganizationId == orgId, ct);
 
         if (!guideExists)
         {
@@ -259,21 +311,32 @@ internal static class ToursHandlers
         return Results.Ok(new { tourId = id, guideUserId = guideId });
     }
 
-    internal static async Task<IResult> GetParticipants(string tourId, string? query, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetParticipants(
+        string tourId,
+        string? query,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
-            .Where(x => x.TourId == id);
+            .Where(x => x.TourId == id && x.OrganizationId == orgId);
 
         var search = query?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
@@ -285,7 +348,8 @@ internal static class ToursHandlers
                 || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)));
         }
 
-        var checkinsQuery = db.CheckIns.AsNoTracking().Where(x => x.TourId == id);
+        var checkinsQuery = db.CheckIns.AsNoTracking()
+            .Where(x => x.TourId == id && x.OrganizationId == orgId);
 
         var participants = await participantsQuery
             .OrderBy(x => x.FullName)
@@ -305,14 +369,25 @@ internal static class ToursHandlers
         return Results.Ok(participants);
     }
 
-    internal static async Task<IResult> CreateParticipant(string tourId, CreateParticipantRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> CreateParticipant(
+        string tourId,
+        CreateParticipantRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
@@ -334,6 +409,7 @@ internal static class ToursHandlers
         {
             Id = Guid.NewGuid(),
             TourId = id,
+            OrganizationId = orgId,
             FullName = fullName,
             Email = request.Email?.Trim(),
             Phone = request.Phone?.Trim(),
@@ -360,6 +436,7 @@ internal static class ToursHandlers
         string tourId,
         string participantId,
         UpdateParticipantRequest request,
+        HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -378,14 +455,20 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Request body is required.");
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
         }
 
         var entity = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == id, ct);
+            x => x.Id == participantGuid && x.TourId == id && x.OrganizationId == orgId, ct);
 
         if (entity is null)
         {
@@ -408,7 +491,7 @@ internal static class ToursHandlers
         await db.SaveChangesAsync(ct);
 
         var arrived = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.TourId == id && x.ParticipantId == entity.Id, ct);
+            .AnyAsync(x => x.TourId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, arrived));
     }
@@ -416,6 +499,7 @@ internal static class ToursHandlers
     internal static async Task<IResult> DeleteParticipant(
         string tourId,
         string participantId,
+        HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -429,14 +513,20 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Invalid participant id.");
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
         }
 
         var entity = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == id, ct);
+            x => x.Id == participantGuid && x.TourId == id && x.OrganizationId == orgId, ct);
 
         if (entity is null)
         {
@@ -444,7 +534,7 @@ internal static class ToursHandlers
         }
 
         var checkIn = await db.CheckIns.FirstOrDefaultAsync(
-            x => x.TourId == id && x.ParticipantId == participantGuid, ct);
+            x => x.TourId == id && x.ParticipantId == participantGuid && x.OrganizationId == orgId, ct);
         if (checkIn is not null)
         {
             db.CheckIns.Remove(checkIn);
@@ -456,14 +546,35 @@ internal static class ToursHandlers
         return Results.NoContent();
     }
 
-    internal static async Task<IResult> CheckIn(string tourId, CheckInRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> CheckIn(
+        string tourId,
+        CheckInRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        return await CheckInForOrg(orgId, tourId, request, db, ct);
+    }
+
+    internal static async Task<IResult> CheckInForOrg(
+        Guid orgId,
+        string tourId,
+        CheckInRequest request,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
@@ -474,13 +585,13 @@ internal static class ToursHandlers
         if (request.ParticipantId.HasValue)
         {
             participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.TourId == id, ct);
+                .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.TourId == id && x.OrganizationId == orgId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(request.Code))
         {
             var code = request.Code.Trim().ToUpperInvariant();
             participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.TourId == id && x.CheckInCode == code, ct);
+                .FirstOrDefaultAsync(x => x.TourId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
         }
         else
         {
@@ -499,7 +610,7 @@ internal static class ToursHandlers
         }
 
         var alreadyCheckedIn = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.TourId == id && x.ParticipantId == participant.Id, ct);
+            .AnyAsync(x => x.TourId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
 
         if (!alreadyCheckedIn)
         {
@@ -508,6 +619,7 @@ internal static class ToursHandlers
                 Id = Guid.NewGuid(),
                 TourId = id,
                 ParticipantId = participant.Id,
+                OrganizationId = orgId,
                 CheckedInAt = DateTime.UtcNow,
                 Method = method
             });
@@ -520,13 +632,31 @@ internal static class ToursHandlers
             { }
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
-        var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+        var arrivedCount = await db.CheckIns.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, alreadyCheckedIn, arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> UndoCheckIn(
+        string tourId,
+        CheckInUndoRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        return await UndoCheckInForOrg(orgId, tourId, request, db, ct);
+    }
+
+    internal static async Task<IResult> UndoCheckInForOrg(
+        Guid orgId,
         string tourId,
         CheckInUndoRequest request,
         TripflowDbContext db,
@@ -542,7 +672,8 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Request body is required.");
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
@@ -553,7 +684,7 @@ internal static class ToursHandlers
         if (request.ParticipantId.HasValue)
         {
             participant = await db.Participants.FirstOrDefaultAsync(
-                x => x.Id == request.ParticipantId.Value && x.TourId == id, ct);
+                x => x.Id == request.ParticipantId.Value && x.TourId == id && x.OrganizationId == orgId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(request.CheckInCode))
         {
@@ -564,7 +695,7 @@ internal static class ToursHandlers
             }
 
             participant = await db.Participants.FirstOrDefaultAsync(
-                x => x.TourId == id && x.CheckInCode == code, ct);
+                x => x.TourId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
         }
         else
         {
@@ -577,7 +708,7 @@ internal static class ToursHandlers
         }
 
         var checkIn = await db.CheckIns.FirstOrDefaultAsync(
-            x => x.TourId == id && x.ParticipantId == participant.Id, ct);
+            x => x.TourId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
 
         var alreadyUndone = checkIn is null;
         if (!alreadyUndone)
@@ -586,13 +717,35 @@ internal static class ToursHandlers
             await db.SaveChangesAsync(ct);
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
-        var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+        var arrivedCount = await db.CheckIns.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
     }
 
-    internal static async Task<IResult> CheckInByCode(string tourId, CheckInCodeRequest request, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> CheckInByCode(
+        string tourId,
+        CheckInCodeRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        return await CheckInByCodeForOrg(orgId, tourId, request, db, ct);
+    }
+
+    internal static async Task<IResult> CheckInByCodeForOrg(
+        Guid orgId,
+        string tourId,
+        CheckInCodeRequest request,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (request is null)
         {
@@ -610,24 +763,36 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Check-in code must be 8 characters.");
         }
 
-        return await CheckIn(tourId, new CheckInRequest(code, null, "qr"), db, ct);
+        return await CheckInForOrg(orgId, tourId, new CheckInRequest(code, null, "qr"), db, ct);
     }
 
-    internal static async Task<IResult> GetCheckInSummary(string tourId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetCheckInSummary(
+        string tourId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
         if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var tourExists = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (!tourExists)
         {
             return Results.NotFound(new { message = "Tour not found." });
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking().CountAsync(x => x.TourId == id, ct);
-        var totalCount = await db.Participants.AsNoTracking().CountAsync(x => x.TourId == id, ct);
+        var arrivedCount = await db.CheckIns.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }

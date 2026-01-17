@@ -8,6 +8,7 @@ using Tripflow.Api.Data;
 using Tripflow.Api.Data.Dev;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Auth;
+using Tripflow.Api.Features.Organizations;
 using Tripflow.Api.Features.Tours;
 using Tripflow.Api.Features.Users;
 
@@ -77,7 +78,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("SuperAdmin"));
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("SuperAdmin", "AgencyAdmin"));
     options.AddPolicy("GuideOnly", policy => policy.RequireRole("Guide"));
 });
 
@@ -156,6 +158,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
    .WithOpenApi();
 
 app.MapAuthEndpoints();
+app.MapOrganizationEndpoints();
 app.MapGuideEndpoints();
 app.MapUsersEndpoints();
 app.MapToursEndpoints();

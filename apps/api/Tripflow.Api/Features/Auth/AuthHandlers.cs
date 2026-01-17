@@ -51,6 +51,11 @@ internal static class AuthHandlers
             new("role", user.Role)
         };
 
+        if (user.OrganizationId.HasValue)
+        {
+            claims.Add(new Claim("orgId", user.OrganizationId.Value.ToString()));
+        }
+
         if (!string.IsNullOrWhiteSpace(user.FullName))
         {
             claims.Add(new Claim("name", user.FullName));

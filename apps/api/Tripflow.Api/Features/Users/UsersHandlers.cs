@@ -1,14 +1,21 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
+using Tripflow.Api.Features.Organizations;
 
 namespace Tripflow.Api.Features.Users;
 
 internal static class UsersHandlers
 {
-    internal static async Task<IResult> GetUsers(string? role, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetUsers(string? role, HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
     {
-        var query = db.Users.AsNoTracking();
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var error))
+        {
+            return error!;
+        }
+
+        var query = db.Users.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId);
 
         var roleFilter = role?.Trim();
         if (!string.IsNullOrWhiteSpace(roleFilter))
