@@ -13,6 +13,7 @@ const userRole = computed(() => {
 
   return getTokenRole(token)
 })
+const showOrgLink = computed(() => userRole.value === 'SuperAdmin')
 const showAuthActions = computed(() => Boolean(userRole.value))
 const toursPath = computed(() => {
   if (userRole.value === 'Guide') {
@@ -49,6 +50,9 @@ const handleLogout = async () => {
                 </div>
 
                 <nav class="flex items-center gap-3 text-sm text-slate-600">
+                    <RouterLink v-if="showOrgLink" class="hover:text-slate-900" to="/admin/orgs">
+                        Organizations
+                    </RouterLink>
                     <RouterLink v-if="toursPath" class="hover:text-slate-900" :to="toursPath">
                         Tours
                     </RouterLink>

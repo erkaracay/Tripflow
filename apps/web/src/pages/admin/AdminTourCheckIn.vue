@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { apiGet, apiPost } from '../../lib/api'
+import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -30,6 +31,14 @@ const codeInput = ref<HTMLInputElement | null>(null)
 const undoingParticipantId = ref<string | null>(null)
 
 const { pushToast } = useToast()
+const isSuperAdmin = computed(() => {
+  const token = getToken()
+  if (!token || isTokenExpired(token)) {
+    return false
+  }
+
+  return getTokenRole(token) === 'SuperAdmin'
+})
 
 const filteredParticipants = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
@@ -250,9 +259,27 @@ onMounted(() => {
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <div class="flex items-start justify-between gap-4">
         <div>
-          <RouterLink class="text-sm text-slate-600 underline" :to="`/admin/tours/${tourId}`">
-            Back to tour
-          </RouterLink>
+          <div class="flex flex-wrap items-center gap-2">
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              to="/admin/tours"
+            >
+              Back to tours
+            </RouterLink>
+            <RouterLink
+              v-if="isSuperAdmin"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              to="/admin/orgs"
+            >
+              Back to organizations
+            </RouterLink>
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              :to="`/admin/tours/${tourId}`"
+            >
+              Back to tour
+            </RouterLink>
+          </div>
           <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? 'Tour check-in' }}</h1>
           <p class="text-sm text-slate-500" v-if="tour">{{ tour.startDate }} to {{ tour.endDate }}</p>
         </div>

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
+import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import {
   formatPhoneDisplay,
   normalizeEmail,
@@ -50,6 +51,14 @@ const editParticipantSaving = ref(false)
 const editParticipantError = ref<string | null>(null)
 
 const { pushToast } = useToast()
+const isSuperAdmin = computed(() => {
+  const token = getToken()
+  if (!token || isTokenExpired(token)) {
+    return false
+  }
+
+  return getTokenRole(token) === 'SuperAdmin'
+})
 
 const form = reactive({
   fullName: '',
@@ -495,7 +504,21 @@ onMounted(loadTour)
   <div class="space-y-8">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <RouterLink class="text-sm text-slate-600 underline" to="/admin/tours">Back to tours</RouterLink>
+        <div class="flex flex-wrap items-center gap-2">
+          <RouterLink
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            to="/admin/tours"
+          >
+            Back to tours
+          </RouterLink>
+          <RouterLink
+            v-if="isSuperAdmin"
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            to="/admin/orgs"
+          >
+            Back to organizations
+          </RouterLink>
+        </div>
         <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? 'Tour' }}</h1>
         <p class="text-sm text-slate-500" v-if="tour">{{ tour.startDate }} to {{ tour.endDate }}</p>
       </div>
