@@ -23,7 +23,7 @@ export const sanitizePhoneInput = (value: string) => {
 
 type PhoneNormalization = {
   normalized: string
-  error?: string
+  errorKey?: string
 }
 
 export const normalizePhone = (raw: string): PhoneNormalization => {
@@ -36,16 +36,16 @@ export const normalizePhone = (raw: string): PhoneNormalization => {
   const sanitized = sanitizePhoneInput(cleaned)
 
   if (!sanitized) {
-    return { normalized: '', error: 'Telefon geçersiz.' }
+    return { normalized: '', errorKey: 'validation.phone.invalid' }
   }
 
   if (sanitized.startsWith('+')) {
     const digits = sanitized.slice(1)
     if (!digits) {
-      return { normalized: '', error: 'Telefon geçersiz.' }
+      return { normalized: '', errorKey: 'validation.phone.invalid' }
     }
     if (digits.length > 15) {
-      return { normalized: '', error: 'Telefon çok uzun.' }
+      return { normalized: '', errorKey: 'validation.phone.tooLong' }
     }
     return { normalized: `+${digits}` }
   }
@@ -63,7 +63,7 @@ export const normalizePhone = (raw: string): PhoneNormalization => {
     return { normalized: `+90${digits}` }
   }
 
-  return { normalized: digits, error: 'Telefon +90 ile başlamalı.' }
+  return { normalized: digits, errorKey: 'validation.phone.requireCountry' }
 }
 
 const chunkString = (value: string, size: number) =>

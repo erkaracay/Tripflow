@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import {
@@ -16,6 +17,7 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import type { DayPlan, LinkInfo, Participant, Tour, TourPortalInfo, UserListItem } from '../../types'
 
 const route = useRoute()
+const { t } = useI18n()
 const tourId = computed(() => route.params.tourId as string)
 
 const tour = ref<Tour | null>(null)
@@ -29,26 +31,32 @@ const tourForm = reactive({
 })
 const loading = ref(true)
 const submitting = ref(false)
-const loadError = ref<string | null>(null)
-const formError = ref<string | null>(null)
+const loadErrorKey = ref<string | null>(null)
+const loadErrorMessage = ref<string | null>(null)
+const formErrorKey = ref<string | null>(null)
+const formErrorMessage = ref<string | null>(null)
 const tourSaving = ref(false)
-const tourMessage = ref<string | null>(null)
-const tourError = ref<string | null>(null)
-const dateHint = ref<string | null>(null)
+const tourMessageKey = ref<string | null>(null)
+const tourErrorKey = ref<string | null>(null)
+const tourErrorMessage = ref<string | null>(null)
+const dateHintKey = ref<string | null>(null)
 const portalSaving = ref(false)
-const portalMessage = ref<string | null>(null)
-const portalError = ref<string | null>(null)
+const portalMessageKey = ref<string | null>(null)
+const portalErrorKey = ref<string | null>(null)
+const portalErrorMessage = ref<string | null>(null)
 const guideSaving = ref(false)
-const guideError = ref<string | null>(null)
+const guideErrorKey = ref<string | null>(null)
+const guideErrorMessage = ref<string | null>(null)
 const guideLoading = ref(true)
 const guides = ref<UserListItem[]>([])
 const guideId = ref('')
-const phoneError = ref<string | null>(null)
-const editPhoneError = ref<string | null>(null)
+const phoneErrorKey = ref<string | null>(null)
+const editPhoneErrorKey = ref<string | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const editingParticipantId = ref<string | null>(null)
 const editParticipantSaving = ref(false)
-const editParticipantError = ref<string | null>(null)
+const editParticipantErrorKey = ref<string | null>(null)
+const editParticipantErrorMessage = ref<string | null>(null)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -73,19 +81,19 @@ const editForm = reactive({
 })
 
 const handlePhoneInput = () => {
-  phoneError.value = null
+  phoneErrorKey.value = null
   const sanitized = sanitizePhoneInput(form.phone)
   form.phone = sanitized.slice(0, 15)
 }
 
 const handlePhoneBlur = () => {
-  const { normalized, error } = normalizePhone(form.phone)
-  if (error) {
-    phoneError.value = error
+  const { normalized, errorKey } = normalizePhone(form.phone)
+  if (errorKey) {
+    phoneErrorKey.value = errorKey
     return
   }
 
-  phoneError.value = null
+  phoneErrorKey.value = null
   form.phone = normalized
 }
 
@@ -171,17 +179,23 @@ const moveDay = (index: number, direction: number) => {
 
 const loadTour = async () => {
   loading.value = true
-  loadError.value = null
-  portalMessage.value = null
-  portalError.value = null
-  formError.value = null
-  tourMessage.value = null
-  tourError.value = null
-  dateHint.value = null
+  loadErrorKey.value = null
+  loadErrorMessage.value = null
+  portalMessageKey.value = null
+  portalErrorKey.value = null
+  portalErrorMessage.value = null
+  formErrorKey.value = null
+  formErrorMessage.value = null
+  tourMessageKey.value = null
+  tourErrorKey.value = null
+  tourErrorMessage.value = null
+  dateHintKey.value = null
   editingParticipantId.value = null
-  editParticipantError.value = null
-  editPhoneError.value = null
-  guideError.value = null
+  editParticipantErrorKey.value = null
+  editParticipantErrorMessage.value = null
+  editPhoneErrorKey.value = null
+  guideErrorKey.value = null
+  guideErrorMessage.value = null
   guideLoading.value = true
 
   try {
@@ -198,7 +212,10 @@ const loadTour = async () => {
     guideId.value = tourData.guideUserId ?? ''
     setPortalForm(portalData)
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : 'Failed to load tour.'
+    loadErrorMessage.value = err instanceof Error ? err.message : null
+    if (!loadErrorMessage.value) {
+      loadErrorKey.value = 'errors.tourDetail.load'
+    }
     return
   } finally {
     loading.value = false
@@ -207,29 +224,33 @@ const loadTour = async () => {
   try {
     guides.value = await apiGet<UserListItem[]>('/api/users?role=Guide')
   } catch (err) {
-    guideError.value = err instanceof Error ? err.message : 'Failed to load guides.'
+    guideErrorMessage.value = err instanceof Error ? err.message : null
+    if (!guideErrorMessage.value) {
+      guideErrorKey.value = 'errors.guides.load'
+    }
   } finally {
     guideLoading.value = false
   }
 }
 
 const saveTour = async () => {
-  tourMessage.value = null
-  tourError.value = null
+  tourMessageKey.value = null
+  tourErrorKey.value = null
+  tourErrorMessage.value = null
 
   const name = tourForm.name.trim()
   if (!name) {
-    tourError.value = 'Name is required.'
+    tourErrorKey.value = 'validation.tourNameRequired'
     return
   }
 
   if (!tourForm.startDate || !tourForm.endDate) {
-    tourError.value = 'Start and end dates are required.'
+    tourErrorKey.value = 'validation.startEndRequired'
     return
   }
 
   if (tourForm.endDate < tourForm.startDate) {
-    tourError.value = 'End date must be on or after start date.'
+    tourErrorKey.value = 'validation.endAfterStart'
     return
   }
 
@@ -242,29 +263,33 @@ const saveTour = async () => {
     })
     tour.value = updated
     setTourForm(updated)
-    tourMessage.value = 'Saved.'
-    pushToast('Tour updated', 'success')
+    tourMessageKey.value = 'common.saved'
+    pushToast({ key: 'toast.tourUpdated', tone: 'success' })
   } catch (err) {
-    tourError.value = err instanceof Error ? err.message : 'Failed to update tour.'
-    pushToast(tourError.value, 'error')
+    tourErrorMessage.value = err instanceof Error ? err.message : null
+    if (!tourErrorMessage.value) {
+      tourErrorKey.value = 'errors.tourDetail.update'
+    }
+    pushToast({ key: 'toast.tourUpdateFailed', tone: 'error' })
   } finally {
     tourSaving.value = false
   }
 }
 
 const addParticipant = async () => {
-  formError.value = null
-  phoneError.value = null
+  formErrorKey.value = null
+  formErrorMessage.value = null
+  phoneErrorKey.value = null
 
   const fullName = normalizeName(form.fullName)
   if (fullName.length < 2) {
-    formError.value = 'Full name is required.'
+    formErrorKey.value = 'validation.fullNameRequired'
     return
   }
 
-  const { normalized: normalizedPhone, error: phoneErr } = normalizePhone(form.phone)
-  if (phoneErr) {
-    phoneError.value = phoneErr
+  const { normalized: normalizedPhone, errorKey } = normalizePhone(form.phone)
+  if (errorKey) {
+    phoneErrorKey.value = errorKey
     return
   }
 
@@ -280,11 +305,14 @@ const addParticipant = async () => {
     form.fullName = ''
     form.email = ''
     form.phone = ''
-    pushToast('Participant added', 'success')
+    pushToast({ key: 'toast.participantAdded', tone: 'success' })
     nameInput.value?.focus()
   } catch (err) {
-    formError.value = err instanceof Error ? err.message : 'Failed to add participant.'
-    pushToast(formError.value, 'error')
+    formErrorMessage.value = err instanceof Error ? err.message : null
+    if (!formErrorMessage.value) {
+      formErrorKey.value = 'errors.participant.create'
+    }
+    pushToast({ key: 'toast.participantAddFailed', tone: 'error' })
   } finally {
     submitting.value = false
   }
@@ -292,8 +320,9 @@ const addParticipant = async () => {
 
 const startEditParticipant = (participant: Participant) => {
   editingParticipantId.value = participant.id
-  editParticipantError.value = null
-  editPhoneError.value = null
+  editParticipantErrorKey.value = null
+  editParticipantErrorMessage.value = null
+  editPhoneErrorKey.value = null
   editForm.fullName = participant.fullName
   editForm.email = participant.email ?? ''
   editForm.phone = participant.phone ?? ''
@@ -301,40 +330,42 @@ const startEditParticipant = (participant: Participant) => {
 
 const cancelEditParticipant = () => {
   editingParticipantId.value = null
-  editParticipantError.value = null
-  editPhoneError.value = null
+  editParticipantErrorKey.value = null
+  editParticipantErrorMessage.value = null
+  editPhoneErrorKey.value = null
 }
 
 const handleEditPhoneInput = () => {
-  editPhoneError.value = null
+  editPhoneErrorKey.value = null
   const sanitized = sanitizePhoneInput(editForm.phone)
   editForm.phone = sanitized.slice(0, 15)
 }
 
 const handleEditPhoneBlur = () => {
-  const { normalized, error } = normalizePhone(editForm.phone)
-  if (error) {
-    editPhoneError.value = error
+  const { normalized, errorKey } = normalizePhone(editForm.phone)
+  if (errorKey) {
+    editPhoneErrorKey.value = errorKey
     return
   }
 
-  editPhoneError.value = null
+  editPhoneErrorKey.value = null
   editForm.phone = normalized
 }
 
 const saveParticipant = async (participant: Participant) => {
-  editParticipantError.value = null
-  editPhoneError.value = null
+  editParticipantErrorKey.value = null
+  editParticipantErrorMessage.value = null
+  editPhoneErrorKey.value = null
 
   const fullName = normalizeName(editForm.fullName)
   if (fullName.length < 2) {
-    editParticipantError.value = 'Full name is required.'
+    editParticipantErrorKey.value = 'validation.fullNameRequired'
     return
   }
 
-  const { normalized: normalizedPhone, error: phoneErr } = normalizePhone(editForm.phone)
-  if (phoneErr) {
-    editPhoneError.value = phoneErr
+  const { normalized: normalizedPhone, errorKey } = normalizePhone(editForm.phone)
+  if (errorKey) {
+    editPhoneErrorKey.value = errorKey
     return
   }
 
@@ -353,18 +384,22 @@ const saveParticipant = async (participant: Participant) => {
       item.id === participant.id ? updated : item
     )
     editingParticipantId.value = null
-    pushToast('Participant updated', 'success')
+    pushToast({ key: 'toast.participantUpdated', tone: 'success' })
   } catch (err) {
-    editParticipantError.value =
-      err instanceof Error ? err.message : 'Failed to update participant.'
-    pushToast(editParticipantError.value, 'error')
+    editParticipantErrorMessage.value = err instanceof Error ? err.message : null
+    if (!editParticipantErrorMessage.value) {
+      editParticipantErrorKey.value = 'errors.participant.update'
+    }
+    pushToast({ key: 'toast.participantUpdateFailed', tone: 'error' })
   } finally {
     editParticipantSaving.value = false
   }
 }
 
 const deleteParticipant = async (participant: Participant) => {
-  const confirmed = globalThis.confirm?.(`Delete ${participant.fullName}?`)
+  const confirmed = globalThis.confirm?.(
+    t('admin.participants.deleteConfirm', { name: participant.fullName })
+  )
   if (!confirmed) {
     return
   }
@@ -372,16 +407,16 @@ const deleteParticipant = async (participant: Participant) => {
   try {
     await apiDelete(`/api/tours/${tourId.value}/participants/${participant.id}`)
     participants.value = participants.value.filter((item) => item.id !== participant.id)
-    pushToast('Participant removed', 'success')
+    pushToast({ key: 'toast.participantRemoved', tone: 'success' })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to delete participant.'
-    pushToast(message, 'error')
+    pushToast({ key: 'toast.participantDeleteFailed', tone: 'error' })
   }
 }
 
 const savePortal = async () => {
-  portalMessage.value = null
-  portalError.value = null
+  portalMessageKey.value = null
+  portalErrorKey.value = null
+  portalErrorMessage.value = null
 
   const meetingTime = portalForm.meetingTime.trim()
   const meetingPlace = portalForm.meetingPlace.trim()
@@ -389,17 +424,17 @@ const savePortal = async () => {
   const meetingNote = portalForm.meetingNote.trim()
 
   if (!meetingTime) {
-    portalError.value = 'Meeting time is required.'
+    portalErrorKey.value = 'validation.meetingTimeRequired'
     return
   }
 
   if (!meetingPlace) {
-    portalError.value = 'Meeting place is required.'
+    portalErrorKey.value = 'validation.meetingPlaceRequired'
     return
   }
 
   if (!meetingMapsUrl) {
-    portalError.value = 'Meeting maps URL is required.'
+    portalErrorKey.value = 'validation.meetingMapsRequired'
     return
   }
 
@@ -444,21 +479,25 @@ const savePortal = async () => {
     const saved = await apiPut<TourPortalInfo>(`/api/tours/${tourId.value}/portal`, payload)
     portal.value = saved
     portalDays.value = normalizeDays(saved.days)
-    portalMessage.value = 'Saved.'
-    pushToast('Portal Saved', 'success')
+    portalMessageKey.value = 'common.saved'
+    pushToast({ key: 'toast.portalSaved', tone: 'success' })
   } catch (err) {
-    portalError.value = err instanceof Error ? err.message : 'Failed to save portal.'
-    pushToast(portalError.value, 'error')
+    portalErrorMessage.value = err instanceof Error ? err.message : null
+    if (!portalErrorMessage.value) {
+      portalErrorKey.value = 'errors.portal.save'
+    }
+    pushToast({ key: 'toast.portalSaveFailed', tone: 'error' })
   } finally {
     portalSaving.value = false
   }
 }
 
 const saveGuide = async () => {
-  guideError.value = null
+  guideErrorKey.value = null
+  guideErrorMessage.value = null
 
   if (!guideId.value) {
-    guideError.value = 'Select a guide.'
+    guideErrorKey.value = 'validation.guideRequired'
     return
   }
 
@@ -470,10 +509,13 @@ const saveGuide = async () => {
     if (tour.value) {
       tour.value = { ...tour.value, guideUserId: guideId.value }
     }
-    pushToast('Guide assigned', 'success')
+    pushToast({ key: 'toast.guideAssigned', tone: 'success' })
   } catch (err) {
-    guideError.value = err instanceof Error ? err.message : 'Failed to assign guide.'
-    pushToast(guideError.value, 'error')
+    guideErrorMessage.value = err instanceof Error ? err.message : null
+    if (!guideErrorMessage.value) {
+      guideErrorKey.value = 'errors.guide.assign'
+    }
+    pushToast({ key: 'toast.guideAssignFailed', tone: 'error' })
   } finally {
     guideSaving.value = false
   }
@@ -483,17 +525,17 @@ watch(
   () => tourForm.startDate,
   (value) => {
     if (!value || !tourForm.endDate) {
-      dateHint.value = null
+      dateHintKey.value = null
       return
     }
 
     if (tourForm.endDate < value) {
       tourForm.endDate = value
-      dateHint.value = 'End date was adjusted to match start date.'
+      dateHintKey.value = 'validation.endDateAdjusted'
       return
     }
 
-    dateHint.value = null
+    dateHintKey.value = null
   }
 )
 
@@ -509,25 +551,27 @@ onMounted(loadTour)
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
             to="/admin/tours"
           >
-            Back to tours
+            {{ t('nav.backToTours') }}
           </RouterLink>
           <RouterLink
             v-if="isSuperAdmin"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
             to="/admin/orgs"
           >
-            Back to organizations
+            {{ t('nav.backToOrganizations') }}
           </RouterLink>
         </div>
-        <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? 'Tour' }}</h1>
-        <p class="text-sm text-slate-500" v-if="tour">{{ tour.startDate }} to {{ tour.endDate }}</p>
+        <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? t('common.tour') }}</h1>
+        <p class="text-sm text-slate-500" v-if="tour">
+          {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
+        </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <RouterLink
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
           :to="`/admin/tours/${tourId}/checkin`"
         >
-          Check-in
+          {{ t('common.checkIn') }}
         </RouterLink>
         <a
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
@@ -535,35 +579,40 @@ onMounted(loadTour)
           rel="noreferrer"
           target="_blank"
         >
-          Open portal
+          {{ t('admin.tourDetail.openPortal') }}
         </a>
       </div>
     </div>
 
-    <LoadingState v-if="loading" message="Loading tour details..." />
-    <ErrorState v-else-if="loadError" :message="loadError" @retry="loadTour" />
+    <LoadingState v-if="loading" message-key="admin.tourDetail.loading" />
+    <ErrorState
+      v-else-if="loadErrorKey || loadErrorMessage"
+      :message="loadErrorMessage ?? undefined"
+      :message-key="loadErrorKey ?? undefined"
+      @retry="loadTour"
+    />
 
     <template v-else>
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 class="text-lg font-semibold">Tour Details</h2>
-            <p class="text-sm text-slate-500">Update the tour name and dates.</p>
+            <h2 class="text-lg font-semibold">{{ t('admin.tourDetail.detailsTitle') }}</h2>
+            <p class="text-sm text-slate-500">{{ t('admin.tourDetail.detailsSubtitle') }}</p>
           </div>
         </div>
 
         <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="saveTour">
           <label class="grid gap-1 text-sm md:col-span-1">
-            <span class="text-slate-600">Name</span>
+            <span class="text-slate-600">{{ t('admin.tourDetail.form.nameLabel') }}</span>
             <input
               v-model.trim="tourForm.name"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              placeholder="Tour name"
+              :placeholder="t('admin.tourDetail.form.namePlaceholder')"
               type="text"
             />
           </label>
           <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">Start date</span>
+            <span class="text-slate-600">{{ t('admin.tourDetail.form.startDateLabel') }}</span>
             <input
               v-model="tourForm.startDate"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
@@ -571,7 +620,7 @@ onMounted(loadTour)
             />
           </label>
           <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">End date</span>
+            <span class="text-slate-600">{{ t('admin.tourDetail.form.endDateLabel') }}</span>
             <input
               v-model="tourForm.endDate"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
@@ -585,11 +634,13 @@ onMounted(loadTour)
               :disabled="tourSaving"
               type="submit"
             >
-              {{ tourSaving ? 'Saving...' : 'Save tour' }}
+              {{ tourSaving ? t('common.saving') : t('admin.tourDetail.form.save') }}
             </button>
-            <span v-if="tourMessage" class="text-xs text-emerald-600">{{ tourMessage }}</span>
-            <span v-if="tourError" class="text-xs text-rose-600">{{ tourError }}</span>
-            <span v-if="dateHint" class="text-xs text-slate-500">{{ dateHint }}</span>
+            <span v-if="tourMessageKey" class="text-xs text-emerald-600">{{ t(tourMessageKey) }}</span>
+            <span v-if="tourErrorKey || tourErrorMessage" class="text-xs text-rose-600">
+              {{ tourErrorKey ? t(tourErrorKey) : tourErrorMessage }}
+            </span>
+            <span v-if="dateHintKey" class="text-xs text-slate-500">{{ t(dateHintKey) }}</span>
           </div>
         </form>
       </section>
@@ -597,21 +648,21 @@ onMounted(loadTour)
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 class="text-lg font-semibold">Guide Assignment</h2>
-            <p class="text-sm text-slate-500">Assign a guide to run check-ins for this tour.</p>
+            <h2 class="text-lg font-semibold">{{ t('admin.tourDetail.guide.title') }}</h2>
+            <p class="text-sm text-slate-500">{{ t('admin.tourDetail.guide.subtitle') }}</p>
           </div>
         </div>
 
-        <div v-if="guideLoading" class="mt-4 text-sm text-slate-500">Loading guides...</div>
+        <div v-if="guideLoading" class="mt-4 text-sm text-slate-500">{{ t('admin.tourDetail.guide.loading') }}</div>
         <div v-else-if="guides.length === 0" class="mt-4 text-sm text-slate-500">
-          No guide users found.
+          {{ t('admin.tourDetail.guide.empty') }}
         </div>
         <form v-else class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="saveGuide">
           <select
             v-model="guideId"
             class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none sm:w-auto"
           >
-            <option value="" disabled>Select a guide</option>
+            <option value="" disabled>{{ t('admin.tourDetail.guide.selectPlaceholder') }}</option>
             <option v-for="guide in guides" :key="guide.id" :value="guide.id">
               {{ guide.fullName || guide.email }}
             </option>
@@ -621,41 +672,43 @@ onMounted(loadTour)
             :disabled="guideSaving"
             type="submit"
           >
-            {{ guideSaving ? 'Saving...' : 'Save guide' }}
+            {{ guideSaving ? t('common.saving') : t('admin.tourDetail.guide.save') }}
           </button>
-          <span v-if="guideError" class="text-xs text-rose-600">{{ guideError }}</span>
+          <span v-if="guideErrorKey || guideErrorMessage" class="text-xs text-rose-600">
+            {{ guideErrorKey ? t(guideErrorKey) : guideErrorMessage }}
+          </span>
         </form>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 class="text-lg font-semibold">Add participant</h2>
+        <h2 class="text-lg font-semibold">{{ t('admin.participants.addTitle') }}</h2>
         <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="addParticipant">
           <label class="grid gap-1 text-sm md:col-span-1">
-            <span class="text-slate-600">Full name</span>
+            <span class="text-slate-600">{{ t('admin.participants.form.fullName') }}</span>
             <input
               v-model.trim="form.fullName"
               ref="nameInput"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              placeholder="Ayse Kaya"
+              :placeholder="t('admin.participants.form.fullNamePlaceholder')"
               type="text"
             />
           </label>
           <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">Email (optional)</span>
+            <span class="text-slate-600">{{ t('admin.participants.form.email') }}</span>
             <input
               v-model.trim="form.email"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              placeholder="ayse@example.com"
+              :placeholder="t('admin.participants.form.emailPlaceholder')"
               type="email"
             />
           </label>
           <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">Phone (optional)</span>
+            <span class="text-slate-600">{{ t('admin.participants.form.phone') }}</span>
             <input
               v-model.trim="form.phone"
               class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="phoneError ? 'border-rose-300' : 'border-slate-200'"
-              placeholder="+90 555 123 45 67"
+              :class="phoneErrorKey ? 'border-rose-300' : 'border-slate-200'"
+              :placeholder="t('admin.participants.form.phonePlaceholder')"
               inputmode="tel"
               maxlength="15"
               type="tel"
@@ -669,57 +722,59 @@ onMounted(loadTour)
               :disabled="submitting"
               type="submit"
             >
-              {{ submitting ? 'Adding...' : 'Add participant' }}
+              {{ submitting ? t('admin.participants.form.adding') : t('admin.participants.form.add') }}
             </button>
           </div>
         </form>
-        <p v-if="phoneError" class="mt-2 text-sm text-rose-600">{{ phoneError }}</p>
-        <p v-if="formError" class="mt-3 text-sm text-rose-600">{{ formError }}</p>
+        <p v-if="phoneErrorKey" class="mt-2 text-sm text-rose-600">{{ t(phoneErrorKey) }}</p>
+        <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
+          {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
+        </p>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Portal Content</h2>
-          <span class="text-xs text-slate-500">Participant view</span>
+          <h2 class="text-lg font-semibold">{{ t('admin.portal.title') }}</h2>
+          <span class="text-xs text-slate-500">{{ t('admin.portal.subtitle') }}</span>
         </div>
 
         <form class="mt-4 space-y-6" @submit.prevent="savePortal">
           <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-slate-700">Meeting</h3>
+            <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.meeting.title') }}</h3>
             <div class="grid gap-4 md:grid-cols-3">
               <label class="grid gap-1 text-sm">
-                <span class="text-slate-600">Time</span>
+                <span class="text-slate-600">{{ t('admin.portal.meeting.time') }}</span>
                 <input
                   v-model.trim="portalForm.meetingTime"
                   class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  placeholder="08:30"
+                  :placeholder="t('admin.portal.meeting.timePlaceholder')"
                   type="text"
                 />
               </label>
               <label class="grid gap-1 text-sm md:col-span-2">
-                <span class="text-slate-600">Place</span>
+                <span class="text-slate-600">{{ t('admin.portal.meeting.place') }}</span>
                 <input
                   v-model.trim="portalForm.meetingPlace"
                   class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  placeholder="Hotel lobby"
+                  :placeholder="t('admin.portal.meeting.placePlaceholder')"
                   type="text"
                 />
               </label>
               <label class="grid gap-1 text-sm md:col-span-2">
-                <span class="text-slate-600">Maps URL</span>
+                <span class="text-slate-600">{{ t('admin.portal.meeting.maps') }}</span>
                 <input
                   v-model.trim="portalForm.meetingMapsUrl"
                   class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  placeholder="https://maps.google.com/?q=..."
+                  :placeholder="t('admin.portal.meeting.mapsPlaceholder')"
                   type="url"
                 />
               </label>
               <label class="grid gap-1 text-sm md:col-span-3">
-                <span class="text-slate-600">Note</span>
+                <span class="text-slate-600">{{ t('admin.portal.meeting.note') }}</span>
                 <textarea
                   v-model.trim="portalForm.meetingNote"
                   class="min-h-22.5 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  placeholder="Arrive 15 minutes early."
+                  :placeholder="t('admin.portal.meeting.notePlaceholder')"
                 ></textarea>
               </label>
             </div>
@@ -727,13 +782,13 @@ onMounted(loadTour)
 
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-slate-700">Links</h3>
+              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.links.title') }}</h3>
               <button
                 class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                 type="button"
                 @click="addPortalLink"
               >
-                Add link
+                {{ t('admin.portal.links.add') }}
               </button>
             </div>
             <div class="space-y-3">
@@ -743,20 +798,20 @@ onMounted(loadTour)
                 class="grid gap-3 md:grid-cols-[1fr_1fr_auto]"
               >
                 <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">Label</span>
+                  <span class="text-slate-600">{{ t('admin.portal.links.label') }}</span>
                   <input
                     v-model.trim="link.label"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    placeholder="Tour info pack"
+                    :placeholder="t('admin.portal.links.labelPlaceholder')"
                     type="text"
                   />
                 </label>
                 <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">URL</span>
+                  <span class="text-slate-600">{{ t('admin.portal.links.url') }}</span>
                   <input
                     v-model.trim="link.url"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    placeholder="https://example.com"
+                    :placeholder="t('admin.portal.links.urlPlaceholder')"
                     type="url"
                   />
                 </label>
@@ -766,7 +821,7 @@ onMounted(loadTour)
                     type="button"
                     @click="removePortalLink(index)"
                   >
-                    Remove
+                    {{ t('common.remove') }}
                   </button>
                 </div>
               </div>
@@ -775,20 +830,20 @@ onMounted(loadTour)
 
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-slate-700">Days</h3>
+              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.days.title') }}</h3>
               <button
                 class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                 type="button"
                 @click="addDay"
               >
-                Add day
+                {{ t('admin.portal.days.add') }}
               </button>
             </div>
             <div
               v-if="portalDays.length === 0"
               class="rounded border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"
             >
-              No days yet. Add the first day.
+              {{ t('admin.portal.days.empty') }}
             </div>
             <div v-else class="space-y-4">
               <div
@@ -797,7 +852,9 @@ onMounted(loadTour)
                 class="rounded-lg border border-slate-200 bg-slate-50 p-4"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="text-sm font-semibold text-slate-700">Day {{ index + 1 }}</div>
+                  <div class="text-sm font-semibold text-slate-700">
+                    {{ t('admin.portal.days.dayLabel', { day: index + 1 }) }}
+                  </div>
                   <div class="flex flex-wrap gap-2">
                     <button
                       class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
@@ -805,7 +862,7 @@ onMounted(loadTour)
                       type="button"
                       @click="moveDay(index, -1)"
                     >
-                      Up
+                      {{ t('common.moveUp') }}
                     </button>
                     <button
                       class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
@@ -813,33 +870,33 @@ onMounted(loadTour)
                       type="button"
                       @click="moveDay(index, 1)"
                     >
-                      Down
+                      {{ t('common.moveDown') }}
                     </button>
                     <button
                       class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
                       type="button"
                       @click="removeDay(index)"
                     >
-                      Remove
+                      {{ t('common.remove') }}
                     </button>
                   </div>
                 </div>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                   <label class="grid gap-1 text-sm md:col-span-2">
-                    <span class="text-slate-600">Title</span>
+                    <span class="text-slate-600">{{ t('admin.portal.days.titleLabel') }}</span>
                     <input
                       v-model.trim="day.title"
                       class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                      placeholder="Day title"
+                      :placeholder="t('admin.portal.days.titlePlaceholder')"
                       type="text"
                     />
                   </label>
                   <label class="grid gap-1 text-sm md:col-span-2">
-                    <span class="text-slate-600">Items (one per line)</span>
+                    <span class="text-slate-600">{{ t('admin.portal.days.itemsLabel') }}</span>
                     <textarea
                       class="min-h-24 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                       :value="day.items.join('\n')"
-                      placeholder="Visit museum"
+                      :placeholder="t('admin.portal.days.itemsPlaceholder')"
                       @input="updateDayItems(index, ($event.target as HTMLTextAreaElement).value)"
                     ></textarea>
                   </label>
@@ -849,13 +906,13 @@ onMounted(loadTour)
           </div>
 
           <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-slate-700">Notes</h3>
+            <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.notes.title') }}</h3>
             <label class="grid gap-1 text-sm">
-              <span class="text-slate-600">One note per line</span>
+              <span class="text-slate-600">{{ t('admin.portal.notes.label') }}</span>
               <textarea
                 v-model="portalForm.notesText"
                 class="min-h-30 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                placeholder="Bring a reusable water bottle."
+                :placeholder="t('admin.portal.notes.placeholder')"
               ></textarea>
             </label>
           </div>
@@ -866,25 +923,27 @@ onMounted(loadTour)
               :disabled="portalSaving"
               type="submit"
             >
-              {{ portalSaving ? 'Saving...' : 'Save portal' }}
+              {{ portalSaving ? t('common.saving') : t('admin.portal.save') }}
             </button>
-            <span v-if="portalMessage" class="text-xs text-emerald-600">{{ portalMessage }}</span>
-            <span v-if="portalError" class="text-xs text-rose-600">{{ portalError }}</span>
+            <span v-if="portalMessageKey" class="text-xs text-emerald-600">{{ t(portalMessageKey) }}</span>
+            <span v-if="portalErrorKey || portalErrorMessage" class="text-xs text-rose-600">
+              {{ portalErrorKey ? t(portalErrorKey) : portalErrorMessage }}
+            </span>
           </div>
         </form>
       </section>
 
       <section class="space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Participants</h2>
-          <span class="text-xs text-slate-500">{{ participants.length }} total</span>
+          <h2 class="text-lg font-semibold">{{ t('admin.participants.title') }}</h2>
+          <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
         </div>
 
         <div
           v-if="participants.length === 0"
           class="rounded border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500"
         >
-          No participants yet. Add someone above.
+          {{ t('admin.participants.empty') }}
         </div>
 
         <ul v-else class="space-y-3">
@@ -894,10 +953,10 @@ onMounted(loadTour)
             class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div v-if="editingParticipantId === participant.id" class="space-y-3">
-              <div class="text-sm font-semibold text-slate-700">Edit participant</div>
+              <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.editTitle') }}</div>
               <div class="grid gap-3 md:grid-cols-3">
                 <label class="grid gap-1 text-sm md:col-span-1">
-                  <span class="text-slate-600">Full name</span>
+                  <span class="text-slate-600">{{ t('admin.participants.form.fullName') }}</span>
                   <input
                     v-model.trim="editForm.fullName"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
@@ -905,7 +964,7 @@ onMounted(loadTour)
                   />
                 </label>
                 <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">Email</span>
+                  <span class="text-slate-600">{{ t('admin.participants.form.emailShort') }}</span>
                   <input
                     v-model.trim="editForm.email"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
@@ -913,12 +972,12 @@ onMounted(loadTour)
                   />
                 </label>
                 <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">Phone</span>
+                  <span class="text-slate-600">{{ t('admin.participants.form.phoneShort') }}</span>
                   <input
                     v-model.trim="editForm.phone"
                     class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    :class="editPhoneError ? 'border-rose-300' : 'border-slate-200'"
-                    placeholder="+90 555 123 45 67"
+                    :class="editPhoneErrorKey ? 'border-rose-300' : 'border-slate-200'"
+                    :placeholder="t('admin.participants.form.phonePlaceholder')"
                     inputmode="tel"
                     maxlength="15"
                     type="tel"
@@ -934,17 +993,21 @@ onMounted(loadTour)
                   type="button"
                   @click="saveParticipant(participant)"
                 >
-                  {{ editParticipantSaving ? 'Saving...' : 'Save' }}
+                  {{ editParticipantSaving ? t('common.saving') : t('common.save') }}
                 </button>
                 <button
                   class="rounded border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:border-slate-300"
                   type="button"
                   @click="cancelEditParticipant"
                 >
-                  Cancel
+                  {{ t('common.cancel') }}
                 </button>
-                <span v-if="editPhoneError" class="text-xs text-rose-600">{{ editPhoneError }}</span>
-                <span v-if="editParticipantError" class="text-xs text-rose-600">{{ editParticipantError }}</span>
+                <span v-if="editPhoneErrorKey" class="text-xs text-rose-600">
+                  {{ t(editPhoneErrorKey) }}
+                </span>
+                <span v-if="editParticipantErrorKey || editParticipantErrorMessage" class="text-xs text-rose-600">
+                  {{ editParticipantErrorKey ? t(editParticipantErrorKey) : editParticipantErrorMessage }}
+                </span>
               </div>
             </div>
 
@@ -966,7 +1029,7 @@ onMounted(loadTour)
                       : 'bg-amber-100 text-amber-700'
                   "
                 >
-                  {{ participant.arrived ? 'Arrived' : 'Pending' }}
+                  {{ participant.arrived ? t('common.arrivedLabel') : t('common.pendingLabel') }}
                 </span>
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -978,14 +1041,14 @@ onMounted(loadTour)
                   type="button"
                   @click="startEditParticipant(participant)"
                 >
-                  Edit
+                  {{ t('common.edit') }}
                 </button>
                 <button
                   class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:border-rose-300"
                   type="button"
                   @click="deleteParticipant(participant)"
                 >
-                  Delete
+                  {{ t('common.delete') }}
                 </button>
               </div>
             </div>

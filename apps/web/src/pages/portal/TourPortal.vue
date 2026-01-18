@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import * as QRCode from 'qrcode'
+import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -11,25 +12,27 @@ import type { Tour, TourPortalInfo } from '../../types'
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
 
 const route = useRoute()
+const { t } = useI18n()
 const tourId = computed(() => route.params.tourId as string)
 
 const tour = ref<Tour | null>(null)
 const portal = ref<TourPortalInfo | null>(null)
 const loading = ref(true)
-const error = ref<string | null>(null)
-const copyStatus = ref<string | null>(null)
-const codeCopyStatus = ref<string | null>(null)
-const linkCopyStatus = ref<string | null>(null)
+const errorKey = ref<string | null>(null)
+const errorMessage = ref<string | null>(null)
+const copyStatusKey = ref<string | null>(null)
+const codeCopyStatusKey = ref<string | null>(null)
+const linkCopyStatusKey = ref<string | null>(null)
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
 
-const tabs: { id: TabKey; label: string }[] = [
-  { id: 'days', label: 'Days' },
-  { id: 'docs', label: 'Docs' },
-  { id: 'qr', label: 'QR' },
-  { id: 'info', label: 'Info' },
-]
+const tabs = computed<{ id: TabKey; label: string }[]>(() => [
+  { id: 'days', label: t('portal.tabs.days') },
+  { id: 'docs', label: t('portal.tabs.docs') },
+  { id: 'qr', label: t('portal.tabs.qr') },
+  { id: 'info', label: t('portal.tabs.info') },
+])
 
 const days = computed(() => portal.value?.days ?? [])
 const selectedDay = computed(() => days.value[selectedDayIndex.value] ?? null)
@@ -61,7 +64,7 @@ const persistCheckInCode = (code: string) => {
 const clearStoredCode = () => {
   globalThis.localStorage?.removeItem(storageKey.value)
   checkInCode.value = ''
-  codeCopyStatus.value = 'Code cleared.'
+  codeCopyStatusKey.value = 'portal.qr.codeCleared'
 }
 
 const buildCheckInLink = (code: string) => {
@@ -75,7 +78,8 @@ const buildCheckInLink = (code: string) => {
 
 const loadPortal = async () => {
   loading.value = true
-  error.value = null
+  errorKey.value = null
+  errorMessage.value = null
 
   try {
     const [tourData, portalData] = await Promise.all([
@@ -87,7 +91,10 @@ const loadPortal = async () => {
     portal.value = portalData
     setDefaultDay()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load tour.'
+    errorMessage.value = err instanceof Error ? err.message : null
+    if (!errorMessage.value) {
+      errorKey.value = 'errors.portal.load'
+    }
   } finally {
     loading.value = false
   }
@@ -168,54 +175,54 @@ const resolveCheckInCode = () => {
 }
 
 const copyShareLink = async () => {
-  copyStatus.value = null
+  copyStatusKey.value = null
   const url = globalThis.location?.href
 
   if (!url) {
-    copyStatus.value = 'Unable to copy link.'
+    copyStatusKey.value = 'portal.actions.copyLinkFailed'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    copyStatus.value = 'Clipboard not supported.'
+    copyStatusKey.value = 'errors.copyNotSupported'
     return
   }
 
   try {
     await clipboard.writeText(url)
-    copyStatus.value = 'Link copied.'
+    copyStatusKey.value = 'portal.actions.linkCopied'
   } catch {
-    copyStatus.value = 'Copy failed.'
+    copyStatusKey.value = 'errors.copyFailed'
   }
 }
 
 
 const copyCheckInCode = async () => {
-  codeCopyStatus.value = null
+  codeCopyStatusKey.value = null
   if (!checkInCode.value) {
-    codeCopyStatus.value = 'No code available.'
+    codeCopyStatusKey.value = 'portal.qr.noCode'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    codeCopyStatus.value = 'Clipboard not supported.'
+    codeCopyStatusKey.value = 'errors.copyNotSupported'
     return
   }
 
   try {
     await clipboard.writeText(checkInCode.value)
-    codeCopyStatus.value = 'Code copied.'
+    codeCopyStatusKey.value = 'common.copySuccess'
   } catch {
-    codeCopyStatus.value = 'Copy failed.'
+    codeCopyStatusKey.value = 'errors.copyFailed'
   }
 }
 
 const applyManualCode = () => {
   const normalized = manualCode.value.trim().toUpperCase()
   if (!normalized) {
-    codeCopyStatus.value = 'Enter a code first.'
+    codeCopyStatusKey.value = 'portal.qr.enterCode'
     return
   }
 
@@ -225,35 +232,35 @@ const applyManualCode = () => {
 }
 
 const copyCheckInLink = async () => {
-  linkCopyStatus.value = null
+  linkCopyStatusKey.value = null
   if (!checkInCode.value) {
-    linkCopyStatus.value = 'Add a code to build the link.'
+    linkCopyStatusKey.value = 'portal.qr.linkNeedsCode'
     return
   }
 
   const link = buildCheckInLink(checkInCode.value)
   if (!link) {
-    linkCopyStatus.value = 'Unable to build link.'
+    linkCopyStatusKey.value = 'portal.actions.copyLinkFailed'
     return
   }
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    linkCopyStatus.value = 'Clipboard not supported.'
+    linkCopyStatusKey.value = 'errors.copyNotSupported'
     return
   }
 
   try {
     await clipboard.writeText(link)
-    linkCopyStatus.value = 'Link copied.'
+    linkCopyStatusKey.value = 'portal.actions.linkCopied'
   } catch {
-    linkCopyStatus.value = 'Copy failed.'
+    linkCopyStatusKey.value = 'errors.copyFailed'
   }
 }
 
 watch([checkInCode, () => tourId.value], async ([value]) => {
-  codeCopyStatus.value = null
-  linkCopyStatus.value = null
+  codeCopyStatusKey.value = null
+  linkCopyStatusKey.value = null
   if (!value) {
     qrDataUrl.value = null
     return
@@ -292,21 +299,21 @@ onMounted(loadPortal)
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p class="text-xs uppercase tracking-wide text-slate-500">Participant Portal</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500">{{ t('portal.header.kicker') }}</p>
             <h1 class="mt-3 text-2xl font-semibold">
-              {{ tour?.name ?? 'Tour' }}
+              {{ tour?.name ?? t('common.tour') }}
             </h1>
             <p class="text-sm text-slate-500" v-if="tour">
-              {{ tour.startDate }} to {{ tour.endDate }}
+              {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
             </p>
           </div>
           <div class="flex w-full flex-col items-start gap-2 sm:w-auto sm:items-end">
             <button
               class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
               type="button" @click="copyShareLink">
-              Copy link
+              {{ t('portal.actions.copyPageLink') }}
             </button>
-            <p v-if="copyStatus" class="text-xs text-slate-500">{{ copyStatus }}</p>
+            <p v-if="copyStatusKey" class="text-xs text-slate-500">{{ t(copyStatusKey) }}</p>
           </div>
         </div>
       </section>
@@ -328,17 +335,22 @@ onMounted(loadPortal)
         </button>
       </div>
 
-      <LoadingState v-if="loading" message="Loading tour details..." />
-      <ErrorState v-else-if="error" :message="error" @retry="loadPortal" />
+      <LoadingState v-if="loading" message-key="portal.loading" />
+      <ErrorState
+        v-else-if="errorKey || errorMessage"
+        :message="errorMessage ?? undefined"
+        :message-key="errorKey ?? undefined"
+        @retry="loadPortal"
+      />
 
       <template v-else>
         <div v-if="portal" class="space-y-6 sm:space-y-8">
           <section v-if="activeTab === 'days'"
             class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">Itinerary</h2>
+            <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
             <div v-if="days.length === 0"
               class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-              Itinerary is not available yet.
+              {{ t('portal.days.empty') }}
             </div>
             <template v-else>
               <div class="mt-4 flex gap-2 overflow-x-auto pb-2">
@@ -347,13 +359,13 @@ onMounted(loadPortal)
                       ? 'border-slate-900 bg-slate-900 text-white'
                       : 'border-slate-200 bg-white text-slate-600'
                     " type="button" @click="selectDay(index)">
-                  Day {{ day.day }}
+                  {{ t('portal.days.dayLabel', { day: day.day }) }}
                 </button>
               </div>
 
               <div v-if="selectedDay" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                 <div class="text-sm font-semibold text-slate-800">
-                  Day {{ selectedDay.day }} - {{ selectedDay.title }}
+                  {{ t('portal.days.dayTitle', { day: selectedDay.day, title: selectedDay.title }) }}
                 </div>
                 <ul class="mt-3 space-y-2 text-sm text-slate-600">
                   <li v-for="item in selectedDay.items" :key="item" class="flex items-start gap-2">
@@ -367,10 +379,10 @@ onMounted(loadPortal)
 
           <section v-if="activeTab === 'docs'"
             class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">Documents</h2>
+            <h2 class="text-lg font-semibold">{{ t('portal.docs.title') }}</h2>
             <div v-if="portal.links.length === 0"
               class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-              No documents yet.
+              {{ t('portal.docs.empty') }}
             </div>
             <ul v-else class="mt-4 space-y-3 text-sm">
               <li v-for="link in portal.links" :key="link.url"
@@ -378,20 +390,20 @@ onMounted(loadPortal)
                 <span class="font-medium text-slate-700">{{ link.label }}</span>
                 <a class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
                   :href="link.url" rel="noreferrer" target="_blank">
-                  Open
+                  {{ t('common.open') }}
                 </a>
               </li>
             </ul>
           </section>
 
           <section v-if="activeTab === 'qr'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">Your QR</h2>
+            <h2 class="text-lg font-semibold">{{ t('portal.qr.title') }}</h2>
             <div class="mt-4 space-y-4">
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs uppercase tracking-wide text-slate-400">Check-in code</p>
+                <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.qr.codeLabel') }}</p>
                 <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-mono text-slate-800">
-                    {{ checkInCode || 'No code yet' }}
+                    {{ checkInCode || t('portal.qr.noCode') }}
                   </div>
                   <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                     <button
@@ -399,7 +411,7 @@ onMounted(loadPortal)
                       type="button"
                       @click="copyCheckInCode"
                     >
-                      Copy code
+                      {{ t('portal.qr.copyCode') }}
                     </button>
                     <button
                       v-if="checkInCode"
@@ -407,18 +419,18 @@ onMounted(loadPortal)
                       type="button"
                       @click="clearStoredCode"
                     >
-                      Clear code
+                      {{ t('portal.qr.clearCode') }}
                     </button>
                   </div>
                 </div>
-                <p v-if="codeCopyStatus" class="mt-2 text-xs text-slate-500">{{ codeCopyStatus }}</p>
+                <p v-if="codeCopyStatusKey" class="mt-2 text-xs text-slate-500">{{ t(codeCopyStatusKey) }}</p>
                 <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
-                  <p>No code saved yet. Paste the code you received from your guide.</p>
+                  <p>{{ t('portal.qr.emptyHint') }}</p>
                   <div class="flex flex-col gap-2 sm:flex-row">
                     <input
                       v-model.trim="manualCode"
                       class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-                      placeholder="Paste code"
+                      :placeholder="t('portal.qr.pastePlaceholder')"
                       type="text"
                       maxlength="8"
                     />
@@ -427,22 +439,22 @@ onMounted(loadPortal)
                       type="button"
                       @click="applyManualCode"
                     >
-                      Save
+                      {{ t('common.save') }}
                     </button>
                   </div>
-                  <p class="text-xs text-slate-500">The QR opens the guide check-in screen with the code prefilled.</p>
+                  <p class="text-xs text-slate-500">{{ t('portal.qr.helper') }}</p>
                 </div>
               </div>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs uppercase tracking-wide text-slate-400">QR</p>
+                <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.qr.title') }}</p>
                 <div class="mt-4 flex items-center justify-center">
                   <div v-if="qrDataUrl"
                     class="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-4">
-                    <img :src="qrDataUrl" alt="QR" class="h-40 w-40" />
+                    <img :src="qrDataUrl" :alt="t('portal.qr.imageAlt')" class="h-40 w-40" />
                   </div>
                   <div v-else class="text-sm text-slate-500">
-                    Add a code to generate the QR.
+                    {{ t('portal.qr.empty') }}
                   </div>
                 </div>
                 <div class="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -451,9 +463,9 @@ onMounted(loadPortal)
                     type="button"
                     @click="copyCheckInLink"
                   >
-                    Copy guide link
+                    {{ t('portal.qr.copyGuideLink') }}
                   </button>
-                  <p v-if="linkCopyStatus" class="text-xs text-slate-500">{{ linkCopyStatus }}</p>
+                  <p v-if="linkCopyStatusKey" class="text-xs text-slate-500">{{ t(linkCopyStatusKey) }}</p>
                 </div>
               </div>
             </div>
@@ -461,35 +473,35 @@ onMounted(loadPortal)
 
           <section v-if="activeTab === 'info'" class="space-y-4">
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <h2 class="text-lg font-semibold">Meeting point</h2>
+              <h2 class="text-lg font-semibold">{{ t('portal.info.meetingTitle') }}</h2>
               <div class="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Time</p>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.time') }}</p>
                   <p class="mt-1 font-medium">{{ portal.meeting.time }}</p>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Place</p>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.place') }}</p>
                   <p class="mt-1 font-medium">{{ portal.meeting.place }}</p>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Maps</p>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.maps') }}</p>
                   <a class="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
                     :href="portal.meeting.mapsUrl" rel="noreferrer" target="_blank">
-                    Open in Maps
+                    {{ t('portal.info.openMaps') }}
                   </a>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Note</p>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.note') }}</p>
                   <p class="mt-2 text-sm text-slate-600">{{ portal.meeting.note }}</p>
                 </div>
               </div>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <h2 class="text-lg font-semibold">Notes</h2>
+              <h2 class="text-lg font-semibold">{{ t('portal.info.notesTitle') }}</h2>
               <div v-if="portal.notes.length === 0"
                 class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                No notes yet.
+                {{ t('portal.info.notesEmpty') }}
               </div>
               <ul v-else class="mt-4 space-y-2 text-sm text-slate-600">
                 <li v-for="note in portal.notes" :key="note"
@@ -502,7 +514,7 @@ onMounted(loadPortal)
         </div>
 
         <div v-else class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-          Portal content is not available yet.
+          {{ t('portal.empty') }}
         </div>
       </template>
     </div>

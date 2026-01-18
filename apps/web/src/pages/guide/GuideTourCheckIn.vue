@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
 import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
@@ -10,18 +11,22 @@ import type { CheckInResponse, CheckInSummary, CheckInUndoResponse, Participant,
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const tourId = computed(() => route.params.tourId as string)
 
 const tour = ref<Tour | null>(null)
 const participants = ref<Participant[]>([])
 const summary = ref<CheckInSummary>({ arrivedCount: 0, totalCount: 0 })
 const loading = ref(true)
-const error = ref<string | null>(null)
+const errorKey = ref<string | null>(null)
+const errorMessage = ref<string | null>(null)
 
 const searchTerm = ref('')
 const checkInCode = ref('')
-const actionMessage = ref<string | null>(null)
-const actionError = ref<string | null>(null)
+const actionMessageKey = ref<string | null>(null)
+const actionMessageText = ref<string | null>(null)
+const actionErrorKey = ref<string | null>(null)
+const actionErrorText = ref<string | null>(null)
 const isCheckingIn = ref(false)
 const dataLoaded = ref(false)
 const lastAutoCode = ref('')
@@ -53,7 +58,8 @@ const hasData = computed(() => Boolean(tour.value))
 
 const loadData = async () => {
   loading.value = true
-  error.value = null
+  errorKey.value = null
+  errorMessage.value = null
 
   try {
     const [tourData, participantsData, summaryData] = await Promise.all([
@@ -66,7 +72,10 @@ const loadData = async () => {
     participants.value = participantsData
     summary.value = summaryData
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load check-in data.'
+    errorMessage.value = err instanceof Error ? err.message : null
+    if (!errorMessage.value) {
+      errorKey.value = 'errors.checkIn.load'
+    }
   } finally {
     loading.value = false
     dataLoaded.value = true
@@ -108,24 +117,28 @@ const undoCheckIn = async (participantId: string) => {
     )
     updateFromUndo(response)
     const tone = response.alreadyUndone ? 'info' : 'success'
-    pushToast(response.alreadyUndone ? 'Zaten geri alınmış' : 'Check-in geri alındı', tone)
+    pushToast({
+      key: response.alreadyUndone ? 'toast.alreadyUndone' : 'toast.checkInUndone',
+      tone,
+    })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Undo failed.'
-    pushToast(message, 'error')
+    pushToast({ key: 'toast.undoFailed', tone: 'error' })
   } finally {
     undoingParticipantId.value = null
   }
 }
 
 const submitCheckIn = async (code: string) => {
-  actionMessage.value = null
-  actionError.value = null
+  actionMessageKey.value = null
+  actionMessageText.value = null
+  actionErrorKey.value = null
+  actionErrorText.value = null
   lastResult.value = null
 
   const normalized = normalizeCheckInCode(code).slice(0, 8)
   if (!normalized) {
-    actionError.value = 'Check-in code is required.'
-    pushToast('Kod bulunamadı', 'error')
+    actionErrorKey.value = 'validation.checkInCodeRequired'
+    pushToast({ key: 'toast.invalidCode', tone: 'error' })
     return false
   }
 
@@ -136,14 +149,18 @@ const submitCheckIn = async (code: string) => {
     })
 
     updateFromCheckIn(response)
-    actionMessage.value = response.alreadyArrived ? 'Already checked in.' : 'Check-in successful.'
+    actionMessageKey.value = response.alreadyArrived
+      ? 'guide.checkIn.alreadyCheckedIn'
+      : 'guide.checkIn.success'
     if (response.alreadyArrived) {
-      pushToast('Zaten check-in yapılmış', 'info')
+      pushToast({ key: 'toast.alreadyArrived', tone: 'info' })
     } else {
-      pushToast('Check-in tamamlandı', 'success', {
+      pushToast({
+        key: 'toast.checkedIn',
+        tone: 'success',
         timeout: 10000,
         action: {
-          label: 'Undo',
+          labelKey: 'common.undo',
           onClick: () => {
             void undoCheckIn(response.participantId)
           },
@@ -163,9 +180,11 @@ const submitCheckIn = async (code: string) => {
     codeInput.value?.focus()
     return true
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Check-in failed.'
-    actionError.value = message
-    pushToast('Kod bulunamadı', 'error')
+    actionErrorText.value = err instanceof Error ? err.message : null
+    if (!actionErrorText.value) {
+      actionErrorKey.value = 'errors.checkIn.failed'
+    }
+    pushToast({ key: 'toast.invalidCode', tone: 'error' })
     return false
   } finally {
     isCheckingIn.value = false
@@ -190,20 +209,22 @@ const markArrived = async (participant: Participant) => {
 }
 
 const copyCode = async (code: string) => {
-  actionMessage.value = null
-  actionError.value = null
+  actionMessageKey.value = null
+  actionMessageText.value = null
+  actionErrorKey.value = null
+  actionErrorText.value = null
 
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
-    actionError.value = 'Copy not supported.'
+    actionErrorKey.value = 'errors.copyNotSupported'
     return
   }
 
   try {
     await clipboard.writeText(code)
-    actionMessage.value = 'Code copied.'
+    actionMessageKey.value = 'common.copySuccess'
   } catch {
-    actionError.value = 'Copy failed.'
+    actionErrorKey.value = 'errors.copyFailed'
   }
 }
 
@@ -265,13 +286,15 @@ onMounted(() => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <RouterLink class="text-sm text-slate-600 underline" to="/guide/tours">
-            Back to guide tours
+            {{ t('nav.backToGuideTours') }}
           </RouterLink>
-          <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? 'Tour check-in' }}</h1>
-          <p class="text-sm text-slate-500" v-if="tour">{{ tour.startDate }} to {{ tour.endDate }}</p>
+          <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? t('guide.checkIn.title') }}</h1>
+          <p class="text-sm text-slate-500" v-if="tour">
+            {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
+          </p>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          <div class="text-xs uppercase tracking-wide text-slate-400">Arrived</div>
+          <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.arrivedLabel') }}</div>
           <div class="mt-1 text-xl font-semibold text-slate-800">
             {{ summary.arrivedCount }} / {{ summary.totalCount }}
           </div>
@@ -279,22 +302,32 @@ onMounted(() => {
       </div>
     </div>
 
-    <LoadingState v-if="loading && !dataLoaded" message="Loading check-in data..." />
-    <ErrorState v-else-if="error && !dataLoaded" :message="error" @retry="initialize" />
+    <LoadingState v-if="loading && !dataLoaded" message-key="guide.checkIn.loading" />
+    <ErrorState
+      v-else-if="(errorKey || errorMessage) && !dataLoaded"
+      :message="errorMessage ?? undefined"
+      :message-key="errorKey ?? undefined"
+      @retry="initialize"
+    />
 
     <template v-else>
-      <ErrorState v-if="error" :message="error" @retry="initialize" />
-      <div v-if="!hasData" class="text-sm text-slate-500">No data available.</div>
+      <ErrorState
+        v-if="errorKey || errorMessage"
+        :message="errorMessage ?? undefined"
+        :message-key="errorKey ?? undefined"
+        @retry="initialize"
+      />
+      <div v-if="!hasData" class="text-sm text-slate-500">{{ t('common.noData') }}</div>
       <template v-else>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <h2 class="text-lg font-semibold">Check-in</h2>
+        <h2 class="text-lg font-semibold">{{ t('common.checkIn') }}</h2>
         <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
           <input
             v-model.trim="checkInCode"
             ref="codeInput"
             autofocus
             class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-            placeholder="8-character code"
+            :placeholder="t('guide.checkIn.codePlaceholder')"
             type="text"
             maxlength="8"
             @input="handleCodeInput"
@@ -304,20 +337,24 @@ onMounted(() => {
             :disabled="isCheckingIn"
             type="submit"
           >
-            {{ isCheckingIn ? 'Checking in...' : 'Check-in' }}
+            {{ isCheckingIn ? t('guide.checkIn.submitting') : t('common.checkIn') }}
           </button>
         </form>
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
-          <span v-if="actionMessage" class="text-emerald-600">{{ actionMessage }}</span>
-          <span v-if="actionError" class="text-rose-600">{{ actionError }}</span>
+          <span v-if="actionMessageKey || actionMessageText" class="text-emerald-600">
+            {{ actionMessageKey ? t(actionMessageKey) : actionMessageText }}
+          </span>
+          <span v-if="actionErrorKey || actionErrorText" class="text-rose-600">
+            {{ actionErrorKey ? t(actionErrorKey) : actionErrorText }}
+          </span>
         </div>
         <label class="mt-4 inline-flex items-center gap-2 text-xs text-slate-600">
           <input v-model="autoCheckIn" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-          Auto-checkin after scan (coming soon)
+          {{ t('guide.checkIn.autoCheckIn') }}
         </label>
         <div v-if="lastResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
           <div class="font-semibold text-emerald-800">
-            {{ lastResult.alreadyArrived ? 'Already arrived' : 'Checked in' }}
+            {{ lastResult.alreadyArrived ? t('common.arrivedAlready') : t('common.checkedIn') }}
           </div>
           <div class="mt-1 text-emerald-700">{{ lastResult.participantName }}</div>
         </div>
@@ -325,15 +362,17 @@ onMounted(() => {
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Participants</h2>
-          <span class="text-xs text-slate-500">{{ filteredParticipants.length }} shown</span>
+          <h2 class="text-lg font-semibold">{{ t('guide.checkIn.participantsTitle') }}</h2>
+          <span class="text-xs text-slate-500">
+            {{ t('common.shown', { count: filteredParticipants.length }) }}
+          </span>
         </div>
 
         <div class="mt-4">
           <input
             v-model.trim="searchTerm"
             class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
-            placeholder="Search by name, email, or phone"
+            :placeholder="t('common.searchPlaceholder')"
             type="text"
           />
         </div>
@@ -342,7 +381,7 @@ onMounted(() => {
           v-if="filteredParticipants.length === 0"
           class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"
         >
-          No participants found.
+          {{ t('guide.checkIn.empty') }}
         </div>
 
         <ul v-else class="mt-4 space-y-3">
@@ -369,7 +408,7 @@ onMounted(() => {
                         : 'bg-amber-100 text-amber-700'
                     "
                   >
-                    {{ participant.arrived ? 'Arrived' : 'Pending' }}
+                    {{ participant.arrived ? t('common.arrivedLabel') : t('common.pendingLabel') }}
                   </span>
                   <button
                     v-if="!participant.arrived"
@@ -377,7 +416,7 @@ onMounted(() => {
                     type="button"
                     @click="markArrived(participant)"
                   >
-                    Mark arrived
+                    {{ t('guide.checkIn.markArrived') }}
                   </button>
                   <button
                     v-else
@@ -386,13 +425,13 @@ onMounted(() => {
                     type="button"
                     @click="undoCheckIn(participant.id)"
                   >
-                    {{ undoingParticipantId === participant.id ? 'Undoing...' : 'Undo' }}
+                    {{ undoingParticipantId === participant.id ? t('common.undoing') : t('common.undo') }}
                   </button>
                 </div>
               </div>
 
               <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="text-xs uppercase tracking-wide text-slate-400">Check-in code</div>
+                <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
                 <div class="flex w-full items-center gap-2 sm:w-auto">
                   <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-700">
                     {{ participant.checkInCode }}
@@ -402,7 +441,7 @@ onMounted(() => {
                     type="button"
                     @click="copyCode(participant.checkInCode)"
                   >
-                    Copy
+                    {{ t('common.copy') }}
                   </button>
                 </div>
               </div>
