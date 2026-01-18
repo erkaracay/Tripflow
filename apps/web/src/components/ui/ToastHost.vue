@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToast } from '../../lib/toast'
 
 const { toasts, removeToast } = useToast()
+const { t } = useI18n()
 
 const toneClass = (tone: string) => {
   switch (tone) {
@@ -32,7 +34,9 @@ const handleAction = (toast: { id: string; action?: { onClick: () => void } }) =
         class="pointer-events-auto flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm"
         :class="toneClass(toast.tone)"
       >
-        <span class="flex-1">{{ toast.message }}</span>
+        <span class="flex-1">
+          {{ toast.key ? t(toast.key, toast.params ?? {}) : toast.message }}
+        </span>
         <div class="flex items-center gap-2">
           <button
             v-if="toast.action"
@@ -40,14 +44,14 @@ const handleAction = (toast: { id: string; action?: { onClick: () => void } }) =
             type="button"
             @click="handleAction(toast)"
           >
-            {{ toast.action.label }}
+            {{ toast.action.labelKey ? t(toast.action.labelKey, toast.action.labelParams ?? {}) : toast.action.label }}
           </button>
           <button
             class="text-xs font-medium text-slate-500 hover:text-slate-700"
             type="button"
             @click="removeToast(toast.id)"
           >
-            Dismiss
+            {{ t('common.dismiss') }}
           </button>
         </div>
       </div>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps<{ msg: string }>()
 
+const { t } = useI18n()
 const count = ref(0)
 </script>
 
@@ -10,28 +12,26 @@ const count = ref(0)
   <h1>{{ msg }}</h1>
 
   <div class="card">
-    <button type="button" @click="count++">count is {{ count }}</button>
+    <button type="button" @click="count++">{{ t('helloWorld.count', { count }) }}</button>
     <p>
-      Edit
-      <code>components/HelloWorld.vue</code> to test HMR
+      {{ t('helloWorld.editPrefix') }}
+      <code>components/HelloWorld.vue</code>
+      {{ t('helloWorld.editSuffix') }}
     </p>
   </div>
 
   <p>
-    Check out
-    <a href="https://vuejs.org/guide/quick-start.html#local" target="_blank"
-      >create-vue</a
-    >, the official Vue + Vite starter
+    {{ t('helloWorld.starterPrefix') }}
+    <a href="https://vuejs.org/guide/quick-start.html#local" target="_blank">create-vue</a>,
+    {{ t('helloWorld.starterSuffix') }}
   </p>
   <p>
-    Learn more about IDE Support for Vue in the
-    <a
-      href="https://vuejs.org/guide/scaling-up/tooling.html#ide-support"
-      target="_blank"
-      >Vue Docs Scaling up Guide</a
-    >.
+    {{ t('helloWorld.idePrefix') }}
+    <a href="https://vuejs.org/guide/scaling-up/tooling.html#ide-support" target="_blank">
+      {{ t('helloWorld.ideLink') }}
+    </a>.
   </p>
-  <p class="read-the-docs">Click on the Vite and Vue logos to learn more</p>
+  <p class="read-the-docs">{{ t('helloWorld.docsHint') }}</p>
 </template>
 
 <style scoped>

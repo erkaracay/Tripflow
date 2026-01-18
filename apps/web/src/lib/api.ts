@@ -34,7 +34,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     const isPortal = path.startsWith('/t/')
     clearToken()
     if (!isPortal) {
-      pushToast('Oturum süren doldu, tekrar giriş yap', 'error')
+      pushToast({ key: 'toast.sessionExpired', tone: 'error' })
       if (path !== '/login') {
         globalThis.location?.assign('/login')
       }
