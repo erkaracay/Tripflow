@@ -1,0 +1,345 @@
+{
+  "common": {
+    "appName": "Tripflow",
+    "sprintLabel": "Sprint 2 Demo",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "dismiss": "Dismiss",
+    "refreshList": "Refresh list",
+    "total": "total",
+    "shown": "{count} shown",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "remove": "Remove",
+    "moveUp": "Up",
+    "moveDown": "Down",
+    "copy": "Copy",
+    "copySuccess": "Code copied.",
+    "open": "Open",
+    "tour": "Tour",
+    "dateRange": "{start} to {end}",
+    "checkIn": "Check-in",
+    "checkInCode": "Check-in code",
+    "arrivedSummary": "Arrived {arrived} / {total}",
+    "arrivedLabel": "Arrived",
+    "pendingLabel": "Pending",
+    "arrivedAlready": "Already arrived",
+    "checkedIn": "Checked in",
+    "undo": "Undo",
+    "undoing": "Undoing...",
+    "noData": "No data available.",
+    "searchPlaceholder": "Search by name, email, or phone"
+  },
+  "nav": {
+    "organizations": "Organizations",
+    "tours": "Tours",
+    "logout": "Logout",
+    "backToOrganizations": "Back to organizations",
+    "backToTours": "Back to tours",
+    "backToTour": "Back to tour",
+    "backToGuideTours": "Back to guide tours"
+  },
+  "auth": {
+    "login": {
+      "subtitle": "Sign in to continue.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "errors": {
+        "required": "Email and password are required.",
+        "failed": "Login failed."
+      }
+    },
+    "forbidden": {
+      "title": "Access denied",
+      "message": "You do not have permission to view this page.",
+      "back": "Return to login"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "tours": {
+      "load": "Failed to load tours.",
+      "create": "Failed to create tour."
+    },
+    "guideTours": {
+      "load": "Failed to load tours."
+    },
+    "tourDetail": {
+      "load": "Failed to load tour.",
+      "update": "Failed to update tour."
+    },
+    "participant": {
+      "create": "Failed to add participant.",
+      "update": "Failed to update participant."
+    },
+    "portal": {
+      "save": "Failed to save portal.",
+      "load": "Failed to load tour."
+    },
+    "guide": {
+      "assign": "Failed to assign guide."
+    },
+    "guides": {
+      "load": "Failed to load guides."
+    },
+    "organizations": {
+      "load": "Failed to load organizations."
+    },
+    "checkIn": {
+      "load": "Failed to load check-in data.",
+      "failed": "Check-in failed."
+    },
+    "copyNotSupported": "Copy not supported.",
+    "copyFailed": "Copy failed."
+  },
+  "validation": {
+    "tourNameRequired": "Tour name is required.",
+    "startEndRequired": "Start and end dates are required.",
+    "endAfterStart": "End date must be on or after start date.",
+    "endDateAdjusted": "End date was adjusted to match start date.",
+    "fullNameRequired": "Full name is required.",
+    "meetingTimeRequired": "Meeting time is required.",
+    "meetingPlaceRequired": "Meeting place is required.",
+    "meetingMapsRequired": "Meeting maps URL is required.",
+    "guideRequired": "Select a guide.",
+    "checkInCodeRequired": "Check-in code is required.",
+    "phone": {
+      "invalid": "Phone number is invalid.",
+      "tooLong": "Phone number is too long.",
+      "requireCountry": "Phone must start with +90."
+    }
+  },
+  "toast": {
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "checkInUndone": "Check-in undone.",
+    "alreadyUndone": "Already undone.",
+    "undoFailed": "Undo failed.",
+    "invalidCode": "Invalid code / not found.",
+    "alreadyArrived": "Already arrived.",
+    "checkedIn": "Checked in.",
+    "tourUpdated": "Tour updated.",
+    "tourUpdateFailed": "Failed to update tour.",
+    "participantAdded": "Participant added.",
+    "participantAddFailed": "Failed to add participant.",
+    "participantUpdated": "Participant updated.",
+    "participantUpdateFailed": "Failed to update participant.",
+    "participantRemoved": "Participant removed.",
+    "participantDeleteFailed": "Failed to delete participant.",
+    "portalSaved": "Portal saved.",
+    "portalSaveFailed": "Failed to save portal.",
+    "guideAssigned": "Guide assigned.",
+    "guideAssignFailed": "Failed to assign guide."
+  },
+  "admin": {
+    "tours": {
+      "title": "Tours",
+      "subtitle": "Create a tour, add participants, and open the portal.",
+      "form": {
+        "nameLabel": "Tour name",
+        "namePlaceholder": "Cappadocia Spring 2025",
+        "startDateLabel": "Start date",
+        "endDateLabel": "End date",
+        "create": "Create tour",
+        "creating": "Creating..."
+      },
+      "list": {
+        "title": "Existing tours",
+        "loading": "Loading tours...",
+        "empty": "No tours yet. Create your first tour above.",
+        "manage": "Manage",
+        "openPortal": "Open portal"
+      }
+    },
+    "tourDetail": {
+      "loading": "Loading tour details...",
+      "detailsTitle": "Tour Details",
+      "detailsSubtitle": "Update the tour name and dates.",
+      "form": {
+        "nameLabel": "Name",
+        "namePlaceholder": "Tour name",
+        "startDateLabel": "Start date",
+        "endDateLabel": "End date",
+        "save": "Save tour"
+      },
+      "openPortal": "Open portal",
+      "guide": {
+        "title": "Guide Assignment",
+        "subtitle": "Assign a guide to run check-ins for this tour.",
+        "loading": "Loading guides...",
+        "empty": "No guide users found.",
+        "selectPlaceholder": "Select a guide",
+        "save": "Save guide"
+      }
+    },
+    "checkIn": {
+      "title": "Tour check-in",
+      "loading": "Loading check-in data...",
+      "codePlaceholder": "8-character code",
+      "submitting": "Checking in...",
+      "participantsTitle": "Participants",
+      "empty": "No participants found.",
+      "markArrived": "Mark arrived",
+      "success": "Check-in successful.",
+      "alreadyCheckedIn": "Already checked in."
+    },
+    "participants": {
+      "title": "Participants",
+      "addTitle": "Add participant",
+      "empty": "No participants yet. Add someone above.",
+      "editTitle": "Edit participant",
+      "deleteConfirm": "Delete {name}?",
+      "form": {
+        "fullName": "Full name",
+        "fullNamePlaceholder": "Ayse Kaya",
+        "email": "Email (optional)",
+        "emailPlaceholder": "ayse@example.com",
+        "phone": "Phone (optional)",
+        "phonePlaceholder": "+90 555 123 45 67",
+        "add": "Add participant",
+        "adding": "Adding...",
+        "emailShort": "Email",
+        "phoneShort": "Phone"
+      }
+    },
+    "portal": {
+      "title": "Portal Content",
+      "subtitle": "Participant view",
+      "meeting": {
+        "title": "Meeting",
+        "time": "Time",
+        "timePlaceholder": "08:30",
+        "place": "Place",
+        "placePlaceholder": "Hotel lobby",
+        "maps": "Maps URL",
+        "mapsPlaceholder": "https://maps.google.com/?q=...",
+        "note": "Note",
+        "notePlaceholder": "Arrive 15 minutes early."
+      },
+      "links": {
+        "title": "Links",
+        "add": "Add link",
+        "label": "Label",
+        "labelPlaceholder": "Tour info pack",
+        "url": "URL",
+        "urlPlaceholder": "https://example.com"
+      },
+      "days": {
+        "title": "Days",
+        "add": "Add day",
+        "empty": "No days yet. Add the first day.",
+        "dayLabel": "Day {day}",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Day title",
+        "itemsLabel": "Items (one per line)",
+        "itemsPlaceholder": "Visit museum"
+      },
+      "notes": {
+        "title": "Notes",
+        "label": "One note per line",
+        "placeholder": "Bring a reusable water bottle."
+      },
+      "save": "Save portal"
+    },
+    "organizations": {
+      "title": "Select organization",
+      "subtitle": "Choose which agency you want to manage.",
+      "loading": "Loading organizations...",
+      "select": "Select",
+      "selected": "Selected",
+      "empty": "No organizations found."
+    }
+  },
+  "guide": {
+    "tours": {
+      "title": "Guide Tours",
+      "subtitle": "Check-in your assigned tours.",
+      "loading": "Loading tours...",
+      "empty": "No tours assigned yet.",
+      "openCheckIn": "Open check-in"
+    },
+    "checkIn": {
+      "title": "Tour check-in",
+      "loading": "Loading check-in data...",
+      "codePlaceholder": "8-character code",
+      "submitting": "Checking in...",
+      "participantsTitle": "Participants",
+      "empty": "No participants found.",
+      "markArrived": "Mark arrived",
+      "autoCheckIn": "Auto-checkin after scan (coming soon)",
+      "success": "Check-in successful.",
+      "alreadyCheckedIn": "Already checked in."
+    }
+  },
+  "portal": {
+    "header": {
+      "kicker": "Participant Portal"
+    },
+    "loading": "Loading tour details...",
+    "empty": "Portal content is not available yet.",
+    "tabs": {
+      "days": "Days",
+      "docs": "Docs",
+      "qr": "QR",
+      "info": "Info"
+    },
+    "actions": {
+      "copyPageLink": "Copy link",
+      "linkCopied": "Link copied.",
+      "copyLinkFailed": "Unable to copy link."
+    },
+    "days": {
+      "title": "Itinerary",
+      "empty": "Itinerary is not available yet.",
+      "dayLabel": "Day {day}",
+      "dayTitle": "Day {day} - {title}"
+    },
+    "docs": {
+      "title": "Documents",
+      "empty": "No documents yet."
+    },
+    "qr": {
+      "title": "Your QR",
+      "codeLabel": "Check-in code",
+      "noCode": "No code yet",
+      "copyCode": "Copy code",
+      "clearCode": "Clear code",
+      "emptyHint": "No code saved yet. Paste the code you received from your guide.",
+      "pastePlaceholder": "Paste code",
+      "helper": "The QR opens the guide check-in screen with the code prefilled.",
+      "empty": "Add a code to generate the QR.",
+      "copyGuideLink": "Copy guide link",
+      "imageAlt": "QR",
+      "codeCleared": "Code cleared.",
+      "enterCode": "Enter a code first.",
+      "linkNeedsCode": "Add a code to build the link."
+    },
+    "info": {
+      "meetingTitle": "Meeting point",
+      "time": "Time",
+      "place": "Place",
+      "maps": "Maps",
+      "openMaps": "Open in Maps",
+      "note": "Note",
+      "notesTitle": "Notes",
+      "notesEmpty": "No notes yet."
+    }
+  },
+  "helloWorld": {
+    "count": "count is {count}",
+    "editPrefix": "Edit",
+    "editSuffix": "to test HMR",
+    "starterPrefix": "Check out",
+    "starterSuffix": "the official Vue + Vite starter",
+    "idePrefix": "Learn more about IDE Support for Vue in the",
+    "ideLink": "Vue Docs Scaling up Guide",
+    "docsHint": "Click on the Vite and Vue logos to learn more"
+  }
+}

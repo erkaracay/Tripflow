@@ -3,8 +3,11 @@ import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import ToastHost from './components/ui/ToastHost.vue'
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { setLocale, type Locale } from './i18n'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
+const { locale, t } = useI18n()
 const userRole = computed(() => {
   const token = getToken()
   if (!token || isTokenExpired(token)) {
@@ -35,6 +38,14 @@ const handleLogout = async () => {
   clearToken()
   await router.push('/login')
 }
+
+const switchLocale = (value: Locale) => {
+  if (locale.value === value) {
+    return
+  }
+
+  setLocale(value)
+}
 </script>
 
 <template>
@@ -43,18 +54,36 @@ const handleLogout = async () => {
         <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
             <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
                 <div class="leading-tight">
-                    <div class="text-base font-semibold">Tripflow</div>
+                    <div class="text-base font-semibold">{{ t('common.appName') }}</div>
                     <div class="text-[11px] uppercase tracking-wide text-slate-500">
-                        Sprint 2 Demo
+                        {{ t('common.sprintLabel') }}
                     </div>
                 </div>
 
                 <nav class="flex items-center gap-3 text-sm text-slate-600">
+                    <div class="flex items-center rounded-full border border-slate-200 bg-white p-0.5 text-[11px] font-semibold text-slate-600">
+                        <button
+                            class="rounded-full px-2.5 py-1 transition"
+                            :class="locale === 'en' ? 'bg-slate-900 text-white' : 'hover:text-slate-900'"
+                            type="button"
+                            @click="switchLocale('en')"
+                        >
+                            EN
+                        </button>
+                        <button
+                            class="rounded-full px-2.5 py-1 transition"
+                            :class="locale === 'tr' ? 'bg-slate-900 text-white' : 'hover:text-slate-900'"
+                            type="button"
+                            @click="switchLocale('tr')"
+                        >
+                            TR
+                        </button>
+                    </div>
                     <RouterLink v-if="showOrgLink" class="hover:text-slate-900" to="/admin/orgs">
-                        Organizations
+                        {{ t('nav.organizations') }}
                     </RouterLink>
                     <RouterLink v-if="toursPath" class="hover:text-slate-900" :to="toursPath">
-                        Tours
+                        {{ t('nav.tours') }}
                     </RouterLink>
                     <button
                         v-if="showAuthActions"
@@ -62,7 +91,7 @@ const handleLogout = async () => {
                         type="button"
                         @click="handleLogout"
                     >
-                        Logout
+                        {{ t('nav.logout') }}
                     </button>
                 </nav>
             </div>

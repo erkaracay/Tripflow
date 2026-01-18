@@ -1,0 +1,345 @@
+{
+  "common": {
+    "appName": "Tripflow",
+    "sprintLabel": "Sprint 2 Demo",
+    "loading": "Yükleniyor...",
+    "retry": "Tekrar dene",
+    "dismiss": "Kapat",
+    "refreshList": "Listeyi yenile",
+    "total": "toplam",
+    "shown": "{count} gösteriliyor",
+    "save": "Kaydet",
+    "saving": "Kaydediliyor...",
+    "saved": "Kaydedildi.",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "remove": "Kaldır",
+    "moveUp": "Yukarı",
+    "moveDown": "Aşağı",
+    "copy": "Kopyala",
+    "copySuccess": "Kod kopyalandı.",
+    "open": "Aç",
+    "tour": "Tur",
+    "dateRange": "{start} - {end}",
+    "checkIn": "Giriş",
+    "checkInCode": "Giriş kodu",
+    "arrivedSummary": "Gelen {arrived} / {total}",
+    "arrivedLabel": "Gelen",
+    "pendingLabel": "Bekliyor",
+    "arrivedAlready": "Zaten geldi",
+    "checkedIn": "Giriş yapıldı",
+    "undo": "Geri al",
+    "undoing": "Geri alınıyor...",
+    "noData": "Veri yok.",
+    "searchPlaceholder": "İsim, e-posta veya telefon ara"
+  },
+  "nav": {
+    "organizations": "Organizasyonlar",
+    "tours": "Turlar",
+    "logout": "Çıkış",
+    "backToOrganizations": "Organizasyonlara dön",
+    "backToTours": "Turlara dön",
+    "backToTour": "Tura dön",
+    "backToGuideTours": "Rehber turlarına dön"
+  },
+  "auth": {
+    "login": {
+      "subtitle": "Devam etmek için giriş yap.",
+      "emailLabel": "E-posta",
+      "emailPlaceholder": "ornek@demo.local",
+      "passwordLabel": "Şifre",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Giriş yap",
+      "submitting": "Giriş yapılıyor...",
+      "errors": {
+        "required": "E-posta ve şifre gerekli.",
+        "failed": "Giriş başarısız."
+      }
+    },
+    "forbidden": {
+      "title": "Erişim yok",
+      "message": "Bu sayfayı görüntüleme iznin yok.",
+      "back": "Girişe dön"
+    }
+  },
+  "errors": {
+    "generic": "Bir şeyler ters gitti.",
+    "tours": {
+      "load": "Turlar yüklenemedi.",
+      "create": "Tur oluşturulamadı."
+    },
+    "guideTours": {
+      "load": "Turlar yüklenemedi."
+    },
+    "tourDetail": {
+      "load": "Tur yüklenemedi.",
+      "update": "Tur güncellenemedi."
+    },
+    "participant": {
+      "create": "Katılımcı eklenemedi.",
+      "update": "Katılımcı güncellenemedi."
+    },
+    "portal": {
+      "save": "Portal kaydedilemedi.",
+      "load": "Portal içeriği yüklenemedi."
+    },
+    "guide": {
+      "assign": "Rehber atanamadı."
+    },
+    "guides": {
+      "load": "Rehberler yüklenemedi."
+    },
+    "organizations": {
+      "load": "Organizasyonlar yüklenemedi."
+    },
+    "checkIn": {
+      "load": "Giriş verileri yüklenemedi.",
+      "failed": "Giriş başarısız."
+    },
+    "copyNotSupported": "Kopyalama desteklenmiyor.",
+    "copyFailed": "Kopyalanamadı."
+  },
+  "validation": {
+    "tourNameRequired": "Tur adı gerekli.",
+    "startEndRequired": "Başlangıç ve bitiş tarihleri gerekli.",
+    "endAfterStart": "Bitiş tarihi başlangıçtan önce olamaz.",
+    "endDateAdjusted": "Bitiş tarihi başlangıca göre güncellendi.",
+    "fullNameRequired": "Ad soyad gerekli.",
+    "meetingTimeRequired": "Buluşma saati gerekli.",
+    "meetingPlaceRequired": "Buluşma yeri gerekli.",
+    "meetingMapsRequired": "Harita bağlantısı gerekli.",
+    "guideRequired": "Rehber seçin.",
+    "checkInCodeRequired": "Giriş kodu gerekli.",
+    "phone": {
+      "invalid": "Telefon numarası geçersiz.",
+      "tooLong": "Telefon numarası çok uzun.",
+      "requireCountry": "Telefon +90 ile başlamalı."
+    }
+  },
+  "toast": {
+    "sessionExpired": "Oturum süren doldu, tekrar giriş yap.",
+    "checkInUndone": "Giriş geri alındı.",
+    "alreadyUndone": "Zaten geri alınmış.",
+    "undoFailed": "Geri alma başarısız.",
+    "invalidCode": "Kod bulunamadı.",
+    "alreadyArrived": "Zaten geldi.",
+    "checkedIn": "Giriş yapıldı.",
+    "tourUpdated": "Tur güncellendi.",
+    "tourUpdateFailed": "Tur güncellenemedi.",
+    "participantAdded": "Katılımcı eklendi.",
+    "participantAddFailed": "Katılımcı eklenemedi.",
+    "participantUpdated": "Katılımcı güncellendi.",
+    "participantUpdateFailed": "Katılımcı güncellenemedi.",
+    "participantRemoved": "Katılımcı silindi.",
+    "participantDeleteFailed": "Katılımcı silinemedi.",
+    "portalSaved": "Portal kaydedildi.",
+    "portalSaveFailed": "Portal kaydedilemedi.",
+    "guideAssigned": "Rehber atandı.",
+    "guideAssignFailed": "Rehber atanamadı."
+  },
+  "admin": {
+    "tours": {
+      "title": "Turlar",
+      "subtitle": "Tur oluştur, katılımcı ekle ve portalı aç.",
+      "form": {
+        "nameLabel": "Tur adı",
+        "namePlaceholder": "Kapadokya Bahar 2025",
+        "startDateLabel": "Başlangıç tarihi",
+        "endDateLabel": "Bitiş tarihi",
+        "create": "Tur oluştur",
+        "creating": "Oluşturuluyor..."
+      },
+      "list": {
+        "title": "Mevcut turlar",
+        "loading": "Turlar yükleniyor...",
+        "empty": "Henüz tur yok. Yukarıdan ilk turunu oluştur.",
+        "manage": "Yönet",
+        "openPortal": "Portalı aç"
+      }
+    },
+    "tourDetail": {
+      "loading": "Tur detayları yükleniyor...",
+      "detailsTitle": "Tur Detayları",
+      "detailsSubtitle": "Tur adı ve tarihleri güncelle.",
+      "form": {
+        "nameLabel": "Ad",
+        "namePlaceholder": "Tur adı",
+        "startDateLabel": "Başlangıç tarihi",
+        "endDateLabel": "Bitiş tarihi",
+        "save": "Turu kaydet"
+      },
+      "openPortal": "Portalı aç",
+      "guide": {
+        "title": "Rehber Atama",
+        "subtitle": "Bu tur için giriş yapacak rehberi seç.",
+        "loading": "Rehberler yükleniyor...",
+        "empty": "Rehber bulunamadı.",
+        "selectPlaceholder": "Rehber seç",
+        "save": "Rehberi kaydet"
+      }
+    },
+    "checkIn": {
+      "title": "Tur girişi",
+      "loading": "Giriş verileri yükleniyor...",
+      "codePlaceholder": "8 karakter kod",
+      "submitting": "Giriş yapılıyor...",
+      "participantsTitle": "Katılımcılar",
+      "empty": "Katılımcı bulunamadı.",
+      "markArrived": "Geldi olarak işaretle",
+      "success": "Giriş başarılı.",
+      "alreadyCheckedIn": "Zaten giriş yapılmış."
+    },
+    "participants": {
+      "title": "Katılımcılar",
+      "addTitle": "Katılımcı ekle",
+      "empty": "Henüz katılımcı yok. Yukarıdan ekle.",
+      "editTitle": "Katılımcıyı düzenle",
+      "deleteConfirm": "{name} silinsin mi?",
+      "form": {
+        "fullName": "Ad soyad",
+        "fullNamePlaceholder": "Ayşe Kaya",
+        "email": "E-posta (opsiyonel)",
+        "emailPlaceholder": "ayse@example.com",
+        "phone": "Telefon (opsiyonel)",
+        "phonePlaceholder": "+90 555 123 45 67",
+        "add": "Katılımcı ekle",
+        "adding": "Ekleniyor...",
+        "emailShort": "E-posta",
+        "phoneShort": "Telefon"
+      }
+    },
+    "portal": {
+      "title": "Portal İçeriği",
+      "subtitle": "Katılımcı görünümü",
+      "meeting": {
+        "title": "Buluşma",
+        "time": "Saat",
+        "timePlaceholder": "08:30",
+        "place": "Yer",
+        "placePlaceholder": "Otel lobisi",
+        "maps": "Harita URL",
+        "mapsPlaceholder": "https://maps.google.com/?q=...",
+        "note": "Not",
+        "notePlaceholder": "15 dakika önce gelin."
+      },
+      "links": {
+        "title": "Bağlantılar",
+        "add": "Bağlantı ekle",
+        "label": "Etiket",
+        "labelPlaceholder": "Tur bilgi paketi",
+        "url": "URL",
+        "urlPlaceholder": "https://example.com"
+      },
+      "days": {
+        "title": "Günler",
+        "add": "Gün ekle",
+        "empty": "Henüz gün yok. İlk günü ekleyin.",
+        "dayLabel": "Gün {day}",
+        "titleLabel": "Başlık",
+        "titlePlaceholder": "Gün başlığı",
+        "itemsLabel": "Öğeler (satır başına bir)",
+        "itemsPlaceholder": "Müze gezisi"
+      },
+      "notes": {
+        "title": "Notlar",
+        "label": "Her satır bir not",
+        "placeholder": "Yeniden kullanılabilir şişe getirin."
+      },
+      "save": "Portalı kaydet"
+    },
+    "organizations": {
+      "title": "Organizasyon seç",
+      "subtitle": "Yönetmek istediğin acenteyi seç.",
+      "loading": "Organizasyonlar yükleniyor...",
+      "select": "Seç",
+      "selected": "Seçildi",
+      "empty": "Organizasyon bulunamadı."
+    }
+  },
+  "guide": {
+    "tours": {
+      "title": "Rehber Turları",
+      "subtitle": "Atandığın turlarda giriş yap.",
+      "loading": "Turlar yükleniyor...",
+      "empty": "Henüz atanmış tur yok.",
+      "openCheckIn": "Girişi aç"
+    },
+    "checkIn": {
+      "title": "Tur girişi",
+      "loading": "Giriş verileri yükleniyor...",
+      "codePlaceholder": "8 karakter kod",
+      "submitting": "Giriş yapılıyor...",
+      "participantsTitle": "Katılımcılar",
+      "empty": "Katılımcı bulunamadı.",
+      "markArrived": "Geldi olarak işaretle",
+      "autoCheckIn": "Tarama sonrası otomatik giriş (yakında)",
+      "success": "Giriş başarılı.",
+      "alreadyCheckedIn": "Zaten giriş yapılmış."
+    }
+  },
+  "portal": {
+    "header": {
+      "kicker": "Katılımcı Portalı"
+    },
+    "loading": "Tur detayları yükleniyor...",
+    "empty": "Portal içeriği henüz hazır değil.",
+    "tabs": {
+      "days": "Günler",
+      "docs": "Belgeler",
+      "qr": "QR",
+      "info": "Bilgiler"
+    },
+    "actions": {
+      "copyPageLink": "Bağlantıyı kopyala",
+      "linkCopied": "Bağlantı kopyalandı.",
+      "copyLinkFailed": "Bağlantı kopyalanamadı."
+    },
+    "days": {
+      "title": "Program",
+      "empty": "Program henüz hazır değil.",
+      "dayLabel": "Gün {day}",
+      "dayTitle": "Gün {day} - {title}"
+    },
+    "docs": {
+      "title": "Belgeler",
+      "empty": "Henüz belge yok."
+    },
+    "qr": {
+      "title": "QR",
+      "codeLabel": "Giriş kodu",
+      "noCode": "Kod yok",
+      "copyCode": "Kodu kopyala",
+      "clearCode": "Kodu temizle",
+      "emptyHint": "Henüz kod kaydedilmedi. Rehberinden aldığın kodu yapıştır.",
+      "pastePlaceholder": "Kodu yapıştır",
+      "helper": "QR, kodu hazır halde rehber giriş ekranını açar.",
+      "empty": "QR oluşturmak için kod ekleyin.",
+      "copyGuideLink": "Rehber linkini kopyala",
+      "imageAlt": "QR",
+      "codeCleared": "Kod temizlendi.",
+      "enterCode": "Önce kod girin.",
+      "linkNeedsCode": "Link için kod ekleyin."
+    },
+    "info": {
+      "meetingTitle": "Buluşma noktası",
+      "time": "Saat",
+      "place": "Yer",
+      "maps": "Harita",
+      "openMaps": "Haritada aç",
+      "note": "Not",
+      "notesTitle": "Notlar",
+      "notesEmpty": "Henüz not yok."
+    }
+  },
+  "helloWorld": {
+    "count": "Sayaç: {count}",
+    "editPrefix": "HMR'i test etmek için",
+    "editSuffix": "dosyasını düzenleyin.",
+    "starterPrefix": "Şuna göz atın",
+    "starterSuffix": "resmi Vue + Vite başlangıç projesi.",
+    "idePrefix": "Vue için IDE desteği hakkında daha fazla bilgi için",
+    "ideLink": "Vue Dokümanları Ölçeklendirme Rehberi",
+    "docsHint": "Vite ve Vue logolarına tıklayarak daha fazla bilgi alın."
+  }
+}
