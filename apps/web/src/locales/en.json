@@ -47,7 +47,7 @@
     "login": {
       "subtitle": "Sign in to continue.",
       "emailLabel": "Email",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "you@@example.com",
       "passwordLabel": "Password",
       "passwordPlaceholder": "••••••••",
       "submit": "Sign in",
@@ -200,7 +200,7 @@
         "fullName": "Full name",
         "fullNamePlaceholder": "Ayse Kaya",
         "email": "Email (optional)",
-        "emailPlaceholder": "ayse@example.com",
+        "emailPlaceholder": "ayse@@example.com",
         "phone": "Phone (optional)",
         "phonePlaceholder": "+90 555 123 45 67",
         "add": "Add participant",
