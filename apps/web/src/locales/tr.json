@@ -22,13 +22,13 @@
     "open": "Aç",
     "tour": "Tur",
     "dateRange": "{start} - {end}",
-    "checkIn": "Giriş",
-    "checkInCode": "Giriş kodu",
+    "checkIn": "Yoklama al",
+    "checkInCode": "Yoklama kodu",
     "arrivedSummary": "Gelen {arrived} / {total}",
     "arrivedLabel": "Gelen",
     "pendingLabel": "Bekliyor",
     "arrivedAlready": "Zaten geldi",
-    "checkedIn": "Giriş yapıldı",
+    "checkedIn": "Geldi işaretlendi",
     "undo": "Geri al",
     "undoing": "Geri alınıyor...",
     "noData": "Veri yok.",
@@ -47,7 +47,7 @@
     "login": {
       "subtitle": "Devam etmek için giriş yap.",
       "emailLabel": "E-posta",
-      "emailPlaceholder": "ornek@demo.local",
+      "emailPlaceholder": "ornek@demo.com",
       "passwordLabel": "Şifre",
       "passwordPlaceholder": "••••••••",
       "submit": "Giriş yap",
@@ -94,8 +94,8 @@
       "load": "Organizasyonlar yüklenemedi."
     },
     "checkIn": {
-      "load": "Giriş verileri yüklenemedi.",
-      "failed": "Giriş başarısız."
+      "load": "Yoklama verileri yüklenemedi.",
+      "failed": "Yoklama başarısız."
     },
     "copyNotSupported": "Kopyalama desteklenmiyor.",
     "copyFailed": "Kopyalanamadı."
@@ -110,7 +110,7 @@
     "meetingPlaceRequired": "Buluşma yeri gerekli.",
     "meetingMapsRequired": "Harita bağlantısı gerekli.",
     "guideRequired": "Rehber seçin.",
-    "checkInCodeRequired": "Giriş kodu gerekli.",
+    "checkInCodeRequired": "Yoklama kodu gerekli.",
     "phone": {
       "invalid": "Telefon numarası geçersiz.",
       "tooLong": "Telefon numarası çok uzun.",
@@ -119,12 +119,12 @@
   },
   "toast": {
     "sessionExpired": "Oturum süren doldu, tekrar giriş yap.",
-    "checkInUndone": "Giriş geri alındı.",
+    "checkInUndone": "Yoklama geri alındı.",
     "alreadyUndone": "Zaten geri alınmış.",
     "undoFailed": "Geri alma başarısız.",
     "invalidCode": "Kod bulunamadı.",
     "alreadyArrived": "Zaten geldi.",
-    "checkedIn": "Giriş yapıldı.",
+    "checkedIn": "Geldi işaretlendi.",
     "tourUpdated": "Tur güncellendi.",
     "tourUpdateFailed": "Tur güncellenemedi.",
     "participantAdded": "Katılımcı eklendi.",
@@ -172,7 +172,7 @@
       "openPortal": "Portalı aç",
       "guide": {
         "title": "Rehber Atama",
-        "subtitle": "Bu tur için giriş yapacak rehberi seç.",
+        "subtitle": "Bu tur için yoklama alacak rehberi seç.",
         "loading": "Rehberler yükleniyor...",
         "empty": "Rehber bulunamadı.",
         "selectPlaceholder": "Rehber seç",
@@ -180,15 +180,15 @@
       }
     },
     "checkIn": {
-      "title": "Tur girişi",
-      "loading": "Giriş verileri yükleniyor...",
+      "title": "Tur yoklaması",
+      "loading": "Yoklama verileri yükleniyor...",
       "codePlaceholder": "8 karakter kod",
-      "submitting": "Giriş yapılıyor...",
+      "submitting": "İşleniyor...",
       "participantsTitle": "Katılımcılar",
       "empty": "Katılımcı bulunamadı.",
       "markArrived": "Geldi olarak işaretle",
-      "success": "Giriş başarılı.",
-      "alreadyCheckedIn": "Zaten giriş yapılmış."
+      "success": "Geldi olarak işaretlendi.",
+      "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş."
     },
     "participants": {
       "title": "Katılımcılar",
@@ -260,22 +260,22 @@
   "guide": {
     "tours": {
       "title": "Rehber Turları",
-      "subtitle": "Atandığın turlarda giriş yap.",
+      "subtitle": "Atandığın turlarda yoklama al.",
       "loading": "Turlar yükleniyor...",
       "empty": "Henüz atanmış tur yok.",
-      "openCheckIn": "Girişi aç"
+      "openCheckIn": "Yoklama al"
     },
     "checkIn": {
-      "title": "Tur girişi",
-      "loading": "Giriş verileri yükleniyor...",
+      "title": "Tur yoklaması",
+      "loading": "Yoklama verileri yükleniyor...",
       "codePlaceholder": "8 karakter kod",
-      "submitting": "Giriş yapılıyor...",
+      "submitting": "İşleniyor...",
       "participantsTitle": "Katılımcılar",
       "empty": "Katılımcı bulunamadı.",
       "markArrived": "Geldi olarak işaretle",
-      "autoCheckIn": "Tarama sonrası otomatik giriş (yakında)",
-      "success": "Giriş başarılı.",
-      "alreadyCheckedIn": "Zaten giriş yapılmış."
+      "autoCheckIn": "Tarama sonrası otomatik yoklama (yakında)",
+      "success": "Geldi olarak işaretlendi.",
+      "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş."
     }
   },
   "portal": {
@@ -307,13 +307,13 @@
     },
     "qr": {
       "title": "QR",
-      "codeLabel": "Giriş kodu",
+      "codeLabel": "Yoklama kodu",
       "noCode": "Kod yok",
       "copyCode": "Kodu kopyala",
       "clearCode": "Kodu temizle",
       "emptyHint": "Henüz kod kaydedilmedi. Rehberinden aldığın kodu yapıştır.",
       "pastePlaceholder": "Kodu yapıştır",
-      "helper": "QR, kodu hazır halde rehber giriş ekranını açar.",
+      "helper": "QR, kodu hazır halde rehber yoklama ekranını açar.",
       "empty": "QR oluşturmak için kod ekleyin.",
       "copyGuideLink": "Rehber linkini kopyala",
       "imageAlt": "QR",
