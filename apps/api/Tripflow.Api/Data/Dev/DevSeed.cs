@@ -60,8 +60,8 @@ public static class DevSeed
         var now = DateTime.UtcNow;
         var hasher = new PasswordHasher<UserEntity>();
 
-        var orgA = await GetOrCreateOrg(db, "Org A Travel", "org-a", now, ct, state);
-        var orgB = await GetOrCreateOrg(db, "Org B Travel", "org-b", now, ct, state);
+        var orgA = await GetOrCreateOrg(db, "Mavi Rota Travel", "org-a", now, ct, state);
+        var orgB = await GetOrCreateOrg(db, "Atlas Travel", "org-b", now, ct, state);
 
         var superAdmin = await UpsertUser(
             db,
@@ -125,11 +125,11 @@ public static class DevSeed
 
         await db.SaveChangesAsync(ct);
 
-        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 1", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, state);
-        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Org A - Demo Tour 2", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, state);
+        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Kapadokya Bahar Turu", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, state);
+        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Ege Kiyilari Hafta Sonu", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, state);
 
-        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 1", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, state);
-        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Org B - Demo Tour 2", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, state);
+        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Karadeniz Yayla Rotasi", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, state);
+        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Istanbul Tarih Turu", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, state);
 
         await db.SaveChangesAsync(ct);
 
