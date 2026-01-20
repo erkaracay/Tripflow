@@ -14,6 +14,45 @@ public static class DevSeed
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly string[] SampleNames =
+    [
+        "Ayşe Demir",
+        "Mehmet Kaya",
+        "Elif Yılmaz",
+        "Can Arslan",
+        "Zeynep Acar",
+        "Mert Yıldız",
+        "Ece Şahin",
+        "Kerem Polat",
+        "Deniz Turan",
+        "Seda Koç",
+        "Emre Çakır",
+        "Melis Aydın",
+        "Ozan Aslan",
+        "Nazlı Güneş",
+        "Barış Eren",
+        "İpek Tan",
+        "Bora Demir",
+        "Selin Öz",
+        "Burak Yılmaz",
+        "Derya Akın",
+        "Tuna Arda",
+        "Sevgi Koçak",
+        "Ceren Ateş",
+        "Kaan Gül",
+        "Gökçe Sarı",
+        "Tolga Bozkurt",
+        "Eda Yaşar",
+        "Umut Erdem",
+        "Pelin Aksoy",
+        "Hakan Köse",
+        "Ege Karaman",
+        "Aslı Kaplan",
+        "Yasemin Er",
+        "Cemal Ak",
+        "Hande Ar",
+        "İlker Tan"
+    ];
 
     public static async Task<(bool Seeded, string Message)> SeedAsync(TripflowDbContext db, CancellationToken ct)
     {
@@ -288,14 +327,16 @@ public static class DevSeed
         for (var i = 1; i <= count; i++)
         {
             var code = await GenerateUniqueCheckInCodeAsync(db, ct);
+            var name = SampleNames[(i - 1) % SampleNames.Length];
+            var phoneDigits = 5300000000 + i;
             participants.Add(new ParticipantEntity
             {
                 Id = Guid.NewGuid(),
                 TourId = tour.Id,
                 OrganizationId = organizationId,
-                FullName = $"{prefix} Participant {i:00}",
-                Email = $"{prefix.ToLowerInvariant()}{i:00}@demo.local",
-                Phone = $"+90555{i:000000}",
+                FullName = name,
+                Email = BuildDemoEmail(prefix, i),
+                Phone = $"+90{phoneDigits:0000000000}",
                 CheckInCode = code,
                 CreatedAt = now
             });
@@ -354,7 +395,7 @@ public static class DevSeed
                 time,
                 place,
                 mapsUrl,
-                note = $"Welcome to {tourName}. 15 dk erken gel."
+                note = $"Welcome to {tourName}. Please arrive 15 minutes early."
             },
             links = new[]
             {
@@ -370,6 +411,12 @@ public static class DevSeed
         };
 
         return JsonSerializer.Serialize(obj, JsonOptions);
+    }
+
+    private static string BuildDemoEmail(string prefix, int index)
+    {
+        var safePrefix = prefix.Trim().ToLowerInvariant();
+        return $"traveler.{safePrefix}.{index:00}@demo.local";
     }
 
     private static async Task<string> GenerateUniqueCheckInCodeAsync(TripflowDbContext db, CancellationToken ct)
