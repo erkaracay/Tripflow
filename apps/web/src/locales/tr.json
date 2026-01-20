@@ -47,7 +47,7 @@
     "login": {
       "subtitle": "Devam etmek için giriş yap.",
       "emailLabel": "E-posta",
-      "emailPlaceholder": "ornek@@demo.com",
+      "emailPlaceholder": "ornek{'@'}demo.com",
       "passwordLabel": "Şifre",
       "passwordPlaceholder": "••••••••",
       "submit": "Giriş yap",
@@ -200,7 +200,7 @@
         "fullName": "Ad soyad",
         "fullNamePlaceholder": "Ayşe Kaya",
         "email": "E-posta (opsiyonel)",
-        "emailPlaceholder": "ayse@@example.com",
+        "emailPlaceholder": "ayse{'@'}example.com",
         "phone": "Telefon (opsiyonel)",
         "phonePlaceholder": "+90 555 123 45 67",
         "add": "Katılımcı ekle",
