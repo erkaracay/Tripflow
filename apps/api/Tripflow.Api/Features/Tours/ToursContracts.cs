@@ -28,4 +28,6 @@ public sealed record CheckInUndoRequest(Guid? ParticipantId, string? CheckInCode
 public sealed record CheckInSummary(int ArrivedCount, int TotalCount);
 public sealed record CheckInResponse(Guid ParticipantId, string ParticipantName, bool AlreadyArrived, int ArrivedCount, int TotalCount);
 public sealed record CheckInUndoResponse(Guid ParticipantId, bool AlreadyUndone, int ArrivedCount, int TotalCount);
+public sealed record VerifyCheckInCodeRequest(string? CheckInCode);
+public sealed record VerifyCheckInCodeResponse(bool IsValid, string? NormalizedCode);
 public sealed record AssignGuideRequest(Guid? GuideUserId);

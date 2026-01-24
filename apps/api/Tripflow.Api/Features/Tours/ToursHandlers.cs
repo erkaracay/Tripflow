@@ -207,6 +207,39 @@ internal static class ToursHandlers
         return Results.Ok(portal);
     }
 
+    internal static async Task<IResult> VerifyCheckInCode(
+        string tourId,
+        VerifyCheckInCodeRequest request,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        var raw = request?.CheckInCode ?? string.Empty;
+        var normalized = raw.Trim().ToUpperInvariant()
+            .Replace(" ", string.Empty)
+            .Replace("-", string.Empty);
+
+        if (normalized.Length != 8)
+        {
+            return Results.Ok(new VerifyCheckInCodeResponse(false, null));
+        }
+
+        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!tourExists)
+        {
+            return Results.Ok(new VerifyCheckInCodeResponse(false, null));
+        }
+
+        var isValid = await db.Participants.AsNoTracking()
+            .AnyAsync(p => p.TourId == id && p.CheckInCode == normalized, ct);
+
+        return Results.Ok(new VerifyCheckInCodeResponse(isValid, isValid ? normalized : null));
+    }
+
     internal static async Task<IResult> SavePortal(
         string tourId,
         TourPortalInfo request,

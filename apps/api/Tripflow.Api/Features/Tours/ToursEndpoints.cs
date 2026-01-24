@@ -59,6 +59,13 @@ public static class ToursEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .AllowAnonymous();
 
+        group.MapPost("/{tourId}/checkins/verify", ToursHandlers.VerifyCheckInCode)
+            .WithSummary("Verify a participant check-in code for the tour (public)")
+            .Produces<VerifyCheckInCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .AllowAnonymous()
+            .WithOpenApi();
+
         admin.MapPut("/{tourId}/portal", ToursHandlers.SavePortal)
             .WithSummary("Save portal content")
             .WithDescription("Upserts portal JSON for a tour.")
