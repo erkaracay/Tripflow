@@ -3,16 +3,18 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
-import { apiGet } from '../../lib/api'
+import { apiGet, verifyTourCheckInCode } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import { useToast } from '../../lib/toast'
 import type { Tour, TourPortalInfo } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
 
 const route = useRoute()
 const { t } = useI18n()
+const { pushToast } = useToast()
 const tourId = computed(() => route.params.tourId as string)
 
 const tour = ref<Tour | null>(null)
@@ -23,6 +25,7 @@ const errorMessage = ref<string | null>(null)
 const copyStatusKey = ref<string | null>(null)
 const codeCopyStatusKey = ref<string | null>(null)
 const linkCopyStatusKey = ref<string | null>(null)
+const verifyingCode = ref(false)
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
@@ -65,6 +68,11 @@ const clearStoredCode = () => {
   globalThis.localStorage?.removeItem(storageKey.value)
   checkInCode.value = ''
   codeCopyStatusKey.value = 'portal.qr.codeCleared'
+}
+
+const clearInvalidCode = () => {
+  globalThis.localStorage?.removeItem(storageKey.value)
+  checkInCode.value = ''
 }
 
 const buildCheckInLink = (code: string) => {
@@ -162,16 +170,17 @@ const setActiveTab = (value: string) => {
 
 const resolveCheckInCode = () => {
   const raw = route.query.code ?? route.query.checkInCode
-  const queryCode = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
+  const queryCode = typeof raw === 'string' ? raw : ''
+  const stored = globalThis.localStorage?.getItem(storageKey.value) ?? ''
 
   if (queryCode) {
-    checkInCode.value = queryCode
-    persistCheckInCode(queryCode)
+    void verifyAndApplyCode(queryCode, 'info')
     return
   }
 
-  const stored = globalThis.localStorage?.getItem(storageKey.value)
-  checkInCode.value = stored ?? ''
+  if (stored) {
+    void verifyAndApplyCode(stored, 'info')
+  }
 }
 
 const copyShareLink = async () => {
@@ -219,15 +228,46 @@ const copyCheckInCode = async () => {
   }
 }
 
-const applyManualCode = () => {
-  const normalized = manualCode.value.trim().toUpperCase()
+const normalizeCheckInCode = (value: string) =>
+  value.trim().toUpperCase().replace(/[\s-]/g, '')
+
+const verifyAndApplyCode = async (raw: string, tone: 'info' | 'error' = 'error') => {
+  codeCopyStatusKey.value = null
+  const normalized = normalizeCheckInCode(raw)
+
+  if (normalized.length !== 8) {
+    clearInvalidCode()
+    pushToast({ key: 'toast.portalCodeInvalid', tone })
+    return
+  }
+
+  verifyingCode.value = true
+  try {
+    const result = await verifyTourCheckInCode(tourId.value, normalized)
+    if (result.isValid && result.normalizedCode) {
+      checkInCode.value = result.normalizedCode
+      persistCheckInCode(result.normalizedCode)
+      return
+    }
+
+    clearInvalidCode()
+    pushToast({ key: 'toast.portalCodeInvalid', tone })
+  } catch {
+    clearInvalidCode()
+    pushToast({ key: 'toast.portalCodeInvalid', tone })
+  } finally {
+    verifyingCode.value = false
+  }
+}
+
+const applyManualCode = async () => {
+  const normalized = normalizeCheckInCode(manualCode.value)
   if (!normalized) {
     codeCopyStatusKey.value = 'portal.qr.enterCode'
     return
   }
 
-  checkInCode.value = normalized
-  persistCheckInCode(normalized)
+  await verifyAndApplyCode(normalized, 'error')
   manualCode.value = ''
 }
 
@@ -266,8 +306,6 @@ watch([checkInCode, () => tourId.value], async ([value]) => {
     return
   }
 
-  persistCheckInCode(value)
-
   try {
     const deepLink = buildCheckInLink(value)
     if (!deepLink) {
@@ -286,7 +324,7 @@ watch([checkInCode, () => tourId.value], async ([value]) => {
 
 watch(
   () => [route.query.code, route.query.checkInCode, tourId.value],
-  resolveCheckInCode,
+  () => resolveCheckInCode(),
   { immediate: true }
 )
 
@@ -424,11 +462,11 @@ onMounted(loadPortal)
                   </div>
                 </div>
                 <p v-if="codeCopyStatusKey" class="mt-2 text-xs text-slate-500">{{ t(codeCopyStatusKey) }}</p>
-                <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
-                  <p>{{ t('portal.qr.emptyHint') }}</p>
-                  <div class="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      v-model.trim="manualCode"
+                  <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
+                    <p>{{ t('portal.qr.emptyHint') }}</p>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        v-model.trim="manualCode"
                       class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
                       :placeholder="t('portal.qr.pastePlaceholder')"
                       type="text"
@@ -437,11 +475,13 @@ onMounted(loadPortal)
                     <button
                       class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
                       type="button"
+                      :disabled="verifyingCode"
                       @click="applyManualCode"
                     >
                       {{ t('common.save') }}
                     </button>
                   </div>
+                  <p v-if="verifyingCode" class="text-xs text-slate-500">{{ t('portal.qr.verifying') }}</p>
                   <p class="text-xs text-slate-500">{{ t('portal.qr.helper') }}</p>
                 </div>
               </div>

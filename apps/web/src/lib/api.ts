@@ -114,3 +114,17 @@ export const apiDelete = async <T>(path: string): Promise<T> => {
 
   return handleResponse<T>(response)
 }
+
+export type VerifyCheckInCodeResponse = {
+  isValid: boolean
+  normalizedCode?: string | null
+}
+
+export const verifyTourCheckInCode = async (
+  tourId: string,
+  code: string
+): Promise<VerifyCheckInCodeResponse> => {
+  return apiPost<VerifyCheckInCodeResponse>(`/api/tours/${tourId}/checkins/verify`, {
+    checkInCode: code,
+  })
+}

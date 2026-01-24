@@ -147,7 +147,8 @@
     "orgUpdated": "Organization updated.",
     "orgUpdateFailed": "Failed to update organization.",
     "orgDeleted": "Organization deleted.",
-    "orgDeleteFailed": "Failed to delete organization."
+    "orgDeleteFailed": "Failed to delete organization.",
+    "portalCodeInvalid": "Code not found. Please check with your guide."
   },
   "admin": {
     "tours": {
@@ -337,6 +338,7 @@
     },
     "qr": {
       "title": "Your QR",
+      "verifying": "Verifying code...",
       "codeLabel": "Check-in code",
       "noCode": "No code yet",
       "copyCode": "Copy code",

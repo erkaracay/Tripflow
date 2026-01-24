@@ -147,7 +147,8 @@
     "orgUpdated": "Organizasyon güncellendi.",
     "orgUpdateFailed": "Organizasyon güncellenemedi.",
     "orgDeleted": "Organizasyon silindi.",
-    "orgDeleteFailed": "Organizasyon silinemedi."
+    "orgDeleteFailed": "Organizasyon silinemedi.",
+    "portalCodeInvalid": "Kod bulunamadı. Lütfen rehberinizden kontrol edin."
   },
   "admin": {
     "tours": {
@@ -337,6 +338,7 @@
     },
     "qr": {
       "title": "QR",
+      "verifying": "Kod doğrulanıyor...",
       "codeLabel": "Yoklama kodu",
       "noCode": "Kod yok",
       "copyCode": "Kodu kopyala",

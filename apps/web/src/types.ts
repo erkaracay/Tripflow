@@ -95,3 +95,8 @@ export type LoginResponse = {
   userId: string
   fullName?: string | null
 }
+
+export type VerifyCheckInCodeResponse = {
+  isValid: boolean
+  normalizedCode?: string | null
+}
