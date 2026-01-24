@@ -91,7 +91,10 @@
       "load": "Rehberler yüklenemedi."
     },
     "organizations": {
-      "load": "Organizasyonlar yüklenemedi."
+      "load": "Organizasyonlar yüklenemedi.",
+      "create": "Organizasyon oluşturulamadı.",
+      "update": "Organizasyon güncellenemedi.",
+      "delete": "Organizasyon silinemedi."
     },
     "checkIn": {
       "load": "Yoklama verileri yüklenemedi.",
@@ -110,6 +113,8 @@
     "meetingPlaceRequired": "Buluşma yeri gerekli.",
     "meetingMapsRequired": "Harita bağlantısı gerekli.",
     "guideRequired": "Rehber seçin.",
+    "orgNameRequired": "Organizasyon adı gerekli.",
+    "orgSlugRequired": "Organizasyon slug gerekli.",
     "checkInCodeRequired": "Yoklama kodu gerekli.",
     "phone": {
       "invalid": "Telefon numarası geçersiz.",
@@ -136,7 +141,13 @@
     "portalSaved": "Portal kaydedildi.",
     "portalSaveFailed": "Portal kaydedilemedi.",
     "guideAssigned": "Rehber atandı.",
-    "guideAssignFailed": "Rehber atanamadı."
+    "guideAssignFailed": "Rehber atanamadı.",
+    "orgCreated": "Organizasyon oluşturuldu.",
+    "orgCreateFailed": "Organizasyon oluşturulamadı.",
+    "orgUpdated": "Organizasyon güncellendi.",
+    "orgUpdateFailed": "Organizasyon güncellenemedi.",
+    "orgDeleted": "Organizasyon silindi.",
+    "orgDeleteFailed": "Organizasyon silinemedi."
   },
   "admin": {
     "tours": {
@@ -254,7 +265,26 @@
       "loading": "Organizasyonlar yükleniyor...",
       "select": "Seç",
       "selected": "Seçildi",
-      "empty": "Organizasyon bulunamadı."
+      "empty": "Organizasyon bulunamadı.",
+      "manageLink": "Organizasyonları yönet",
+      "inactive": "Pasif",
+      "manage": {
+        "title": "Organizasyon yönetimi",
+        "subtitle": "Pilot için organizasyonları oluştur, güncelle ve pasifleştir.",
+        "createTitle": "Organizasyon oluştur",
+        "creating": "Oluşturuluyor...",
+        "create": "Oluştur",
+        "nameLabel": "Organizasyon adı",
+        "namePlaceholder": "Atlas Rota Travel",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "atlas-rota",
+        "empty": "Organizasyon bulunamadı.",
+        "inactive": "Pasif",
+        "activeLabel": "Aktif",
+        "save": "Kaydet",
+        "saving": "Kaydediliyor...",
+        "confirmDelete": "{name} silinsin mi?"
+      }
     }
   },
   "guide": {

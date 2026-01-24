@@ -45,10 +45,20 @@ onMounted(loadOrgs)
 <template>
   <div class="space-y-6">
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 class="text-2xl font-semibold">{{ t('admin.organizations.title') }}</h1>
-      <p class="mt-2 text-sm text-slate-600">
-        {{ t('admin.organizations.subtitle') }}
-      </p>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-semibold">{{ t('admin.organizations.title') }}</h1>
+          <p class="mt-2 text-sm text-slate-600">
+            {{ t('admin.organizations.subtitle') }}
+          </p>
+        </div>
+        <RouterLink
+          class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+          to="/admin/orgs"
+        >
+          {{ t('admin.organizations.manageLink') }}
+        </RouterLink>
+      </div>
     </section>
 
     <LoadingState v-if="loading" message-key="admin.organizations.loading" />
@@ -69,10 +79,14 @@ onMounted(loadOrgs)
           <div>
             <div class="text-lg font-semibold">{{ org.name }}</div>
             <div class="text-xs text-slate-500">{{ org.slug }}</div>
+            <div v-if="!org.isActive" class="mt-2 text-xs text-amber-600">
+              {{ t('admin.organizations.inactive') }}
+            </div>
           </div>
           <button
             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
             type="button"
+            :disabled="!org.isActive"
             @click="selectOrg(org)"
           >
             {{ selectedOrgId === org.id ? t('admin.organizations.selected') : t('admin.organizations.select') }}

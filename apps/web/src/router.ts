@@ -3,7 +3,7 @@ import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } 
 import AdminTours from './pages/admin/AdminTours.vue'
 import AdminTourDetail from './pages/admin/AdminTourDetail.vue'
 import AdminTourCheckIn from './pages/admin/AdminTourCheckIn.vue'
-import SuperAdminOrgSelect from './pages/admin/SuperAdminOrgSelect.vue'
+import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
 import GuideTours from './pages/guide/GuideTours.vue'
 import GuideTourCheckIn from './pages/guide/GuideTourCheckIn.vue'
 import Login from './pages/Login.vue'
@@ -36,7 +36,7 @@ const router = createRouter({
     },
     {
       path: '/admin/orgs',
-      component: SuperAdminOrgSelect,
+      component: AdminOrganizations,
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {

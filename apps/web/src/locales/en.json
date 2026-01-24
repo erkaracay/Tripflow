@@ -91,7 +91,10 @@
       "load": "Failed to load guides."
     },
     "organizations": {
-      "load": "Failed to load organizations."
+      "load": "Failed to load organizations.",
+      "create": "Failed to create organization.",
+      "update": "Failed to update organization.",
+      "delete": "Failed to delete organization."
     },
     "checkIn": {
       "load": "Failed to load check-in data.",
@@ -110,6 +113,8 @@
     "meetingPlaceRequired": "Meeting place is required.",
     "meetingMapsRequired": "Meeting maps URL is required.",
     "guideRequired": "Select a guide.",
+    "orgNameRequired": "Organization name is required.",
+    "orgSlugRequired": "Organization slug is required.",
     "checkInCodeRequired": "Check-in code is required.",
     "phone": {
       "invalid": "Phone number is invalid.",
@@ -136,7 +141,13 @@
     "portalSaved": "Portal saved.",
     "portalSaveFailed": "Failed to save portal.",
     "guideAssigned": "Guide assigned.",
-    "guideAssignFailed": "Failed to assign guide."
+    "guideAssignFailed": "Failed to assign guide.",
+    "orgCreated": "Organization created.",
+    "orgCreateFailed": "Failed to create organization.",
+    "orgUpdated": "Organization updated.",
+    "orgUpdateFailed": "Failed to update organization.",
+    "orgDeleted": "Organization deleted.",
+    "orgDeleteFailed": "Failed to delete organization."
   },
   "admin": {
     "tours": {
@@ -254,7 +265,26 @@
       "loading": "Loading organizations...",
       "select": "Select",
       "selected": "Selected",
-      "empty": "No organizations found."
+      "empty": "No organizations found.",
+      "manageLink": "Manage organizations",
+      "inactive": "Inactive",
+      "manage": {
+        "title": "Organization management",
+        "subtitle": "Create, update, and disable organizations for the pilot.",
+        "createTitle": "Create organization",
+        "creating": "Creating...",
+        "create": "Create",
+        "nameLabel": "Organization name",
+        "namePlaceholder": "Atlas Route Travel",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "atlas-route",
+        "empty": "No organizations found.",
+        "inactive": "Inactive",
+        "activeLabel": "Active",
+        "save": "Save",
+        "saving": "Saving...",
+        "confirmDelete": "Delete {name}?"
+      }
     }
   },
   "guide": {

@@ -23,7 +23,10 @@ public sealed class TripflowDbContext : DbContext
 
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.Slug).HasMaxLength(64).IsRequired();
+            b.Property(x => x.IsActive).IsRequired();
+            b.Property(x => x.IsDeleted).IsRequired();
             b.Property(x => x.CreatedAt).IsRequired();
+            b.Property(x => x.UpdatedAt).IsRequired();
 
             b.HasIndex(x => x.Slug).IsUnique();
         });

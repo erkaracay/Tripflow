@@ -166,6 +166,31 @@ public static class DevSeed
         var org = await db.Organizations.FirstOrDefaultAsync(x => x.Slug == slug, ct);
         if (org is not null)
         {
+            var updated = false;
+            if (!string.Equals(org.Name, name, StringComparison.Ordinal))
+            {
+                org.Name = name;
+                updated = true;
+            }
+
+            if (!org.IsActive)
+            {
+                org.IsActive = true;
+                updated = true;
+            }
+
+            if (org.IsDeleted)
+            {
+                org.IsDeleted = false;
+                updated = true;
+            }
+
+            if (updated)
+            {
+                org.UpdatedAt = now;
+                db.Organizations.Update(org);
+                state.Seeded = true;
+            }
             return org;
         }
 
@@ -174,7 +199,10 @@ public static class DevSeed
             Id = Guid.NewGuid(),
             Name = name,
             Slug = slug,
-            CreatedAt = now
+            IsActive = true,
+            IsDeleted = false,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         db.Organizations.Add(org);
