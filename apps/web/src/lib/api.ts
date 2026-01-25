@@ -67,7 +67,9 @@ const handlePortalResponse = async <T>(response: Response): Promise<T> => {
         ? String((data as { message?: string }).message ?? 'Request failed')
         : response.statusText
 
-    throw new Error(message)
+    const error = new Error(message) as Error & { status?: number }
+    error.status = response.status
+    throw error
   }
 
   return data as T

@@ -23,10 +23,13 @@ const portal = ref<TourPortalInfo | null>(null)
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
+const networkErrorKey = ref<string | null>(null)
+const isRetrying = ref(false)
 const copyStatusKey = ref<string | null>(null)
 const codeCopyStatusKey = ref<string | null>(null)
 const linkCopyStatusKey = ref<string | null>(null)
 const accessState = ref<'idle' | 'checking' | 'verified' | 'missing' | 'invalid'>('idle')
+const sessionExpired = ref(false)
 const accessToken = ref('')
 const last4 = ref('')
 const phoneHint = ref<string | null>(null)
@@ -34,11 +37,16 @@ const participantSummary = ref<PortalParticipantSummary | null>(null)
 const policy = ref<PortalAccessPolicy | null>(null)
 const attemptsRemaining = ref<number | null>(null)
 const lockedUntil = ref<Date | null>(null)
+const rateLimitUntil = ref<Date | null>(null)
 const verifyingAccess = ref(false)
 const confirmingAccess = ref(false)
 const sessionToken = ref('')
 const sessionExpiresAt = ref<Date | null>(null)
 const nowTick = ref(Date.now())
+const welcomeVisible = ref(false)
+const welcomeTimer = ref<number | null>(null)
+const hasLoadedOnce = ref(false)
+const qrError = ref(false)
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
@@ -51,6 +59,10 @@ const qrRequiresLast4 = computed(
 const isLocked = computed(() => lockRemainingSeconds.value > 0)
 const portalReady = computed(() => {
   if (accessState.value !== 'verified') {
+    return false
+  }
+
+  if (sessionExpired.value) {
     return false
   }
 
@@ -81,6 +93,78 @@ const resolvePublicBase = () => {
   }
 
   return globalThis.location?.origin ?? ''
+}
+
+const isNetworkError = (err: unknown) => {
+  if (err instanceof TypeError) {
+    return true
+  }
+
+  if (err instanceof Error) {
+    return /Failed to fetch|NetworkError/i.test(err.message)
+  }
+
+  return false
+}
+
+const getErrorStatus = (err: unknown) => {
+  if (err && typeof err === 'object' && 'status' in err) {
+    const value = (err as { status?: number }).status
+    return typeof value === 'number' ? value : null
+  }
+
+  return null
+}
+
+const setNetworkError = () => {
+  networkErrorKey.value = 'portal.networkError'
+}
+
+const clearNetworkError = () => {
+  networkErrorKey.value = null
+}
+
+const startRateLimit = (seconds = 60) => {
+  rateLimitUntil.value = new Date(Date.now() + seconds * 1000)
+}
+
+const clearRateLimit = () => {
+  rateLimitUntil.value = null
+}
+
+const welcomeStorageKey = (participantId: string) =>
+  `tf_welcome_shown:${tourId.value}:${participantId}`
+
+const showWelcomeBanner = (participantId: string) => {
+  if (!participantId) {
+    return
+  }
+
+  const key = welcomeStorageKey(participantId)
+  const alreadyShown = globalThis.localStorage?.getItem(key)
+  if (alreadyShown) {
+    return
+  }
+
+  globalThis.localStorage?.setItem(key, '1')
+  welcomeVisible.value = true
+
+  if (welcomeTimer.value) {
+    globalThis.clearTimeout(welcomeTimer.value)
+  }
+
+  welcomeTimer.value = globalThis.setTimeout(() => {
+    welcomeVisible.value = false
+    welcomeTimer.value = null
+  }, 4000)
+}
+
+const dismissWelcome = () => {
+  welcomeVisible.value = false
+  if (welcomeTimer.value) {
+    globalThis.clearTimeout(welcomeTimer.value)
+    welcomeTimer.value = null
+  }
 }
 
 const accessTokenKey = computed(() => `tripflow.portal.access.${tourId.value}`)
@@ -131,7 +215,17 @@ const loadTour = async () => {
   try {
     const tourData = await apiGet<Tour>(`/api/tours/${tourId.value}`)
     tour.value = tourData
+    hasLoadedOnce.value = true
+    clearNetworkError()
   } catch (err) {
+    if (isNetworkError(err)) {
+      setNetworkError()
+      if (!hasLoadedOnce.value) {
+        errorKey.value = 'errors.portal.load'
+      }
+      return
+    }
+
     errorMessage.value = err instanceof Error ? err.message : null
     if (!errorMessage.value) {
       errorKey.value = 'errors.portal.load'
@@ -208,6 +302,17 @@ const lockRemainingSeconds = computed(() => {
   return Math.max(0, Math.ceil(diff / 1000))
 })
 
+const rateLimitRemainingSeconds = computed(() => {
+  if (!rateLimitUntil.value) {
+    return 0
+  }
+
+  const diff = rateLimitUntil.value.getTime() - nowTick.value
+  return Math.max(0, Math.ceil(diff / 1000))
+})
+
+const isRateLimited = computed(() => rateLimitRemainingSeconds.value > 0)
+
 const applyAccessTokenFromQuery = () => {
   const raw = route.query.pt
   const token = typeof raw === 'string' ? raw.trim() : ''
@@ -249,9 +354,21 @@ const restoreSession = async () => {
     checkInCode.value = me.checkInCode
     policy.value = me.policy
     accessState.value = 'verified'
+    sessionExpired.value = false
+    clearRateLimit()
+    clearNetworkError()
     return true
-  } catch {
+  } catch (err) {
     clearSession()
+    const status = getErrorStatus(err)
+    if (status === 401 || status === 403) {
+      sessionExpired.value = true
+      return false
+    }
+
+    if (isNetworkError(err)) {
+      setNetworkError()
+    }
     return false
   }
 }
@@ -274,6 +391,10 @@ const verifyAccessToken = async (token: string, tone: 'info' | 'error' = 'error'
     portal.value = result.portal
     policy.value = result.policy
     participantSummary.value = result.participant
+    hasLoadedOnce.value = true
+    sessionExpired.value = false
+    clearRateLimit()
+    clearNetworkError()
     setDefaultDay()
     attemptsRemaining.value = result.attemptsRemaining
 
@@ -283,7 +404,24 @@ const verifyAccessToken = async (token: string, tone: 'info' | 'error' = 'error'
 
     phoneHint.value = result.phoneHint ?? null
     accessState.value = 'verified'
-  } catch {
+  } catch (err) {
+    if (isNetworkError(err)) {
+      setNetworkError()
+      return
+    }
+
+    const status = getErrorStatus(err)
+    if (status === 401 || status === 403) {
+      clearSession()
+      sessionExpired.value = true
+      return
+    }
+    if (status === 429) {
+      startRateLimit()
+      codeCopyStatusKey.value = 'portal.access.rateLimited'
+      return
+    }
+
     clearAccessToken()
     accessState.value = 'invalid'
     pushToast({ key: 'portal.access.invalidLink', tone })
@@ -301,6 +439,10 @@ const initAccessFlow = async () => {
   lockedUntil.value = null
   participantSummary.value = null
   policy.value = null
+  sessionExpired.value = false
+  welcomeVisible.value = false
+  clearRateLimit()
+  clearNetworkError()
 
   try {
     await loadTour()
@@ -374,6 +516,11 @@ const confirmAccess = async (skipValidation = false) => {
     return
   }
 
+  if (isRateLimited.value) {
+    codeCopyStatusKey.value = 'portal.access.rateLimited'
+    return
+  }
+
   const needsLast4 = (policy.value?.requireLast4ForPortal ?? false) || (policy.value?.requireLast4ForQr ?? false)
   const value = last4.value.trim()
   if (needsLast4 && !skipValidation && !value) {
@@ -383,6 +530,7 @@ const confirmAccess = async (skipValidation = false) => {
 
   confirmingAccess.value = true
   codeCopyStatusKey.value = null
+  clearNetworkError()
 
   try {
     const result = await portalConfirmAccess(tourId.value, accessToken.value, needsLast4 ? value : undefined)
@@ -401,12 +549,24 @@ const confirmAccess = async (skipValidation = false) => {
 
     checkInCode.value = me.checkInCode
     accessState.value = 'verified'
+    sessionExpired.value = false
+    showWelcomeBanner(me.participantId)
+    clearRateLimit()
   } catch (err) {
-    // Re-verify to refresh lock/attempts state.
-    const message = err instanceof Error ? err.message : ''
-    if (!message.includes('Too many attempts')) {
-      pushToast({ key: 'portal.access.invalidLast4', tone: 'error' })
+    if (isNetworkError(err)) {
+      setNetworkError()
+      return
     }
+
+    const status = getErrorStatus(err)
+    if (status === 429) {
+      startRateLimit()
+      codeCopyStatusKey.value = 'portal.access.rateLimited'
+      return
+    }
+
+    // Re-verify to refresh lock/attempts state.
+    pushToast({ key: 'portal.access.invalidLast4', tone: 'error' })
     await verifyAccessToken(accessToken.value, 'error')
   } finally {
     confirmingAccess.value = false
@@ -444,11 +604,39 @@ const copyCheckInLink = async () => {
   }
 }
 
+const handleSessionContinue = async () => {
+  sessionExpired.value = false
+  if (!accessToken.value) {
+    accessState.value = 'missing'
+    return
+  }
+
+  await verifyAccessToken(accessToken.value, 'info')
+  const currentPolicy = policy.value as PortalAccessPolicy | null
+  if (currentPolicy && !currentPolicy.requireLast4ForQr && !currentPolicy.requireLast4ForPortal) {
+    await confirmAccess(true)
+  }
+}
+
+const retryPortal = async () => {
+  if (isRetrying.value) {
+    return
+  }
+
+  isRetrying.value = true
+  try {
+    await initAccessFlow()
+  } finally {
+    isRetrying.value = false
+  }
+}
+
 watch([checkInCode, () => tourId.value], async ([value]) => {
   codeCopyStatusKey.value = null
   linkCopyStatusKey.value = null
   if (!value) {
     qrDataUrl.value = null
+    qrError.value = false
     return
   }
 
@@ -456,6 +644,7 @@ watch([checkInCode, () => tourId.value], async ([value]) => {
     const deepLink = buildCheckInLink(value)
     if (!deepLink) {
       qrDataUrl.value = null
+      qrError.value = false
       return
     }
 
@@ -463,10 +652,24 @@ watch([checkInCode, () => tourId.value], async ([value]) => {
       width: 200,
       margin: 1,
     })
+    qrError.value = false
   } catch {
     qrDataUrl.value = null
+    qrError.value = true
   }
 }, { immediate: true })
+
+watch(rateLimitRemainingSeconds, (seconds) => {
+  if (seconds > 0) {
+    return
+  }
+
+  if (codeCopyStatusKey.value === 'portal.access.rateLimited') {
+    codeCopyStatusKey.value = null
+  }
+
+  rateLimitUntil.value = null
+})
 
 watch(
   () => [route.query.pt, tourId.value],
@@ -519,12 +722,53 @@ onUnmounted(() => {
       </section>
 
       <section
-        v-if="accessState !== 'verified' || portalRequiresLast4"
+        v-if="welcomeVisible"
+        class="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+      >
+        <span>{{ t('portal.welcome', { tour: tour?.name ?? t('common.tour') }) }}</span>
+        <button
+          class="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:border-emerald-300"
+          type="button"
+          @click="dismissWelcome"
+        >
+          {{ t('common.dismiss') }}
+        </button>
+      </section>
+
+      <section
+        v-if="networkErrorKey"
+        class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <span>{{ t(networkErrorKey) }}</span>
+        <button
+          class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 hover:border-amber-300"
+          type="button"
+          :disabled="isRetrying"
+          @click="retryPortal"
+        >
+          <span v-if="isRetrying" class="h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent"></span>
+          {{ t('common.retry') }}
+        </button>
+      </section>
+
+      <section
+        v-if="accessState !== 'verified' || portalRequiresLast4 || sessionExpired"
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
       >
         <h2 class="text-lg font-semibold">{{ t('portal.access.title') }}</h2>
         <p class="mt-1 text-sm text-slate-600">{{ t('portal.access.subtitle') }}</p>
         <div class="mt-4 space-y-3 text-sm text-slate-600">
+          <div v-if="sessionExpired" class="space-y-3">
+            <p>{{ t('portal.sessionExpired.message') }}</p>
+            <button
+              class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+              type="button"
+              @click="handleSessionContinue"
+            >
+              {{ t('portal.sessionExpired.continue') }}
+            </button>
+          </div>
+          <template v-else>
           <p v-if="accessState === 'checking' || verifyingAccess" class="text-xs text-slate-500">
             {{ t('portal.access.verifying') }}
           </p>
@@ -552,23 +796,27 @@ onUnmounted(() => {
                   maxlength="4"
                   @input="handleLast4Input"
                 />
-                <button
-                  class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                  type="button"
-                  :disabled="confirmingAccess || verifyingAccess || !phoneHint"
-                  @click="() => confirmAccess()"
-                >
-                  {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
-                </button>
-              </div>
+                  <button
+                    class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                    type="button"
+                    :disabled="confirmingAccess || verifyingAccess || !phoneHint || isRateLimited"
+                    @click="() => confirmAccess()"
+                  >
+                    {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
+                  </button>
+                </div>
               <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
                 {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
+              </p>
+              <p v-if="isRateLimited" class="text-xs text-amber-600">
+                {{ t('portal.access.rateLimited', { seconds: rateLimitRemainingSeconds }) }}
               </p>
             </template>
           </div>
           <p v-if="codeCopyStatusKey" class="text-xs text-rose-600">
             {{ t(codeCopyStatusKey) }}
           </p>
+          </template>
         </div>
       </section>
 
@@ -695,7 +943,7 @@ onUnmounted(() => {
                       <button
                         class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         type="button"
-                        :disabled="confirmingAccess || verifyingAccess || !phoneHint"
+                        :disabled="confirmingAccess || verifyingAccess || !phoneHint || isRateLimited"
                         @click="() => confirmAccess()"
                       >
                         {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
@@ -703,6 +951,9 @@ onUnmounted(() => {
                     </div>
                     <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
                       {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
+                    </p>
+                    <p v-if="isRateLimited" class="text-xs text-amber-600">
+                      {{ t('portal.access.rateLimited', { seconds: rateLimitRemainingSeconds }) }}
                     </p>
                   </template>
                 </div>
@@ -717,7 +968,7 @@ onUnmounted(() => {
                     <img :src="qrDataUrl" :alt="t('portal.qr.imageAlt')" class="h-40 w-40" />
                   </div>
                   <div v-else class="text-sm text-slate-500">
-                    {{ t('portal.qr.empty') }}
+                    {{ qrError ? t('portal.qr.failed') : t('portal.qr.empty') }}
                   </div>
                 </div>
                 <div class="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">

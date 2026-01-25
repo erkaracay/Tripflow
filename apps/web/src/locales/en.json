@@ -330,6 +330,8 @@
     "header": {
       "kicker": "Participant Portal"
     },
+    "welcome": "Welcome to {tour}",
+    "networkError": "Connection issue. Try again.",
     "loading": "Loading tour details...",
     "empty": "Portal content is not available yet.",
     "tabs": {
@@ -362,6 +364,7 @@
       "last4Prompt": "Enter the last 4 digits of your phone to view QR ({hint}).",
       "helper": "The QR opens the guide check-in screen with the code prefilled.",
       "empty": "Verify your link to generate the QR.",
+      "failed": "QR could not be generated. Use the code instead.",
       "copyGuideLink": "Copy guide link",
       "imageAlt": "QR",
       "codeCleared": "Code cleared.",
@@ -384,7 +387,12 @@
       "attemptsRemaining": "{count} attempts remaining.",
       "invalidLink": "Access link not found. Please request a new one.",
       "invalidLast4": "Last 4 digits do not match.",
-      "last4Required": "Enter the last 4 digits."
+      "last4Required": "Enter the last 4 digits.",
+      "rateLimited": "Please wait {seconds}s before trying again."
+    },
+    "sessionExpired": {
+      "message": "Your session has expired. Please verify again to continue.",
+      "continue": "Continue"
     },
     "info": {
       "meetingTitle": "Meeting point",

@@ -330,6 +330,8 @@
     "header": {
       "kicker": "Katılımcı Portalı"
     },
+    "welcome": "{tour} turuna hoş geldin",
+    "networkError": "Bağlantı sorunu var. Tekrar dene.",
     "loading": "Tur detayları yükleniyor...",
     "empty": "Portal içeriği henüz hazır değil.",
     "tabs": {
@@ -362,6 +364,7 @@
       "last4Prompt": "QR görmek için telefonunun son 4 hanesini gir ({hint}).",
       "helper": "QR, kodu hazır halde rehber yoklama ekranını açar.",
       "empty": "QR için linki doğrulayın.",
+      "failed": "QR üretilemedi, kodu kullan.",
       "copyGuideLink": "Rehber linkini kopyala",
       "imageAlt": "QR",
       "codeCleared": "Kod temizlendi.",
@@ -384,7 +387,12 @@
       "attemptsRemaining": "{count} deneme hakkı kaldı.",
       "invalidLink": "Erişim linki bulunamadı. Yeni link isteyin.",
       "invalidLast4": "Son 4 hane eşleşmiyor.",
-      "last4Required": "Son 4 haneyi gir."
+      "last4Required": "Son 4 haneyi gir.",
+      "rateLimited": "Yeniden denemek için {seconds} sn bekleyin."
+    },
+    "sessionExpired": {
+      "message": "Oturumun doldu, devam etmek için tekrar doğrulaman gerekiyor.",
+      "continue": "Devam et"
     },
     "info": {
       "meetingTitle": "Buluşma noktası",
