@@ -18,6 +18,8 @@ internal static class OrganizationsHandlers
                 x.Slug,
                 x.IsActive,
                 x.IsDeleted,
+                x.RequireLast4ForQr,
+                x.RequireLast4ForPortal,
                 x.CreatedAt,
                 x.UpdatedAt))
             .ToArrayAsync(ct);
@@ -35,6 +37,8 @@ internal static class OrganizationsHandlers
                 x.Slug,
                 x.IsActive,
                 x.IsDeleted,
+                x.RequireLast4ForQr,
+                x.RequireLast4ForPortal,
                 x.CreatedAt,
                 x.UpdatedAt))
             .FirstOrDefaultAsync(ct);
@@ -73,6 +77,8 @@ internal static class OrganizationsHandlers
             Slug = slug,
             IsActive = true,
             IsDeleted = false,
+            RequireLast4ForQr = request.RequireLast4ForQr ?? true,
+            RequireLast4ForPortal = request.RequireLast4ForPortal ?? false,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -86,6 +92,8 @@ internal static class OrganizationsHandlers
             org.Slug,
             org.IsActive,
             org.IsDeleted,
+            org.RequireLast4ForQr,
+            org.RequireLast4ForPortal,
             org.CreatedAt,
             org.UpdatedAt);
 
@@ -125,6 +133,8 @@ internal static class OrganizationsHandlers
         org.Name = name;
         org.Slug = slug;
         org.IsActive = request.IsActive;
+        org.RequireLast4ForQr = request.RequireLast4ForQr;
+        org.RequireLast4ForPortal = request.RequireLast4ForPortal;
         org.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -135,6 +145,8 @@ internal static class OrganizationsHandlers
             org.Slug,
             org.IsActive,
             org.IsDeleted,
+            org.RequireLast4ForQr,
+            org.RequireLast4ForPortal,
             org.CreatedAt,
             org.UpdatedAt);
 

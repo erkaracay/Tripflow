@@ -16,5 +16,9 @@ public sealed class ParticipantEntity
     // QR / check-in için tekil kod (GUID string de olabilir)
     public string CheckInCode { get; set; } = default!;
 
+    public int PortalFailedAttempts { get; set; }
+    public DateTime? PortalLockedUntil { get; set; }
+    public DateTime? PortalLastFailedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

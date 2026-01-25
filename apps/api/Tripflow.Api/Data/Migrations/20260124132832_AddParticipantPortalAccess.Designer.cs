@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tripflow.Api.Data;
@@ -11,9 +12,11 @@ using Tripflow.Api.Data;
 namespace Tripflow.Api.Data.Migrations
 {
     [DbContext(typeof(TripflowDbContext))]
-    partial class TripflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260124132832_AddParticipantPortalAccess")]
+    partial class AddParticipantPortalAccess
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -78,16 +81,6 @@ namespace Tripflow.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<bool>("RequireLast4ForPortal")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("RequireLast4ForQr")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
 
                     b.Property<string>("Slug")
                         .IsRequired()

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
+using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Features.Tours;
 
@@ -194,6 +195,20 @@ public static class ToursEndpoints
             .WithSummary("Update participant")
             .WithDescription("Updates participant details.")
             .Produces<ParticipantDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{tourId}/participants/{participantId}/portal-access", PortalAccessHandlers.GetParticipantAccess)
+            .WithSummary("Get participant portal access")
+            .WithDescription("Returns the portal access token for a participant.")
+            .Produces<ParticipantPortalAccessResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{tourId}/participants/{participantId}/portal-access/reset", PortalAccessHandlers.ResetParticipantAccess)
+            .WithSummary("Reset participant portal access")
+            .WithDescription("Revokes existing access and creates a new portal token.")
+            .Produces<ParticipantPortalAccessResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 

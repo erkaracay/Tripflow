@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Data.Dev;
 
@@ -143,6 +144,11 @@ public static class DevSeed
         await EnsureParticipantsAsync(db, tourB1, orgB.Id, "B1", 30, now, ct, state);
         await EnsureParticipantsAsync(db, tourB2, orgB.Id, "B2", 30, now, ct, state);
 
+        await EnsureParticipantAccessAsync(db, tourA1, orgA.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, tourA2, orgA.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, tourB1, orgB.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, tourB2, orgB.Id, now, ct, state);
+
         await EnsureCheckInsAsync(db, tourA1, orgA.Id, now, ct, state);
         await EnsureCheckInsAsync(db, tourB1, orgB.Id, now, ct, state);
 
@@ -170,6 +176,18 @@ public static class DevSeed
             if (!string.Equals(org.Name, name, StringComparison.Ordinal))
             {
                 org.Name = name;
+                updated = true;
+            }
+
+            if (!org.RequireLast4ForQr)
+            {
+                org.RequireLast4ForQr = true;
+                updated = true;
+            }
+
+            if (org.RequireLast4ForPortal)
+            {
+                org.RequireLast4ForPortal = false;
                 updated = true;
             }
 
@@ -201,6 +219,8 @@ public static class DevSeed
             Slug = slug,
             IsActive = true,
             IsDeleted = false,
+            RequireLast4ForQr = true,
+            RequireLast4ForPortal = false,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -409,6 +429,68 @@ public static class DevSeed
         }
 
         if (participants.Count > 0)
+        {
+            state.Seeded = true;
+        }
+    }
+
+    private static async Task EnsureParticipantAccessAsync(
+        TripflowDbContext db,
+        TourEntity tour,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var participants = await db.Participants.AsNoTracking()
+            .Where(x => x.TourId == tour.Id && x.OrganizationId == organizationId)
+            .ToListAsync(ct);
+
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        var participantIds = participants.Select(x => x.Id).ToList();
+        var accessInfo = await db.ParticipantAccesses.AsNoTracking()
+            .Where(x => participantIds.Contains(x.ParticipantId))
+            .GroupBy(x => x.ParticipantId)
+            .ToDictionaryAsync(
+                g => g.Key,
+                g => new
+                {
+                    HasActive = g.Any(x => x.RevokedAt == null),
+                    MaxVersion = g.Max(x => x.Version)
+                },
+                ct);
+
+        var added = false;
+        foreach (var participant in participants)
+        {
+            if (accessInfo.TryGetValue(participant.Id, out var info) && info.HasActive)
+            {
+                continue;
+            }
+
+            var secret = PortalAccessHelpers.GenerateSecret();
+            var tokenId = Guid.NewGuid();
+            var version = accessInfo.TryGetValue(participant.Id, out info) ? info.MaxVersion + 1 : 1;
+
+            db.ParticipantAccesses.Add(new ParticipantAccessEntity
+            {
+                Id = tokenId,
+                OrganizationId = organizationId,
+                ParticipantId = participant.Id,
+                Version = version,
+                Secret = secret,
+                SecretHash = PortalAccessHelpers.HashSecret(secret),
+                CreatedAt = now
+            });
+
+            added = true;
+        }
+
+        if (added)
         {
             state.Seeded = true;
         }

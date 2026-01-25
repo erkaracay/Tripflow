@@ -432,6 +432,12 @@ internal static class ToursHandlers
             return ToursHelpers.BadRequest("Full name is required.");
         }
 
+        var phone = request.Phone?.Trim();
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return ToursHelpers.BadRequest("Phone is required.");
+        }
+
         var code = await ToursHelpers.GenerateUniqueCheckInCodeAsync(db, ct);
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -445,7 +451,7 @@ internal static class ToursHandlers
             OrganizationId = orgId,
             FullName = fullName,
             Email = request.Email?.Trim(),
-            Phone = request.Phone?.Trim(),
+            Phone = phone,
             CheckInCode = code,
             CreatedAt = DateTime.UtcNow
         };
@@ -516,6 +522,10 @@ internal static class ToursHandlers
 
         var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
         var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return ToursHelpers.BadRequest("Phone is required.");
+        }
 
         entity.FullName = fullName;
         entity.Email = email;
