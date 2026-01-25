@@ -21,6 +21,7 @@ public sealed record DayPlan(int Day, string Title, string[] Items);
 public sealed record CreateParticipantRequest(string? FullName, string? Email, string? Phone);
 public sealed record UpdateParticipantRequest(string? FullName, string? Email, string? Phone);
 public sealed record ParticipantDto(Guid Id, string FullName, string? Email, string? Phone, string CheckInCode, bool Arrived);
+public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
 
 public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method);
 public sealed record CheckInCodeRequest(string? CheckInCode);

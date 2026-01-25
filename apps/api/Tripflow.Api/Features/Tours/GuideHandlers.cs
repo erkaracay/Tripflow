@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
@@ -102,6 +103,59 @@ internal static class GuideHandlers
             .ToArrayAsync(ct);
 
         return Results.Ok(participants);
+    }
+
+    internal static async Task<IResult> ResolveParticipantByCode(
+        string tourId,
+        string? code,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        var hasAccess = await db.Tours.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Tour not found." });
+        }
+
+        var normalized = NormalizeCheckInCode(code);
+        if (normalized.Length != 8)
+        {
+            return Results.BadRequest(new { message = "Invalid code." });
+        }
+
+        var participant = await db.Participants.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TourId == id && x.OrganizationId == orgId && x.CheckInCode == normalized, ct);
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var arrived = await db.CheckIns.AsNoTracking()
+            .AnyAsync(x => x.ParticipantId == participant.Id && x.TourId == id && x.OrganizationId == orgId, ct);
+
+        return Results.Ok(new ParticipantResolveDto(
+            participant.Id,
+            participant.FullName,
+            arrived,
+            participant.CheckInCode));
     }
 
     internal static async Task<IResult> GetCheckInSummary(
@@ -218,5 +272,17 @@ internal static class GuideHandlers
 
         error = null;
         return true;
+    }
+
+    private static string NormalizeCheckInCode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        var cleaned = raw.Trim().ToUpperInvariant();
+        var normalized = new string(cleaned.Where(char.IsLetterOrDigit).ToArray());
+        return normalized;
     }
 }

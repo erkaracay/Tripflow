@@ -24,6 +24,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/tours/{tourId}/participants/resolve", GuideHandlers.ResolveParticipantByCode)
+            .WithSummary("Resolve participant by check-in code")
+            .WithDescription("Resolves a participant using check-in code for a guide tour.")
+            .Produces<ParticipantResolveDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/tours/{tourId}/checkins/summary", GuideHandlers.GetCheckInSummary)
             .WithSummary("Guide check-in summary")
             .WithDescription("Returns arrived/total counts for a guide's tour.")
