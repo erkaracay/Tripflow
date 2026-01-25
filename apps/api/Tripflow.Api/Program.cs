@@ -154,8 +154,29 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Health
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+app.MapGet("/health", async (TripflowDbContext db) =>
+{
+    var dbStatus = "ok";
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("SELECT 1");
+    }
+    catch
+    {
+        dbStatus = "error";
+    }
+
+    return Results.Ok(new { status = "ok", db = dbStatus });
+})
    .WithName("Health")
+   .WithOpenApi();
+
+app.MapGet("/version", () =>
+{
+    var version = app.Configuration["APP_VERSION"] ?? "dev";
+    return Results.Ok(new { version, timestamp = DateTime.UtcNow });
+})
+   .WithName("Version")
    .WithOpenApi();
 
 app.MapAuthEndpoints();
