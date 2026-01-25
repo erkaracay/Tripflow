@@ -12,8 +12,10 @@ import {
   sanitizePhoneInput,
 } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
+import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
   DayPlan,
   LinkInfo,
@@ -69,6 +71,7 @@ const editParticipantErrorKey = ref<string | null>(null)
 const editParticipantErrorMessage = ref<string | null>(null)
 const portalAccessInfo = ref<Record<string, ParticipantPortalAccessResponse>>({})
 const portalAccessLoading = ref<Record<string, boolean>>({})
+const whatsappLinks = ref<Record<string, string>>({})
 const missingPhoneParticipantId = ref<string | null>(null)
 const editPhoneInput = ref<HTMLInputElement | null>(null)
 
@@ -558,33 +561,68 @@ const copyPortalLink = async (participant: Participant) => {
   }
 }
 
-const copyWhatsAppTemplate = async (participant: Participant) => {
-  if (!participant.phone) {
-    missingPhoneParticipantId.value = participant.id
-    startEditParticipant(participant)
-    editPhoneErrorKey.value = 'validation.phone.required'
-    await nextTick()
-    editPhoneInput.value?.focus()
+const setWhatsAppLink = (participantId: string, url: string) => {
+  whatsappLinks.value = { ...whatsappLinks.value, [participantId]: url }
+}
+
+const handleMissingWhatsAppPhone = async (participant: Participant) => {
+  missingPhoneParticipantId.value = participant.id
+  startEditParticipant(participant)
+  editPhoneErrorKey.value = 'validation.phone.required'
+  pushToast({ key: 'warnings.phoneRequiredForWhatsapp', tone: 'error' })
+  await nextTick()
+  editPhoneInput.value?.focus()
+}
+
+const ensureWhatsAppLink = async (participant: Participant) => {
+  const cached = whatsappLinks.value[participant.id]
+  if (cached) {
+    return cached
+  }
+
+  const info = portalAccessInfo.value[participant.id] ?? (await fetchParticipantAccess(participant))
+  const portalUrl = buildPortalLink(info.token)
+  if (!portalUrl) {
+    return ''
+  }
+
+  const requiresLast4 = info.policy?.requireLast4ForQr ?? true
+  const messageKey = requiresLast4
+    ? 'admin.portalAccess.whatsappTemplateWithLast4'
+    : 'admin.portalAccess.whatsappTemplate'
+  const message = t(messageKey, {
+    name: participant.fullName,
+    url: portalUrl,
+  })
+  const waUrl = buildWhatsAppUrl(participant.phone ?? '', message)
+  if (!waUrl) {
+    return ''
+  }
+
+  setWhatsAppLink(participant.id, waUrl)
+  return waUrl
+}
+
+const openWhatsApp = async (participant: Participant) => {
+  if (portalAccessLoading.value[participant.id]) {
     return
   }
 
+  if (!participant.phone) {
+    await handleMissingWhatsAppPhone(participant)
+    return
+  }
+
+  missingPhoneParticipantId.value = null
+
   try {
-    const info = await fetchParticipantAccess(participant)
-    const url = buildPortalLink(info.token)
-    if (!url) {
+    const waUrl = await ensureWhatsAppLink(participant)
+    if (!waUrl) {
       pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
       return
     }
 
-    const requiresLast4 = info.policy?.requireLast4ForQr ?? true
-    const messageKey = requiresLast4
-      ? 'admin.portalAccess.whatsappTemplateWithLast4'
-      : 'admin.portalAccess.whatsappTemplate'
-    const message = t(messageKey, {
-      name: participant.fullName,
-      url,
-    })
-    await copyToClipboard(message, 'toast.portalWhatsappCopied', 'toast.portalLinkCopyFailed')
+    globalThis.open?.(waUrl, '_blank', 'noopener,noreferrer')
   } catch {
     pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
   }
@@ -1281,14 +1319,23 @@ onMounted(loadTour)
                 >
                   {{ t('admin.portalAccess.copyLink') }}
                 </button>
-                <button
-                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  :disabled="portalAccessLoading[participant.id]"
-                  @click="copyWhatsAppTemplate(participant)"
+                <a
+                  class="inline-flex items-center gap-1.5 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  :class="
+                    portalAccessLoading[participant.id] || !participant.phone
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'hover:border-emerald-300 hover:bg-emerald-100'
+                  "
+                  :href="whatsappLinks[participant.id] || '#'"
+                  :aria-label="t('actions.whatsappAria')"
+                  :aria-disabled="portalAccessLoading[participant.id] || !participant.phone"
+                  rel="noreferrer"
+                  target="_blank"
+                  @click.prevent="openWhatsApp(participant)"
                 >
-                  {{ t('admin.portalAccess.copyWhatsapp') }}
-                </button>
+                  <WhatsAppIcon class="text-emerald-700" :size="14" />
+                  <span>{{ t('actions.whatsapp') }}</span>
+                </a>
                 <button
                   class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
@@ -1316,7 +1363,7 @@ onMounted(loadTour)
                 v-if="missingPhoneParticipantId === participant.id && !participant.phone"
                 class="text-xs text-amber-600"
               >
-                {{ t('admin.portalAccess.phoneRequired') }}
+                {{ t('warnings.phoneRequiredForWhatsapp') }}
               </p>
             </div>
           </li>

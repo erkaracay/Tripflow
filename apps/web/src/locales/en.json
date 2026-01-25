@@ -35,6 +35,13 @@
     "searchPlaceholder": "Search by name, email, or phone",
     "clearSearch": "Clear"
   },
+  "actions": {
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "Open WhatsApp message"
+  },
+  "warnings": {
+    "phoneRequiredForWhatsapp": "Phone number required for WhatsApp."
+  },
   "nav": {
     "organizations": "Organizations",
     "tours": "Tours",
@@ -232,11 +239,9 @@
     },
     "portalAccess": {
       "copyLink": "Copy portal link",
-      "copyWhatsapp": "Copy WhatsApp text",
       "reset": "Reset link",
       "resetConfirm": "Reset access link for {name}?",
       "locked": "Locked",
-      "phoneRequired": "Phone is required for WhatsApp.",
       "whatsappTemplate": "Hi {name}, your Tripflow link: {url}",
       "whatsappTemplateWithLast4": "Hi {name}, your Tripflow link: {url}\nTo view the QR, enter the last 4 digits of your phone."
     },

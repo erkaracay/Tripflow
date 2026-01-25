@@ -35,6 +35,13 @@
     "searchPlaceholder": "İsim, e-posta veya telefon ara",
     "clearSearch": "Temizle"
   },
+  "actions": {
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "WhatsApp mesajını aç"
+  },
+  "warnings": {
+    "phoneRequiredForWhatsapp": "WhatsApp için telefon gerekli."
+  },
   "nav": {
     "organizations": "Organizasyonlar",
     "tours": "Turlar",
@@ -231,11 +238,9 @@
     },
     "portalAccess": {
       "copyLink": "Portal linkini kopyala",
-      "copyWhatsapp": "WhatsApp metnini kopyala",
       "reset": "Linki sıfırla",
       "resetConfirm": "{name} için link sıfırlansın mı?",
       "locked": "Kilitli",
-      "phoneRequired": "WhatsApp için telefon gerekli.",
       "whatsappTemplate": "Merhaba {name}, Tripflow linkin: {url}",
       "whatsappTemplateWithLast4": "Merhaba {name}, Tripflow linkin: {url}\nQR görmek için telefonunun son 4 hanesini gir."
     },
