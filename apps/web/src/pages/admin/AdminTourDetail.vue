@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
@@ -44,11 +44,13 @@ const loadErrorMessage = ref<string | null>(null)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
 const tourSaving = ref(false)
+const tourSavedTimer = ref<number | null>(null)
 const tourMessageKey = ref<string | null>(null)
 const tourErrorKey = ref<string | null>(null)
 const tourErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
 const portalSaving = ref(false)
+const portalSavedTimer = ref<number | null>(null)
 const portalMessageKey = ref<string | null>(null)
 const portalErrorKey = ref<string | null>(null)
 const portalErrorMessage = ref<string | null>(null)
@@ -67,6 +69,8 @@ const editParticipantErrorKey = ref<string | null>(null)
 const editParticipantErrorMessage = ref<string | null>(null)
 const portalAccessInfo = ref<Record<string, ParticipantPortalAccessResponse>>({})
 const portalAccessLoading = ref<Record<string, boolean>>({})
+const missingPhoneParticipantId = ref<string | null>(null)
+const editPhoneInput = ref<HTMLInputElement | null>(null)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -139,6 +143,28 @@ const setPortalForm = (data: TourPortalInfo) => {
   const normalizedLinks = data.links.length > 0 ? data.links : [{ label: '', url: '' }]
   portalForm.links.splice(0, portalForm.links.length, ...normalizedLinks)
   portalDays.value = normalizeDays(data.days)
+}
+
+const showTourSaved = () => {
+  tourMessageKey.value = 'common.saved'
+  if (tourSavedTimer.value) {
+    globalThis.clearTimeout(tourSavedTimer.value)
+  }
+  tourSavedTimer.value = globalThis.setTimeout(() => {
+    tourMessageKey.value = null
+    tourSavedTimer.value = null
+  }, 3000)
+}
+
+const showPortalSaved = () => {
+  portalMessageKey.value = 'common.saved'
+  if (portalSavedTimer.value) {
+    globalThis.clearTimeout(portalSavedTimer.value)
+  }
+  portalSavedTimer.value = globalThis.setTimeout(() => {
+    portalMessageKey.value = null
+    portalSavedTimer.value = null
+  }, 3000)
 }
 
 const resolvePublicBase = () => {
@@ -309,7 +335,7 @@ const saveTour = async () => {
     })
     tour.value = updated
     setTourForm(updated)
-    tourMessageKey.value = 'common.saved'
+    showTourSaved()
     pushToast({ key: 'toast.tourUpdated', tone: 'success' })
   } catch (err) {
     tourErrorMessage.value = err instanceof Error ? err.message : null
@@ -383,6 +409,7 @@ const cancelEditParticipant = () => {
   editParticipantErrorKey.value = null
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
+  missingPhoneParticipantId.value = null
 }
 
 const handleEditPhoneInput = () => {
@@ -438,6 +465,9 @@ const saveParticipant = async (participant: Participant) => {
       item.id === participant.id ? updated : item
     )
     editingParticipantId.value = null
+    if (missingPhoneParticipantId.value === participant.id) {
+      missingPhoneParticipantId.value = null
+    }
     pushToast({ key: 'toast.participantUpdated', tone: 'success' })
   } catch (err) {
     editParticipantErrorMessage.value = err instanceof Error ? err.message : null
@@ -529,6 +559,15 @@ const copyPortalLink = async (participant: Participant) => {
 }
 
 const copyWhatsAppTemplate = async (participant: Participant) => {
+  if (!participant.phone) {
+    missingPhoneParticipantId.value = participant.id
+    startEditParticipant(participant)
+    editPhoneErrorKey.value = 'validation.phone.required'
+    await nextTick()
+    editPhoneInput.value?.focus()
+    return
+  }
+
   try {
     const info = await fetchParticipantAccess(participant)
     const url = buildPortalLink(info.token)
@@ -549,6 +588,37 @@ const copyWhatsAppTemplate = async (participant: Participant) => {
   } catch {
     pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
   }
+}
+
+const downloadParticipantsCsv = () => {
+  if (participants.value.length === 0) {
+    return
+  }
+
+  const headers = ['id', 'fullName', 'email', 'phone', 'checkInCode', 'arrived']
+  const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`
+  const rows = participants.value.map((participant) => [
+    participant.id,
+    participant.fullName,
+    participant.email ?? '',
+    participant.phone ?? '',
+    participant.checkInCode,
+    participant.arrived ? 'true' : 'false',
+  ])
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map((value) => escapeValue(String(value ?? ''))).join(','))
+    .join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const name = tour.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
+  link.href = URL.createObjectURL(blob)
+  link.download = `${name}-participants.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(link.href)
 }
 
 const savePortal = async () => {
@@ -617,7 +687,7 @@ const savePortal = async () => {
     const saved = await apiPut<TourPortalInfo>(`/api/tours/${tourId.value}/portal`, payload)
     portal.value = saved
     portalDays.value = normalizeDays(saved.days)
-    portalMessageKey.value = 'common.saved'
+    showPortalSaved()
     pushToast({ key: 'toast.portalSaved', tone: 'success' })
   } catch (err) {
     portalErrorMessage.value = err instanceof Error ? err.message : null
@@ -739,39 +809,42 @@ onMounted(loadTour)
           </div>
         </div>
 
-        <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="saveTour">
-          <label class="grid gap-1 text-sm md:col-span-1">
-            <span class="text-slate-600">{{ t('admin.tourDetail.form.nameLabel') }}</span>
-            <input
-              v-model.trim="tourForm.name"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :placeholder="t('admin.tourDetail.form.namePlaceholder')"
-              type="text"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.tourDetail.form.startDateLabel') }}</span>
-            <input
-              v-model="tourForm.startDate"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              type="date"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.tourDetail.form.endDateLabel') }}</span>
-            <input
-              v-model="tourForm.endDate"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :min="tourForm.startDate"
-              type="date"
-            />
-          </label>
-          <div class="md:col-span-3 flex flex-wrap items-center gap-3">
+        <form class="mt-4 space-y-4" @submit.prevent="saveTour">
+          <fieldset class="grid gap-4 md:grid-cols-3" :disabled="tourSaving">
+            <label class="grid gap-1 text-sm md:col-span-1">
+              <span class="text-slate-600">{{ t('admin.tourDetail.form.nameLabel') }}</span>
+              <input
+                v-model.trim="tourForm.name"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                :placeholder="t('admin.tourDetail.form.namePlaceholder')"
+                type="text"
+              />
+            </label>
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.tourDetail.form.startDateLabel') }}</span>
+              <input
+                v-model="tourForm.startDate"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                type="date"
+              />
+            </label>
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.tourDetail.form.endDateLabel') }}</span>
+              <input
+                v-model="tourForm.endDate"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                :min="tourForm.startDate"
+                type="date"
+              />
+            </label>
+          </fieldset>
+          <div class="flex flex-wrap items-center gap-3">
             <button
-              class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              class="inline-flex items-center gap-2 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="tourSaving"
               type="submit"
             >
+              <span v-if="tourSaving" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
               {{ tourSaving ? t('common.saving') : t('admin.tourDetail.form.save') }}
             </button>
             <span v-if="tourMessageKey" class="text-xs text-emerald-600">{{ t(tourMessageKey) }}</span>
@@ -877,118 +950,119 @@ onMounted(loadTour)
         </div>
 
         <form class="mt-4 space-y-6" @submit.prevent="savePortal">
-          <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.meeting.title') }}</h3>
-            <div class="grid gap-4 md:grid-cols-3">
-              <label class="grid gap-1 text-sm">
-                <span class="text-slate-600">{{ t('admin.portal.meeting.time') }}</span>
-                <input
-                  v-model.trim="portalForm.meetingTime"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :placeholder="t('admin.portal.meeting.timePlaceholder')"
-                  type="text"
-                />
-              </label>
-              <label class="grid gap-1 text-sm md:col-span-2">
-                <span class="text-slate-600">{{ t('admin.portal.meeting.place') }}</span>
-                <input
-                  v-model.trim="portalForm.meetingPlace"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :placeholder="t('admin.portal.meeting.placePlaceholder')"
-                  type="text"
-                />
-              </label>
-              <label class="grid gap-1 text-sm md:col-span-2">
-                <span class="text-slate-600">{{ t('admin.portal.meeting.maps') }}</span>
-                <input
-                  v-model.trim="portalForm.meetingMapsUrl"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :placeholder="t('admin.portal.meeting.mapsPlaceholder')"
-                  type="url"
-                />
-              </label>
-              <label class="grid gap-1 text-sm md:col-span-3">
-                <span class="text-slate-600">{{ t('admin.portal.meeting.note') }}</span>
-                <textarea
-                  v-model.trim="portalForm.meetingNote"
-                  class="min-h-22.5 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :placeholder="t('admin.portal.meeting.notePlaceholder')"
-                ></textarea>
-              </label>
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.links.title') }}</h3>
-              <button
-                class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
-                type="button"
-                @click="addPortalLink"
-              >
-                {{ t('admin.portal.links.add') }}
-              </button>
-            </div>
+          <fieldset class="space-y-6" :disabled="portalSaving">
             <div class="space-y-3">
-              <div
-                v-for="(link, index) in portalForm.links"
-                :key="index"
-                class="grid gap-3 md:grid-cols-[1fr_1fr_auto]"
-              >
+              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.meeting.title') }}</h3>
+              <div class="grid gap-4 md:grid-cols-3">
                 <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">{{ t('admin.portal.links.label') }}</span>
+                  <span class="text-slate-600">{{ t('admin.portal.meeting.time') }}</span>
                   <input
-                    v-model.trim="link.label"
+                    v-model.trim="portalForm.meetingTime"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    :placeholder="t('admin.portal.links.labelPlaceholder')"
+                    :placeholder="t('admin.portal.meeting.timePlaceholder')"
                     type="text"
                   />
                 </label>
-                <label class="grid gap-1 text-sm">
-                  <span class="text-slate-600">{{ t('admin.portal.links.url') }}</span>
+                <label class="grid gap-1 text-sm md:col-span-2">
+                  <span class="text-slate-600">{{ t('admin.portal.meeting.place') }}</span>
                   <input
-                    v-model.trim="link.url"
+                    v-model.trim="portalForm.meetingPlace"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    :placeholder="t('admin.portal.links.urlPlaceholder')"
+                    :placeholder="t('admin.portal.meeting.placePlaceholder')"
+                    type="text"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm md:col-span-2">
+                  <span class="text-slate-600">{{ t('admin.portal.meeting.maps') }}</span>
+                  <input
+                    v-model.trim="portalForm.meetingMapsUrl"
+                    class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                    :placeholder="t('admin.portal.meeting.mapsPlaceholder')"
                     type="url"
                   />
                 </label>
-                <div class="flex items-end">
-                  <button
-                    class="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
-                    type="button"
-                    @click="removePortalLink(index)"
-                  >
-                    {{ t('common.remove') }}
-                  </button>
+                <label class="grid gap-1 text-sm md:col-span-3">
+                  <span class="text-slate-600">{{ t('admin.portal.meeting.note') }}</span>
+                  <textarea
+                    v-model.trim="portalForm.meetingNote"
+                    class="min-h-22.5 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                    :placeholder="t('admin.portal.meeting.notePlaceholder')"
+                  ></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.links.title') }}</h3>
+                <button
+                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+                  type="button"
+                  @click="addPortalLink"
+                >
+                  {{ t('admin.portal.links.add') }}
+                </button>
+              </div>
+              <div class="space-y-3">
+                <div
+                  v-for="(link, index) in portalForm.links"
+                  :key="index"
+                  class="grid gap-3 md:grid-cols-[1fr_1fr_auto]"
+                >
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.portal.links.label') }}</span>
+                    <input
+                      v-model.trim="link.label"
+                      class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                      :placeholder="t('admin.portal.links.labelPlaceholder')"
+                      type="text"
+                    />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.portal.links.url') }}</span>
+                    <input
+                      v-model.trim="link.url"
+                      class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                      :placeholder="t('admin.portal.links.urlPlaceholder')"
+                      type="url"
+                    />
+                  </label>
+                  <div class="flex items-end">
+                    <button
+                      class="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+                      type="button"
+                      @click="removePortalLink(index)"
+                    >
+                      {{ t('common.remove') }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.days.title') }}</h3>
-              <button
-                class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
-                type="button"
-                @click="addDay"
-              >
-                {{ t('admin.portal.days.add') }}
-              </button>
-            </div>
-            <div
-              v-if="portalDays.length === 0"
-              class="rounded border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"
-            >
-              {{ t('admin.portal.days.empty') }}
-            </div>
-            <div v-else class="space-y-4">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.days.title') }}</h3>
+                <button
+                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+                  type="button"
+                  @click="addDay"
+                >
+                  {{ t('admin.portal.days.add') }}
+                </button>
+              </div>
               <div
-                v-for="(day, index) in portalDays"
-                :key="day.day"
-                class="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                v-if="portalDays.length === 0"
+                class="rounded border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"
               >
+                {{ t('admin.portal.days.empty') }}
+              </div>
+              <div v-else class="space-y-4">
+                <div
+                  v-for="(day, index) in portalDays"
+                  :key="day.day"
+                  class="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="text-sm font-semibold text-slate-700">
                     {{ t('admin.portal.days.dayLabel', { day: index + 1 }) }}
@@ -1054,13 +1128,15 @@ onMounted(loadTour)
               ></textarea>
             </label>
           </div>
+          </fieldset>
 
           <div class="flex flex-wrap items-center gap-3">
             <button
-              class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              class="inline-flex items-center gap-2 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="portalSaving"
               type="submit"
             >
+              <span v-if="portalSaving" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
               {{ portalSaving ? t('common.saving') : t('admin.portal.save') }}
             </button>
             <span v-if="portalMessageKey" class="text-xs text-emerald-600">{{ t(portalMessageKey) }}</span>
@@ -1074,7 +1150,17 @@ onMounted(loadTour)
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">{{ t('admin.participants.title') }}</h2>
-          <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="participants.length === 0"
+              @click="downloadParticipantsCsv"
+            >
+              {{ t('admin.participants.exportCsv') }}
+            </button>
+          </div>
         </div>
 
         <div
@@ -1113,8 +1199,15 @@ onMounted(loadTour)
                   <span class="text-slate-600">{{ t('admin.participants.form.phoneShort') }}</span>
                   <input
                     v-model.trim="editForm.phone"
+                    ref="editPhoneInput"
                     class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    :class="editPhoneErrorKey ? 'border-rose-300' : 'border-slate-200'"
+                    :class="
+                      editPhoneErrorKey
+                        ? 'border-rose-300'
+                        : missingPhoneParticipantId === participant.id
+                          ? 'border-amber-300'
+                          : 'border-slate-200'
+                    "
                     :placeholder="t('admin.participants.form.phonePlaceholder')"
                     inputmode="tel"
                     maxlength="15"
@@ -1219,6 +1312,12 @@ onMounted(loadTour)
                   {{ t('common.delete') }}
                 </button>
               </div>
+              <p
+                v-if="missingPhoneParticipantId === participant.id && !participant.phone"
+                class="text-xs text-amber-600"
+              >
+                {{ t('admin.portalAccess.phoneRequired') }}
+              </p>
             </div>
           </li>
         </ul>

@@ -213,6 +213,7 @@
     "participants": {
       "title": "Participants",
       "addTitle": "Add participant",
+      "exportCsv": "Download CSV",
       "empty": "No participants yet. Add someone above.",
       "editTitle": "Edit participant",
       "deleteConfirm": "Delete {name}?",
@@ -235,6 +236,7 @@
       "reset": "Reset link",
       "resetConfirm": "Reset access link for {name}?",
       "locked": "Locked",
+      "phoneRequired": "Phone is required for WhatsApp.",
       "whatsappTemplate": "Hi {name}, your Tripflow link: {url}",
       "whatsappTemplateWithLast4": "Hi {name}, your Tripflow link: {url}\nTo view the QR, enter the last 4 digits of your phone."
     },

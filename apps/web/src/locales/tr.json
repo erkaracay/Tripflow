@@ -212,6 +212,7 @@
     "participants": {
       "title": "Katılımcılar",
       "addTitle": "Katılımcı ekle",
+      "exportCsv": "CSV indir",
       "empty": "Henüz katılımcı yok. Yukarıdan ekle.",
       "editTitle": "Katılımcıyı düzenle",
       "deleteConfirm": "{name} silinsin mi?",
@@ -234,6 +235,7 @@
       "reset": "Linki sıfırla",
       "resetConfirm": "{name} için link sıfırlansın mı?",
       "locked": "Kilitli",
+      "phoneRequired": "WhatsApp için telefon gerekli.",
       "whatsappTemplate": "Merhaba {name}, Tripflow linkin: {url}",
       "whatsappTemplateWithLast4": "Merhaba {name}, Tripflow linkin: {url}\nQR görmek için telefonunun son 4 hanesini gir."
     },
