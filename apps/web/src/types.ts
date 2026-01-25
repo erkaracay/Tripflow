@@ -44,6 +44,13 @@ export type Participant = {
   arrived: boolean
 }
 
+export type ParticipantResolve = {
+  id: string
+  fullName: string
+  arrived: boolean
+  checkInCode: string
+}
+
 export type MeetingInfo = {
   time: string
   place: string

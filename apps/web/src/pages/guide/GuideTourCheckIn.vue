@@ -7,7 +7,15 @@ import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { CheckInResponse, CheckInSummary, CheckInUndoResponse, Participant, Tour } from '../../types'
+import QrScannerModal from '../../components/QrScannerModal.vue'
+import type {
+  CheckInResponse,
+  CheckInSummary,
+  CheckInUndoResponse,
+  Participant,
+  ParticipantResolve,
+  Tour,
+} from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,7 +41,14 @@ const dataLoaded = ref(false)
 const lastAutoCode = ref('')
 const lastResult = ref<CheckInResponse | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
-const autoCheckIn = ref(true)
+const autoCheckInAfterScan = ref(false)
+const autoCheckInStorageKey = 'tripflow:guide:autoCheckInAfterScan'
+const scannerOpen = ref(false)
+const scanErrorKey = ref<string | null>(null)
+const scanErrorText = ref<string | null>(null)
+const scanFoundCode = ref<string | null>(null)
+const scanFoundParticipant = ref<ParticipantResolve | null>(null)
+const scanResolving = ref(false)
 const highlightParticipantId = ref<string | null>(null)
 const undoingParticipantId = ref<string | null>(null)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
@@ -223,6 +238,99 @@ const clearSearch = () => {
   searchTerm.value = ''
 }
 
+const normalizeQrCode = (raw: string) => {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  let candidate = trimmed
+  try {
+    const url = new URL(trimmed)
+    candidate = url.searchParams.get('code') ?? url.searchParams.get('checkInCode') ?? trimmed
+  } catch {
+    // Not a URL; keep raw string.
+  }
+
+  const normalized = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return normalized.length === 8 ? normalized : ''
+}
+
+const resolveParticipantByCode = async (code: string) => {
+  scanResolving.value = true
+  try {
+    const participant = await apiGet<ParticipantResolve>(
+      `/api/guide/tours/${tourId.value}/participants/resolve?code=${encodeURIComponent(code)}`
+    )
+    scanFoundParticipant.value = participant
+    return true
+  } catch (err) {
+    scanFoundParticipant.value = null
+    return false
+  } finally {
+    scanResolving.value = false
+  }
+}
+
+const resetScanState = () => {
+  scanErrorKey.value = null
+  scanErrorText.value = null
+  scanFoundCode.value = null
+  scanFoundParticipant.value = null
+}
+
+const handleScanCheckIn = async () => {
+  if (!scanFoundCode.value) {
+    return
+  }
+
+  const success = await submitCheckIn(scanFoundCode.value)
+  if (success) {
+    resetScanState()
+  }
+}
+
+const handleScanResult = async (raw: string) => {
+  scannerOpen.value = false
+  resetScanState()
+
+  const code = normalizeQrCode(raw)
+  if (!code) {
+    scanErrorKey.value = 'guide.checkIn.invalidCode'
+    return
+  }
+
+  scanFoundCode.value = code
+  const resolved = await resolveParticipantByCode(code)
+  if (!resolved) {
+    scanFoundCode.value = null
+    scanErrorKey.value = 'guide.checkIn.invalidCode'
+    return
+  }
+
+  if (autoCheckInAfterScan.value) {
+    const success = await submitCheckIn(code)
+    if (success) {
+      resetScanState()
+    }
+  }
+}
+
+const openScanner = () => {
+  resetScanState()
+  scannerOpen.value = true
+}
+
+const scanAgain = () => {
+  resetScanState()
+  scannerOpen.value = true
+}
+
+const focusManualCode = async () => {
+  await nextTick()
+  codeInput.value?.focus()
+}
+
 const handleCheckInSubmit = async () => {
   await submitCheckIn(checkInCode.value)
 }
@@ -285,7 +393,7 @@ const resolveQueryCode = async () => {
   }
 
   lastAutoCode.value = queryCode
-  if (autoCheckIn.value) {
+  if (autoCheckInAfterScan.value) {
     const success = await submitCheckIn(queryCode)
     if (success) {
       await clearCheckInQuery()
@@ -298,6 +406,15 @@ const initialize = async () => {
   await resolveQueryCode()
   await nextTick()
   codeInput.value?.focus()
+}
+
+const loadAutoCheckInPreference = () => {
+  const stored = globalThis.localStorage?.getItem(autoCheckInStorageKey)
+  if (stored === '1') {
+    autoCheckInAfterScan.value = true
+  } else if (stored === '0') {
+    autoCheckInAfterScan.value = false
+  }
 }
 
 watch(searchTerm, (value) => {
@@ -316,7 +433,12 @@ watch(
   }
 )
 
+watch(autoCheckInAfterScan, (value) => {
+  globalThis.localStorage?.setItem(autoCheckInStorageKey, value ? '1' : '0')
+})
+
 onMounted(() => {
+  loadAutoCheckInPreference()
   void initialize()
 })
 
@@ -393,6 +515,15 @@ onUnmounted(() => {
             {{ isCheckingIn ? t('guide.checkIn.submitting') : t('common.checkIn') }}
           </button>
         </form>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+            type="button"
+            @click="openScanner"
+          >
+            {{ t('guide.checkIn.scanQr') }}
+          </button>
+        </div>
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
           <span v-if="actionMessageKey || actionMessageText" class="text-emerald-600">
             {{ actionMessageKey ? t(actionMessageKey) : actionMessageText }}
@@ -401,9 +532,85 @@ onUnmounted(() => {
             {{ actionErrorKey ? t(actionErrorKey) : actionErrorText }}
           </span>
         </div>
+        <div
+          v-if="scanErrorKey || scanErrorText"
+          class="mt-4 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700"
+        >
+          <div class="font-semibold">
+            {{ scanErrorKey ? t(scanErrorKey) : scanErrorText }}
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300"
+              type="button"
+              @click="scanAgain"
+            >
+              {{ t('guide.checkIn.scanAgain') }}
+            </button>
+            <button
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="focusManualCode"
+            >
+              {{ t('guide.checkIn.useManualCode') }}
+            </button>
+          </div>
+        </div>
+        <div
+          v-if="scanFoundCode"
+          class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm"
+        >
+          <div class="text-xs uppercase tracking-wide text-slate-400">
+            {{ t('guide.checkIn.foundParticipant') }}
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="font-semibold text-slate-800">
+              {{ scanFoundParticipant?.fullName ?? scanFoundCode }}
+            </span>
+            <span v-if="scanResolving" class="text-xs text-slate-500">
+              {{ t('common.loading') }}
+            </span>
+            <span
+              v-if="scanFoundParticipant"
+              class="rounded-full px-3 py-1 text-xs font-semibold"
+              :class="
+                scanFoundParticipant.arrived
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              "
+            >
+              {{ scanFoundParticipant.arrived ? t('common.arrivedLabel') : t('common.pendingLabel') }}
+            </span>
+          </div>
+          <div class="mt-1 text-xs font-mono text-slate-500">{{ scanFoundCode }}</div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              :disabled="isCheckingIn"
+              @click="handleScanCheckIn"
+            >
+              {{ isCheckingIn ? t('guide.checkIn.submitting') : t('guide.checkIn.checkInNow') }}
+            </button>
+            <button
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="scanAgain"
+            >
+              {{ t('guide.checkIn.scanAgain') }}
+            </button>
+            <button
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="resetScanState"
+            >
+              {{ t('common.dismiss') }}
+            </button>
+          </div>
+        </div>
         <label class="mt-4 inline-flex items-center gap-2 text-xs text-slate-600">
-          <input v-model="autoCheckIn" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-          {{ t('guide.checkIn.autoCheckIn') }}
+          <input v-model="autoCheckInAfterScan" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+          {{ t('guide.checkIn.autoCheckInToggle') }}
         </label>
         <div v-if="lastResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
           <div class="font-semibold text-emerald-800">
@@ -528,4 +735,5 @@ onUnmounted(() => {
       </template>
     </template>
   </div>
+  <QrScannerModal :open="scannerOpen" @close="scannerOpen = false" @result="handleScanResult" />
 </template>
