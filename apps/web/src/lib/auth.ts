@@ -1,5 +1,12 @@
+import { ref } from 'vue'
+
 const TOKEN_KEY = 'tripflow_token'
 const ORG_KEY = 'tripflow_org'
+
+const readStorage = (key: string) => globalThis.localStorage?.getItem(key) ?? ''
+
+const tokenRef = ref(readStorage(TOKEN_KEY))
+const orgRef = ref(readStorage(ORG_KEY))
 
 const decodeBase64Url = (value: string) => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
@@ -13,15 +20,20 @@ const decodeBase64Url = (value: string) => {
 
 export type JwtPayload = Record<string, unknown>
 
-export const getToken = () => globalThis.localStorage?.getItem(TOKEN_KEY) ?? ''
+export const tokenState = tokenRef
+export const orgState = orgRef
+
+export const getToken = () => tokenRef.value
 
 export const setToken = (token: string) => {
+  tokenRef.value = token
   globalThis.localStorage?.setItem(TOKEN_KEY, token)
 }
 
 export const clearToken = () => {
+  tokenRef.value = ''
+  clearSelectedOrgId()
   globalThis.localStorage?.removeItem(TOKEN_KEY)
-  globalThis.localStorage?.removeItem(ORG_KEY)
 }
 
 export const getTokenPayload = (token: string): JwtPayload | null => {
@@ -82,12 +94,14 @@ export const isTokenExpired = (token: string): boolean => {
   return exp <= now
 }
 
-export const getSelectedOrgId = () => globalThis.localStorage?.getItem(ORG_KEY) ?? ''
+export const getSelectedOrgId = () => orgRef.value
 
 export const setSelectedOrgId = (orgId: string) => {
+  orgRef.value = orgId
   globalThis.localStorage?.setItem(ORG_KEY, orgId)
 }
 
 export const clearSelectedOrgId = () => {
+  orgRef.value = ''
   globalThis.localStorage?.removeItem(ORG_KEY)
 }

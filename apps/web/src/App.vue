@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import ToastHost from './components/ui/ToastHost.vue'
-import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { clearToken, getTokenRole, isTokenExpired, orgState, tokenState } from './lib/auth'
 import { setLocale, type Locale } from './i18n'
 import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const { locale, t } = useI18n()
 const userRole = computed(() => {
-  const token = getToken()
+  const token = tokenState.value
   if (!token || isTokenExpired(token)) {
     return null
   }
@@ -28,7 +28,7 @@ const toursPath = computed(() => {
   }
 
   if (userRole.value === 'SuperAdmin') {
-    return getSelectedOrgId() ? '/admin/tours' : '/admin/orgs'
+    return orgState.value ? '/admin/tours' : '/admin/orgs'
   }
 
   return ''
