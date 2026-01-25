@@ -14,7 +14,15 @@ import {
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { DayPlan, LinkInfo, Participant, Tour, TourPortalInfo, UserListItem } from '../../types'
+import type {
+  DayPlan,
+  LinkInfo,
+  Participant,
+  ParticipantPortalAccessResponse,
+  Tour,
+  TourPortalInfo,
+  UserListItem,
+} from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -57,6 +65,8 @@ const editingParticipantId = ref<string | null>(null)
 const editParticipantSaving = ref(false)
 const editParticipantErrorKey = ref<string | null>(null)
 const editParticipantErrorMessage = ref<string | null>(null)
+const portalAccessInfo = ref<Record<string, ParticipantPortalAccessResponse>>({})
+const portalAccessLoading = ref<Record<string, boolean>>({})
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -129,6 +139,42 @@ const setPortalForm = (data: TourPortalInfo) => {
   const normalizedLinks = data.links.length > 0 ? data.links : [{ label: '', url: '' }]
   portalForm.links.splice(0, portalForm.links.length, ...normalizedLinks)
   portalDays.value = normalizeDays(data.days)
+}
+
+const resolvePublicBase = () => {
+  const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim()
+  if (envBase) {
+    return envBase.replace(/\/$/, '')
+  }
+
+  return globalThis.location?.origin ?? ''
+}
+
+const buildPortalLink = (token: string) => {
+  const base = resolvePublicBase()
+  if (!base) {
+    return ''
+  }
+
+  return `${base}/t/${tourId.value}?pt=${encodeURIComponent(token)}`
+}
+
+const setPortalAccessInfo = (participantId: string, info: ParticipantPortalAccessResponse) => {
+  portalAccessInfo.value = { ...portalAccessInfo.value, [participantId]: info }
+}
+
+const withPortalAccessLoading = async (
+  participantId: string,
+  action: () => Promise<ParticipantPortalAccessResponse>
+) => {
+  portalAccessLoading.value = { ...portalAccessLoading.value, [participantId]: true }
+  try {
+    const info = await action()
+    setPortalAccessInfo(participantId, info)
+    return info
+  } finally {
+    portalAccessLoading.value = { ...portalAccessLoading.value, [participantId]: false }
+  }
 }
 
 const addPortalLink = () => {
@@ -292,6 +338,10 @@ const addParticipant = async () => {
     phoneErrorKey.value = errorKey
     return
   }
+  if (!normalizedPhone) {
+    phoneErrorKey.value = 'validation.phone.required'
+    return
+  }
 
   submitting.value = true
   try {
@@ -368,6 +418,10 @@ const saveParticipant = async (participant: Participant) => {
     editPhoneErrorKey.value = errorKey
     return
   }
+  if (!normalizedPhone) {
+    editPhoneErrorKey.value = 'validation.phone.required'
+    return
+  }
 
   editParticipantSaving.value = true
   try {
@@ -410,6 +464,90 @@ const deleteParticipant = async (participant: Participant) => {
     pushToast({ key: 'toast.participantRemoved', tone: 'success' })
   } catch (err) {
     pushToast({ key: 'toast.participantDeleteFailed', tone: 'error' })
+  }
+}
+
+const copyToClipboard = async (value: string, successKey: string, errorKey: string) => {
+  const clipboard = globalThis.navigator?.clipboard
+  if (!clipboard?.writeText) {
+    pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+    return
+  }
+
+  try {
+    await clipboard.writeText(value)
+    pushToast({ key: successKey, tone: 'success' })
+  } catch {
+    pushToast({ key: errorKey, tone: 'error' })
+  }
+}
+
+const fetchParticipantAccess = async (participant: Participant) => {
+  return withPortalAccessLoading(participant.id, async () =>
+    apiGet<ParticipantPortalAccessResponse>(
+      `/api/tours/${tourId.value}/participants/${participant.id}/portal-access`
+    )
+  )
+}
+
+const resetParticipantAccess = async (participant: Participant) => {
+  const confirmed = globalThis.confirm?.(
+    t('admin.portalAccess.resetConfirm', { name: participant.fullName })
+  )
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    const info = await withPortalAccessLoading(participant.id, async () =>
+      apiPost<ParticipantPortalAccessResponse>(
+        `/api/tours/${tourId.value}/participants/${participant.id}/portal-access/reset`,
+        {}
+      )
+    )
+    const url = buildPortalLink(info.token)
+    if (url) {
+      await copyToClipboard(url, 'toast.portalLinkReset', 'toast.portalLinkCopyFailed')
+    }
+  } catch {
+    pushToast({ key: 'toast.portalLinkResetFailed', tone: 'error' })
+  }
+}
+
+const copyPortalLink = async (participant: Participant) => {
+  try {
+    const info = await fetchParticipantAccess(participant)
+    const url = buildPortalLink(info.token)
+    if (!url) {
+      pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
+      return
+    }
+    await copyToClipboard(url, 'toast.portalLinkCopied', 'toast.portalLinkCopyFailed')
+  } catch {
+    pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
+  }
+}
+
+const copyWhatsAppTemplate = async (participant: Participant) => {
+  try {
+    const info = await fetchParticipantAccess(participant)
+    const url = buildPortalLink(info.token)
+    if (!url) {
+      pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
+      return
+    }
+
+    const requiresLast4 = info.policy?.requireLast4ForQr ?? true
+    const messageKey = requiresLast4
+      ? 'admin.portalAccess.whatsappTemplateWithLast4'
+      : 'admin.portalAccess.whatsappTemplate'
+    const message = t(messageKey, {
+      name: participant.fullName,
+      url,
+    })
+    await copyToClipboard(message, 'toast.portalWhatsappCopied', 'toast.portalLinkCopyFailed')
+  } catch {
+    pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
   }
 }
 
@@ -1034,8 +1172,38 @@ onMounted(loadTour)
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span class="font-mono">{{ participant.checkInCode }}</span>
+                <span
+                  v-if="portalAccessInfo[participant.id]?.isLocked"
+                  class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700"
+                >
+                  {{ t('admin.portalAccess.locked') }}
+                </span>
               </div>
               <div class="flex flex-wrap items-center gap-2">
+                <button
+                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  :disabled="portalAccessLoading[participant.id]"
+                  @click="copyPortalLink(participant)"
+                >
+                  {{ t('admin.portalAccess.copyLink') }}
+                </button>
+                <button
+                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  :disabled="portalAccessLoading[participant.id]"
+                  @click="copyWhatsAppTemplate(participant)"
+                >
+                  {{ t('admin.portalAccess.copyWhatsapp') }}
+                </button>
+                <button
+                  class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  :disabled="portalAccessLoading[participant.id]"
+                  @click="resetParticipantAccess(participant)"
+                >
+                  {{ t('admin.portalAccess.reset') }}
+                </button>
                 <button
                   class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                   type="button"

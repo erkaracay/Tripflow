@@ -23,6 +23,8 @@ const selectedOrgId = ref<string | null>(getSelectedOrgId() || null)
 const createForm = reactive({
   name: '',
   slug: '',
+  requireLast4ForQr: true,
+  requireLast4ForPortal: false,
 })
 const creating = ref(false)
 const createErrorKey = ref<string | null>(null)
@@ -33,6 +35,8 @@ const editForm = reactive({
   name: '',
   slug: '',
   isActive: true,
+  requireLast4ForQr: true,
+  requireLast4ForPortal: false,
 })
 const savingOrgId = ref<string | null>(null)
 
@@ -67,11 +71,15 @@ const createOrg = async () => {
     const payload = {
       name: createForm.name.trim(),
       slug: createForm.slug.trim() || undefined,
+      requireLast4ForQr: createForm.requireLast4ForQr,
+      requireLast4ForPortal: createForm.requireLast4ForPortal,
     }
     const created = await apiPost<Organization>('/api/organizations', payload)
     orgs.value = [created, ...orgs.value]
     createForm.name = ''
     createForm.slug = ''
+    createForm.requireLast4ForQr = true
+    createForm.requireLast4ForPortal = false
     pushToast({ key: 'toast.orgCreated', tone: 'success' })
   } catch (err) {
     createErrorMessage.value = err instanceof Error ? err.message : null
@@ -89,6 +97,8 @@ const startEdit = (org: Organization) => {
   editForm.name = org.name
   editForm.slug = org.slug
   editForm.isActive = org.isActive
+  editForm.requireLast4ForQr = org.requireLast4ForQr
+  editForm.requireLast4ForPortal = org.requireLast4ForPortal
 }
 
 const cancelEdit = () => {
@@ -112,6 +122,8 @@ const saveEdit = async (org: Organization) => {
       name: editForm.name.trim(),
       slug: editForm.slug.trim(),
       isActive: editForm.isActive,
+      requireLast4ForQr: editForm.requireLast4ForQr,
+      requireLast4ForPortal: editForm.requireLast4ForPortal,
     }
     const updated = await apiPut<Organization>(`/api/organizations/${org.id}`, payload)
     orgs.value = orgs.value.map((item) => (item.id === org.id ? updated : item))
@@ -192,6 +204,16 @@ onMounted(loadOrgs)
             type="text"
           />
         </label>
+        <div class="grid gap-2 text-sm text-slate-600">
+          <label class="flex items-center gap-2">
+            <input v-model="createForm.requireLast4ForQr" type="checkbox" class="rounded border-slate-300" />
+            {{ t('admin.organizations.manage.requireLast4ForQr') }}
+          </label>
+          <label class="flex items-center gap-2">
+            <input v-model="createForm.requireLast4ForPortal" type="checkbox" class="rounded border-slate-300" />
+            {{ t('admin.organizations.manage.requireLast4ForPortal') }}
+          </label>
+        </div>
         <div class="flex items-end">
           <button
             class="w-full rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -289,6 +311,14 @@ onMounted(loadOrgs)
           <label class="flex items-center gap-2 text-sm text-slate-600">
             <input v-model="editForm.isActive" type="checkbox" class="rounded border-slate-300" />
             {{ t('admin.organizations.manage.activeLabel') }}
+          </label>
+          <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input v-model="editForm.requireLast4ForQr" type="checkbox" class="rounded border-slate-300" />
+            {{ t('admin.organizations.manage.requireLast4ForQr') }}
+          </label>
+          <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input v-model="editForm.requireLast4ForPortal" type="checkbox" class="rounded border-slate-300" />
+            {{ t('admin.organizations.manage.requireLast4ForPortal') }}
           </label>
 
           <div class="md:col-span-3 flex flex-wrap gap-2">

@@ -117,6 +117,7 @@
     "orgSlugRequired": "Organization slug is required.",
     "checkInCodeRequired": "Check-in code is required.",
     "phone": {
+      "required": "Phone is required.",
       "invalid": "Phone number is invalid.",
       "tooLong": "Phone number is too long.",
       "requireCountry": "Phone must start with +90."
@@ -148,7 +149,12 @@
     "orgUpdateFailed": "Failed to update organization.",
     "orgDeleted": "Organization deleted.",
     "orgDeleteFailed": "Failed to delete organization.",
-    "portalCodeInvalid": "Code not found. Please check with your guide."
+    "portalCodeInvalid": "Code not found. Please check with your guide.",
+    "portalLinkCopied": "Portal link copied.",
+    "portalLinkCopyFailed": "Failed to copy portal link.",
+    "portalWhatsappCopied": "WhatsApp message copied.",
+    "portalLinkReset": "Portal link reset and copied.",
+    "portalLinkResetFailed": "Failed to reset portal link."
   },
   "admin": {
     "tours": {
@@ -213,13 +219,22 @@
         "fullNamePlaceholder": "Ayse Kaya",
         "email": "Email (optional)",
         "emailPlaceholder": "ayse{'@'}example.com",
-        "phone": "Phone (optional)",
+        "phone": "Phone",
         "phonePlaceholder": "+90 555 123 45 67",
         "add": "Add participant",
         "adding": "Adding...",
         "emailShort": "Email",
         "phoneShort": "Phone"
       }
+    },
+    "portalAccess": {
+      "copyLink": "Copy portal link",
+      "copyWhatsapp": "Copy WhatsApp text",
+      "reset": "Reset link",
+      "resetConfirm": "Reset access link for {name}?",
+      "locked": "Locked",
+      "whatsappTemplate": "Hi {name}, your Tripflow link: {url}",
+      "whatsappTemplateWithLast4": "Hi {name}, your Tripflow link: {url}\nTo view the QR, enter the last 4 digits of your phone."
     },
     "portal": {
       "title": "Portal Content",
@@ -282,6 +297,8 @@
         "empty": "No organizations found.",
         "inactive": "Inactive",
         "activeLabel": "Active",
+        "requireLast4ForQr": "Require last 4 digits for QR",
+        "requireLast4ForPortal": "Require last 4 digits for portal",
         "save": "Save",
         "saving": "Saving...",
         "confirmDelete": "Delete {name}?"
@@ -338,20 +355,36 @@
     },
     "qr": {
       "title": "Your QR",
-      "verifying": "Verifying code...",
       "codeLabel": "Check-in code",
+      "codePlaceholder": "Verify to reveal",
       "noCode": "No code yet",
       "copyCode": "Copy code",
-      "clearCode": "Clear code",
-      "emptyHint": "No code saved yet. Paste the code you received from your guide.",
-      "pastePlaceholder": "Paste code",
+      "last4Prompt": "Enter the last 4 digits of your phone to view QR ({hint}).",
       "helper": "The QR opens the guide check-in screen with the code prefilled.",
-      "empty": "Add a code to generate the QR.",
+      "empty": "Verify your link to generate the QR.",
       "copyGuideLink": "Copy guide link",
       "imageAlt": "QR",
       "codeCleared": "Code cleared.",
       "enterCode": "Enter a code first.",
-      "linkNeedsCode": "Add a code to build the link."
+      "linkNeedsCode": "Verify to build the link."
+    },
+    "access": {
+      "title": "Verify access",
+      "subtitle": "This link is personal. We may ask for the last 4 digits before showing the QR.",
+      "verifying": "Verifying access...",
+      "missing": "This link is personal. Ask your guide or admin for your access link.",
+      "invalid": "This link is invalid or expired. Please request a new link.",
+      "locked": "Too many attempts. Try again in {seconds}s.",
+      "tryLater": "If you keep getting locked, ask your guide to reset the link.",
+      "phoneHint": "Enter the last 4 digits of your phone ({hint}).",
+      "phoneMissing": "Your phone number is missing. Please contact the organizer.",
+      "last4Placeholder": "Last 4 digits",
+      "confirm": "Confirm",
+      "confirming": "Verifying...",
+      "attemptsRemaining": "{count} attempts remaining.",
+      "invalidLink": "Access link not found. Please request a new one.",
+      "invalidLast4": "Last 4 digits do not match.",
+      "last4Required": "Enter the last 4 digits."
     },
     "info": {
       "meetingTitle": "Meeting point",

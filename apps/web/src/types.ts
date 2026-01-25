@@ -29,6 +29,8 @@ export type Organization = {
   slug: string
   isActive: boolean
   isDeleted: boolean
+  requireLast4ForQr: boolean
+  requireLast4ForPortal: boolean
   createdAt: string
   updatedAt: string
 }
@@ -96,7 +98,49 @@ export type LoginResponse = {
   fullName?: string | null
 }
 
-export type VerifyCheckInCodeResponse = {
-  isValid: boolean
-  normalizedCode?: string | null
+export type PortalAccessVerifyResponse = {
+  tourId: string
+  portal: TourPortalInfo
+  policy: PortalAccessPolicy
+  participant: PortalParticipantSummary
+  phoneHint?: string | null
+  isLocked: boolean
+  lockedForSeconds: number
+  attemptsRemaining: number
+}
+
+export type PortalAccessConfirmResponse = {
+  sessionToken: string
+  expiresAt: string
+  policy: PortalAccessPolicy
+  participant: PortalParticipantSummary
+}
+
+export type PortalAccessMeResponse = {
+  tourId: string
+  participantId: string
+  participantName: string
+  checkInCode: string
+  arrived: boolean
+  policy: PortalAccessPolicy
+}
+
+export type ParticipantPortalAccessResponse = {
+  token: string
+  isLocked: boolean
+  lockedUntil?: string | null
+  failedAttempts: number
+  policy: PortalAccessPolicy
+}
+
+export type PortalAccessPolicy = {
+  requireLast4ForQr: boolean
+  requireLast4ForPortal: boolean
+  maxAttempts: number
+  lockMinutes: number
+}
+
+export type PortalParticipantSummary = {
+  displayName: string
+  hasPhone: boolean
 }

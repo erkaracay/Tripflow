@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
-import { apiGet, verifyTourCheckInCode } from '../../lib/api'
+import { apiGet, portalConfirmAccess, portalGetMe, portalVerifyAccess } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { useToast } from '../../lib/toast'
-import type { Tour, TourPortalInfo } from '../../types'
+import type { PortalAccessPolicy, PortalParticipantSummary, Tour, TourPortalInfo } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const { pushToast } = useToast()
 const tourId = computed(() => route.params.tourId as string)
@@ -25,10 +26,40 @@ const errorMessage = ref<string | null>(null)
 const copyStatusKey = ref<string | null>(null)
 const codeCopyStatusKey = ref<string | null>(null)
 const linkCopyStatusKey = ref<string | null>(null)
-const verifyingCode = ref(false)
+const accessState = ref<'idle' | 'checking' | 'verified' | 'missing' | 'invalid'>('idle')
+const accessToken = ref('')
+const last4 = ref('')
+const phoneHint = ref<string | null>(null)
+const participantSummary = ref<PortalParticipantSummary | null>(null)
+const policy = ref<PortalAccessPolicy | null>(null)
+const attemptsRemaining = ref<number | null>(null)
+const lockedUntil = ref<Date | null>(null)
+const verifyingAccess = ref(false)
+const confirmingAccess = ref(false)
+const sessionToken = ref('')
+const sessionExpiresAt = ref<Date | null>(null)
+const nowTick = ref(Date.now())
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
+const portalRequiresLast4 = computed(
+  () => (policy.value?.requireLast4ForPortal ?? false) && !sessionToken.value
+)
+const qrRequiresLast4 = computed(
+  () => (policy.value?.requireLast4ForQr ?? false) && !sessionToken.value
+)
+const isLocked = computed(() => lockRemainingSeconds.value > 0)
+const portalReady = computed(() => {
+  if (accessState.value !== 'verified') {
+    return false
+  }
+
+  if (portalRequiresLast4.value) {
+    return false
+  }
+
+  return true
+})
 
 const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'days', label: t('portal.tabs.days') },
@@ -41,8 +72,6 @@ const days = computed(() => portal.value?.days ?? [])
 const selectedDay = computed(() => days.value[selectedDayIndex.value] ?? null)
 
 const checkInCode = ref('')
-const manualCode = ref('')
-
 const qrDataUrl = ref<string | null>(null)
 
 const resolvePublicBase = () => {
@@ -54,25 +83,36 @@ const resolvePublicBase = () => {
   return globalThis.location?.origin ?? ''
 }
 
-const storageKey = computed(() => `tripflow.checkin.${tourId.value}`)
+const accessTokenKey = computed(() => `tripflow.portal.access.${tourId.value}`)
+const sessionTokenKey = computed(() => `tripflow.portal.session.${tourId.value}`)
+const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${tourId.value}`)
 
-const persistCheckInCode = (code: string) => {
-  if (!code) {
+const saveAccessToken = (token: string) => {
+  if (!token) {
     return
   }
 
-  globalThis.localStorage?.setItem(storageKey.value, code)
+  globalThis.localStorage?.setItem(accessTokenKey.value, token)
+  accessToken.value = token
 }
 
-const clearStoredCode = () => {
-  globalThis.localStorage?.removeItem(storageKey.value)
-  checkInCode.value = ''
-  codeCopyStatusKey.value = 'portal.qr.codeCleared'
+const clearAccessToken = () => {
+  globalThis.localStorage?.removeItem(accessTokenKey.value)
+  accessToken.value = ''
 }
 
-const clearInvalidCode = () => {
-  globalThis.localStorage?.removeItem(storageKey.value)
-  checkInCode.value = ''
+const saveSession = (token: string, expiresAt: Date) => {
+  globalThis.sessionStorage?.setItem(sessionTokenKey.value, token)
+  globalThis.sessionStorage?.setItem(sessionExpiryKey.value, expiresAt.toISOString())
+  sessionToken.value = token
+  sessionExpiresAt.value = expiresAt
+}
+
+const clearSession = () => {
+  globalThis.sessionStorage?.removeItem(sessionTokenKey.value)
+  globalThis.sessionStorage?.removeItem(sessionExpiryKey.value)
+  sessionToken.value = ''
+  sessionExpiresAt.value = null
 }
 
 const buildCheckInLink = (code: string) => {
@@ -84,27 +124,18 @@ const buildCheckInLink = (code: string) => {
   return `${base}/guide/tours/${tourId.value}/checkin?code=${encodeURIComponent(code)}`
 }
 
-const loadPortal = async () => {
-  loading.value = true
+const loadTour = async () => {
   errorKey.value = null
   errorMessage.value = null
 
   try {
-    const [tourData, portalData] = await Promise.all([
-      apiGet<Tour>(`/api/tours/${tourId.value}`),
-      apiGet<TourPortalInfo>(`/api/tours/${tourId.value}/portal`),
-    ])
-
+    const tourData = await apiGet<Tour>(`/api/tours/${tourId.value}`)
     tour.value = tourData
-    portal.value = portalData
-    setDefaultDay()
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : null
     if (!errorMessage.value) {
       errorKey.value = 'errors.portal.load'
     }
-  } finally {
-    loading.value = false
   }
 }
 
@@ -168,18 +199,127 @@ const setActiveTab = (value: string) => {
   activeTab.value = value as TabKey
 }
 
-const resolveCheckInCode = () => {
-  const raw = route.query.code ?? route.query.checkInCode
-  const queryCode = typeof raw === 'string' ? raw : ''
-  const stored = globalThis.localStorage?.getItem(storageKey.value) ?? ''
+const lockRemainingSeconds = computed(() => {
+  if (!lockedUntil.value) {
+    return 0
+  }
 
-  if (queryCode) {
-    void verifyAndApplyCode(queryCode, 'info')
+  const diff = lockedUntil.value.getTime() - nowTick.value
+  return Math.max(0, Math.ceil(diff / 1000))
+})
+
+const applyAccessTokenFromQuery = () => {
+  const raw = route.query.pt
+  const token = typeof raw === 'string' ? raw.trim() : ''
+  if (!token) {
     return
   }
 
-  if (stored) {
-    void verifyAndApplyCode(stored, 'info')
+  saveAccessToken(token)
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.pt
+  router.replace({ query: nextQuery })
+}
+
+const restoreSession = async () => {
+  const storedToken = globalThis.sessionStorage?.getItem(sessionTokenKey.value) ?? ''
+  const storedExpiry = globalThis.sessionStorage?.getItem(sessionExpiryKey.value) ?? ''
+
+  if (!storedToken || !storedExpiry) {
+    clearSession()
+    return false
+  }
+
+  const expiresAt = new Date(storedExpiry)
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    clearSession()
+    return false
+  }
+
+  sessionToken.value = storedToken
+  sessionExpiresAt.value = expiresAt
+
+  try {
+    const me = await portalGetMe(storedToken)
+    if (me.tourId !== tourId.value) {
+      clearSession()
+      return false
+    }
+    checkInCode.value = me.checkInCode
+    policy.value = me.policy
+    accessState.value = 'verified'
+    return true
+  } catch {
+    clearSession()
+    return false
+  }
+}
+
+const verifyAccessToken = async (token: string, tone: 'info' | 'error' = 'error') => {
+  verifyingAccess.value = true
+  phoneHint.value = null
+  participantSummary.value = null
+  attemptsRemaining.value = null
+  lockedUntil.value = null
+
+  try {
+    const result = await portalVerifyAccess(tourId.value, token)
+    if (result.tourId !== tourId.value) {
+      clearAccessToken()
+      accessState.value = 'invalid'
+      pushToast({ key: 'portal.access.invalidLink', tone })
+      return
+    }
+    portal.value = result.portal
+    policy.value = result.policy
+    participantSummary.value = result.participant
+    setDefaultDay()
+    attemptsRemaining.value = result.attemptsRemaining
+
+    if (result.isLocked) {
+      lockedUntil.value = new Date(Date.now() + result.lockedForSeconds * 1000)
+    }
+
+    phoneHint.value = result.phoneHint ?? null
+    accessState.value = 'verified'
+  } catch {
+    clearAccessToken()
+    accessState.value = 'invalid'
+    pushToast({ key: 'portal.access.invalidLink', tone })
+  } finally {
+    verifyingAccess.value = false
+  }
+}
+
+const initAccessFlow = async () => {
+  loading.value = true
+  accessState.value = 'checking'
+  checkInCode.value = ''
+  phoneHint.value = null
+  attemptsRemaining.value = null
+  lockedUntil.value = null
+  participantSummary.value = null
+  policy.value = null
+
+  try {
+    await loadTour()
+    const storedToken = globalThis.localStorage?.getItem(accessTokenKey.value) ?? ''
+    accessToken.value = storedToken
+
+    if (!storedToken) {
+      accessState.value = 'missing'
+      return
+    }
+
+    await verifyAccessToken(storedToken, 'info')
+    const hasSession = await restoreSession()
+    const currentPolicy = policy.value as PortalAccessPolicy | null
+    if (!hasSession && currentPolicy && !currentPolicy.requireLast4ForQr && !currentPolicy.requireLast4ForPortal) {
+      await confirmAccess(true)
+    }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -228,47 +368,53 @@ const copyCheckInCode = async () => {
   }
 }
 
-const normalizeCheckInCode = (value: string) =>
-  value.trim().toUpperCase().replace(/[\s-]/g, '')
-
-const verifyAndApplyCode = async (raw: string, tone: 'info' | 'error' = 'error') => {
-  codeCopyStatusKey.value = null
-  const normalized = normalizeCheckInCode(raw)
-
-  if (normalized.length !== 8) {
-    clearInvalidCode()
-    pushToast({ key: 'toast.portalCodeInvalid', tone })
+const confirmAccess = async (skipValidation = false) => {
+  if (!accessToken.value) {
+    accessState.value = 'missing'
     return
   }
 
-  verifyingCode.value = true
+  const needsLast4 = (policy.value?.requireLast4ForPortal ?? false) || (policy.value?.requireLast4ForQr ?? false)
+  const value = last4.value.trim()
+  if (needsLast4 && !skipValidation && !value) {
+    codeCopyStatusKey.value = 'portal.access.last4Required'
+    return
+  }
+
+  confirmingAccess.value = true
+  codeCopyStatusKey.value = null
+
   try {
-    const result = await verifyTourCheckInCode(tourId.value, normalized)
-    if (result.isValid && result.normalizedCode) {
-      checkInCode.value = result.normalizedCode
-      persistCheckInCode(result.normalizedCode)
+    const result = await portalConfirmAccess(tourId.value, accessToken.value, needsLast4 ? value : undefined)
+    const expiresAt = new Date(result.expiresAt)
+    saveSession(result.sessionToken, expiresAt)
+    last4.value = ''
+    policy.value = result.policy
+    participantSummary.value = result.participant
+
+    const me = await portalGetMe(result.sessionToken)
+    if (me.tourId !== tourId.value) {
+      clearSession()
+      accessState.value = 'invalid'
       return
     }
 
-    clearInvalidCode()
-    pushToast({ key: 'toast.portalCodeInvalid', tone })
-  } catch {
-    clearInvalidCode()
-    pushToast({ key: 'toast.portalCodeInvalid', tone })
+    checkInCode.value = me.checkInCode
+    accessState.value = 'verified'
+  } catch (err) {
+    // Re-verify to refresh lock/attempts state.
+    const message = err instanceof Error ? err.message : ''
+    if (!message.includes('Too many attempts')) {
+      pushToast({ key: 'portal.access.invalidLast4', tone: 'error' })
+    }
+    await verifyAccessToken(accessToken.value, 'error')
   } finally {
-    verifyingCode.value = false
+    confirmingAccess.value = false
   }
 }
 
-const applyManualCode = async () => {
-  const normalized = normalizeCheckInCode(manualCode.value)
-  if (!normalized) {
-    codeCopyStatusKey.value = 'portal.qr.enterCode'
-    return
-  }
-
-  await verifyAndApplyCode(normalized, 'error')
-  manualCode.value = ''
+const handleLast4Input = () => {
+  last4.value = last4.value.replace(/\D/g, '').slice(0, 4)
 }
 
 const copyCheckInLink = async () => {
@@ -323,12 +469,28 @@ watch([checkInCode, () => tourId.value], async ([value]) => {
 }, { immediate: true })
 
 watch(
-  () => [route.query.code, route.query.checkInCode, tourId.value],
-  () => resolveCheckInCode(),
+  () => [route.query.pt, tourId.value],
+  () => {
+    applyAccessTokenFromQuery()
+    void initAccessFlow()
+  },
   { immediate: true }
 )
 
-onMounted(loadPortal)
+let tickHandle: number | null = null
+
+onMounted(() => {
+  tickHandle = globalThis.setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (tickHandle) {
+    globalThis.clearInterval(tickHandle)
+  }
+  tickHandle = null
+})
 </script>
 
 <template>
@@ -356,7 +518,64 @@ onMounted(loadPortal)
         </div>
       </section>
 
-      <div class="sticky top-16 z-10 hidden items-center gap-6 border-b border-slate-200 bg-slate-50/90 px-1 backdrop-blur md:flex">
+      <section
+        v-if="accessState !== 'verified' || portalRequiresLast4"
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+      >
+        <h2 class="text-lg font-semibold">{{ t('portal.access.title') }}</h2>
+        <p class="mt-1 text-sm text-slate-600">{{ t('portal.access.subtitle') }}</p>
+        <div class="mt-4 space-y-3 text-sm text-slate-600">
+          <p v-if="accessState === 'checking' || verifyingAccess" class="text-xs text-slate-500">
+            {{ t('portal.access.verifying') }}
+          </p>
+          <p v-else-if="accessState === 'missing'">
+            {{ t('portal.access.missing') }}
+          </p>
+          <p v-else-if="accessState === 'invalid'">
+            {{ t('portal.access.invalid') }}
+          </p>
+          <div v-else-if="portalRequiresLast4" class="space-y-2">
+            <div v-if="isLocked" class="space-y-1">
+              <p>{{ t('portal.access.locked', { seconds: lockRemainingSeconds }) }}</p>
+              <p class="text-xs text-slate-500">{{ t('portal.access.tryLater') }}</p>
+            </div>
+            <template v-else>
+              <p v-if="phoneHint">{{ t('portal.access.phoneHint', { hint: phoneHint }) }}</p>
+              <p v-else class="text-sm text-slate-600">{{ t('portal.access.phoneMissing') }}</p>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <input
+                  v-model.trim="last4"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
+                  :placeholder="t('portal.access.last4Placeholder')"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="4"
+                  @input="handleLast4Input"
+                />
+                <button
+                  class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  type="button"
+                  :disabled="confirmingAccess || verifyingAccess || !phoneHint"
+                  @click="() => confirmAccess()"
+                >
+                  {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
+                </button>
+              </div>
+              <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
+                {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
+              </p>
+            </template>
+          </div>
+          <p v-if="codeCopyStatusKey" class="text-xs text-rose-600">
+            {{ t(codeCopyStatusKey) }}
+          </p>
+        </div>
+      </section>
+
+      <div
+        v-if="portalReady"
+        class="sticky top-16 z-10 hidden items-center gap-6 border-b border-slate-200 bg-slate-50/90 px-1 backdrop-blur md:flex"
+      >
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -378,11 +597,11 @@ onMounted(loadPortal)
         v-else-if="errorKey || errorMessage"
         :message="errorMessage ?? undefined"
         :message-key="errorKey ?? undefined"
-        @retry="loadPortal"
+        @retry="initAccessFlow"
       />
 
       <template v-else>
-        <div v-if="portal" class="space-y-6 sm:space-y-8">
+        <div v-if="portal && portalReady" class="space-y-6 sm:space-y-8">
           <section v-if="activeTab === 'days'"
             class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
@@ -441,49 +660,53 @@ onMounted(loadPortal)
                 <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.qr.codeLabel') }}</p>
                 <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-mono text-slate-800">
-                    {{ checkInCode || t('portal.qr.noCode') }}
+                    {{ checkInCode || t('portal.qr.codePlaceholder') }}
                   </div>
                   <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                     <button
-                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                       type="button"
+                      :disabled="!checkInCode"
                       @click="copyCheckInCode"
                     >
                       {{ t('portal.qr.copyCode') }}
                     </button>
-                    <button
-                      v-if="checkInCode"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-                      type="button"
-                      @click="clearStoredCode"
-                    >
-                      {{ t('portal.qr.clearCode') }}
-                    </button>
                   </div>
                 </div>
                 <p v-if="codeCopyStatusKey" class="mt-2 text-xs text-slate-500">{{ t(codeCopyStatusKey) }}</p>
-                  <div v-if="!checkInCode" class="mt-4 space-y-2 text-sm text-slate-600">
-                    <p>{{ t('portal.qr.emptyHint') }}</p>
+                <div v-if="qrRequiresLast4" class="mt-4 space-y-2 text-sm text-slate-600">
+                  <div v-if="isLocked" class="space-y-1">
+                    <p>{{ t('portal.access.locked', { seconds: lockRemainingSeconds }) }}</p>
+                    <p class="text-xs text-slate-500">{{ t('portal.access.tryLater') }}</p>
+                  </div>
+                  <template v-else>
+                    <p v-if="phoneHint">{{ t('portal.qr.last4Prompt', { hint: phoneHint }) }}</p>
+                    <p v-else class="text-sm text-slate-600">{{ t('portal.access.phoneMissing') }}</p>
                     <div class="flex flex-col gap-2 sm:flex-row">
                       <input
-                        v-model.trim="manualCode"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-                      :placeholder="t('portal.qr.pastePlaceholder')"
-                      type="text"
-                      maxlength="8"
-                    />
-                    <button
-                      class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
-                      type="button"
-                      :disabled="verifyingCode"
-                      @click="applyManualCode"
-                    >
-                      {{ t('common.save') }}
-                    </button>
-                  </div>
-                  <p v-if="verifyingCode" class="text-xs text-slate-500">{{ t('portal.qr.verifying') }}</p>
-                  <p class="text-xs text-slate-500">{{ t('portal.qr.helper') }}</p>
+                        v-model.trim="last4"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
+                        :placeholder="t('portal.access.last4Placeholder')"
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="4"
+                        @input="handleLast4Input"
+                      />
+                      <button
+                        class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                        type="button"
+                        :disabled="confirmingAccess || verifyingAccess || !phoneHint"
+                        @click="() => confirmAccess()"
+                      >
+                        {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
+                      </button>
+                    </div>
+                    <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
+                      {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
+                    </p>
+                  </template>
                 </div>
+                <p v-else-if="checkInCode" class="mt-3 text-xs text-slate-500">{{ t('portal.qr.helper') }}</p>
               </div>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -553,12 +776,12 @@ onMounted(loadPortal)
           </section>
         </div>
 
-        <div v-else class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+        <div v-else-if="portalReady" class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
           {{ t('portal.empty') }}
         </div>
       </template>
     </div>
 
-    <PortalTabBar :tabs="tabs" :active="activeTab" @select="setActiveTab" />
+    <PortalTabBar v-if="portalReady" :tabs="tabs" :active="activeTab" @select="setActiveTab" />
   </div>
 </template>
