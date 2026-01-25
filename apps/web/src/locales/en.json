@@ -32,7 +32,8 @@
     "undo": "Undo",
     "undoing": "Undoing...",
     "noData": "No data available.",
-    "searchPlaceholder": "Search by name, email, or phone"
+    "searchPlaceholder": "Search by name, email, or phone",
+    "clearSearch": "Clear"
   },
   "nav": {
     "organizations": "Organizations",
@@ -203,6 +204,7 @@
       "codePlaceholder": "8-character code",
       "submitting": "Checking in...",
       "participantsTitle": "Participants",
+      "lastAction": "Last check-in: {name}",
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
       "success": "Check-in successful.",

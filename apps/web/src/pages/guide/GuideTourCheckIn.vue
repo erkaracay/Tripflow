@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
@@ -22,6 +22,7 @@ const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
 const searchTerm = ref('')
+const debouncedSearchTerm = ref('')
 const checkInCode = ref('')
 const actionMessageKey = ref<string | null>(null)
 const actionMessageText = ref<string | null>(null)
@@ -35,12 +36,15 @@ const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckIn = ref(true)
 const highlightParticipantId = ref<string | null>(null)
 const undoingParticipantId = ref<string | null>(null)
+const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
 let highlightTimer: number | undefined
+let lastActionTimer: number | undefined
+let searchDebounceTimer: number | undefined
 
 const { pushToast } = useToast()
 
 const filteredParticipants = computed(() => {
-  const query = searchTerm.value.trim().toLowerCase()
+  const query = debouncedSearchTerm.value.trim().toLowerCase()
   if (!query) {
     return participants.value
   }
@@ -95,6 +99,26 @@ const updateFromCheckIn = (response: CheckInResponse) => {
   )
 }
 
+const setLastAction = (response: CheckInResponse) => {
+  if (response.alreadyArrived) {
+    return
+  }
+
+  lastAction.value = {
+    participantId: response.participantId,
+    participantName: response.participantName,
+  }
+
+  if (lastActionTimer) {
+    globalThis.clearTimeout(lastActionTimer)
+  }
+
+  lastActionTimer = globalThis.setTimeout(() => {
+    lastAction.value = null
+    lastActionTimer = undefined
+  }, 10000)
+}
+
 const updateFromUndo = (response: CheckInUndoResponse) => {
   summary.value = {
     arrivedCount: response.arrivedCount,
@@ -116,6 +140,9 @@ const undoCheckIn = async (participantId: string) => {
       { participantId }
     )
     updateFromUndo(response)
+    if (lastAction.value?.participantId === participantId) {
+      lastAction.value = null
+    }
     const tone = response.alreadyUndone ? 'info' : 'success'
     pushToast({
       key: response.alreadyUndone ? 'toast.alreadyUndone' : 'toast.checkInUndone',
@@ -169,6 +196,7 @@ const submitCheckIn = async (code: string) => {
     }
     checkInCode.value = ''
     lastResult.value = response
+    setLastAction(response)
     highlightParticipantId.value = response.participantId
     if (highlightTimer) {
       globalThis.clearTimeout(highlightTimer)
@@ -189,6 +217,10 @@ const submitCheckIn = async (code: string) => {
   } finally {
     isCheckingIn.value = false
   }
+}
+
+const clearSearch = () => {
+  searchTerm.value = ''
 }
 
 const handleCheckInSubmit = async () => {
@@ -268,6 +300,15 @@ const initialize = async () => {
   codeInput.value?.focus()
 }
 
+watch(searchTerm, (value) => {
+  if (searchDebounceTimer) {
+    globalThis.clearTimeout(searchDebounceTimer)
+  }
+  searchDebounceTimer = globalThis.setTimeout(() => {
+    debouncedSearchTerm.value = value
+  }, 250)
+}, { immediate: true })
+
 watch(
   () => [route.query.code, route.query.checkInCode, dataLoaded.value],
   () => {
@@ -277,6 +318,18 @@ watch(
 
 onMounted(() => {
   void initialize()
+})
+
+onUnmounted(() => {
+  if (highlightTimer) {
+    globalThis.clearTimeout(highlightTimer)
+  }
+  if (lastActionTimer) {
+    globalThis.clearTimeout(lastActionTimer)
+  }
+  if (searchDebounceTimer) {
+    globalThis.clearTimeout(searchDebounceTimer)
+  }
 })
 </script>
 
@@ -368,13 +421,36 @@ onMounted(() => {
           </span>
         </div>
 
-        <div class="mt-4">
+        <div
+          v-if="lastAction"
+          class="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{{ t('guide.checkIn.lastAction', { name: lastAction.participantName }) }}</span>
+          <button
+            class="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+            type="button"
+            :disabled="undoingParticipantId === lastAction.participantId"
+            @click="undoCheckIn(lastAction.participantId)"
+          >
+            {{ undoingParticipantId === lastAction.participantId ? t('common.undoing') : t('common.undo') }}
+          </button>
+        </div>
+
+        <div class="relative mt-4">
           <input
             v-model.trim="searchTerm"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pr-16 text-sm focus:border-slate-400 focus:outline-none"
             :placeholder="t('common.searchPlaceholder')"
             type="text"
           />
+          <button
+            v-if="searchTerm"
+            class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+            type="button"
+            @click="clearSearch"
+          >
+            {{ t('common.clearSearch') }}
+          </button>
         </div>
 
         <div

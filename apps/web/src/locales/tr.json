@@ -32,7 +32,8 @@
     "undo": "Geri al",
     "undoing": "Geri alınıyor...",
     "noData": "Veri yok.",
-    "searchPlaceholder": "İsim, e-posta veya telefon ara"
+    "searchPlaceholder": "İsim, e-posta veya telefon ara",
+    "clearSearch": "Temizle"
   },
   "nav": {
     "organizations": "Organizasyonlar",
@@ -319,6 +320,7 @@
       "codePlaceholder": "8 karakter kod",
       "submitting": "İşleniyor...",
       "participantsTitle": "Katılımcılar",
+      "lastAction": "Son yoklama: {name}",
       "empty": "Katılımcı bulunamadı.",
       "markArrived": "Geldi olarak işaretle",
       "autoCheckIn": "Tarama sonrası otomatik yoklama (yakında)",
