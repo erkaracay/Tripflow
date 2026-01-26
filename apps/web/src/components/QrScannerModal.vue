@@ -17,14 +17,26 @@ const { t } = useI18n()
 const videoRef = ref<HTMLVideoElement | null>(null)
 const errorKey = ref<string | null>(null)
 const isStarting = ref(false)
+const isScanning = ref(false)
 let controls: IScannerControls | null = null
 let reader: BrowserQRCodeReader | null = null
 
 const stopScanner = () => {
-  controls?.stop()
-  controls = null
-  reader?.reset()
+  try {
+    controls?.stop()
+  } finally {
+    controls = null
+  }
+
+  const video = videoRef.value
+  const stream = video?.srcObject as MediaStream | null
+  stream?.getTracks().forEach((track) => track.stop())
+  if (video) {
+    video.srcObject = null
+  }
+
   reader = null
+  isScanning.value = false
 }
 
 const resolveErrorKey = (err: unknown) => {
@@ -47,7 +59,19 @@ const startScanner = async () => {
 
   errorKey.value = null
   isStarting.value = true
+  isScanning.value = false
   await nextTick()
+
+  if (!props.open) {
+    isStarting.value = false
+    return
+  }
+
+  if (!globalThis.navigator?.mediaDevices?.getUserMedia) {
+    errorKey.value = 'guide.checkIn.cameraNotSupported'
+    isStarting.value = false
+    return
+  }
 
   const video = videoRef.value
   if (!video) {
@@ -64,8 +88,14 @@ const startScanner = async () => {
       stopScanner()
       emit('result', result.getText())
     })
+    if (!props.open) {
+      stopScanner()
+      return
+    }
+    isScanning.value = true
   } catch (err) {
     errorKey.value = resolveErrorKey(err)
+    stopScanner()
   } finally {
     isStarting.value = false
   }
@@ -86,6 +116,11 @@ watch(
 onUnmounted(() => {
   stopScanner()
 })
+
+const handleClose = () => {
+  stopScanner()
+  emit('close')
+}
 </script>
 
 <template>
@@ -97,7 +132,7 @@ onUnmounted(() => {
           <button
             class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
             type="button"
-            @click="emit('close')"
+            @click="handleClose"
           >
             {{ t('common.dismiss') }}
           </button>
@@ -108,7 +143,13 @@ onUnmounted(() => {
         </div>
 
         <p class="mt-3 text-sm text-slate-600">
-          {{ errorKey ? t(errorKey) : t('guide.checkIn.scanning') }}
+          {{
+            errorKey
+              ? t(errorKey)
+              : isScanning
+                ? t('guide.checkIn.scanningActive')
+                : t('guide.checkIn.scanning')
+          }}
         </p>
 
         <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -122,7 +163,7 @@ onUnmounted(() => {
           <button
             class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
             type="button"
-            @click="emit('close')"
+            @click="handleClose"
           >
             {{ t('guide.checkIn.useManualCode') }}
           </button>
