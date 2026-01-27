@@ -245,11 +245,20 @@ const normalizeQrCode = (raw: string) => {
   }
 
   let candidate = trimmed
-  try {
-    const url = new URL(trimmed)
-    candidate = url.searchParams.get('code') ?? url.searchParams.get('checkInCode') ?? trimmed
-  } catch {
-    // Not a URL; keep raw string.
+  const queryMatch = trimmed.match(/[?&](?:code|checkInCode)=([^&#]+)/i)
+  if (queryMatch?.[1]) {
+    try {
+      candidate = decodeURIComponent(queryMatch[1])
+    } catch {
+      candidate = queryMatch[1]
+    }
+  } else {
+    try {
+      const url = new URL(trimmed)
+      candidate = url.searchParams.get('code') ?? url.searchParams.get('checkInCode') ?? trimmed
+    } catch {
+      // Not a URL; keep raw string.
+    }
   }
 
   const normalized = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -296,7 +305,7 @@ const handleScanResult = async (raw: string) => {
 
   const code = normalizeQrCode(raw)
   if (!code) {
-    scanErrorKey.value = 'guide.checkIn.invalidCode'
+    scanErrorKey.value = 'guide.checkIn.invalidQr'
     return
   }
 
