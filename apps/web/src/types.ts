@@ -1,4 +1,4 @@
-export type Tour = {
+export type Event = {
   id: string
   name: string
   startDate: string
@@ -6,7 +6,7 @@ export type Tour = {
   guideUserId?: string | null
 }
 
-export type TourListItem = {
+export type EventListItem = {
   id: string
   name: string
   startDate: string
@@ -69,7 +69,7 @@ export type DayPlan = {
   items: string[]
 }
 
-export type TourPortalInfo = {
+export type EventPortalInfo = {
   meeting: MeetingInfo
   links: LinkInfo[]
   days: DayPlan[]
@@ -106,8 +106,8 @@ export type LoginResponse = {
 }
 
 export type PortalAccessVerifyResponse = {
-  tourId: string
-  portal: TourPortalInfo
+  eventId: string
+  portal: EventPortalInfo
   policy: PortalAccessPolicy
   participant: PortalParticipantSummary
   phoneHint?: string | null
@@ -124,7 +124,7 @@ export type PortalAccessConfirmResponse = {
 }
 
 export type PortalAccessMeResponse = {
-  tourId: string
+  eventId: string
   participantId: string
   participantName: string
   checkInCode: string

@@ -36,7 +36,7 @@ const loadOrgs = async () => {
 const selectOrg = async (org: Organization) => {
   setSelectedOrgId(org.id)
   selectedOrgId.value = org.id
-  await router.push('/admin/tours')
+  await router.push('/admin/events')
 }
 
 onMounted(loadOrgs)

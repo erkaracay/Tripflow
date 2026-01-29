@@ -4,11 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
 import { apiGet, portalConfirmAccess, portalGetMe, portalVerifyAccess } from '../../lib/api'
+import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { useToast } from '../../lib/toast'
-import type { PortalAccessPolicy, PortalParticipantSummary, Tour, TourPortalInfo } from '../../types'
+import type { PortalAccessPolicy, PortalParticipantSummary, Event as EventDto, EventPortalInfo } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
 
@@ -16,10 +17,25 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { pushToast } = useToast()
-const tourId = computed(() => route.params.tourId as string)
+const eventId = computed(() => route.params.eventId as string)
+const previewParam = computed(() => route.query.preview)
+const isPreviewRequested = computed(() => previewParam.value === '1' || previewParam.value === 'true')
+const isAdminPreview = computed(() => {
+  if (!isPreviewRequested.value) {
+    return false
+  }
 
-const tour = ref<Tour | null>(null)
-const portal = ref<TourPortalInfo | null>(null)
+  const token = getToken()
+  if (!token || isTokenExpired(token)) {
+    return false
+  }
+
+  const role = getTokenRole(token)
+  return role === 'AgencyAdmin' || role === 'SuperAdmin'
+})
+
+const event = ref<EventDto | null>(null)
+const portal = ref<EventPortalInfo | null>(null)
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
@@ -133,7 +149,7 @@ const clearRateLimit = () => {
 }
 
 const welcomeStorageKey = (participantId: string) =>
-  `tf_welcome_shown:${tourId.value}:${participantId}`
+  `tf_welcome_shown:${eventId.value}:${participantId}`
 
 const showWelcomeBanner = (participantId: string) => {
   if (!participantId) {
@@ -167,9 +183,9 @@ const dismissWelcome = () => {
   }
 }
 
-const accessTokenKey = computed(() => `tripflow.portal.access.${tourId.value}`)
-const sessionTokenKey = computed(() => `tripflow.portal.session.${tourId.value}`)
-const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${tourId.value}`)
+const accessTokenKey = computed(() => `tripflow.portal.access.${eventId.value}`)
+const sessionTokenKey = computed(() => `tripflow.portal.session.${eventId.value}`)
+const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${eventId.value}`)
 
 const saveAccessToken = (token: string) => {
   if (!token) {
@@ -205,16 +221,16 @@ const buildCheckInLink = (code: string) => {
     return ''
   }
 
-  return `${base}/guide/tours/${tourId.value}/checkin?code=${encodeURIComponent(code)}`
+  return `${base}/guide/events/${eventId.value}/checkin?code=${encodeURIComponent(code)}`
 }
 
-const loadTour = async () => {
+const loadEvent = async () => {
   errorKey.value = null
   errorMessage.value = null
 
   try {
-    const tourData = await apiGet<Tour>(`/api/tours/${tourId.value}`)
-    tour.value = tourData
+    const eventData = await apiGet<EventDto>(`/api/events/${eventId.value}`)
+    event.value = eventData
     hasLoadedOnce.value = true
     clearNetworkError()
   } catch (err) {
@@ -268,8 +284,8 @@ const setDefaultDay = () => {
     return
   }
 
-  const startDate = parseDate(tour.value?.startDate)
-  const endDate = parseDate(tour.value?.endDate)
+  const startDate = parseDate(event.value?.startDate)
+  const endDate = parseDate(event.value?.endDate)
   const today = toDateOnly(new Date())
 
   if (!startDate || !endDate) {
@@ -347,7 +363,7 @@ const restoreSession = async () => {
 
   try {
     const me = await portalGetMe(storedToken)
-    if (me.tourId !== tourId.value) {
+    if (me.eventId !== eventId.value) {
       clearSession()
       return false
     }
@@ -381,8 +397,8 @@ const verifyAccessToken = async (token: string, tone: 'info' | 'error' = 'error'
   lockedUntil.value = null
 
   try {
-    const result = await portalVerifyAccess(tourId.value, token)
-    if (result.tourId !== tourId.value) {
+    const result = await portalVerifyAccess(eventId.value, token)
+    if (result.eventId !== eventId.value) {
       clearAccessToken()
       accessState.value = 'invalid'
       pushToast({ key: 'portal.access.invalidLink', tone })
@@ -445,7 +461,24 @@ const initAccessFlow = async () => {
   clearNetworkError()
 
   try {
-    await loadTour()
+    if (isAdminPreview.value) {
+      await loadEvent()
+      const portalData = await apiGet<EventPortalInfo>(`/api/events/${eventId.value}/portal`)
+      portal.value = portalData
+      policy.value = {
+        requireLast4ForPortal: false,
+        requireLast4ForQr: false,
+        maxAttempts: 0,
+        lockMinutes: 0,
+      }
+      accessState.value = 'verified'
+      hasLoadedOnce.value = true
+      sessionExpired.value = false
+      setDefaultDay()
+      return
+    }
+
+    await loadEvent()
     const storedToken = globalThis.localStorage?.getItem(accessTokenKey.value) ?? ''
     accessToken.value = storedToken
 
@@ -533,7 +566,7 @@ const confirmAccess = async (skipValidation = false) => {
   clearNetworkError()
 
   try {
-    const result = await portalConfirmAccess(tourId.value, accessToken.value, needsLast4 ? value : undefined)
+    const result = await portalConfirmAccess(eventId.value, accessToken.value, needsLast4 ? value : undefined)
     const expiresAt = new Date(result.expiresAt)
     saveSession(result.sessionToken, expiresAt)
     last4.value = ''
@@ -541,7 +574,7 @@ const confirmAccess = async (skipValidation = false) => {
     participantSummary.value = result.participant
 
     const me = await portalGetMe(result.sessionToken)
-    if (me.tourId !== tourId.value) {
+    if (me.eventId !== eventId.value) {
       clearSession()
       accessState.value = 'invalid'
       return
@@ -631,7 +664,7 @@ const retryPortal = async () => {
   }
 }
 
-watch([checkInCode, () => tourId.value], async ([value]) => {
+watch([checkInCode, () => eventId.value], async ([value]) => {
   codeCopyStatusKey.value = null
   linkCopyStatusKey.value = null
   if (!value) {
@@ -672,7 +705,7 @@ watch(rateLimitRemainingSeconds, (seconds) => {
 })
 
 watch(
-  () => [route.query.pt, tourId.value],
+  () => [route.query.pt, route.query.preview, eventId.value],
   () => {
     applyAccessTokenFromQuery()
     void initAccessFlow()
@@ -704,10 +737,10 @@ onUnmounted(() => {
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-500">{{ t('portal.header.kicker') }}</p>
             <h1 class="mt-3 text-2xl font-semibold">
-              {{ tour?.name ?? t('common.tour') }}
+              {{ event?.name ?? t('common.event') }}
             </h1>
-            <p class="text-sm text-slate-500" v-if="tour">
-              {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
+            <p class="text-sm text-slate-500" v-if="event">
+              {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
             </p>
           </div>
           <div class="flex w-full flex-col items-start gap-2 sm:w-auto sm:items-end">
@@ -725,7 +758,7 @@ onUnmounted(() => {
         v-if="welcomeVisible"
         class="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
       >
-        <span>{{ t('portal.welcome', { tour: tour?.name ?? t('common.tour') }) }}</span>
+        <span>{{ t('portal.welcome', { event: event?.name ?? t('common.event') }) }}</span>
         <button
           class="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:border-emerald-300"
           type="button"

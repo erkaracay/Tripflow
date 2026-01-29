@@ -21,20 +21,20 @@ import type {
   LinkInfo,
   Participant,
   ParticipantPortalAccessResponse,
-  Tour,
-  TourPortalInfo,
+  Event as EventDto,
+  EventPortalInfo,
   UserListItem,
 } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
-const tourId = computed(() => route.params.tourId as string)
+const eventId = computed(() => route.params.eventId as string)
 
-const tour = ref<Tour | null>(null)
+const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
-const portal = ref<TourPortalInfo | null>(null)
+const portal = ref<EventPortalInfo | null>(null)
 const portalDays = ref<DayPlan[]>([])
-const tourForm = reactive({
+const eventForm = reactive({
   name: '',
   startDate: '',
   endDate: '',
@@ -45,11 +45,11 @@ const loadErrorKey = ref<string | null>(null)
 const loadErrorMessage = ref<string | null>(null)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
-const tourSaving = ref(false)
-const tourSavedTimer = ref<number | null>(null)
-const tourMessageKey = ref<string | null>(null)
-const tourErrorKey = ref<string | null>(null)
-const tourErrorMessage = ref<string | null>(null)
+const eventSaving = ref(false)
+const eventSavedTimer = ref<number | null>(null)
+const eventMessageKey = ref<string | null>(null)
+const eventErrorKey = ref<string | null>(null)
+const eventErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
 const portalSaving = ref(false)
 const portalSavedTimer = ref<number | null>(null)
@@ -130,13 +130,13 @@ const normalizeDays = (days: DayPlan[]) =>
     items: day.items ?? [],
   }))
 
-const setTourForm = (data: Tour) => {
-  tourForm.name = data.name
-  tourForm.startDate = data.startDate
-  tourForm.endDate = data.endDate
+const setEventForm = (data: EventDto) => {
+  eventForm.name = data.name
+  eventForm.startDate = data.startDate
+  eventForm.endDate = data.endDate
 }
 
-const setPortalForm = (data: TourPortalInfo) => {
+const setPortalForm = (data: EventPortalInfo) => {
   portalForm.meetingTime = data.meeting.time
   portalForm.meetingPlace = data.meeting.place
   portalForm.meetingMapsUrl = data.meeting.mapsUrl
@@ -148,14 +148,14 @@ const setPortalForm = (data: TourPortalInfo) => {
   portalDays.value = normalizeDays(data.days)
 }
 
-const showTourSaved = () => {
-  tourMessageKey.value = 'common.saved'
-  if (tourSavedTimer.value) {
-    globalThis.clearTimeout(tourSavedTimer.value)
+const showEventSaved = () => {
+  eventMessageKey.value = 'common.saved'
+  if (eventSavedTimer.value) {
+    globalThis.clearTimeout(eventSavedTimer.value)
   }
-  tourSavedTimer.value = globalThis.setTimeout(() => {
-    tourMessageKey.value = null
-    tourSavedTimer.value = null
+  eventSavedTimer.value = globalThis.setTimeout(() => {
+    eventMessageKey.value = null
+    eventSavedTimer.value = null
   }, 3000)
 }
 
@@ -185,7 +185,7 @@ const buildPortalLink = (token: string) => {
     return ''
   }
 
-  return `${base}/t/${tourId.value}?pt=${encodeURIComponent(token)}`
+  return `${base}/t/${eventId.value}?pt=${encodeURIComponent(token)}`
 }
 
 const setPortalAccessInfo = (participantId: string, info: ParticipantPortalAccessResponse) => {
@@ -252,7 +252,7 @@ const moveDay = (index: number, direction: number) => {
   portalDays.value = normalizeDays(next)
 }
 
-const loadTour = async () => {
+const loadEvent = async () => {
   loading.value = true
   loadErrorKey.value = null
   loadErrorMessage.value = null
@@ -261,9 +261,9 @@ const loadTour = async () => {
   portalErrorMessage.value = null
   formErrorKey.value = null
   formErrorMessage.value = null
-  tourMessageKey.value = null
-  tourErrorKey.value = null
-  tourErrorMessage.value = null
+  eventMessageKey.value = null
+  eventErrorKey.value = null
+  eventErrorMessage.value = null
   dateHintKey.value = null
   editingParticipantId.value = null
   editParticipantErrorKey.value = null
@@ -274,22 +274,22 @@ const loadTour = async () => {
   guideLoading.value = true
 
   try {
-    const [tourData, participantsData, portalData] = await Promise.all([
-      apiGet<Tour>(`/api/tours/${tourId.value}`),
-      apiGet<Participant[]>(`/api/tours/${tourId.value}/participants`),
-      apiGet<TourPortalInfo>(`/api/tours/${tourId.value}/portal`),
+    const [eventData, participantsData, portalData] = await Promise.all([
+      apiGet<EventDto>(`/api/events/${eventId.value}`),
+      apiGet<Participant[]>(`/api/events/${eventId.value}/participants`),
+      apiGet<EventPortalInfo>(`/api/events/${eventId.value}/portal`),
     ])
 
-    tour.value = tourData
-    setTourForm(tourData)
+    event.value = eventData
+    setEventForm(eventData)
     participants.value = participantsData
     portal.value = portalData
-    guideId.value = tourData.guideUserId ?? ''
+    guideId.value = eventData.guideUserId ?? ''
     setPortalForm(portalData)
   } catch (err) {
     loadErrorMessage.value = err instanceof Error ? err.message : null
     if (!loadErrorMessage.value) {
-      loadErrorKey.value = 'errors.tourDetail.load'
+      loadErrorKey.value = 'errors.eventDetail.load'
     }
     return
   } finally {
@@ -308,46 +308,46 @@ const loadTour = async () => {
   }
 }
 
-const saveTour = async () => {
-  tourMessageKey.value = null
-  tourErrorKey.value = null
-  tourErrorMessage.value = null
+const saveEvent = async () => {
+  eventMessageKey.value = null
+  eventErrorKey.value = null
+  eventErrorMessage.value = null
 
-  const name = tourForm.name.trim()
+  const name = eventForm.name.trim()
   if (!name) {
-    tourErrorKey.value = 'validation.tourNameRequired'
+    eventErrorKey.value = 'validation.eventNameRequired'
     return
   }
 
-  if (!tourForm.startDate || !tourForm.endDate) {
-    tourErrorKey.value = 'validation.startEndRequired'
+  if (!eventForm.startDate || !eventForm.endDate) {
+    eventErrorKey.value = 'validation.startEndRequired'
     return
   }
 
-  if (tourForm.endDate < tourForm.startDate) {
-    tourErrorKey.value = 'validation.endAfterStart'
+  if (eventForm.endDate < eventForm.startDate) {
+    eventErrorKey.value = 'validation.endAfterStart'
     return
   }
 
-  tourSaving.value = true
+  eventSaving.value = true
   try {
-    const updated = await apiPut<Tour>(`/api/tours/${tourId.value}`, {
+    const updated = await apiPut<EventDto>(`/api/events/${eventId.value}`, {
       name,
-      startDate: tourForm.startDate,
-      endDate: tourForm.endDate,
+      startDate: eventForm.startDate,
+      endDate: eventForm.endDate,
     })
-    tour.value = updated
-    setTourForm(updated)
-    showTourSaved()
-    pushToast({ key: 'toast.tourUpdated', tone: 'success' })
+    event.value = updated
+    setEventForm(updated)
+    showEventSaved()
+    pushToast({ key: 'toast.eventUpdated', tone: 'success' })
   } catch (err) {
-    tourErrorMessage.value = err instanceof Error ? err.message : null
-    if (!tourErrorMessage.value) {
-      tourErrorKey.value = 'errors.tourDetail.update'
+    eventErrorMessage.value = err instanceof Error ? err.message : null
+    if (!eventErrorMessage.value) {
+      eventErrorKey.value = 'errors.eventDetail.update'
     }
-    pushToast({ key: 'toast.tourUpdateFailed', tone: 'error' })
+    pushToast({ key: 'toast.eventUpdateFailed', tone: 'error' })
   } finally {
-    tourSaving.value = false
+    eventSaving.value = false
   }
 }
 
@@ -374,7 +374,7 @@ const addParticipant = async () => {
 
   submitting.value = true
   try {
-    const created = await apiPost<Participant>(`/api/tours/${tourId.value}/participants`, {
+    const created = await apiPost<Participant>(`/api/events/${eventId.value}/participants`, {
       fullName,
       email: normalizeEmail(form.email) || undefined,
       phone: normalizedPhone || undefined,
@@ -456,7 +456,7 @@ const saveParticipant = async (participant: Participant) => {
   editParticipantSaving.value = true
   try {
     const updated = await apiPut<Participant>(
-      `/api/tours/${tourId.value}/participants/${participant.id}`,
+      `/api/events/${eventId.value}/participants/${participant.id}`,
       {
         fullName,
         email: normalizeEmail(editForm.email) || undefined,
@@ -492,7 +492,7 @@ const deleteParticipant = async (participant: Participant) => {
   }
 
   try {
-    await apiDelete(`/api/tours/${tourId.value}/participants/${participant.id}`)
+    await apiDelete(`/api/events/${eventId.value}/participants/${participant.id}`)
     participants.value = participants.value.filter((item) => item.id !== participant.id)
     pushToast({ key: 'toast.participantRemoved', tone: 'success' })
   } catch (err) {
@@ -518,7 +518,7 @@ const copyToClipboard = async (value: string, successKey: string, errorKey: stri
 const fetchParticipantAccess = async (participant: Participant) => {
   return withPortalAccessLoading(participant.id, async () =>
     apiGet<ParticipantPortalAccessResponse>(
-      `/api/tours/${tourId.value}/participants/${participant.id}/portal-access`
+      `/api/events/${eventId.value}/participants/${participant.id}/portal-access`
     )
   )
 }
@@ -534,7 +534,7 @@ const resetParticipantAccess = async (participant: Participant) => {
   try {
     const info = await withPortalAccessLoading(participant.id, async () =>
       apiPost<ParticipantPortalAccessResponse>(
-        `/api/tours/${tourId.value}/participants/${participant.id}/portal-access/reset`,
+        `/api/events/${eventId.value}/participants/${participant.id}/portal-access/reset`,
         {}
       )
     )
@@ -586,7 +586,7 @@ const ensureWhatsAppLink = async (participant: Participant) => {
     return ''
   }
 
-  const requiresLast4 = info.policy?.requireLast4ForQr ?? true
+  const requiresLast4 = info.policy?.requireLast4ForQr ?? false
   const messageKey = requiresLast4
     ? 'admin.portalAccess.whatsappTemplateWithLast4'
     : 'admin.portalAccess.whatsappTemplate'
@@ -650,7 +650,7 @@ const downloadParticipantsCsv = () => {
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
-  const name = tour.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
+  const name = event.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
   link.href = URL.createObjectURL(blob)
   link.download = `${name}-participants.csv`
   document.body.appendChild(link)
@@ -708,7 +708,7 @@ const savePortal = async () => {
     })
     .filter((day): day is DayPlan => day !== null)
 
-  const payload: TourPortalInfo = {
+  const payload: EventPortalInfo = {
     meeting: {
       time: meetingTime,
       place: meetingPlace,
@@ -722,7 +722,7 @@ const savePortal = async () => {
 
   portalSaving.value = true
   try {
-    const saved = await apiPut<TourPortalInfo>(`/api/tours/${tourId.value}/portal`, payload)
+    const saved = await apiPut<EventPortalInfo>(`/api/events/${eventId.value}/portal`, payload)
     portal.value = saved
     portalDays.value = normalizeDays(saved.days)
     showPortalSaved()
@@ -749,11 +749,11 @@ const saveGuide = async () => {
 
   guideSaving.value = true
   try {
-    await apiPut(`/api/tours/${tourId.value}/guide`, {
+    await apiPut(`/api/events/${eventId.value}/guide`, {
       guideUserId: guideId.value,
     })
-    if (tour.value) {
-      tour.value = { ...tour.value, guideUserId: guideId.value }
+    if (event.value) {
+      event.value = { ...event.value, guideUserId: guideId.value }
     }
     pushToast({ key: 'toast.guideAssigned', tone: 'success' })
   } catch (err) {
@@ -768,15 +768,15 @@ const saveGuide = async () => {
 }
 
 watch(
-  () => tourForm.startDate,
+  () => eventForm.startDate,
   (value) => {
-    if (!value || !tourForm.endDate) {
+    if (!value || !eventForm.endDate) {
       dateHintKey.value = null
       return
     }
 
-    if (tourForm.endDate < value) {
-      tourForm.endDate = value
+    if (eventForm.endDate < value) {
+      eventForm.endDate = value
       dateHintKey.value = 'validation.endDateAdjusted'
       return
     }
@@ -785,7 +785,7 @@ watch(
   }
 )
 
-onMounted(loadTour)
+onMounted(loadEvent)
 </script>
 
 <template>
@@ -795,9 +795,9 @@ onMounted(loadTour)
         <div class="flex flex-wrap items-center gap-2">
           <RouterLink
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-            to="/admin/tours"
+            to="/admin/events"
           >
-            {{ t('nav.backToTours') }}
+            {{ t('nav.backToEvents') }}
           </RouterLink>
           <RouterLink
             v-if="isSuperAdmin"
@@ -807,71 +807,71 @@ onMounted(loadTour)
             {{ t('nav.backToOrganizations') }}
           </RouterLink>
         </div>
-        <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? t('common.tour') }}</h1>
-        <p class="text-sm text-slate-500" v-if="tour">
-          {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
+        <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
+        <p class="text-sm text-slate-500" v-if="event">
+          {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <RouterLink
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-          :to="`/admin/tours/${tourId}/checkin`"
+          :to="`/admin/events/${eventId}/checkin`"
         >
           {{ t('common.checkIn') }}
         </RouterLink>
         <a
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-          :href="`/t/${tourId}`"
+          :href="`/t/${eventId}?preview=1`"
           rel="noreferrer"
           target="_blank"
         >
-          {{ t('admin.tourDetail.openPortal') }}
+          {{ t('admin.eventDetail.openPortal') }}
         </a>
       </div>
     </div>
 
-    <LoadingState v-if="loading" message-key="admin.tourDetail.loading" />
+    <LoadingState v-if="loading" message-key="admin.eventDetail.loading" />
     <ErrorState
       v-else-if="loadErrorKey || loadErrorMessage"
       :message="loadErrorMessage ?? undefined"
       :message-key="loadErrorKey ?? undefined"
-      @retry="loadTour"
+      @retry="loadEvent"
     />
 
     <template v-else>
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 class="text-lg font-semibold">{{ t('admin.tourDetail.detailsTitle') }}</h2>
-            <p class="text-sm text-slate-500">{{ t('admin.tourDetail.detailsSubtitle') }}</p>
+            <h2 class="text-lg font-semibold">{{ t('admin.eventDetail.detailsTitle') }}</h2>
+            <p class="text-sm text-slate-500">{{ t('admin.eventDetail.detailsSubtitle') }}</p>
           </div>
         </div>
 
-        <form class="mt-4 space-y-4" @submit.prevent="saveTour">
-          <fieldset class="grid gap-4 md:grid-cols-3" :disabled="tourSaving">
+        <form class="mt-4 space-y-4" @submit.prevent="saveEvent">
+          <fieldset class="grid gap-4 md:grid-cols-3" :disabled="eventSaving">
             <label class="grid gap-1 text-sm md:col-span-1">
-              <span class="text-slate-600">{{ t('admin.tourDetail.form.nameLabel') }}</span>
+              <span class="text-slate-600">{{ t('admin.eventDetail.form.nameLabel') }}</span>
               <input
-                v-model.trim="tourForm.name"
+                v-model.trim="eventForm.name"
                 class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                :placeholder="t('admin.tourDetail.form.namePlaceholder')"
+                :placeholder="t('admin.eventDetail.form.namePlaceholder')"
                 type="text"
               />
             </label>
             <label class="grid gap-1 text-sm">
-              <span class="text-slate-600">{{ t('admin.tourDetail.form.startDateLabel') }}</span>
+              <span class="text-slate-600">{{ t('admin.eventDetail.form.startDateLabel') }}</span>
               <input
-                v-model="tourForm.startDate"
+                v-model="eventForm.startDate"
                 class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                 type="date"
               />
             </label>
             <label class="grid gap-1 text-sm">
-              <span class="text-slate-600">{{ t('admin.tourDetail.form.endDateLabel') }}</span>
+              <span class="text-slate-600">{{ t('admin.eventDetail.form.endDateLabel') }}</span>
               <input
-                v-model="tourForm.endDate"
+                v-model="eventForm.endDate"
                 class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                :min="tourForm.startDate"
+                :min="eventForm.startDate"
                 type="date"
               />
             </label>
@@ -879,15 +879,15 @@ onMounted(loadTour)
           <div class="flex flex-wrap items-center gap-3">
             <button
               class="inline-flex items-center gap-2 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="tourSaving"
+              :disabled="eventSaving"
               type="submit"
             >
-              <span v-if="tourSaving" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
-              {{ tourSaving ? t('common.saving') : t('admin.tourDetail.form.save') }}
+              <span v-if="eventSaving" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
+              {{ eventSaving ? t('common.saving') : t('admin.eventDetail.form.save') }}
             </button>
-            <span v-if="tourMessageKey" class="text-xs text-emerald-600">{{ t(tourMessageKey) }}</span>
-            <span v-if="tourErrorKey || tourErrorMessage" class="text-xs text-rose-600">
-              {{ tourErrorKey ? t(tourErrorKey) : tourErrorMessage }}
+            <span v-if="eventMessageKey" class="text-xs text-emerald-600">{{ t(eventMessageKey) }}</span>
+            <span v-if="eventErrorKey || eventErrorMessage" class="text-xs text-rose-600">
+              {{ eventErrorKey ? t(eventErrorKey) : eventErrorMessage }}
             </span>
             <span v-if="dateHintKey" class="text-xs text-slate-500">{{ t(dateHintKey) }}</span>
           </div>
@@ -897,21 +897,21 @@ onMounted(loadTour)
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 class="text-lg font-semibold">{{ t('admin.tourDetail.guide.title') }}</h2>
-            <p class="text-sm text-slate-500">{{ t('admin.tourDetail.guide.subtitle') }}</p>
+            <h2 class="text-lg font-semibold">{{ t('admin.eventDetail.guide.title') }}</h2>
+            <p class="text-sm text-slate-500">{{ t('admin.eventDetail.guide.subtitle') }}</p>
           </div>
         </div>
 
-        <div v-if="guideLoading" class="mt-4 text-sm text-slate-500">{{ t('admin.tourDetail.guide.loading') }}</div>
+        <div v-if="guideLoading" class="mt-4 text-sm text-slate-500">{{ t('admin.eventDetail.guide.loading') }}</div>
         <div v-else-if="guides.length === 0" class="mt-4 text-sm text-slate-500">
-          {{ t('admin.tourDetail.guide.empty') }}
+          {{ t('admin.eventDetail.guide.empty') }}
         </div>
         <form v-else class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="saveGuide">
           <select
             v-model="guideId"
             class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none sm:w-auto"
           >
-            <option value="" disabled>{{ t('admin.tourDetail.guide.selectPlaceholder') }}</option>
+            <option value="" disabled>{{ t('admin.eventDetail.guide.selectPlaceholder') }}</option>
             <option v-for="guide in guides" :key="guide.id" :value="guide.id">
               {{ guide.fullName || guide.email }}
             </option>
@@ -921,7 +921,7 @@ onMounted(loadTour)
             :disabled="guideSaving"
             type="submit"
           >
-            {{ guideSaving ? t('common.saving') : t('admin.tourDetail.guide.save') }}
+            {{ guideSaving ? t('common.saving') : t('admin.eventDetail.guide.save') }}
           </button>
           <span v-if="guideErrorKey || guideErrorMessage" class="text-xs text-rose-600">
             {{ guideErrorKey ? t(guideErrorKey) : guideErrorMessage }}

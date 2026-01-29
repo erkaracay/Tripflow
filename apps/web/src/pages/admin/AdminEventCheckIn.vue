@@ -8,14 +8,14 @@ import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { CheckInResponse, CheckInSummary, CheckInUndoResponse, Participant, Tour } from '../../types'
+import type { CheckInResponse, CheckInSummary, CheckInUndoResponse, Participant, Event as EventDto } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const tourId = computed(() => route.params.tourId as string)
+const eventId = computed(() => route.params.eventId as string)
 
-const tour = ref<Tour | null>(null)
+const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
 const summary = ref<CheckInSummary>({ arrivedCount: 0, totalCount: 0 })
 const loading = ref(true)
@@ -60,7 +60,7 @@ const filteredParticipants = computed(() => {
   })
 })
 
-const hasData = computed(() => Boolean(tour.value))
+const hasData = computed(() => Boolean(event.value))
 
 const loadData = async () => {
   loading.value = true
@@ -68,13 +68,13 @@ const loadData = async () => {
   errorMessage.value = null
 
   try {
-    const [tourData, participantsData, summaryData] = await Promise.all([
-      apiGet<Tour>(`/api/tours/${tourId.value}`),
-      apiGet<Participant[]>(`/api/tours/${tourId.value}/participants`),
-      apiGet<CheckInSummary>(`/api/tours/${tourId.value}/checkins/summary`),
+    const [eventData, participantsData, summaryData] = await Promise.all([
+      apiGet<EventDto>(`/api/events/${eventId.value}`),
+      apiGet<Participant[]>(`/api/events/${eventId.value}/participants`),
+      apiGet<CheckInSummary>(`/api/events/${eventId.value}/checkins/summary`),
     ])
 
-    tour.value = tourData
+    event.value = eventData
     participants.value = participantsData
     summary.value = summaryData
   } catch (err) {
@@ -118,7 +118,7 @@ const undoCheckIn = async (participantId: string) => {
   undoingParticipantId.value = participantId
   try {
     const response = await apiPost<CheckInUndoResponse>(
-      `/api/tours/${tourId.value}/checkins/undo`,
+      `/api/events/${eventId.value}/checkins/undo`,
       { participantId }
     )
     updateFromUndo(response)
@@ -150,7 +150,7 @@ const submitCheckIn = async (code: string) => {
 
   isCheckingIn.value = true
   try {
-    const response = await apiPost<CheckInResponse>(`/api/tours/${tourId.value}/checkins`, {
+    const response = await apiPost<CheckInResponse>(`/api/events/${eventId.value}/checkins`, {
       checkInCode: normalized,
     })
 
@@ -283,9 +283,9 @@ onMounted(() => {
           <div class="flex flex-wrap items-center gap-2">
             <RouterLink
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-              to="/admin/tours"
+              to="/admin/events"
             >
-              {{ t('nav.backToTours') }}
+              {{ t('nav.backToEvents') }}
             </RouterLink>
             <RouterLink
               v-if="isSuperAdmin"
@@ -296,14 +296,14 @@ onMounted(() => {
             </RouterLink>
             <RouterLink
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-              :to="`/admin/tours/${tourId}`"
+              :to="`/admin/events/${eventId}`"
             >
-              {{ t('nav.backToTour') }}
+              {{ t('nav.backToEvent') }}
             </RouterLink>
           </div>
-          <h1 class="mt-2 text-2xl font-semibold">{{ tour?.name ?? t('admin.checkIn.title') }}</h1>
-          <p class="text-sm text-slate-500" v-if="tour">
-            {{ t('common.dateRange', { start: tour.startDate, end: tour.endDate }) }}
+          <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('admin.checkIn.title') }}</h1>
+          <p class="text-sm text-slate-500" v-if="event">
+            {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
           </p>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">

@@ -23,7 +23,7 @@ const selectedOrgId = ref<string | null>(getSelectedOrgId() || null)
 const createForm = reactive({
   name: '',
   slug: '',
-  requireLast4ForQr: true,
+  requireLast4ForQr: false,
   requireLast4ForPortal: false,
 })
 const creating = ref(false)
@@ -35,7 +35,7 @@ const editForm = reactive({
   name: '',
   slug: '',
   isActive: true,
-  requireLast4ForQr: true,
+  requireLast4ForQr: false,
   requireLast4ForPortal: false,
 })
 const savingOrgId = ref<string | null>(null)
@@ -78,7 +78,7 @@ const createOrg = async () => {
     orgs.value = [created, ...orgs.value]
     createForm.name = ''
     createForm.slug = ''
-    createForm.requireLast4ForQr = true
+    createForm.requireLast4ForQr = false
     createForm.requireLast4ForPortal = false
     pushToast({ key: 'toast.orgCreated', tone: 'success' })
   } catch (err) {
@@ -166,7 +166,7 @@ const selectOrg = async (org: Organization) => {
 
   setSelectedOrgId(org.id)
   selectedOrgId.value = org.id
-  await router.push('/admin/tours')
+  await router.push('/admin/events')
 }
 
 onMounted(loadOrgs)

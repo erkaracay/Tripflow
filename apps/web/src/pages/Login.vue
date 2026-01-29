@@ -33,9 +33,9 @@ const submit = async () => {
     })
 
     setToken(response.accessToken)
-    let target = '/admin/tours'
+    let target = '/admin/events'
     if (response.role === 'Guide') {
-      target = '/guide/tours'
+      target = '/guide/events'
     } else if (response.role === 'SuperAdmin') {
       target = '/admin/orgs'
     }

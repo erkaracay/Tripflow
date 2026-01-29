@@ -20,12 +20,12 @@
     "copy": "Kopyala",
     "copySuccess": "Kod kopyalandı.",
     "open": "Aç",
-    "tour": "Tur",
+    "event": "Etkinlik",
     "dateRange": "{start} - {end}",
     "checkIn": "Yoklama al",
     "checkInCode": "Yoklama kodu",
     "arrivedSummary": "Gelen {arrived} / {total}",
-    "arrivedLabel": "Gelen",
+    "arrivedLabel": "Geldi",
     "pendingLabel": "Bekliyor",
     "arrivedAlready": "Zaten geldi",
     "checkedIn": "Geldi işaretlendi",
@@ -44,12 +44,12 @@
   },
   "nav": {
     "organizations": "Organizasyonlar",
-    "tours": "Turlar",
+    "events": "Etkinlikler",
     "logout": "Çıkış",
     "backToOrganizations": "Organizasyonlara dön",
-    "backToTours": "Turlara dön",
-    "backToTour": "Tura dön",
-    "backToGuideTours": "Rehber turlarına dön"
+    "backToEvents": "Etkinliklere dön",
+    "backToEvent": "Etkinliğe dön",
+    "backToGuideEvents": "Rehber etkinliklerine dön"
   },
   "auth": {
     "login": {
@@ -73,16 +73,16 @@
   },
   "errors": {
     "generic": "Bir şeyler ters gitti.",
-    "tours": {
-      "load": "Turlar yüklenemedi.",
-      "create": "Tur oluşturulamadı."
+    "events": {
+      "load": "Etkinlikler yüklenemedi.",
+      "create": "Etkinlik oluşturulamadı."
     },
-    "guideTours": {
-      "load": "Turlar yüklenemedi."
+    "guideEvents": {
+      "load": "Etkinlikler yüklenemedi."
     },
-    "tourDetail": {
-      "load": "Tur yüklenemedi.",
-      "update": "Tur güncellenemedi."
+    "eventDetail": {
+      "load": "Etkinlik yüklenemedi.",
+      "update": "Etkinlik güncellenemedi."
     },
     "participant": {
       "create": "Katılımcı eklenemedi.",
@@ -90,7 +90,7 @@
     },
     "portal": {
       "save": "Portal kaydedilemedi.",
-      "load": "Portal içeriği yüklenemedi."
+      "load": "Etkinlik yüklenemedi."
     },
     "guide": {
       "assign": "Rehber atanamadı."
@@ -112,7 +112,7 @@
     "copyFailed": "Kopyalanamadı."
   },
   "validation": {
-    "tourNameRequired": "Tur adı gerekli.",
+    "eventNameRequired": "Etkinlik adı gerekli.",
     "startEndRequired": "Başlangıç ve bitiş tarihleri gerekli.",
     "endAfterStart": "Bitiş tarihi başlangıçtan önce olamaz.",
     "endDateAdjusted": "Bitiş tarihi başlangıca göre güncellendi.",
@@ -139,8 +139,8 @@
     "invalidCode": "Kod bulunamadı.",
     "alreadyArrived": "Zaten geldi.",
     "checkedIn": "Geldi işaretlendi.",
-    "tourUpdated": "Tur güncellendi.",
-    "tourUpdateFailed": "Tur güncellenemedi.",
+    "eventUpdated": "Etkinlik güncellendi.",
+    "eventUpdateFailed": "Etkinlik güncellenemedi.",
     "participantAdded": "Katılımcı eklendi.",
     "participantAddFailed": "Katılımcı eklenemedi.",
     "participantUpdated": "Katılımcı güncellendi.",
@@ -165,40 +165,40 @@
     "portalLinkResetFailed": "Portal linki sıfırlanamadı."
   },
   "admin": {
-    "tours": {
-      "title": "Turlar",
-      "subtitle": "Tur oluştur, katılımcı ekle ve portalı aç.",
+    "events": {
+      "title": "Etkinlikler",
+      "subtitle": "Etkinlik oluştur, katılımcı ekle ve portalı aç.",
       "form": {
-        "nameLabel": "Tur adı",
+        "nameLabel": "Etkinlik adı",
         "namePlaceholder": "Kapadokya Bahar 2025",
         "startDateLabel": "Başlangıç tarihi",
         "endDateLabel": "Bitiş tarihi",
-        "create": "Tur oluştur",
+        "create": "Etkinlik oluştur",
         "creating": "Oluşturuluyor..."
       },
       "list": {
-        "title": "Mevcut turlar",
-        "loading": "Turlar yükleniyor...",
-        "empty": "Henüz tur yok. Yukarıdan ilk turunu oluştur.",
+        "title": "Mevcut etkinlikler",
+        "loading": "Etkinlikler yükleniyor...",
+        "empty": "Henüz etkinlik yok. Yukarıdan ilk etkinliğini oluştur.",
         "manage": "Yönet",
-        "openPortal": "Portalı aç"
+        "openPortal": "Portal önizleme"
       }
     },
-    "tourDetail": {
-      "loading": "Tur detayları yükleniyor...",
-      "detailsTitle": "Tur Detayları",
-      "detailsSubtitle": "Tur adı ve tarihleri güncelle.",
+    "eventDetail": {
+      "loading": "Etkinlik detayları yükleniyor...",
+      "detailsTitle": "Etkinlik Detayları",
+      "detailsSubtitle": "Etkinlik adı ve tarihleri güncelle.",
       "form": {
         "nameLabel": "Ad",
-        "namePlaceholder": "Tur adı",
+        "namePlaceholder": "Etkinlik adı",
         "startDateLabel": "Başlangıç tarihi",
         "endDateLabel": "Bitiş tarihi",
-        "save": "Turu kaydet"
+        "save": "Etkinliği kaydet"
       },
-      "openPortal": "Portalı aç",
+      "openPortal": "Portal önizleme",
       "guide": {
         "title": "Rehber Atama",
-        "subtitle": "Bu tur için yoklama alacak rehberi seç.",
+        "subtitle": "Bu etkinlik için yoklama alacak rehberi seç.",
         "loading": "Rehberler yükleniyor...",
         "empty": "Rehber bulunamadı.",
         "selectPlaceholder": "Rehber seç",
@@ -206,7 +206,7 @@
       }
     },
     "checkIn": {
-      "title": "Tur yoklaması",
+      "title": "Etkinlik yoklaması",
       "loading": "Yoklama verileri yükleniyor...",
       "codePlaceholder": "8 karakter kod",
       "submitting": "İşleniyor...",
@@ -262,7 +262,7 @@
         "title": "Bağlantılar",
         "add": "Bağlantı ekle",
         "label": "Etiket",
-        "labelPlaceholder": "Tur bilgi paketi",
+        "labelPlaceholder": "Etkinlik bilgi paketi",
         "url": "URL",
         "urlPlaceholder": "https://example.com"
       },
@@ -314,15 +314,15 @@
     }
   },
   "guide": {
-    "tours": {
-      "title": "Rehber Turları",
-      "subtitle": "Atandığın turlarda yoklama al.",
-      "loading": "Turlar yükleniyor...",
-      "empty": "Henüz atanmış tur yok.",
+    "events": {
+      "title": "Rehber Etkinlikleri",
+      "subtitle": "Atandığın etkinliklerde yoklama al.",
+      "loading": "Etkinlikler yükleniyor...",
+      "empty": "Henüz atanmış etkinlik yok.",
       "openCheckIn": "Yoklama al"
     },
     "checkIn": {
-      "title": "Tur yoklaması",
+      "title": "Etkinlik yoklaması",
       "loading": "Yoklama verileri yükleniyor...",
       "codePlaceholder": "8 karakter kod",
       "submitting": "İşleniyor...",
@@ -352,9 +352,9 @@
     "header": {
       "kicker": "Katılımcı Portalı"
     },
-    "welcome": "{tour} turuna hoş geldin",
+    "welcome": "{event} etkinliğine hoş geldin",
     "networkError": "Bağlantı sorunu var. Tekrar dene.",
-    "loading": "Tur detayları yükleniyor...",
+    "loading": "Etkinlik detayları yükleniyor...",
     "empty": "Portal içeriği henüz hazır değil.",
     "tabs": {
       "days": "Günler",

@@ -1,6 +1,6 @@
 # Tripflow
 
-Tripflow, seyahat acenteleri için tur operasyon yönetimi (belge toplama, QR yoklama, gezi rehberi, duyuru, anket) uygulamasıdır. Stack: Vue 3 + .NET 8 + PostgreSQL.
+Tripflow, seyahat acenteleri için etkinlik operasyon yönetimi (belge toplama, QR yoklama, gezi rehberi, duyuru, anket) uygulamasıdır. Stack: Vue 3 + .NET 8 + PostgreSQL.
 
 ## Repo yapısı
 
@@ -85,11 +85,11 @@ Başka bir terminalde seed at:
 
 Demo hesapları (dev seed):
 
-- superadmin@demo.local / admin123
-- adminA@demo.local / admin123
-- guideA@demo.local / guide123
-- adminB@demo.local / admin123
-- guideB@demo.local / guide123
+- <superadmin@demo.local> / admin123
+- <adminA@demo.local> / admin123
+- <guideA@demo.local> / guide123
+- <adminB@demo.local> / admin123
+- <guideB@demo.local> / guide123
 
 SuperAdmin notu:
 

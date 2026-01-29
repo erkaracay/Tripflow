@@ -156,19 +156,19 @@ const portalGet = async <T>(path: string, headers?: Record<string, string>): Pro
 }
 
 export const portalVerifyAccess = async (
-  tourId: string,
+  eventId: string,
   token: string
 ): Promise<PortalAccessVerifyResponse> => {
-  return portalPost<PortalAccessVerifyResponse>('/api/portal/access/verify', { tourId, pt: token })
+  return portalPost<PortalAccessVerifyResponse>('/api/portal/access/verify', { eventId, pt: token })
 }
 
 export const portalConfirmAccess = async (
-  tourId: string,
+  eventId: string,
   token: string,
   last4?: string
 ): Promise<PortalAccessConfirmResponse> => {
   return portalPost<PortalAccessConfirmResponse>('/api/portal/access/confirm', {
-    tourId,
+    eventId,
     pt: token,
     last4: last4 ?? null,
   })

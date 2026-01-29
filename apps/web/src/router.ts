@@ -1,36 +1,36 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
-import AdminTours from './pages/admin/AdminTours.vue'
-import AdminTourDetail from './pages/admin/AdminTourDetail.vue'
-import AdminTourCheckIn from './pages/admin/AdminTourCheckIn.vue'
+import AdminEvents from './pages/admin/AdminEvents.vue'
+import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
+import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
-import GuideTours from './pages/guide/GuideTours.vue'
-import GuideTourCheckIn from './pages/guide/GuideTourCheckIn.vue'
+import GuideEvents from './pages/guide/GuideEvents.vue'
+import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
-import TourPortal from './pages/portal/TourPortal.vue'
+import EventPortal from './pages/portal/EventPortal.vue'
 import type { UserRole } from './types'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/admin/tours' },
+    { path: '/', redirect: '/admin/events' },
     { path: '/login', component: Login },
     { path: '/forbidden', component: Forbidden },
     {
-      path: '/admin/tours',
-      component: AdminTours,
+      path: '/admin/events',
+      component: AdminEvents,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
-      path: '/admin/tours/:tourId',
-      component: AdminTourDetail,
+      path: '/admin/events/:eventId',
+      component: AdminEventDetail,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
-      path: '/admin/tours/:tourId/checkin',
-      component: AdminTourCheckIn,
+      path: '/admin/events/:eventId/checkin',
+      component: AdminEventCheckIn,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
@@ -40,17 +40,17 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {
-      path: '/guide/tours',
-      component: GuideTours,
+      path: '/guide/events',
+      component: GuideEvents,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     {
-      path: '/guide/tours/:tourId/checkin',
-      component: GuideTourCheckIn,
+      path: '/guide/events/:eventId/checkin',
+      component: GuideEventCheckIn,
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
-    { path: '/t/:tourId', component: TourPortal, props: true },
+    { path: '/t/:eventId', component: EventPortal, props: true },
   ],
 })
 

@@ -20,7 +20,7 @@
     "copy": "Copy",
     "copySuccess": "Code copied.",
     "open": "Open",
-    "tour": "Tour",
+    "event": "Event",
     "dateRange": "{start} to {end}",
     "checkIn": "Check-in",
     "checkInCode": "Check-in code",
@@ -44,12 +44,12 @@
   },
   "nav": {
     "organizations": "Organizations",
-    "tours": "Tours",
+    "events": "Events",
     "logout": "Logout",
     "backToOrganizations": "Back to organizations",
-    "backToTours": "Back to tours",
-    "backToTour": "Back to tour",
-    "backToGuideTours": "Back to guide tours"
+    "backToEvents": "Back to events",
+    "backToEvent": "Back to event",
+    "backToGuideEvents": "Back to guide events"
   },
   "auth": {
     "login": {
@@ -73,16 +73,16 @@
   },
   "errors": {
     "generic": "Something went wrong.",
-    "tours": {
-      "load": "Failed to load tours.",
-      "create": "Failed to create tour."
+    "events": {
+      "load": "Failed to load events.",
+      "create": "Failed to create event."
     },
-    "guideTours": {
-      "load": "Failed to load tours."
+    "guideEvents": {
+      "load": "Failed to load events."
     },
-    "tourDetail": {
-      "load": "Failed to load tour.",
-      "update": "Failed to update tour."
+    "eventDetail": {
+      "load": "Failed to load event.",
+      "update": "Failed to update event."
     },
     "participant": {
       "create": "Failed to add participant.",
@@ -90,7 +90,7 @@
     },
     "portal": {
       "save": "Failed to save portal.",
-      "load": "Failed to load tour."
+      "load": "Failed to load event."
     },
     "guide": {
       "assign": "Failed to assign guide."
@@ -112,7 +112,7 @@
     "copyFailed": "Copy failed."
   },
   "validation": {
-    "tourNameRequired": "Tour name is required.",
+    "eventNameRequired": "Event name is required.",
     "startEndRequired": "Start and end dates are required.",
     "endAfterStart": "End date must be on or after start date.",
     "endDateAdjusted": "End date was adjusted to match start date.",
@@ -139,8 +139,8 @@
     "invalidCode": "Invalid code / not found.",
     "alreadyArrived": "Already arrived.",
     "checkedIn": "Checked in.",
-    "tourUpdated": "Tour updated.",
-    "tourUpdateFailed": "Failed to update tour.",
+    "eventUpdated": "Event updated.",
+    "eventUpdateFailed": "Failed to update event.",
     "participantAdded": "Participant added.",
     "participantAddFailed": "Failed to add participant.",
     "participantUpdated": "Participant updated.",
@@ -165,40 +165,40 @@
     "portalLinkResetFailed": "Failed to reset portal link."
   },
   "admin": {
-    "tours": {
-      "title": "Tours",
-      "subtitle": "Create a tour, add participants, and open the portal.",
+    "events": {
+      "title": "Events",
+      "subtitle": "Create an event, add participants, and open the portal.",
       "form": {
-        "nameLabel": "Tour name",
+        "nameLabel": "Event name",
         "namePlaceholder": "Cappadocia Spring 2025",
         "startDateLabel": "Start date",
         "endDateLabel": "End date",
-        "create": "Create tour",
+        "create": "Create event",
         "creating": "Creating..."
       },
       "list": {
-        "title": "Existing tours",
-        "loading": "Loading tours...",
-        "empty": "No tours yet. Create your first tour above.",
+        "title": "Existing events",
+        "loading": "Loading events...",
+        "empty": "No events yet. Create your first event above.",
         "manage": "Manage",
-        "openPortal": "Open portal"
+        "openPortal": "Preview portal"
       }
     },
-    "tourDetail": {
-      "loading": "Loading tour details...",
-      "detailsTitle": "Tour Details",
-      "detailsSubtitle": "Update the tour name and dates.",
+    "eventDetail": {
+      "loading": "Loading event details...",
+      "detailsTitle": "Event Details",
+      "detailsSubtitle": "Update the event name and dates.",
       "form": {
         "nameLabel": "Name",
-        "namePlaceholder": "Tour name",
+        "namePlaceholder": "Event name",
         "startDateLabel": "Start date",
         "endDateLabel": "End date",
-        "save": "Save tour"
+        "save": "Save event"
       },
-      "openPortal": "Open portal",
+      "openPortal": "Preview portal",
       "guide": {
         "title": "Guide Assignment",
-        "subtitle": "Assign a guide to run check-ins for this tour.",
+        "subtitle": "Assign a guide to run check-ins for this event.",
         "loading": "Loading guides...",
         "empty": "No guide users found.",
         "selectPlaceholder": "Select a guide",
@@ -206,7 +206,7 @@
       }
     },
     "checkIn": {
-      "title": "Tour check-in",
+      "title": "Event check-in",
       "loading": "Loading check-in data...",
       "codePlaceholder": "8-character code",
       "submitting": "Checking in...",
@@ -277,7 +277,7 @@
         "title": "Links",
         "add": "Add link",
         "label": "Label",
-        "labelPlaceholder": "Tour info pack",
+        "labelPlaceholder": "Event info pack",
         "url": "URL",
         "urlPlaceholder": "https://example.com"
       },
@@ -329,15 +329,15 @@
     }
   },
   "guide": {
-    "tours": {
-      "title": "Guide Tours",
-      "subtitle": "Check-in your assigned tours.",
-      "loading": "Loading tours...",
-      "empty": "No tours assigned yet.",
+    "events": {
+      "title": "Guide Events",
+      "subtitle": "Check-in your assigned events.",
+      "loading": "Loading events...",
+      "empty": "No events assigned yet.",
       "openCheckIn": "Open check-in"
     },
     "checkIn": {
-      "title": "Tour check-in",
+      "title": "Event check-in",
       "loading": "Loading check-in data...",
       "codePlaceholder": "8-character code",
       "submitting": "Checking in...",
@@ -364,9 +364,9 @@
     "header": {
       "kicker": "Participant Portal"
     },
-    "welcome": "Welcome to {tour}",
+    "welcome": "Welcome to {event}",
     "networkError": "Connection issue. Try again.",
-    "loading": "Loading tour details...",
+    "loading": "Loading event details...",
     "empty": "Portal content is not available yet.",
     "tabs": {
       "days": "Days",
