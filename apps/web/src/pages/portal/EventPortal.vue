@@ -411,7 +411,7 @@ onUnmounted(() => {
     <ErrorState
       v-else-if="errorKey && !hasLoadedOnce"
       :message-key="errorKey"
-      :message="errorMessage"
+      :message="errorMessage ?? undefined"
       @retry="retryLoad"
     />
 
