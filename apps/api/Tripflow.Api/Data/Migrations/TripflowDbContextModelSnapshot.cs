@@ -31,6 +31,9 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<DateTime>("CheckedInAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Method")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -42,21 +45,75 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<Guid>("ParticipantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TourId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("EventId");
 
                     b.HasIndex("OrganizationId");
 
                     b.HasIndex("ParticipantId");
 
-                    b.HasIndex("TourId");
-
-                    b.HasIndex("TourId", "ParticipantId")
+                    b.HasIndex("EventId", "ParticipantId")
                         .IsUnique();
 
                     b.ToTable("checkins", (string)null);
+                });
+
+            modelBuilder.Entity("Tripflow.Api.Data.Entities.EventEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("GuideUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuideUserId");
+
+                    b.HasIndex("OrganizationId", "StartDate");
+
+                    b.ToTable("events", (string)null);
+                });
+
+            modelBuilder.Entity("Tripflow.Api.Data.Entities.EventPortalEntity", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PortalJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("event_portals", (string)null);
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.OrganizationEntity", b =>
@@ -87,7 +144,7 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<bool>("RequireLast4ForQr")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -163,6 +220,9 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -184,17 +244,14 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<DateTime?>("PortalLockedUntil")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("TourId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CheckInCode")
                         .IsUnique();
 
-                    b.HasIndex("OrganizationId");
+                    b.HasIndex("EventId");
 
-                    b.HasIndex("TourId");
+                    b.HasIndex("OrganizationId");
 
                     b.ToTable("participants", (string)null);
                 });
@@ -224,63 +281,6 @@ namespace Tripflow.Api.Data.Migrations
                     b.HasIndex("ParticipantId");
 
                     b.ToTable("portal_sessions", (string)null);
-                });
-
-            modelBuilder.Entity("Tripflow.Api.Data.Entities.TourEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date");
-
-                    b.Property<Guid?>("GuideUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuideUserId");
-
-                    b.HasIndex("OrganizationId", "StartDate");
-
-                    b.ToTable("tours", (string)null);
-                });
-
-            modelBuilder.Entity("Tripflow.Api.Data.Entities.TourPortalEntity", b =>
-                {
-                    b.Property<Guid>("TourId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PortalJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("TourId");
-
-                    b.HasIndex("OrganizationId");
-
-                    b.ToTable("tour_portals", (string)null);
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.UserEntity", b =>
@@ -334,6 +334,43 @@ namespace Tripflow.Api.Data.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("Tripflow.Api.Data.Entities.EventEntity", b =>
+                {
+                    b.HasOne("Tripflow.Api.Data.Entities.UserEntity", "GuideUser")
+                        .WithMany("GuidedEvents")
+                        .HasForeignKey("GuideUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
+                        .WithMany("Events")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GuideUser");
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("Tripflow.Api.Data.Entities.EventPortalEntity", b =>
+                {
+                    b.HasOne("Tripflow.Api.Data.Entities.EventEntity", "Event")
+                        .WithOne("Portal")
+                        .HasForeignKey("Tripflow.Api.Data.Entities.EventPortalEntity", "EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
+                        .WithMany("Portals")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("Organization");
+                });
+
             modelBuilder.Entity("Tripflow.Api.Data.Entities.ParticipantAccessEntity", b =>
                 {
                     b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
@@ -355,21 +392,21 @@ namespace Tripflow.Api.Data.Migrations
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.ParticipantEntity", b =>
                 {
+                    b.HasOne("Tripflow.Api.Data.Entities.EventEntity", "Event")
+                        .WithMany("Participants")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
                         .WithMany("Participants")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tripflow.Api.Data.Entities.TourEntity", "Tour")
-                        .WithMany("Participants")
-                        .HasForeignKey("TourId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Event");
 
                     b.Navigation("Organization");
-
-                    b.Navigation("Tour");
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.PortalSessionEntity", b =>
@@ -391,43 +428,6 @@ namespace Tripflow.Api.Data.Migrations
                     b.Navigation("Participant");
                 });
 
-            modelBuilder.Entity("Tripflow.Api.Data.Entities.TourEntity", b =>
-                {
-                    b.HasOne("Tripflow.Api.Data.Entities.UserEntity", "GuideUser")
-                        .WithMany("GuidedTours")
-                        .HasForeignKey("GuideUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
-                        .WithMany("Tours")
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GuideUser");
-
-                    b.Navigation("Organization");
-                });
-
-            modelBuilder.Entity("Tripflow.Api.Data.Entities.TourPortalEntity", b =>
-                {
-                    b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
-                        .WithMany("Portals")
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Tripflow.Api.Data.Entities.TourEntity", "Tour")
-                        .WithOne("Portal")
-                        .HasForeignKey("Tripflow.Api.Data.Entities.TourPortalEntity", "TourId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("Tour");
-                });
-
             modelBuilder.Entity("Tripflow.Api.Data.Entities.UserEntity", b =>
                 {
                     b.HasOne("Tripflow.Api.Data.Entities.OrganizationEntity", "Organization")
@@ -438,9 +438,18 @@ namespace Tripflow.Api.Data.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("Tripflow.Api.Data.Entities.EventEntity", b =>
+                {
+                    b.Navigation("Participants");
+
+                    b.Navigation("Portal");
+                });
+
             modelBuilder.Entity("Tripflow.Api.Data.Entities.OrganizationEntity", b =>
                 {
                     b.Navigation("CheckIns");
+
+                    b.Navigation("Events");
 
                     b.Navigation("ParticipantAccesses");
 
@@ -450,21 +459,12 @@ namespace Tripflow.Api.Data.Migrations
 
                     b.Navigation("Portals");
 
-                    b.Navigation("Tours");
-
                     b.Navigation("Users");
-                });
-
-            modelBuilder.Entity("Tripflow.Api.Data.Entities.TourEntity", b =>
-                {
-                    b.Navigation("Participants");
-
-                    b.Navigation("Portal");
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.UserEntity", b =>
                 {
-                    b.Navigation("GuidedTours");
+                    b.Navigation("GuidedEvents");
                 });
 #pragma warning restore 612, 618
         }
