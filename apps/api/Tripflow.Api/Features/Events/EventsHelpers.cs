@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 
-namespace Tripflow.Api.Features.Tours;
+namespace Tripflow.Api.Features.Events;
 
-internal static class ToursHelpers
+internal static class EventsHelpers
 {
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -17,11 +17,11 @@ internal static class ToursHelpers
     internal static bool TryParseDate(string? value, out DateOnly date)
         => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
-    internal static bool TryParseTourId(string tourIdValue, out Guid tourId, out IResult? error)
+    internal static bool TryParseEventId(string eventIdValue, out Guid eventId, out IResult? error)
     {
-        if (!Guid.TryParse(tourIdValue, out tourId))
+        if (!Guid.TryParse(eventIdValue, out eventId))
         {
-            error = BadRequest("Invalid tour id.");
+            error = BadRequest("Invalid event id.");
             return false;
         }
 
@@ -29,18 +29,18 @@ internal static class ToursHelpers
         return true;
     }
 
-    internal static TourDto ToDto(TourEntity entity)
+    internal static EventDto ToDto(EventEntity entity)
         => new(entity.Id,
             entity.Name,
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
             entity.GuideUserId);
 
-    internal static TourPortalInfo? TryDeserializePortal(string json)
+    internal static EventPortalInfo? TryDeserializePortal(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<TourPortalInfo>(json, JsonOptions);
+            return JsonSerializer.Deserialize<EventPortalInfo>(json, JsonOptions);
         }
         catch
         {
@@ -48,17 +48,17 @@ internal static class ToursHelpers
         }
     }
 
-    internal static TourPortalInfo CreateDefaultPortalInfo(TourDto tour)
+    internal static EventPortalInfo CreateDefaultPortalInfo(EventDto eventDto)
     {
         var meeting = new MeetingInfo(
             "08:30",
             "Hotel lobby - Grand Central Hotel",
             "https://maps.google.com/?q=Grand+Central+Hotel",
-            $"Welcome to {tour.Name}. Please arrive 15 minutes early.");
+            $"Welcome to {eventDto.Name}. Please arrive 15 minutes early.");
 
         var links = new[]
         {
-            new LinkInfo("Tour info pack", "https://example.com/tripflow/tour-pack"),
+            new LinkInfo("Event info pack", "https://example.com/tripflow/event-pack"),
             new LinkInfo("Emergency contacts", "https://example.com/tripflow/emergency"),
             new LinkInfo("Feedback form", "https://example.com/tripflow/feedback")
         };
@@ -73,7 +73,7 @@ internal static class ToursHelpers
             }),
             new DayPlan(2, "Signature sights", new[]
             {
-                "Morning guided tour",
+                "Morning guided visit",
                 "Free time for lunch",
                 "Museum visit"
             }),
@@ -92,7 +92,7 @@ internal static class ToursHelpers
             "Share dietary restrictions with the guide."
         };
 
-        return new TourPortalInfo(meeting, links, days, notes);
+        return new EventPortalInfo(meeting, links, days, notes);
     }
 
     internal static async Task<string> GenerateUniqueCheckInCodeAsync(TripflowDbContext db, CancellationToken ct)

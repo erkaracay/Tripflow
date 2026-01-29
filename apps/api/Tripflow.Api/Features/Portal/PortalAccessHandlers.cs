@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
-using Tripflow.Api.Features.Tours;
+using Tripflow.Api.Features.Events;
 
 namespace Tripflow.Api.Features.Portal;
 
@@ -19,9 +19,9 @@ internal static class PortalAccessHandlers
             return Results.BadRequest(new { message = "pt token is required." });
         }
 
-        if (!Guid.TryParse(request.TourId, out var tourId))
+        if (!Guid.TryParse(request.EventId, out var eventId))
         {
-            return Results.BadRequest(new { message = "tourId is required." });
+            return Results.BadRequest(new { message = "eventId is required." });
         }
 
         if (!PortalAccessHelpers.TryParseToken(request.Pt, out var tokenId, out var secret))
@@ -44,7 +44,7 @@ internal static class PortalAccessHandlers
             return Results.NotFound();
         }
 
-        if (participant.TourId != tourId)
+        if (participant.EventId != eventId)
         {
             return Results.NotFound();
         }
@@ -65,14 +65,14 @@ internal static class PortalAccessHandlers
             : Math.Max(0, PortalAccessHelpers.MaxAttempts - participant.PortalFailedAttempts);
 
         var policy = BuildPolicy(org);
-        var portal = await GetPortalInfoAsync(db, participant.TourId, participant.OrganizationId, ct);
+        var portal = await GetPortalInfoAsync(db, participant.EventId, participant.OrganizationId, ct);
         if (portal is null)
         {
             return Results.NotFound();
         }
 
         var response = new PortalAccessVerifyResponse(
-            participant.TourId,
+            participant.EventId,
             portal,
             policy,
             BuildParticipantSummary(participant),
@@ -94,9 +94,9 @@ internal static class PortalAccessHandlers
             return Results.BadRequest(new { message = "pt token is required." });
         }
 
-        if (!Guid.TryParse(request.TourId, out var tourId))
+        if (!Guid.TryParse(request.EventId, out var eventId))
         {
-            return Results.BadRequest(new { message = "tourId is required." });
+            return Results.BadRequest(new { message = "eventId is required." });
         }
 
         if (!PortalAccessHelpers.TryParseToken(request.Pt, out var tokenId, out var secret))
@@ -119,7 +119,7 @@ internal static class PortalAccessHandlers
             return Results.NotFound();
         }
 
-        if (participant.TourId != tourId)
+        if (participant.EventId != eventId)
         {
             return Results.NotFound();
         }
@@ -220,7 +220,7 @@ internal static class PortalAccessHandlers
             .AnyAsync(x => x.ParticipantId == participant.Id && x.OrganizationId == participant.OrganizationId, ct);
 
         return Results.Ok(new PortalAccessMeResponse(
-            participant.TourId,
+            participant.EventId,
             participant.Id,
             participant.FullName,
             participant.CheckInCode,
@@ -229,20 +229,20 @@ internal static class PortalAccessHandlers
     }
 
     internal static async Task<IResult> GetParticipantAccess(
-        string tourId,
+        string eventId,
         string participantId,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var tourGuid, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
         {
             return error!;
         }
 
         if (!Guid.TryParse(participantId, out var participantGuid))
         {
-            return ToursHelpers.BadRequest("Invalid participant id.");
+            return EventsHelpers.BadRequest("Invalid participant id.");
         }
 
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -251,7 +251,7 @@ internal static class PortalAccessHandlers
         }
 
         var participant = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == tourGuid && x.OrganizationId == orgId, ct);
+            x => x.Id == participantGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
 
         if (participant is null)
         {
@@ -287,20 +287,20 @@ internal static class PortalAccessHandlers
     }
 
     internal static async Task<IResult> ResetParticipantAccess(
-        string tourId,
+        string eventId,
         string participantId,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var tourGuid, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
         {
             return error!;
         }
 
         if (!Guid.TryParse(participantId, out var participantGuid))
         {
-            return ToursHelpers.BadRequest("Invalid participant id.");
+            return EventsHelpers.BadRequest("Invalid participant id.");
         }
 
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -309,7 +309,7 @@ internal static class PortalAccessHandlers
         }
 
         var participant = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == tourGuid && x.OrganizationId == orgId, ct);
+            x => x.Id == participantGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
 
         if (participant is null)
         {
@@ -410,27 +410,27 @@ internal static class PortalAccessHandlers
         return new PortalParticipantSummary(masked, !string.IsNullOrWhiteSpace(participant.Phone));
     }
 
-    private static async Task<TourPortalInfo?> GetPortalInfoAsync(
+    private static async Task<EventPortalInfo?> GetPortalInfoAsync(
         TripflowDbContext db,
-        Guid tourId,
+        Guid eventId,
         Guid organizationId,
         CancellationToken ct)
     {
-        var tour = await db.Tours.AsNoTracking().FirstOrDefaultAsync(x => x.Id == tourId, ct);
-        if (tour is null)
+        var eventEntity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == eventId, ct);
+        if (eventEntity is null)
         {
             return null;
         }
 
-        var portalEntity = await db.TourPortals.FirstOrDefaultAsync(x => x.TourId == tourId, ct);
+        var portalEntity = await db.EventPortals.FirstOrDefaultAsync(x => x.EventId == eventId, ct);
         if (portalEntity is null)
         {
-            var fallback = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
-            var json = System.Text.Json.JsonSerializer.Serialize(fallback, ToursHelpers.JsonOptions);
+            var fallback = EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(eventEntity));
+            var json = System.Text.Json.JsonSerializer.Serialize(fallback, EventsHelpers.JsonOptions);
 
-            db.TourPortals.Add(new TourPortalEntity
+            db.EventPortals.Add(new EventPortalEntity
             {
-                TourId = tourId,
+                EventId = eventId,
                 OrganizationId = organizationId,
                 PortalJson = json,
                 UpdatedAt = DateTime.UtcNow
@@ -440,11 +440,11 @@ internal static class PortalAccessHandlers
             return fallback;
         }
 
-        var portal = ToursHelpers.TryDeserializePortal(portalEntity.PortalJson);
+        var portal = EventsHelpers.TryDeserializePortal(portalEntity.PortalJson);
         if (portal is null)
         {
-            portal = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
-            portalEntity.PortalJson = System.Text.Json.JsonSerializer.Serialize(portal, ToursHelpers.JsonOptions);
+            portal = EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(eventEntity));
+            portalEntity.PortalJson = System.Text.Json.JsonSerializer.Serialize(portal, EventsHelpers.JsonOptions);
             portalEntity.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
         }

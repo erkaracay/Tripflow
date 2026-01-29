@@ -11,5 +11,5 @@ public sealed class UserEntity
     public string Role { get; set; } = default!;
     public DateTime CreatedAt { get; set; }
 
-    public List<TourEntity> GuidedTours { get; set; } = new();
+    public List<EventEntity> GuidedEvents { get; set; } = new();
 }

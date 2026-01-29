@@ -7,11 +7,11 @@ public sealed class TripflowDbContext : DbContext
 {
     public DbSet<OrganizationEntity> Organizations => Set<OrganizationEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
-    public DbSet<TourEntity> Tours => Set<TourEntity>();
+    public DbSet<EventEntity> Events => Set<EventEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantAccessEntity> ParticipantAccesses => Set<ParticipantAccessEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
-    public DbSet<TourPortalEntity> TourPortals => Set<TourPortalEntity>();
+    public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
     public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
@@ -27,7 +27,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Slug).HasMaxLength(64).IsRequired();
             b.Property(x => x.IsActive).IsRequired();
             b.Property(x => x.IsDeleted).IsRequired();
-            b.Property(x => x.RequireLast4ForQr).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.RequireLast4ForQr).IsRequired().HasDefaultValue(false);
             b.Property(x => x.RequireLast4ForPortal).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CreatedAt).IsRequired();
             b.Property(x => x.UpdatedAt).IsRequired();
@@ -55,9 +55,9 @@ public sealed class TripflowDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<TourEntity>(b =>
+        modelBuilder.Entity<EventEntity>(b =>
         {
-            b.ToTable("tours");
+            b.ToTable("events");
             b.HasKey(x => x.Id);
 
             b.Property(x => x.OrganizationId).IsRequired();
@@ -69,23 +69,23 @@ public sealed class TripflowDbContext : DbContext
             b.HasIndex(x => new { x.OrganizationId, x.StartDate });
 
             b.HasOne(x => x.Organization)
-                .WithMany(x => x.Tours)
+                .WithMany(x => x.Events)
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             b.HasOne(x => x.GuideUser)
-                .WithMany(x => x.GuidedTours)
+                .WithMany(x => x.GuidedEvents)
                 .HasForeignKey(x => x.GuideUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             b.HasMany(x => x.Participants)
-                .WithOne(x => x.Tour)
-                .HasForeignKey(x => x.TourId)
+                .WithOne(x => x.Event)
+                .HasForeignKey(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             b.HasOne(x => x.Portal)
-                .WithOne(x => x.Tour)
-                .HasForeignKey<TourPortalEntity>(x => x.TourId)
+                .WithOne(x => x.Event)
+                .HasForeignKey<EventPortalEntity>(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -107,7 +107,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.PortalLastFailedAt);
 
             b.Property(x => x.CreatedAt).IsRequired();
-            b.HasIndex(x => x.TourId);
+            b.HasIndex(x => x.EventId);
             b.HasIndex(x => x.OrganizationId);
 
             b.HasOne(x => x.Organization)
@@ -167,10 +167,10 @@ public sealed class TripflowDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<TourPortalEntity>(b =>
+        modelBuilder.Entity<EventPortalEntity>(b =>
         {
-            b.ToTable("tour_portals");
-            b.HasKey(x => x.TourId);
+            b.ToTable("event_portals");
+            b.HasKey(x => x.EventId);
 
             b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.PortalJson).HasColumnType("jsonb").IsRequired();
@@ -193,10 +193,10 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Method).HasMaxLength(16).IsRequired();
             b.Property(x => x.CheckedInAt).IsRequired();
 
-            b.HasIndex(x => x.TourId);
+            b.HasIndex(x => x.EventId);
             b.HasIndex(x => x.ParticipantId);
             b.HasIndex(x => x.OrganizationId);
-            b.HasIndex(x => new { x.TourId, x.ParticipantId }).IsUnique();
+            b.HasIndex(x => new { x.EventId, x.ParticipantId }).IsUnique();
 
             b.HasOne(x => x.Organization)
                 .WithMany(x => x.CheckIns)

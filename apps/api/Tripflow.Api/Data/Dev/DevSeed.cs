@@ -126,36 +126,36 @@ public static class DevSeed
 
         await db.SaveChangesAsync(ct);
 
-        var tourA1 = await GetOrCreateTour(db, orgA.Id, "Kapadokya Bahar Turu", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, state);
-        var tourA2 = await GetOrCreateTour(db, orgA.Id, "Ege Kiyilari Hafta Sonu", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, state);
+        var eventA1 = await GetOrCreateEvent(db, orgA.Id, "Kapadokya Bahar Etkinliği", new DateOnly(2026, 1, 10), new DateOnly(2026, 1, 12), guideA.Id, now, ct, state);
+        var eventA2 = await GetOrCreateEvent(db, orgA.Id, "Ege Kıyıları Hafta Sonu", new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 2), guideA.Id, now, ct, state);
 
-        var tourB1 = await GetOrCreateTour(db, orgB.Id, "Karadeniz Yayla Rotasi", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, state);
-        var tourB2 = await GetOrCreateTour(db, orgB.Id, "Istanbul Tarih Turu", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, state);
+        var eventB1 = await GetOrCreateEvent(db, orgB.Id, "Karadeniz Yayla Rotası", new DateOnly(2026, 3, 10), new DateOnly(2026, 3, 12), guideB.Id, now, ct, state);
+        var eventB2 = await GetOrCreateEvent(db, orgB.Id, "İstanbul Tarih Etkinliği", new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 2), guideB.Id, now, ct, state);
 
         await db.SaveChangesAsync(ct);
 
-        await EnsurePortalAsync(db, tourA1, orgA.Id, now, ct, state);
-        await EnsurePortalAsync(db, tourA2, orgA.Id, now, ct, state);
-        await EnsurePortalAsync(db, tourB1, orgB.Id, now, ct, state);
-        await EnsurePortalAsync(db, tourB2, orgB.Id, now, ct, state);
+        await EnsurePortalAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsurePortalAsync(db, eventA2, orgA.Id, now, ct, state);
+        await EnsurePortalAsync(db, eventB1, orgB.Id, now, ct, state);
+        await EnsurePortalAsync(db, eventB2, orgB.Id, now, ct, state);
 
-        await EnsureParticipantsAsync(db, tourA1, orgA.Id, "A1", 30, now, ct, state);
-        await EnsureParticipantsAsync(db, tourA2, orgA.Id, "A2", 30, now, ct, state);
-        await EnsureParticipantsAsync(db, tourB1, orgB.Id, "B1", 30, now, ct, state);
-        await EnsureParticipantsAsync(db, tourB2, orgB.Id, "B2", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, eventA1, orgA.Id, "A1", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, eventA2, orgA.Id, "A2", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, eventB1, orgB.Id, "B1", 30, now, ct, state);
+        await EnsureParticipantsAsync(db, eventB2, orgB.Id, "B2", 30, now, ct, state);
 
-        await EnsureParticipantAccessAsync(db, tourA1, orgA.Id, now, ct, state);
-        await EnsureParticipantAccessAsync(db, tourA2, orgA.Id, now, ct, state);
-        await EnsureParticipantAccessAsync(db, tourB1, orgB.Id, now, ct, state);
-        await EnsureParticipantAccessAsync(db, tourB2, orgB.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, eventA2, orgA.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, eventB1, orgB.Id, now, ct, state);
+        await EnsureParticipantAccessAsync(db, eventB2, orgB.Id, now, ct, state);
 
-        await EnsureCheckInsAsync(db, tourA1, orgA.Id, now, ct, state);
-        await EnsureCheckInsAsync(db, tourB1, orgB.Id, now, ct, state);
+        await EnsureCheckInsAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsureCheckInsAsync(db, eventB1, orgB.Id, now, ct, state);
 
         await db.SaveChangesAsync(ct);
 
         var message = state.Seeded
-            ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 tour, 120 participant, check-in örnekleri."
+            ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 etkinlik, 120 katılımcı, check-in örnekleri."
             : "Seed zaten yapılmış. Mevcut demo kayıtları korundu.";
 
         return (state.Seeded, message);
@@ -179,9 +179,9 @@ public static class DevSeed
                 updated = true;
             }
 
-            if (!org.RequireLast4ForQr)
+            if (org.RequireLast4ForQr)
             {
-                org.RequireLast4ForQr = true;
+                org.RequireLast4ForQr = false;
                 updated = true;
             }
 
@@ -219,7 +219,7 @@ public static class DevSeed
             Slug = slug,
             IsActive = true,
             IsDeleted = false,
-            RequireLast4ForQr = true,
+            RequireLast4ForQr = false,
             RequireLast4ForPortal = false,
             CreatedAt = now,
             UpdatedAt = now
@@ -292,7 +292,7 @@ public static class DevSeed
         return user;
     }
 
-    private static async Task<TourEntity> GetOrCreateTour(
+    private static async Task<EventEntity> GetOrCreateEvent(
         TripflowDbContext db,
         Guid organizationId,
         string name,
@@ -303,19 +303,19 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
-        var tour = await db.Tours.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
-        if (tour is not null)
+        var eventEntity = await db.Events.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
+        if (eventEntity is not null)
         {
-            if (tour.GuideUserId != guideUserId)
+            if (eventEntity.GuideUserId != guideUserId)
             {
-                tour.GuideUserId = guideUserId;
-                db.Tours.Update(tour);
+                eventEntity.GuideUserId = guideUserId;
+                db.Events.Update(eventEntity);
                 state.Seeded = true;
             }
-            return tour;
+            return eventEntity;
         }
 
-        tour = new TourEntity
+        eventEntity = new EventEntity
         {
             Id = Guid.NewGuid(),
             OrganizationId = organizationId,
@@ -326,30 +326,30 @@ public static class DevSeed
             GuideUserId = guideUserId
         };
 
-        db.Tours.Add(tour);
+        db.Events.Add(eventEntity);
         state.Seeded = true;
-        return tour;
+        return eventEntity;
     }
 
     private static async Task EnsurePortalAsync(
         TripflowDbContext db,
-        TourEntity tour,
+        EventEntity eventEntity,
         Guid organizationId,
         DateTime now,
         CancellationToken ct,
         SeedState state)
     {
-        var portalExists = await db.TourPortals.AnyAsync(x => x.TourId == tour.Id, ct);
+        var portalExists = await db.EventPortals.AnyAsync(x => x.EventId == eventEntity.Id, ct);
         if (portalExists)
         {
             return;
         }
 
-        db.TourPortals.Add(new TourPortalEntity
+        db.EventPortals.Add(new EventPortalEntity
         {
-            TourId = tour.Id,
+            EventId = eventEntity.Id,
             OrganizationId = organizationId,
-            PortalJson = CreatePortalJson(tour.Name, "09:00", "Lobby", "https://maps.google.com/?q=Lobby"),
+            PortalJson = CreatePortalJson(eventEntity.Name, "09:00", "Lobby", "https://maps.google.com/?q=Lobby"),
             UpdatedAt = now
         });
         state.Seeded = true;
@@ -357,7 +357,7 @@ public static class DevSeed
 
     private static async Task EnsureParticipantsAsync(
         TripflowDbContext db,
-        TourEntity tour,
+        EventEntity eventEntity,
         Guid organizationId,
         string prefix,
         int count,
@@ -365,7 +365,7 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
-        var existing = await db.Participants.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
+        var existing = await db.Participants.AsNoTracking().AnyAsync(x => x.EventId == eventEntity.Id, ct);
         if (existing)
         {
             return;
@@ -380,7 +380,7 @@ public static class DevSeed
             participants.Add(new ParticipantEntity
             {
                 Id = Guid.NewGuid(),
-                TourId = tour.Id,
+                EventId = eventEntity.Id,
                 OrganizationId = organizationId,
                 FullName = name,
                 Email = BuildDemoEmail(prefix, i),
@@ -396,20 +396,20 @@ public static class DevSeed
 
     private static async Task EnsureCheckInsAsync(
         TripflowDbContext db,
-        TourEntity tour,
+        EventEntity eventEntity,
         Guid organizationId,
         DateTime now,
         CancellationToken ct,
         SeedState state)
     {
-        var alreadyCheckedIn = await db.CheckIns.AsNoTracking().AnyAsync(x => x.TourId == tour.Id, ct);
+        var alreadyCheckedIn = await db.CheckIns.AsNoTracking().AnyAsync(x => x.EventId == eventEntity.Id, ct);
         if (alreadyCheckedIn)
         {
             return;
         }
 
         var participants = await db.Participants.AsNoTracking()
-            .Where(x => x.TourId == tour.Id)
+            .Where(x => x.EventId == eventEntity.Id)
             .OrderBy(x => x.FullName)
             .Take(5)
             .ToListAsync(ct);
@@ -420,7 +420,7 @@ public static class DevSeed
             db.CheckIns.Add(new CheckInEntity
             {
                 Id = Guid.NewGuid(),
-                TourId = tour.Id,
+                EventId = eventEntity.Id,
                 ParticipantId = participant.Id,
                 OrganizationId = organizationId,
                 CheckedInAt = now.AddMinutes(-(i + 1)),
@@ -436,14 +436,14 @@ public static class DevSeed
 
     private static async Task EnsureParticipantAccessAsync(
         TripflowDbContext db,
-        TourEntity tour,
+        EventEntity eventEntity,
         Guid organizationId,
         DateTime now,
         CancellationToken ct,
         SeedState state)
     {
         var participants = await db.Participants.AsNoTracking()
-            .Where(x => x.TourId == tour.Id && x.OrganizationId == organizationId)
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId)
             .ToListAsync(ct);
 
         if (participants.Count == 0)
@@ -496,7 +496,7 @@ public static class DevSeed
         }
     }
 
-    private static string CreatePortalJson(string tourName, string time, string place, string mapsUrl)
+    private static string CreatePortalJson(string eventName, string time, string place, string mapsUrl)
     {
         var obj = new
         {
@@ -505,7 +505,7 @@ public static class DevSeed
                 time,
                 place,
                 mapsUrl,
-                note = $"Welcome to {tourName}. Please arrive 15 minutes early."
+                note = $"Welcome to {eventName}. Please arrive 15 minutes early."
             },
             links = new[]
             {

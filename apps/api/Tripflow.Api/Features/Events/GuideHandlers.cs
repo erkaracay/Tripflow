@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Features.Organizations;
 
-namespace Tripflow.Api.Features.Tours;
+namespace Tripflow.Api.Features.Events;
 
 internal static class GuideHandlers
 {
-    internal static async Task<IResult> GetTours(
+    internal static async Task<IResult> GetEvents(
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
@@ -25,24 +25,24 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        var tours = await db.Tours.AsNoTracking()
+        var events = await db.Events.AsNoTracking()
             .Where(x => x.GuideUserId == userId && x.OrganizationId == orgId)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
-            .Select(x => new TourListItemDto(
+            .Select(x => new EventListItemDto(
                 x.Id,
                 x.Name,
                 x.StartDate.ToString("yyyy-MM-dd"),
                 x.EndDate.ToString("yyyy-MM-dd"),
-                db.CheckIns.Count(c => c.TourId == x.Id),
-                db.Participants.Count(p => p.TourId == x.Id),
+                db.CheckIns.Count(c => c.EventId == x.Id),
+                db.Participants.Count(p => p.EventId == x.Id),
                 x.GuideUserId))
             .ToArrayAsync(ct);
 
-        return Results.Ok(tours);
+        return Results.Ok(events);
     }
 
     internal static async Task<IResult> GetParticipants(
-        string tourId,
+        string eventId,
         string? query,
         HttpContext httpContext,
         ClaimsPrincipal user,
@@ -59,20 +59,20 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
         {
             return parseError!;
         }
 
-        var hasAccess = await db.Tours.AsNoTracking()
+        var hasAccess = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
         if (!hasAccess)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
-            .Where(x => x.TourId == id && x.OrganizationId == orgId);
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var search = query?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
@@ -85,7 +85,7 @@ internal static class GuideHandlers
         }
 
         var checkinsQuery = db.CheckIns.AsNoTracking()
-            .Where(x => x.TourId == id && x.OrganizationId == orgId);
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var participants = await participantsQuery
             .OrderBy(x => x.FullName)
@@ -106,7 +106,7 @@ internal static class GuideHandlers
     }
 
     internal static async Task<IResult> ResolveParticipantByCode(
-        string tourId,
+        string eventId,
         string? code,
         HttpContext httpContext,
         ClaimsPrincipal user,
@@ -123,16 +123,16 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
         {
             return parseError!;
         }
 
-        var hasAccess = await db.Tours.AsNoTracking()
+        var hasAccess = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
         if (!hasAccess)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var normalized = NormalizeCheckInCode(code);
@@ -142,14 +142,14 @@ internal static class GuideHandlers
         }
 
         var participant = await db.Participants.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.TourId == id && x.OrganizationId == orgId && x.CheckInCode == normalized, ct);
+            .FirstOrDefaultAsync(x => x.EventId == id && x.OrganizationId == orgId && x.CheckInCode == normalized, ct);
         if (participant is null)
         {
             return Results.NotFound(new { message = "Participant not found." });
         }
 
         var arrived = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.ParticipantId == participant.Id && x.TourId == id && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.ParticipantId == participant.Id && x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new ParticipantResolveDto(
             participant.Id,
@@ -159,7 +159,7 @@ internal static class GuideHandlers
     }
 
     internal static async Task<IResult> GetCheckInSummary(
-        string tourId,
+        string eventId,
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
@@ -175,28 +175,28 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
         {
             return parseError!;
         }
 
-        var hasAccess = await db.Tours.AsNoTracking()
+        var hasAccess = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
         if (!hasAccess)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> CheckInByCode(
-        string tourId,
+        string eventId,
         CheckInCodeRequest request,
         HttpContext httpContext,
         ClaimsPrincipal user,
@@ -213,23 +213,23 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
         {
             return parseError!;
         }
 
-        var hasAccess = await db.Tours.AsNoTracking()
+        var hasAccess = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
         if (!hasAccess)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
-        return await ToursHandlers.CheckInByCodeForOrg(orgId, tourId, request, db, ct);
+        return await EventsHandlers.CheckInByCodeForOrg(orgId, eventId, request, db, ct);
     }
 
     internal static async Task<IResult> UndoCheckIn(
-        string tourId,
+        string eventId,
         CheckInUndoRequest request,
         HttpContext httpContext,
         ClaimsPrincipal user,
@@ -246,19 +246,19 @@ internal static class GuideHandlers
             return orgError!;
         }
 
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var parseError))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
         {
             return parseError!;
         }
 
-        var hasAccess = await db.Tours.AsNoTracking()
+        var hasAccess = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
         if (!hasAccess)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
-        return await ToursHandlers.UndoCheckInForOrg(orgId, tourId, request, db, ct);
+        return await EventsHandlers.UndoCheckInForOrg(orgId, eventId, request, db, ct);
     }
 
     private static bool TryGetUserId(ClaimsPrincipal user, out Guid userId, out IResult? error)

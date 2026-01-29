@@ -77,7 +77,7 @@ internal static class OrganizationsHandlers
             Slug = slug,
             IsActive = true,
             IsDeleted = false,
-            RequireLast4ForQr = request.RequireLast4ForQr ?? true,
+            RequireLast4ForQr = request.RequireLast4ForQr ?? false,
             RequireLast4ForPortal = request.RequireLast4ForPortal ?? false,
             CreatedAt = now,
             UpdatedAt = now
@@ -161,8 +161,8 @@ internal static class OrganizationsHandlers
             return Results.NotFound();
         }
 
-        var hasTours = await db.Tours.AnyAsync(x => x.OrganizationId == orgId, ct);
-        if (hasTours)
+        var hasEvents = await db.Events.AnyAsync(x => x.OrganizationId == orgId, ct);
+        if (hasEvents)
         {
             return Results.BadRequest(new { message = "Org has active data." });
         }

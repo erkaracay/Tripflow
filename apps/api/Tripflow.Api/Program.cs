@@ -10,7 +10,7 @@ using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Auth;
 using Tripflow.Api.Features.Organizations;
 using Tripflow.Api.Features.Portal;
-using Tripflow.Api.Features.Tours;
+using Tripflow.Api.Features.Events;
 using Tripflow.Api.Features.Users;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -183,7 +183,7 @@ app.MapAuthEndpoints();
 app.MapOrganizationEndpoints();
 app.MapGuideEndpoints();
 app.MapUsersEndpoints();
-app.MapToursEndpoints();
+app.MapEventsEndpoints();
 app.MapPortalAccessEndpoints();
 
 app.Run();

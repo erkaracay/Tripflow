@@ -1,10 +1,10 @@
-namespace Tripflow.Api.Features.Tours;
+namespace Tripflow.Api.Features.Events;
 
-public sealed record CreateTourRequest(string? Name, string? StartDate, string? EndDate);
-public sealed record UpdateTourRequest(string? Name, string? StartDate, string? EndDate);
+public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate);
+public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
 
-public sealed record TourDto(Guid Id, string Name, string StartDate, string EndDate, Guid? GuideUserId);
-public sealed record TourListItemDto(
+public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, Guid? GuideUserId);
+public sealed record EventListItemDto(
     Guid Id,
     string Name,
     string StartDate,
@@ -13,7 +13,7 @@ public sealed record TourListItemDto(
     int TotalCount,
     Guid? GuideUserId);
 
-public sealed record TourPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
+public sealed record EventPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
 public sealed record MeetingInfo(string Time, string Place, string MapsUrl, string Note);
 public sealed record LinkInfo(string Label, string Url);
 public sealed record DayPlan(int Day, string Title, string[] Items);

@@ -4,35 +4,35 @@ using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
 
-namespace Tripflow.Api.Features.Tours;
+namespace Tripflow.Api.Features.Events;
 
-internal static class ToursHandlers
+internal static class EventsHandlers
 {
-    internal static async Task<IResult> GetTours(HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetEvents(HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var error))
         {
             return error!;
         }
 
-        var tours = await db.Tours.AsNoTracking()
+        var events = await db.Events.AsNoTracking()
             .Where(x => x.OrganizationId == orgId)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
-            .Select(x => new TourListItemDto(
+            .Select(x => new EventListItemDto(
                 x.Id,
                 x.Name,
                 x.StartDate.ToString("yyyy-MM-dd"),
                 x.EndDate.ToString("yyyy-MM-dd"),
-                db.CheckIns.Count(c => c.TourId == x.Id),
-                db.Participants.Count(p => p.TourId == x.Id),
+                db.CheckIns.Count(c => c.EventId == x.Id),
+                db.Participants.Count(p => p.EventId == x.Id),
                 x.GuideUserId))
             .ToArrayAsync(ct);
 
-        return Results.Ok(tours);
+        return Results.Ok(events);
     }
 
-    internal static async Task<IResult> CreateTour(
-        CreateTourRequest request,
+    internal static async Task<IResult> CreateEvent(
+        CreateEventRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
@@ -45,25 +45,25 @@ internal static class ToursHandlers
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
-            return ToursHelpers.BadRequest("Name is required.");
+            return EventsHelpers.BadRequest("Name is required.");
         }
 
-        if (!ToursHelpers.TryParseDate(request.StartDate, out var startDate))
+        if (!EventsHelpers.TryParseDate(request.StartDate, out var startDate))
         {
-            return ToursHelpers.BadRequest("Start date must be in YYYY-MM-DD format.");
+            return EventsHelpers.BadRequest("Start date must be in YYYY-MM-DD format.");
         }
 
-        if (!ToursHelpers.TryParseDate(request.EndDate, out var endDate))
+        if (!EventsHelpers.TryParseDate(request.EndDate, out var endDate))
         {
-            return ToursHelpers.BadRequest("End date must be in YYYY-MM-DD format.");
+            return EventsHelpers.BadRequest("End date must be in YYYY-MM-DD format.");
         }
 
         if (endDate < startDate)
         {
-            return ToursHelpers.BadRequest("End date must be on or after start date.");
+            return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
-        var entity = new TourEntity
+        var entity = new EventEntity
         {
             Id = Guid.NewGuid(),
             OrganizationId = orgId,
@@ -74,31 +74,31 @@ internal static class ToursHandlers
         };
 
         var portalJson = System.Text.Json.JsonSerializer.Serialize(
-            ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(entity)),
-            ToursHelpers.JsonOptions);
+            EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(entity)),
+            EventsHelpers.JsonOptions);
 
-        db.Tours.Add(entity);
-        db.TourPortals.Add(new TourPortalEntity
+        db.Events.Add(entity);
+        db.EventPortals.Add(new EventPortalEntity
         {
-            TourId = entity.Id,
+            EventId = entity.Id,
             OrganizationId = orgId,
             PortalJson = portalJson,
             UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync(ct);
 
-        var dto = ToursHelpers.ToDto(entity);
-        return Results.Created($"/api/tours/{dto.Id}", dto);
+        var dto = EventsHelpers.ToDto(entity);
+        return Results.Created($"/api/events/{dto.Id}", dto);
     }
 
-    internal static async Task<IResult> UpdateTour(
-        string tourId,
-        UpdateTourRequest request,
+    internal static async Task<IResult> UpdateEvent(
+        string eventId,
+        UpdateEventRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -110,34 +110,34 @@ internal static class ToursHandlers
 
         if (request is null)
         {
-            return ToursHelpers.BadRequest("Request body is required.");
+            return EventsHelpers.BadRequest("Request body is required.");
         }
 
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
-            return ToursHelpers.BadRequest("Name is required.");
+            return EventsHelpers.BadRequest("Name is required.");
         }
 
-        if (!ToursHelpers.TryParseDate(request.StartDate, out var startDate))
+        if (!EventsHelpers.TryParseDate(request.StartDate, out var startDate))
         {
-            return ToursHelpers.BadRequest("Start date must be in YYYY-MM-DD format.");
+            return EventsHelpers.BadRequest("Start date must be in YYYY-MM-DD format.");
         }
 
-        if (!ToursHelpers.TryParseDate(request.EndDate, out var endDate))
+        if (!EventsHelpers.TryParseDate(request.EndDate, out var endDate))
         {
-            return ToursHelpers.BadRequest("End date must be in YYYY-MM-DD format.");
+            return EventsHelpers.BadRequest("End date must be in YYYY-MM-DD format.");
         }
 
         if (endDate < startDate)
         {
-            return ToursHelpers.BadRequest("End date must be on or after start date.");
+            return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
-        var entity = await db.Tours.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (entity is null)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         entity.Name = name;
@@ -145,48 +145,48 @@ internal static class ToursHandlers
         entity.EndDate = endDate;
 
         await db.SaveChangesAsync(ct);
-        return Results.Ok(ToursHelpers.ToDto(entity));
+        return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
-    internal static async Task<IResult> GetTour(string tourId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetEvent(string eventId, TripflowDbContext db, CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
-        var entity = await db.Tours.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var entity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (entity is null)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
-        return Results.Ok(ToursHelpers.ToDto(entity));
+        return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
-    internal static async Task<IResult> GetPortal(string tourId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetPortal(string eventId, TripflowDbContext db, CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
-        var tour = await db.Tours.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (tour is null)
+        var eventEntity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (eventEntity is null)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
-        var portalEntity = await db.TourPortals.FirstOrDefaultAsync(x => x.TourId == id, ct);
+        var portalEntity = await db.EventPortals.FirstOrDefaultAsync(x => x.EventId == id, ct);
         if (portalEntity is null)
         {
-            var fallback = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
-            var json = System.Text.Json.JsonSerializer.Serialize(fallback, ToursHelpers.JsonOptions);
+            var fallback = EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(eventEntity));
+            var json = System.Text.Json.JsonSerializer.Serialize(fallback, EventsHelpers.JsonOptions);
 
-            db.TourPortals.Add(new TourPortalEntity
+            db.EventPortals.Add(new EventPortalEntity
             {
-                TourId = id,
-                OrganizationId = tour.OrganizationId,
+                EventId = id,
+                OrganizationId = eventEntity.OrganizationId,
                 PortalJson = json,
                 UpdatedAt = DateTime.UtcNow
             });
@@ -195,11 +195,11 @@ internal static class ToursHandlers
             return Results.Ok(fallback);
         }
 
-        var portal = ToursHelpers.TryDeserializePortal(portalEntity.PortalJson);
+        var portal = EventsHelpers.TryDeserializePortal(portalEntity.PortalJson);
         if (portal is null)
         {
-            portal = ToursHelpers.CreateDefaultPortalInfo(ToursHelpers.ToDto(tour));
-            portalEntity.PortalJson = System.Text.Json.JsonSerializer.Serialize(portal, ToursHelpers.JsonOptions);
+            portal = EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(eventEntity));
+            portalEntity.PortalJson = System.Text.Json.JsonSerializer.Serialize(portal, EventsHelpers.JsonOptions);
             portalEntity.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
         }
@@ -208,12 +208,12 @@ internal static class ToursHandlers
     }
 
     internal static async Task<IResult> VerifyCheckInCode(
-        string tourId,
+        string eventId,
         VerifyCheckInCodeRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -228,26 +228,26 @@ internal static class ToursHandlers
             return Results.Ok(new VerifyCheckInCodeResponse(false, null));
         }
 
-        var tourExists = await db.Tours.AsNoTracking().AnyAsync(x => x.Id == id, ct);
-        if (!tourExists)
+        var eventExists = await db.Events.AsNoTracking().AnyAsync(x => x.Id == id, ct);
+        if (!eventExists)
         {
             return Results.Ok(new VerifyCheckInCodeResponse(false, null));
         }
 
         var isValid = await db.Participants.AsNoTracking()
-            .AnyAsync(p => p.TourId == id && p.CheckInCode == normalized, ct);
+            .AnyAsync(p => p.EventId == id && p.CheckInCode == normalized, ct);
 
         return Results.Ok(new VerifyCheckInCodeResponse(isValid, isValid ? normalized : null));
     }
 
     internal static async Task<IResult> SavePortal(
-        string tourId,
-        TourPortalInfo request,
+        string eventId,
+        EventPortalInfo request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -257,39 +257,39 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tour = await db.Tours.AsNoTracking()
+        var eventEntity = await db.Events.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (tour is null)
+        if (eventEntity is null)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         if (request.Meeting is null)
         {
-            return ToursHelpers.BadRequest("Meeting details are required.");
+            return EventsHelpers.BadRequest("Meeting details are required.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Meeting.Time) ||
             string.IsNullOrWhiteSpace(request.Meeting.Place) ||
             string.IsNullOrWhiteSpace(request.Meeting.MapsUrl))
         {
-            return ToursHelpers.BadRequest("Meeting time/place/mapsUrl are required.");
+            return EventsHelpers.BadRequest("Meeting time/place/mapsUrl are required.");
         }
 
-        var json = System.Text.Json.JsonSerializer.Serialize(request, ToursHelpers.JsonOptions);
+        var json = System.Text.Json.JsonSerializer.Serialize(request, EventsHelpers.JsonOptions);
 
-        var portalEntity = await db.TourPortals
-            .FirstOrDefaultAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+        var portalEntity = await db.EventPortals
+            .FirstOrDefaultAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         if (portalEntity is null)
         {
-            portalEntity = new TourPortalEntity
+            portalEntity = new EventPortalEntity
             {
-                TourId = id,
+                EventId = id,
                 OrganizationId = orgId,
                 PortalJson = json,
                 UpdatedAt = DateTime.UtcNow
             };
-            db.TourPortals.Add(portalEntity);
+            db.EventPortals.Add(portalEntity);
         }
         else
         {
@@ -302,13 +302,13 @@ internal static class ToursHandlers
     }
 
     internal static async Task<IResult> AssignGuide(
-        string tourId,
+        string eventId,
         AssignGuideRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -320,13 +320,13 @@ internal static class ToursHandlers
 
         if (request is null || !request.GuideUserId.HasValue || request.GuideUserId == Guid.Empty)
         {
-            return ToursHelpers.BadRequest("Guide user id is required.");
+            return EventsHelpers.BadRequest("Guide user id is required.");
         }
 
-        var tour = await db.Tours.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (tour is null)
+        var eventEntity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (eventEntity is null)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var guideId = request.GuideUserId.Value;
@@ -335,23 +335,23 @@ internal static class ToursHandlers
 
         if (!guideExists)
         {
-            return ToursHelpers.BadRequest("Guide user not found.");
+            return EventsHelpers.BadRequest("Guide user not found.");
         }
 
-        tour.GuideUserId = guideId;
+        eventEntity.GuideUserId = guideId;
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { tourId = id, guideUserId = guideId });
+        return Results.Ok(new { eventId = id, guideUserId = guideId });
     }
 
     internal static async Task<IResult> GetParticipants(
-        string tourId,
+        string eventId,
         string? query,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -361,15 +361,15 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
-            .Where(x => x.TourId == id && x.OrganizationId == orgId);
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var search = query?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
@@ -382,7 +382,7 @@ internal static class ToursHandlers
         }
 
         var checkinsQuery = db.CheckIns.AsNoTracking()
-            .Where(x => x.TourId == id && x.OrganizationId == orgId);
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var participants = await participantsQuery
             .OrderBy(x => x.FullName)
@@ -403,13 +403,13 @@ internal static class ToursHandlers
     }
 
     internal static async Task<IResult> CreateParticipant(
-        string tourId,
+        string eventId,
         CreateParticipantRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -419,26 +419,26 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var fullName = request.FullName?.Trim();
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            return ToursHelpers.BadRequest("Full name is required.");
+            return EventsHelpers.BadRequest("Full name is required.");
         }
 
         var phone = request.Phone?.Trim();
         if (string.IsNullOrWhiteSpace(phone))
         {
-            return ToursHelpers.BadRequest("Phone is required.");
+            return EventsHelpers.BadRequest("Phone is required.");
         }
 
-        var code = await ToursHelpers.GenerateUniqueCheckInCodeAsync(db, ct);
+        var code = await EventsHelpers.GenerateUniqueCheckInCodeAsync(db, ct);
         if (string.IsNullOrWhiteSpace(code))
         {
             return Results.StatusCode(StatusCodes.Status500InternalServerError);
@@ -447,7 +447,7 @@ internal static class ToursHandlers
         var entity = new ParticipantEntity
         {
             Id = Guid.NewGuid(),
-            TourId = id,
+            EventId = id,
             OrganizationId = orgId,
             FullName = fullName,
             Email = request.Email?.Trim(),
@@ -467,31 +467,31 @@ internal static class ToursHandlers
             return Results.Conflict(new { message = "Participant could not be created. Try again." });
         }
 
-        return Results.Created($"/api/tours/{id}/participants/{entity.Id}",
+        return Results.Created($"/api/events/{id}/participants/{entity.Id}",
             new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, false));
     }
 
     internal static async Task<IResult> UpdateParticipant(
-        string tourId,
+        string eventId,
         string participantId,
         UpdateParticipantRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
         if (!Guid.TryParse(participantId, out var participantGuid))
         {
-            return ToursHelpers.BadRequest("Invalid participant id.");
+            return EventsHelpers.BadRequest("Invalid participant id.");
         }
 
         if (request is null)
         {
-            return ToursHelpers.BadRequest("Request body is required.");
+            return EventsHelpers.BadRequest("Request body is required.");
         }
 
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -499,15 +499,15 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var entity = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == id && x.OrganizationId == orgId, ct);
+            x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
 
         if (entity is null)
         {
@@ -517,14 +517,14 @@ internal static class ToursHandlers
         var fullName = request.FullName?.Trim();
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            return ToursHelpers.BadRequest("Full name is required.");
+            return EventsHelpers.BadRequest("Full name is required.");
         }
 
         var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
         var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
         if (string.IsNullOrWhiteSpace(phone))
         {
-            return ToursHelpers.BadRequest("Phone is required.");
+            return EventsHelpers.BadRequest("Phone is required.");
         }
 
         entity.FullName = fullName;
@@ -534,26 +534,26 @@ internal static class ToursHandlers
         await db.SaveChangesAsync(ct);
 
         var arrived = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.TourId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.EventId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, arrived));
     }
 
     internal static async Task<IResult> DeleteParticipant(
-        string tourId,
+        string eventId,
         string participantId,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
         if (!Guid.TryParse(participantId, out var participantGuid))
         {
-            return ToursHelpers.BadRequest("Invalid participant id.");
+            return EventsHelpers.BadRequest("Invalid participant id.");
         }
 
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -561,15 +561,15 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var entity = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.TourId == id && x.OrganizationId == orgId, ct);
+            x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
 
         if (entity is null)
         {
@@ -577,7 +577,7 @@ internal static class ToursHandlers
         }
 
         var checkIn = await db.CheckIns.FirstOrDefaultAsync(
-            x => x.TourId == id && x.ParticipantId == participantGuid && x.OrganizationId == orgId, ct);
+            x => x.EventId == id && x.ParticipantId == participantGuid && x.OrganizationId == orgId, ct);
         if (checkIn is not null)
         {
             db.CheckIns.Remove(checkIn);
@@ -590,7 +590,7 @@ internal static class ToursHandlers
     }
 
     internal static async Task<IResult> CheckIn(
-        string tourId,
+        string eventId,
         CheckInRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
@@ -601,26 +601,26 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        return await CheckInForOrg(orgId, tourId, request, db, ct);
+        return await CheckInForOrg(orgId, eventId, request, db, ct);
     }
 
     internal static async Task<IResult> CheckInForOrg(
         Guid orgId,
-        string tourId,
+        string eventId,
         CheckInRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         ParticipantEntity? participant = null;
@@ -628,17 +628,17 @@ internal static class ToursHandlers
         if (request.ParticipantId.HasValue)
         {
             participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.TourId == id && x.OrganizationId == orgId, ct);
+                .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.EventId == id && x.OrganizationId == orgId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(request.Code))
         {
             var code = request.Code.Trim().ToUpperInvariant();
             participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.TourId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
+                .FirstOrDefaultAsync(x => x.EventId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
         }
         else
         {
-            return ToursHelpers.BadRequest("Provide either participantId or code.");
+            return EventsHelpers.BadRequest("Provide either participantId or code.");
         }
 
         if (participant is null)
@@ -653,14 +653,14 @@ internal static class ToursHandlers
         }
 
         var alreadyCheckedIn = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.TourId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
 
         if (!alreadyCheckedIn)
         {
             db.CheckIns.Add(new CheckInEntity
             {
                 Id = Guid.NewGuid(),
-                TourId = id,
+                EventId = id,
                 ParticipantId = participant.Id,
                 OrganizationId = orgId,
                 CheckedInAt = DateTime.UtcNow,
@@ -676,15 +676,15 @@ internal static class ToursHandlers
         }
 
         var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, alreadyCheckedIn, arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> UndoCheckIn(
-        string tourId,
+        string eventId,
         CheckInUndoRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
@@ -695,31 +695,31 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        return await UndoCheckInForOrg(orgId, tourId, request, db, ct);
+        return await UndoCheckInForOrg(orgId, eventId, request, db, ct);
     }
 
     internal static async Task<IResult> UndoCheckInForOrg(
         Guid orgId,
-        string tourId,
+        string eventId,
         CheckInUndoRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
         if (request is null)
         {
-            return ToursHelpers.BadRequest("Request body is required.");
+            return EventsHelpers.BadRequest("Request body is required.");
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         ParticipantEntity? participant = null;
@@ -727,22 +727,22 @@ internal static class ToursHandlers
         if (request.ParticipantId.HasValue)
         {
             participant = await db.Participants.FirstOrDefaultAsync(
-                x => x.Id == request.ParticipantId.Value && x.TourId == id && x.OrganizationId == orgId, ct);
+                x => x.Id == request.ParticipantId.Value && x.EventId == id && x.OrganizationId == orgId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(request.CheckInCode))
         {
             var code = request.CheckInCode.Trim().ToUpperInvariant();
             if (code.Length != 8)
             {
-                return ToursHelpers.BadRequest("Check-in code must be 8 characters.");
+                return EventsHelpers.BadRequest("Check-in code must be 8 characters.");
             }
 
             participant = await db.Participants.FirstOrDefaultAsync(
-                x => x.TourId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
+                x => x.EventId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
         }
         else
         {
-            return ToursHelpers.BadRequest("Provide participantId or checkInCode.");
+            return EventsHelpers.BadRequest("Provide participantId or checkInCode.");
         }
 
         if (participant is null)
@@ -751,7 +751,7 @@ internal static class ToursHandlers
         }
 
         var checkIn = await db.CheckIns.FirstOrDefaultAsync(
-            x => x.TourId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
+            x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
 
         var alreadyUndone = checkIn is null;
         if (!alreadyUndone)
@@ -761,15 +761,15 @@ internal static class ToursHandlers
         }
 
         var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> CheckInByCode(
-        string tourId,
+        string eventId,
         CheckInCodeRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
@@ -780,42 +780,42 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        return await CheckInByCodeForOrg(orgId, tourId, request, db, ct);
+        return await CheckInByCodeForOrg(orgId, eventId, request, db, ct);
     }
 
     internal static async Task<IResult> CheckInByCodeForOrg(
         Guid orgId,
-        string tourId,
+        string eventId,
         CheckInCodeRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
         if (request is null)
         {
-            return ToursHelpers.BadRequest("Request body is required.");
+            return EventsHelpers.BadRequest("Request body is required.");
         }
 
         var code = request.CheckInCode?.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(code))
         {
-            return ToursHelpers.BadRequest("Check-in code is required.");
+            return EventsHelpers.BadRequest("Check-in code is required.");
         }
 
         if (code.Length != 8)
         {
-            return ToursHelpers.BadRequest("Check-in code must be 8 characters.");
+            return EventsHelpers.BadRequest("Check-in code must be 8 characters.");
         }
 
-        return await CheckInForOrg(orgId, tourId, new CheckInRequest(code, null, "qr"), db, ct);
+        return await CheckInForOrg(orgId, eventId, new CheckInRequest(code, null, "qr"), db, ct);
     }
 
     internal static async Task<IResult> GetCheckInSummary(
-        string tourId,
+        string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!ToursHelpers.TryParseTourId(tourId, out var id, out var error))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
@@ -825,17 +825,17 @@ internal static class ToursHandlers
             return orgError!;
         }
 
-        var tourExists = await db.Tours.AsNoTracking()
+        var eventExists = await db.Events.AsNoTracking()
             .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!tourExists)
+        if (!eventExists)
         {
-            return Results.NotFound(new { message = "Tour not found." });
+            return Results.NotFound(new { message = "Event not found." });
         }
 
         var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.TourId == id && x.OrganizationId == orgId, ct);
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }

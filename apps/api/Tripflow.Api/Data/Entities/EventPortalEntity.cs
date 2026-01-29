@@ -1,9 +1,9 @@
 namespace Tripflow.Api.Data.Entities;
 
-public sealed class TourPortalEntity
+public sealed class EventPortalEntity
 {
-    public Guid TourId { get; set; }
-    public TourEntity Tour { get; set; } = default!;
+    public Guid EventId { get; set; }
+    public EventEntity Event { get; set; } = default!;
     public Guid OrganizationId { get; set; }
     public OrganizationEntity Organization { get; set; } = default!;
 

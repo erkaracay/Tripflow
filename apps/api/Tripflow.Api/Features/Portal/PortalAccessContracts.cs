@@ -1,4 +1,4 @@
-using Tripflow.Api.Features.Tours;
+using Tripflow.Api.Features.Events;
 
 namespace Tripflow.Api.Features.Portal;
 
@@ -10,10 +10,10 @@ public sealed record PortalAccessPolicy(
 
 public sealed record PortalParticipantSummary(string DisplayName, bool HasPhone);
 
-public sealed record PortalAccessVerifyRequest(string? TourId, string? Pt);
+public sealed record PortalAccessVerifyRequest(string? EventId, string? Pt);
 public sealed record PortalAccessVerifyResponse(
-    Guid TourId,
-    TourPortalInfo Portal,
+    Guid EventId,
+    EventPortalInfo Portal,
     PortalAccessPolicy Policy,
     PortalParticipantSummary Participant,
     string? PhoneHint,
@@ -21,11 +21,11 @@ public sealed record PortalAccessVerifyResponse(
     int LockedForSeconds,
     int AttemptsRemaining);
 
-public sealed record PortalAccessConfirmRequest(string? TourId, string? Pt, string? Last4);
+public sealed record PortalAccessConfirmRequest(string? EventId, string? Pt, string? Last4);
 public sealed record PortalAccessConfirmResponse(string SessionToken, DateTime ExpiresAt, PortalAccessPolicy Policy, PortalParticipantSummary Participant);
 
 public sealed record PortalAccessMeResponse(
-    Guid TourId,
+    Guid EventId,
     Guid ParticipantId,
     string ParticipantName,
     string CheckInCode,
