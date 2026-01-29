@@ -233,6 +233,7 @@ internal static class OrganizationsHandlers
         db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.OrganizationId == orgId));
         db.PortalSessions.RemoveRange(db.PortalSessions.Where(x => x.OrganizationId == orgId));
         db.ParticipantAccesses.RemoveRange(db.ParticipantAccesses.Where(x => x.OrganizationId == orgId));
+        db.ParticipantDetails.RemoveRange(db.ParticipantDetails.Where(x => x.Participant.OrganizationId == orgId));
         db.Participants.RemoveRange(db.Participants.Where(x => x.OrganizationId == orgId));
         db.Events.RemoveRange(db.Events.Where(x => x.OrganizationId == orgId));
         db.Users.RemoveRange(db.Users.Where(x => x.OrganizationId == orgId));

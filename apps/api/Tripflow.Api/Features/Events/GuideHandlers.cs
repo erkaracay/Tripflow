@@ -97,10 +97,14 @@ internal static class GuideHandlers
                 (participant, checkIns) => new ParticipantDto(
                     participant.Id,
                     participant.FullName,
-                    participant.Email,
                     participant.Phone,
+                    participant.Email,
+                    participant.TcNo,
+                    participant.BirthDate.ToString("yyyy-MM-dd"),
+                    participant.Gender.ToString(),
                     participant.CheckInCode,
-                    checkIns.Any()))
+                    checkIns.Any(),
+                    null))
             .ToArrayAsync(ct);
 
         return Results.Ok(participants);

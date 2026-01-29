@@ -368,6 +368,49 @@ public static class DevSeed
         var existing = await db.Participants.AsNoTracking().AnyAsync(x => x.EventId == eventEntity.Id, ct);
         if (existing)
         {
+            var existingParticipants = await db.Participants
+                .Where(x => x.EventId == eventEntity.Id)
+                .OrderBy(x => x.CreatedAt)
+                .ToListAsync(ct);
+
+            if (existingParticipants.Count > 0)
+            {
+                for (var i = 0; i < existingParticipants.Count; i++)
+                {
+                    var participant = existingParticipants[i];
+                    var index = i + 1;
+                    var phoneDigits = 5300000000 + index;
+
+                    if (string.IsNullOrWhiteSpace(participant.Phone))
+                    {
+                        participant.Phone = $"+90{phoneDigits:0000000000}";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(participant.TcNo))
+                    {
+                        participant.TcNo = (10000000000L + index).ToString();
+                    }
+
+                    if (participant.BirthDate == default)
+                    {
+                        participant.BirthDate = new DateOnly(1990, 1, 1).AddDays(index);
+                    }
+
+                    if (!Enum.IsDefined(typeof(ParticipantGender), participant.Gender))
+                    {
+                        participant.Gender = (index % 3) switch
+                        {
+                            0 => ParticipantGender.Female,
+                            1 => ParticipantGender.Male,
+                            _ => ParticipantGender.Other
+                        };
+                    }
+                }
+
+                await db.SaveChangesAsync(ct);
+                state.Seeded = true;
+            }
+
             return;
         }
 
@@ -377,6 +420,14 @@ public static class DevSeed
             var code = await GenerateUniqueCheckInCodeAsync(db, ct);
             var name = SampleNames[(i - 1) % SampleNames.Length];
             var phoneDigits = 5300000000 + i;
+            var tcNo = (10000000000L + i).ToString();
+            var birthDate = new DateOnly(1990, 1, 1).AddDays(i);
+            var gender = (i % 3) switch
+            {
+                0 => ParticipantGender.Female,
+                1 => ParticipantGender.Male,
+                _ => ParticipantGender.Other
+            };
             participants.Add(new ParticipantEntity
             {
                 Id = Guid.NewGuid(),
@@ -385,6 +436,9 @@ public static class DevSeed
                 FullName = name,
                 Email = BuildDemoEmail(prefix, i),
                 Phone = $"+90{phoneDigits:0000000000}",
+                TcNo = tcNo,
+                BirthDate = birthDate,
+                Gender = gender,
                 CheckInCode = code,
                 CreatedAt = now
             });

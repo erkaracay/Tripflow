@@ -64,6 +64,8 @@ const guides = ref<UserListItem[]>([])
 const guideId = ref('')
 const phoneErrorKey = ref<string | null>(null)
 const editPhoneErrorKey = ref<string | null>(null)
+const tcNoErrorKey = ref<string | null>(null)
+const editTcNoErrorKey = ref<string | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const editingParticipantId = ref<string | null>(null)
 const editParticipantSaving = ref(false)
@@ -105,15 +107,68 @@ const purgeConfirmValid = computed(() => {
 
 const form = reactive({
   fullName: '',
+  tcNo: '',
+  birthDate: '',
+  gender: '',
   email: '',
   phone: '',
 })
 
 const editForm = reactive({
   fullName: '',
+  tcNo: '',
+  birthDate: '',
+  gender: '',
   email: '',
   phone: '',
 })
+
+const editDetails = reactive({
+  roomNo: '',
+  roomType: '',
+  personNo: '',
+  agencyName: '',
+  city: '',
+  flightCity: '',
+  hotelCheckInDate: '',
+  hotelCheckOutDate: '',
+  ticketNo: '',
+  attendanceStatus: '',
+  arrivalAirline: '',
+  arrivalDepartureAirport: '',
+  arrivalArrivalAirport: '',
+  arrivalFlightCode: '',
+  arrivalDepartureTime: '',
+  arrivalArrivalTime: '',
+  arrivalPnr: '',
+  arrivalBaggageAllowance: '',
+  returnAirline: '',
+  returnDepartureAirport: '',
+  returnArrivalAirport: '',
+  returnFlightCode: '',
+  returnDepartureTime: '',
+  returnArrivalTime: '',
+  returnPnr: '',
+  returnBaggageAllowance: '',
+})
+
+const genderOptions = [
+  { value: 'Female', label: 'common.genderFemale' },
+  { value: 'Male', label: 'common.genderMale' },
+  { value: 'Other', label: 'common.genderOther' },
+]
+
+const sanitizeTcNoInput = (value: string) => value.replace(/\D/g, '').slice(0, 11)
+
+const handleTcNoInput = () => {
+  tcNoErrorKey.value = null
+  form.tcNo = sanitizeTcNoInput(form.tcNo)
+}
+
+const handleEditTcNoInput = () => {
+  editTcNoErrorKey.value = null
+  editForm.tcNo = sanitizeTcNoInput(editForm.tcNo)
+}
 
 const handlePhoneInput = () => {
   phoneErrorKey.value = null
@@ -349,6 +404,8 @@ const loadEvent = async () => {
   editParticipantErrorKey.value = null
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
+  editTcNoErrorKey.value = null
+  tcNoErrorKey.value = null
   guideErrorKey.value = null
   guideErrorMessage.value = null
   guideLoading.value = true
@@ -435,6 +492,7 @@ const addParticipant = async () => {
   formErrorKey.value = null
   formErrorMessage.value = null
   phoneErrorKey.value = null
+  tcNoErrorKey.value = null
 
   const fullName = normalizeName(form.fullName)
   if (fullName.length < 2) {
@@ -452,16 +510,38 @@ const addParticipant = async () => {
     return
   }
 
+  const tcNo = form.tcNo.trim()
+  if (!tcNo) {
+    tcNoErrorKey.value = 'validation.tcNoRequired'
+    return
+  }
+
+  if (!form.birthDate) {
+    formErrorKey.value = 'validation.birthDateRequired'
+    return
+  }
+
+  if (!form.gender) {
+    formErrorKey.value = 'validation.genderRequired'
+    return
+  }
+
   submitting.value = true
   try {
     const created = await apiPost<Participant>(`/api/events/${eventId.value}/participants`, {
       fullName,
-      email: normalizeEmail(form.email) || undefined,
       phone: normalizedPhone || undefined,
+      email: normalizeEmail(form.email) || undefined,
+      tcNo,
+      birthDate: form.birthDate,
+      gender: form.gender,
     })
 
     participants.value = [...participants.value, created]
     form.fullName = ''
+    form.tcNo = ''
+    form.birthDate = ''
+    form.gender = ''
     form.email = ''
     form.phone = ''
     pushToast({ key: 'toast.participantAdded', tone: 'success' })
@@ -482,9 +562,40 @@ const startEditParticipant = (participant: Participant) => {
   editParticipantErrorKey.value = null
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
+  editTcNoErrorKey.value = null
   editForm.fullName = participant.fullName
+  editForm.tcNo = participant.tcNo
+  editForm.birthDate = participant.birthDate
+  editForm.gender = participant.gender
   editForm.email = participant.email ?? ''
-  editForm.phone = participant.phone ?? ''
+  editForm.phone = participant.phone
+
+  editDetails.roomNo = participant.details?.roomNo ?? ''
+  editDetails.roomType = participant.details?.roomType ?? ''
+  editDetails.personNo = participant.details?.personNo ?? ''
+  editDetails.agencyName = participant.details?.agencyName ?? ''
+  editDetails.city = participant.details?.city ?? ''
+  editDetails.flightCity = participant.details?.flightCity ?? ''
+  editDetails.hotelCheckInDate = participant.details?.hotelCheckInDate ?? ''
+  editDetails.hotelCheckOutDate = participant.details?.hotelCheckOutDate ?? ''
+  editDetails.ticketNo = participant.details?.ticketNo ?? ''
+  editDetails.attendanceStatus = participant.details?.attendanceStatus ?? ''
+  editDetails.arrivalAirline = participant.details?.arrivalAirline ?? ''
+  editDetails.arrivalDepartureAirport = participant.details?.arrivalDepartureAirport ?? ''
+  editDetails.arrivalArrivalAirport = participant.details?.arrivalArrivalAirport ?? ''
+  editDetails.arrivalFlightCode = participant.details?.arrivalFlightCode ?? ''
+  editDetails.arrivalDepartureTime = participant.details?.arrivalDepartureTime ?? ''
+  editDetails.arrivalArrivalTime = participant.details?.arrivalArrivalTime ?? ''
+  editDetails.arrivalPnr = participant.details?.arrivalPnr ?? ''
+  editDetails.arrivalBaggageAllowance = participant.details?.arrivalBaggageAllowance ?? ''
+  editDetails.returnAirline = participant.details?.returnAirline ?? ''
+  editDetails.returnDepartureAirport = participant.details?.returnDepartureAirport ?? ''
+  editDetails.returnArrivalAirport = participant.details?.returnArrivalAirport ?? ''
+  editDetails.returnFlightCode = participant.details?.returnFlightCode ?? ''
+  editDetails.returnDepartureTime = participant.details?.returnDepartureTime ?? ''
+  editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
+  editDetails.returnPnr = participant.details?.returnPnr ?? ''
+  editDetails.returnBaggageAllowance = participant.details?.returnBaggageAllowance ?? ''
 }
 
 const cancelEditParticipant = () => {
@@ -492,6 +603,7 @@ const cancelEditParticipant = () => {
   editParticipantErrorKey.value = null
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
+  editTcNoErrorKey.value = null
   missingPhoneParticipantId.value = null
 }
 
@@ -516,6 +628,7 @@ const saveParticipant = async (participant: Participant) => {
   editParticipantErrorKey.value = null
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
+  editTcNoErrorKey.value = null
 
   const fullName = normalizeName(editForm.fullName)
   if (fullName.length < 2) {
@@ -533,14 +646,61 @@ const saveParticipant = async (participant: Participant) => {
     return
   }
 
+  const tcNo = editForm.tcNo.trim()
+  if (!tcNo) {
+    editTcNoErrorKey.value = 'validation.tcNoRequired'
+    return
+  }
+
+  if (!editForm.birthDate) {
+    editParticipantErrorKey.value = 'validation.birthDateRequired'
+    return
+  }
+
+  if (!editForm.gender) {
+    editParticipantErrorKey.value = 'validation.genderRequired'
+    return
+  }
+
   editParticipantSaving.value = true
   try {
     const updated = await apiPut<Participant>(
       `/api/events/${eventId.value}/participants/${participant.id}`,
       {
         fullName,
-        email: normalizeEmail(editForm.email) || undefined,
         phone: normalizedPhone || undefined,
+        email: normalizeEmail(editForm.email) || undefined,
+        tcNo,
+        birthDate: editForm.birthDate,
+        gender: editForm.gender,
+        details: {
+          roomNo: editDetails.roomNo || undefined,
+          roomType: editDetails.roomType || undefined,
+          personNo: editDetails.personNo || undefined,
+          agencyName: editDetails.agencyName || undefined,
+          city: editDetails.city || undefined,
+          flightCity: editDetails.flightCity || undefined,
+          hotelCheckInDate: editDetails.hotelCheckInDate || undefined,
+          hotelCheckOutDate: editDetails.hotelCheckOutDate || undefined,
+          ticketNo: editDetails.ticketNo || undefined,
+          attendanceStatus: editDetails.attendanceStatus || undefined,
+          arrivalAirline: editDetails.arrivalAirline || undefined,
+          arrivalDepartureAirport: editDetails.arrivalDepartureAirport || undefined,
+          arrivalArrivalAirport: editDetails.arrivalArrivalAirport || undefined,
+          arrivalFlightCode: editDetails.arrivalFlightCode || undefined,
+          arrivalDepartureTime: editDetails.arrivalDepartureTime || undefined,
+          arrivalArrivalTime: editDetails.arrivalArrivalTime || undefined,
+          arrivalPnr: editDetails.arrivalPnr || undefined,
+          arrivalBaggageAllowance: editDetails.arrivalBaggageAllowance || undefined,
+          returnAirline: editDetails.returnAirline || undefined,
+          returnDepartureAirport: editDetails.returnDepartureAirport || undefined,
+          returnArrivalAirport: editDetails.returnArrivalAirport || undefined,
+          returnFlightCode: editDetails.returnFlightCode || undefined,
+          returnDepartureTime: editDetails.returnDepartureTime || undefined,
+          returnArrivalTime: editDetails.returnArrivalTime || undefined,
+          returnPnr: editDetails.returnPnr || undefined,
+          returnBaggageAllowance: editDetails.returnBaggageAllowance || undefined,
+        },
       }
     )
 
@@ -713,11 +873,24 @@ const downloadParticipantsCsv = () => {
     return
   }
 
-  const headers = ['id', 'fullName', 'email', 'phone', 'checkInCode', 'arrived']
+  const headers = [
+    'id',
+    'fullName',
+    'tcNo',
+    'birthDate',
+    'gender',
+    'email',
+    'phone',
+    'checkInCode',
+    'arrived',
+  ]
   const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`
   const rows = participants.value.map((participant) => [
     participant.id,
     participant.fullName,
+    participant.tcNo,
+    participant.birthDate,
+    participant.gender,
     participant.email ?? '',
     participant.phone ?? '',
     participant.checkInCode,
@@ -1049,6 +1222,26 @@ onMounted(loadEvent)
             />
           </label>
           <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.participants.form.tcNo') }}</span>
+            <input
+              v-model.trim="form.tcNo"
+              class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              :class="tcNoErrorKey ? 'border-rose-300' : 'border-slate-200'"
+              :placeholder="t('admin.participants.form.tcNoPlaceholder')"
+              inputmode="numeric"
+              type="text"
+              @input="handleTcNoInput"
+            />
+          </label>
+          <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.participants.form.birthDate') }}</span>
+            <input
+              v-model="form.birthDate"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              type="date"
+            />
+          </label>
+          <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.participants.form.email') }}</span>
             <input
               v-model.trim="form.email"
@@ -1071,6 +1264,18 @@ onMounted(loadEvent)
               @blur="handlePhoneBlur"
             />
           </label>
+          <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
+            <select
+              v-model="form.gender"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+            >
+              <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
+              <option v-for="option in genderOptions" :key="option.value" :value="option.value">
+                {{ t(option.label) }}
+              </option>
+            </select>
+          </label>
           <div class="md:col-span-3">
             <button
               class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -1082,6 +1287,7 @@ onMounted(loadEvent)
           </div>
         </form>
         <p v-if="phoneErrorKey" class="mt-2 text-sm text-rose-600">{{ t(phoneErrorKey) }}</p>
+        <p v-if="tcNoErrorKey" class="mt-2 text-sm text-rose-600">{{ t(tcNoErrorKey) }}</p>
         <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
           {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
         </p>
@@ -1332,6 +1538,25 @@ onMounted(loadEvent)
                   />
                 </label>
                 <label class="grid gap-1 text-sm">
+                  <span class="text-slate-600">{{ t('admin.participants.form.tcNo') }}</span>
+                  <input
+                    v-model.trim="editForm.tcNo"
+                    class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                    :class="editTcNoErrorKey ? 'border-rose-300' : 'border-slate-200'"
+                    inputmode="numeric"
+                    type="text"
+                    @input="handleEditTcNoInput"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm">
+                  <span class="text-slate-600">{{ t('admin.participants.form.birthDate') }}</span>
+                  <input
+                    v-model="editForm.birthDate"
+                    class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                    type="date"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participants.form.emailShort') }}</span>
                   <input
                     v-model.trim="editForm.email"
@@ -1360,6 +1585,133 @@ onMounted(loadEvent)
                     @blur="handleEditPhoneBlur"
                   />
                 </label>
+                <label class="grid gap-1 text-sm">
+                  <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
+                  <select
+                    v-model="editForm.gender"
+                    class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
+                    <option v-for="option in genderOptions" :key="option.value" :value="option.value">
+                      {{ t(option.label) }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <div class="space-y-3">
+                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.title') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.roomNo') }}</span>
+                    <input v-model.trim="editDetails.roomNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.roomType') }}</span>
+                    <input v-model.trim="editDetails.roomType" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.personNo') }}</span>
+                    <input v-model.trim="editDetails.personNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.agencyName') }}</span>
+                    <input v-model.trim="editDetails.agencyName" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.city') }}</span>
+                    <input v-model.trim="editDetails.city" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.flightCity') }}</span>
+                    <input v-model.trim="editDetails.flightCity" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.hotelCheckInDate') }}</span>
+                    <input v-model.trim="editDetails.hotelCheckInDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.hotelCheckOutDate') }}</span>
+                    <input v-model.trim="editDetails.hotelCheckOutDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.ticketNo') }}</span>
+                    <input v-model.trim="editDetails.ticketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.attendanceStatus') }}</span>
+                    <input v-model.trim="editDetails.attendanceStatus" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
+                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.arrivalTitle') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalAirline') }}</span>
+                    <input v-model.trim="editDetails.arrivalAirline" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalDepartureAirport') }}</span>
+                    <input v-model.trim="editDetails.arrivalDepartureAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalArrivalAirport') }}</span>
+                    <input v-model.trim="editDetails.arrivalArrivalAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalFlightCode') }}</span>
+                    <input v-model.trim="editDetails.arrivalFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalDepartureTime') }}</span>
+                    <input v-model.trim="editDetails.arrivalDepartureTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalArrivalTime') }}</span>
+                    <input v-model.trim="editDetails.arrivalArrivalTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalPnr') }}</span>
+                    <input v-model.trim="editDetails.arrivalPnr" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalBaggageAllowance') }}</span>
+                    <input v-model.trim="editDetails.arrivalBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
+                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.returnTitle') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnAirline') }}</span>
+                    <input v-model.trim="editDetails.returnAirline" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnDepartureAirport') }}</span>
+                    <input v-model.trim="editDetails.returnDepartureAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnArrivalAirport') }}</span>
+                    <input v-model.trim="editDetails.returnArrivalAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnFlightCode') }}</span>
+                    <input v-model.trim="editDetails.returnFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnDepartureTime') }}</span>
+                    <input v-model.trim="editDetails.returnDepartureTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnArrivalTime') }}</span>
+                    <input v-model.trim="editDetails.returnArrivalTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnPnr') }}</span>
+                    <input v-model.trim="editDetails.returnPnr" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnBaggageAllowance') }}</span>
+                    <input v-model.trim="editDetails.returnBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <button
@@ -1379,6 +1731,9 @@ onMounted(loadEvent)
                 </button>
                 <span v-if="editPhoneErrorKey" class="text-xs text-rose-600">
                   {{ t(editPhoneErrorKey) }}
+                </span>
+                <span v-if="editTcNoErrorKey" class="text-xs text-rose-600">
+                  {{ t(editTcNoErrorKey) }}
                 </span>
                 <span v-if="editParticipantErrorKey || editParticipantErrorMessage" class="text-xs text-rose-600">
                   {{ editParticipantErrorKey ? t(editParticipantErrorKey) : editParticipantErrorMessage }}

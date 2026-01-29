@@ -9,6 +9,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
+    public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
     public DbSet<ParticipantAccessEntity> ParticipantAccesses => Set<ParticipantAccessEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
@@ -97,8 +98,14 @@ public sealed class TripflowDbContext : DbContext
 
             b.Property(x => x.OrganizationId).IsRequired();
             b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Phone).HasMaxLength(50).IsRequired();
             b.Property(x => x.Email).HasMaxLength(200);
-            b.Property(x => x.Phone).HasMaxLength(50);
+            b.Property(x => x.TcNo).HasMaxLength(32).IsRequired();
+            b.Property(x => x.BirthDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.Gender)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsRequired();
 
             b.Property(x => x.CheckInCode).HasMaxLength(64).IsRequired();
             b.HasIndex(x => x.CheckInCode).IsUnique();
@@ -110,11 +117,60 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.CreatedAt).IsRequired();
             b.HasIndex(x => x.EventId);
             b.HasIndex(x => x.OrganizationId);
+            b.HasIndex(x => new { x.EventId, x.TcNo }).IsUnique();
 
             b.HasOne(x => x.Organization)
                 .WithMany(x => x.Participants)
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Details)
+                .WithOne(x => x.Participant)
+                .HasForeignKey<ParticipantDetailsEntity>(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ParticipantDetailsEntity>(b =>
+        {
+            b.ToTable("participant_details", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_participant_details_hotel_dates",
+                    "\"HotelCheckOutDate\" IS NULL OR \"HotelCheckInDate\" IS NULL OR \"HotelCheckOutDate\" >= \"HotelCheckInDate\"");
+            });
+            b.HasKey(x => x.ParticipantId);
+
+            b.Property(x => x.RoomNo).HasMaxLength(50);
+            b.Property(x => x.RoomType).HasMaxLength(50);
+            b.Property(x => x.PersonNo).HasMaxLength(50);
+            b.Property(x => x.AgencyName).HasMaxLength(200);
+            b.Property(x => x.City).HasMaxLength(100);
+            b.Property(x => x.FlightCity).HasMaxLength(100);
+
+            b.Property(x => x.HotelCheckInDate).HasColumnType("date");
+            b.Property(x => x.HotelCheckOutDate).HasColumnType("date");
+
+            b.Property(x => x.TicketNo).HasMaxLength(100);
+            b.Property(x => x.AttendanceStatus).HasMaxLength(100);
+
+            b.Property(x => x.ArrivalAirline).HasMaxLength(100);
+            b.Property(x => x.ArrivalDepartureAirport).HasMaxLength(100);
+            b.Property(x => x.ArrivalArrivalAirport).HasMaxLength(100);
+            b.Property(x => x.ArrivalFlightCode).HasMaxLength(100);
+            b.Property(x => x.ArrivalDepartureTime).HasColumnType("time without time zone");
+            b.Property(x => x.ArrivalArrivalTime).HasColumnType("time without time zone");
+            b.Property(x => x.ArrivalPnr).HasMaxLength(100);
+            b.Property(x => x.ArrivalBaggageAllowance).HasMaxLength(100);
+
+            b.Property(x => x.ReturnAirline).HasMaxLength(100);
+            b.Property(x => x.ReturnDepartureAirport).HasMaxLength(100);
+            b.Property(x => x.ReturnArrivalAirport).HasMaxLength(100);
+            b.Property(x => x.ReturnFlightCode).HasMaxLength(100);
+            b.Property(x => x.ReturnDepartureTime).HasColumnType("time without time zone");
+            b.Property(x => x.ReturnArrivalTime).HasColumnType("time without time zone");
+            b.Property(x => x.ReturnPnr).HasMaxLength(100);
+            b.Property(x => x.ReturnBaggageAllowance).HasMaxLength(100);
+
         });
 
         modelBuilder.Entity<ParticipantAccessEntity>(b =>

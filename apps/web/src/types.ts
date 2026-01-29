@@ -40,10 +40,14 @@ export type Organization = {
 export type Participant = {
   id: string
   fullName: string
+  phone: string
   email?: string | null
-  phone?: string | null
+  tcNo: string
+  birthDate: string
+  gender: ParticipantGender
   checkInCode: string
   arrived: boolean
+  details?: ParticipantDetails | null
 }
 
 export type ParticipantResolve = {
@@ -51,6 +55,37 @@ export type ParticipantResolve = {
   fullName: string
   arrived: boolean
   checkInCode: string
+}
+
+export type ParticipantGender = 'Female' | 'Male' | 'Other'
+
+export type ParticipantDetails = {
+  roomNo?: string | null
+  roomType?: string | null
+  personNo?: string | null
+  agencyName?: string | null
+  city?: string | null
+  flightCity?: string | null
+  hotelCheckInDate?: string | null
+  hotelCheckOutDate?: string | null
+  ticketNo?: string | null
+  attendanceStatus?: string | null
+  arrivalAirline?: string | null
+  arrivalDepartureAirport?: string | null
+  arrivalArrivalAirport?: string | null
+  arrivalFlightCode?: string | null
+  arrivalDepartureTime?: string | null
+  arrivalArrivalTime?: string | null
+  arrivalPnr?: string | null
+  arrivalBaggageAllowance?: string | null
+  returnAirline?: string | null
+  returnDepartureAirport?: string | null
+  returnArrivalAirport?: string | null
+  returnFlightCode?: string | null
+  returnDepartureTime?: string | null
+  returnArrivalTime?: string | null
+  returnPnr?: string | null
+  returnBaggageAllowance?: string | null
 }
 
 export type MeetingInfo = {

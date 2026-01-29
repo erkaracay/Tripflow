@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
@@ -275,6 +276,9 @@ internal static class EventsHandlers
 
             var sessions = db.PortalSessions.Where(x => participantIds.Contains(x.ParticipantId));
             db.PortalSessions.RemoveRange(sessions);
+
+            var details = db.ParticipantDetails.Where(x => participantIds.Contains(x.ParticipantId));
+            db.ParticipantDetails.RemoveRange(details);
         }
 
         db.CheckIns.RemoveRange(db.CheckIns.Where(x => x.EventId == id && x.OrganizationId == orgId));
@@ -493,6 +497,7 @@ internal static class EventsHandlers
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
+            .Include(x => x.Details)
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var search = query?.Trim();
@@ -517,10 +522,14 @@ internal static class EventsHandlers
                 (participant, checkIns) => new ParticipantDto(
                     participant.Id,
                     participant.FullName,
-                    participant.Email,
                     participant.Phone,
+                    participant.Email,
+                    participant.TcNo,
+                    participant.BirthDate.ToString("yyyy-MM-dd"),
+                    participant.Gender.ToString(),
                     participant.CheckInCode,
-                    checkIns.Any()))
+                    checkIns.Any(),
+                    MapDetails(participant.Details)))
             .ToArrayAsync(ct);
 
         return Results.Ok(participants);
@@ -562,6 +571,30 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Phone is required.");
         }
 
+        var tcNo = request.TcNo?.Trim();
+        if (string.IsNullOrWhiteSpace(tcNo))
+        {
+            return EventsHelpers.BadRequest("TcNo is required.");
+        }
+
+        if (!EventsHelpers.TryParseDate(request.BirthDate, out var birthDate))
+        {
+            return EventsHelpers.BadRequest("Birth date must be in YYYY-MM-DD format.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Gender)
+            || !Enum.TryParse<ParticipantGender>(request.Gender, true, out var gender))
+        {
+            return EventsHelpers.BadRequest("Gender is required.");
+        }
+
+        var tcExists = await db.Participants.AsNoTracking()
+            .AnyAsync(x => x.EventId == id && x.OrganizationId == orgId && x.TcNo == tcNo, ct);
+        if (tcExists)
+        {
+            return Results.Conflict(new { message = "TcNo already exists for this event." });
+        }
+
         var code = await EventsHelpers.GenerateUniqueCheckInCodeAsync(db, ct);
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -574,8 +607,11 @@ internal static class EventsHandlers
             EventId = id,
             OrganizationId = orgId,
             FullName = fullName,
-            Email = request.Email?.Trim(),
             Phone = phone,
+            Email = request.Email?.Trim(),
+            TcNo = tcNo,
+            BirthDate = birthDate,
+            Gender = gender,
             CheckInCode = code,
             CreatedAt = DateTime.UtcNow
         };
@@ -592,7 +628,17 @@ internal static class EventsHandlers
         }
 
         return Results.Created($"/api/events/{id}/participants/{entity.Id}",
-            new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, false));
+            new ParticipantDto(
+                entity.Id,
+                entity.FullName,
+                entity.Phone,
+                entity.Email,
+                entity.TcNo,
+                entity.BirthDate.ToString("yyyy-MM-dd"),
+                entity.Gender.ToString(),
+                entity.CheckInCode,
+                false,
+                MapDetails(entity.Details)));
     }
 
     internal static async Task<IResult> UpdateParticipant(
@@ -630,8 +676,9 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        var entity = await db.Participants.FirstOrDefaultAsync(
-            x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        var entity = await db.Participants
+            .Include(x => x.Details)
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
 
         if (entity is null)
         {
@@ -644,23 +691,79 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Full name is required.");
         }
 
-        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
-        var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        var phone = request.Phone?.Trim();
         if (string.IsNullOrWhiteSpace(phone))
         {
             return EventsHelpers.BadRequest("Phone is required.");
         }
 
+        var tcNo = request.TcNo?.Trim();
+        if (string.IsNullOrWhiteSpace(tcNo))
+        {
+            return EventsHelpers.BadRequest("TcNo is required.");
+        }
+
+        if (!EventsHelpers.TryParseDate(request.BirthDate, out var birthDate))
+        {
+            return EventsHelpers.BadRequest("Birth date must be in YYYY-MM-DD format.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Gender)
+            || !Enum.TryParse<ParticipantGender>(request.Gender, true, out var gender))
+        {
+            return EventsHelpers.BadRequest("Gender is required.");
+        }
+
+        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+        if (!string.Equals(entity.TcNo, tcNo, StringComparison.Ordinal))
+        {
+            var tcExists = await db.Participants.AsNoTracking()
+                .AnyAsync(x => x.EventId == id && x.OrganizationId == orgId && x.TcNo == tcNo && x.Id != entity.Id, ct);
+            if (tcExists)
+            {
+                return Results.Conflict(new { message = "TcNo already exists for this event." });
+            }
+        }
+
         entity.FullName = fullName;
         entity.Email = email;
         entity.Phone = phone;
+        entity.TcNo = tcNo;
+        entity.BirthDate = birthDate;
+        entity.Gender = gender;
+
+        if (request.Details is not null)
+        {
+            if (entity.Details is null)
+            {
+                entity.Details = new ParticipantDetailsEntity
+                {
+                    ParticipantId = entity.Id
+                };
+            }
+
+            if (!TryApplyDetails(entity.Details, request.Details, out var detailsError))
+            {
+                return EventsHelpers.BadRequest(detailsError);
+            }
+        }
 
         await db.SaveChangesAsync(ct);
 
         var arrived = await db.CheckIns.AsNoTracking()
             .AnyAsync(x => x.EventId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
 
-        return Results.Ok(new ParticipantDto(entity.Id, entity.FullName, entity.Email, entity.Phone, entity.CheckInCode, arrived));
+        return Results.Ok(new ParticipantDto(
+            entity.Id,
+            entity.FullName,
+            entity.Phone,
+            entity.Email,
+            entity.TcNo,
+            entity.BirthDate.ToString("yyyy-MM-dd"),
+            entity.Gender.ToString(),
+            entity.CheckInCode,
+            arrived,
+            MapDetails(entity.Details)));
     }
 
     internal static async Task<IResult> DeleteParticipant(
@@ -962,5 +1065,145 @@ internal static class EventsHandlers
             .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
+    }
+
+    private static ParticipantDetailsDto? MapDetails(ParticipantDetailsEntity? details)
+    {
+        if (details is null)
+        {
+            return null;
+        }
+
+        return new ParticipantDetailsDto(
+            details.RoomNo,
+            details.RoomType,
+            details.PersonNo,
+            details.AgencyName,
+            details.City,
+            details.FlightCity,
+            details.HotelCheckInDate?.ToString("yyyy-MM-dd"),
+            details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
+            details.TicketNo,
+            details.AttendanceStatus,
+            details.ArrivalAirline,
+            details.ArrivalDepartureAirport,
+            details.ArrivalArrivalAirport,
+            details.ArrivalFlightCode,
+            details.ArrivalDepartureTime?.ToString("HH:mm"),
+            details.ArrivalArrivalTime?.ToString("HH:mm"),
+            details.ArrivalPnr,
+            details.ArrivalBaggageAllowance,
+            details.ReturnAirline,
+            details.ReturnDepartureAirport,
+            details.ReturnArrivalAirport,
+            details.ReturnFlightCode,
+            details.ReturnDepartureTime?.ToString("HH:mm"),
+            details.ReturnArrivalTime?.ToString("HH:mm"),
+            details.ReturnPnr,
+            details.ReturnBaggageAllowance);
+    }
+
+    private static bool TryApplyDetails(
+        ParticipantDetailsEntity details,
+        ParticipantDetailsRequest request,
+        out string error)
+    {
+        details.RoomNo = request.RoomNo;
+        details.RoomType = request.RoomType;
+        details.PersonNo = request.PersonNo;
+        details.AgencyName = request.AgencyName;
+        details.City = request.City;
+        details.FlightCity = request.FlightCity;
+        if (!TryParseDateOnly(request.HotelCheckInDate, out var checkIn))
+        {
+            error = "Hotel check-in date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        if (!TryParseDateOnly(request.HotelCheckOutDate, out var checkOut))
+        {
+            error = "Hotel check-out date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        details.HotelCheckInDate = checkIn;
+        details.HotelCheckOutDate = checkOut;
+        details.TicketNo = request.TicketNo;
+        details.AttendanceStatus = request.AttendanceStatus;
+        details.ArrivalAirline = request.ArrivalAirline;
+        details.ArrivalDepartureAirport = request.ArrivalDepartureAirport;
+        details.ArrivalArrivalAirport = request.ArrivalArrivalAirport;
+        details.ArrivalFlightCode = request.ArrivalFlightCode;
+        if (!TryParseTimeOnly(request.ArrivalDepartureTime, out var arrivalDeparture))
+        {
+            error = "Arrival departure time must be in HH:mm format.";
+            return false;
+        }
+        if (!TryParseTimeOnly(request.ArrivalArrivalTime, out var arrivalArrival))
+        {
+            error = "Arrival arrival time must be in HH:mm format.";
+            return false;
+        }
+        details.ArrivalDepartureTime = arrivalDeparture;
+        details.ArrivalArrivalTime = arrivalArrival;
+        details.ArrivalPnr = request.ArrivalPnr;
+        details.ArrivalBaggageAllowance = request.ArrivalBaggageAllowance;
+        details.ReturnAirline = request.ReturnAirline;
+        details.ReturnDepartureAirport = request.ReturnDepartureAirport;
+        details.ReturnArrivalAirport = request.ReturnArrivalAirport;
+        details.ReturnFlightCode = request.ReturnFlightCode;
+        if (!TryParseTimeOnly(request.ReturnDepartureTime, out var returnDeparture))
+        {
+            error = "Return departure time must be in HH:mm format.";
+            return false;
+        }
+        if (!TryParseTimeOnly(request.ReturnArrivalTime, out var returnArrival))
+        {
+            error = "Return arrival time must be in HH:mm format.";
+            return false;
+        }
+        details.ReturnDepartureTime = returnDeparture;
+        details.ReturnArrivalTime = returnArrival;
+        details.ReturnPnr = request.ReturnPnr;
+        details.ReturnBaggageAllowance = request.ReturnBaggageAllowance;
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryParseDateOnly(string? value, out DateOnly? date)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            date = null;
+            return true;
+        }
+
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            || DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        {
+            date = parsed;
+            return true;
+        }
+
+        date = null;
+        return false;
+    }
+
+    private static bool TryParseTimeOnly(string? value, out TimeOnly? time)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            time = null;
+            return true;
+        }
+
+        if (TimeOnly.TryParseExact(value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            || TimeOnly.TryParseExact(value, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed)
+            || TimeOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        {
+            time = parsed;
+            return true;
+        }
+
+        time = null;
+        return false;
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tripflow.Api.Data;
@@ -11,9 +12,11 @@ using Tripflow.Api.Data;
 namespace Tripflow.Api.Data.Migrations
 {
     [DbContext(typeof(TripflowDbContext))]
-    partial class TripflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260129072544_AddParticipantCoreAndDetails")]
+    partial class AddParticipantCoreAndDetails
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -224,8 +227,9 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<TimeOnly?>("ArrivalArrivalTime")
-                        .HasColumnType("time without time zone");
+                    b.Property<string>("ArrivalArrivalTime")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ArrivalBaggageAllowance")
                         .HasMaxLength(100)
@@ -235,8 +239,9 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<TimeOnly?>("ArrivalDepartureTime")
-                        .HasColumnType("time without time zone");
+                    b.Property<string>("ArrivalDepartureTime")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ArrivalFlightCode")
                         .HasMaxLength(100)
@@ -258,11 +263,13 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateOnly?>("HotelCheckInDate")
-                        .HasColumnType("date");
+                    b.Property<string>("HotelCheckInDate")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
-                    b.Property<DateOnly?>("HotelCheckOutDate")
-                        .HasColumnType("date");
+                    b.Property<string>("HotelCheckOutDate")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("PersonNo")
                         .HasMaxLength(50)
@@ -276,8 +283,9 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<TimeOnly?>("ReturnArrivalTime")
-                        .HasColumnType("time without time zone");
+                    b.Property<string>("ReturnArrivalTime")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ReturnBaggageAllowance")
                         .HasMaxLength(100)
@@ -287,8 +295,9 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<TimeOnly?>("ReturnDepartureTime")
-                        .HasColumnType("time without time zone");
+                    b.Property<string>("ReturnDepartureTime")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ReturnFlightCode")
                         .HasMaxLength(100)
@@ -312,10 +321,7 @@ namespace Tripflow.Api.Data.Migrations
 
                     b.HasKey("ParticipantId");
 
-                    b.ToTable("participant_details", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_participant_details_hotel_dates", "\"HotelCheckOutDate\" IS NULL OR \"HotelCheckInDate\" IS NULL OR \"HotelCheckOutDate\" >= \"HotelCheckInDate\"");
-                        });
+                    b.ToTable("participant_details", (string)null);
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.ParticipantEntity", b =>

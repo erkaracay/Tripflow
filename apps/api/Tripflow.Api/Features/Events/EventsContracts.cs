@@ -19,9 +19,90 @@ public sealed record MeetingInfo(string Time, string Place, string MapsUrl, stri
 public sealed record LinkInfo(string Label, string Url);
 public sealed record DayPlan(int Day, string Title, string[] Items);
 
-public sealed record CreateParticipantRequest(string? FullName, string? Email, string? Phone);
-public sealed record UpdateParticipantRequest(string? FullName, string? Email, string? Phone);
-public sealed record ParticipantDto(Guid Id, string FullName, string? Email, string? Phone, string CheckInCode, bool Arrived);
+public sealed record CreateParticipantRequest(
+    string? FullName,
+    string? Phone,
+    string? Email,
+    string? TcNo,
+    string? BirthDate,
+    string? Gender);
+
+public sealed record UpdateParticipantRequest(
+    string? FullName,
+    string? Phone,
+    string? Email,
+    string? TcNo,
+    string? BirthDate,
+    string? Gender,
+    ParticipantDetailsRequest? Details);
+
+public sealed record ParticipantDetailsRequest(
+    string? RoomNo,
+    string? RoomType,
+    string? PersonNo,
+    string? AgencyName,
+    string? City,
+    string? FlightCity,
+    string? HotelCheckInDate,
+    string? HotelCheckOutDate,
+    string? TicketNo,
+    string? AttendanceStatus,
+    string? ArrivalAirline,
+    string? ArrivalDepartureAirport,
+    string? ArrivalArrivalAirport,
+    string? ArrivalFlightCode,
+    string? ArrivalDepartureTime,
+    string? ArrivalArrivalTime,
+    string? ArrivalPnr,
+    string? ArrivalBaggageAllowance,
+    string? ReturnAirline,
+    string? ReturnDepartureAirport,
+    string? ReturnArrivalAirport,
+    string? ReturnFlightCode,
+    string? ReturnDepartureTime,
+    string? ReturnArrivalTime,
+    string? ReturnPnr,
+    string? ReturnBaggageAllowance);
+
+public sealed record ParticipantDetailsDto(
+    string? RoomNo,
+    string? RoomType,
+    string? PersonNo,
+    string? AgencyName,
+    string? City,
+    string? FlightCity,
+    string? HotelCheckInDate,
+    string? HotelCheckOutDate,
+    string? TicketNo,
+    string? AttendanceStatus,
+    string? ArrivalAirline,
+    string? ArrivalDepartureAirport,
+    string? ArrivalArrivalAirport,
+    string? ArrivalFlightCode,
+    string? ArrivalDepartureTime,
+    string? ArrivalArrivalTime,
+    string? ArrivalPnr,
+    string? ArrivalBaggageAllowance,
+    string? ReturnAirline,
+    string? ReturnDepartureAirport,
+    string? ReturnArrivalAirport,
+    string? ReturnFlightCode,
+    string? ReturnDepartureTime,
+    string? ReturnArrivalTime,
+    string? ReturnPnr,
+    string? ReturnBaggageAllowance);
+
+public sealed record ParticipantDto(
+    Guid Id,
+    string FullName,
+    string Phone,
+    string? Email,
+    string TcNo,
+    string BirthDate,
+    string Gender,
+    string CheckInCode,
+    bool Arrived,
+    ParticipantDetailsDto? Details);
 public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
 
 public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method);
