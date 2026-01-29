@@ -3,7 +3,7 @@ namespace Tripflow.Api.Features.Events;
 public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate);
 public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
 
-public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, Guid? GuideUserId);
+public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, Guid? GuideUserId, bool IsDeleted);
 public sealed record EventListItemDto(
     Guid Id,
     string Name,
@@ -11,7 +11,8 @@ public sealed record EventListItemDto(
     string EndDate,
     int ArrivedCount,
     int TotalCount,
-    Guid? GuideUserId);
+    Guid? GuideUserId,
+    bool IsDeleted);
 
 public sealed record EventPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
 public sealed record MeetingInfo(string Time, string Place, string MapsUrl, string Note);

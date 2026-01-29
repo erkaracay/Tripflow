@@ -34,7 +34,8 @@ internal static class EventsHelpers
             entity.Name,
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
-            entity.GuideUserId);
+            entity.GuideUserId,
+            entity.IsDeleted);
 
     internal static EventPortalInfo? TryDeserializePortal(string json)
     {

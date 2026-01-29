@@ -14,7 +14,7 @@ public static class OrganizationsEndpoints
 
         group.MapGet("", OrganizationsHandlers.GetOrganizations)
             .WithSummary("List organizations")
-            .WithDescription("Returns organizations for SuperAdmin org selection.")
+            .WithDescription("Returns organizations for SuperAdmin org selection. Set includeArchived=true to include archived organizations.")
             .Produces<OrganizationListItemDto[]>(StatusCodes.Status200OK);
 
         group.MapGet("{orgId:guid}", OrganizationsHandlers.GetOrganization)
@@ -35,10 +35,29 @@ public static class OrganizationsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapDelete("{orgId:guid}", OrganizationsHandlers.DeleteOrganization)
-            .WithSummary("Delete organization (soft)")
+        group.MapPost("{orgId:guid}/archive", OrganizationsHandlers.ArchiveOrganization)
+            .WithSummary("Archive organization")
+            .WithDescription("Archives an organization (soft delete).")
+            .Produces<OrganizationDetailDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("{orgId:guid}/restore", OrganizationsHandlers.RestoreOrganization)
+            .WithSummary("Restore organization")
+            .WithDescription("Restores an archived organization.")
+            .Produces<OrganizationDetailDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("{orgId:guid}/purge", OrganizationsHandlers.PurgeOrganization)
+            .WithSummary("Purge organization")
+            .WithDescription("Permanently deletes an archived organization and all related data.")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("{orgId:guid}", OrganizationsHandlers.DeleteOrganization)
+            .WithSummary("Archive organization (deprecated)")
+            .WithDescription("Deprecated. Use /archive instead.")
+            .Produces<OrganizationDetailDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         return app;

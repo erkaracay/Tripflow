@@ -17,6 +17,7 @@ const orgs = ref<Organization[]>([])
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
+const showArchived = ref(false)
 
 const selectedOrgId = ref<string | null>(getSelectedOrgId() || null)
 
@@ -39,6 +40,11 @@ const editForm = reactive({
   requireLast4ForPortal: false,
 })
 const savingOrgId = ref<string | null>(null)
+const archivingOrgId = ref<string | null>(null)
+const restoringOrgId = ref<string | null>(null)
+const purgingOrgId = ref<string | null>(null)
+const purgeConfirm = reactive<Record<string, string>>({})
+const purgeErrorKey = ref<string | null>(null)
 
 const loadOrgs = async () => {
   loading.value = true
@@ -46,7 +52,8 @@ const loadOrgs = async () => {
   errorMessage.value = null
 
   try {
-    orgs.value = await apiGet<Organization[]>('/api/organizations')
+    const query = showArchived.value ? '?includeArchived=true' : ''
+    orgs.value = await apiGet<Organization[]>(`/api/organizations${query}`)
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : null
     if (!errorMessage.value) {
@@ -57,6 +64,78 @@ const loadOrgs = async () => {
   }
 }
 
+const isPurgeConfirmValid = (org: Organization) => {
+  const value = purgeConfirm[org.id]?.trim()
+  if (!value) {
+    return false
+  }
+
+  return value.toLowerCase() === 'sil' || value === org.slug
+}
+
+const archiveOrg = async (org: Organization) => {
+  if (archivingOrgId.value) {
+    return
+  }
+  archivingOrgId.value = org.id
+  try {
+    const updated = await apiPost<Organization>(`/api/organizations/${org.id}/archive`, {})
+    orgs.value = orgs.value.map((item) => (item.id === org.id ? updated : item))
+    if (selectedOrgId.value === org.id) {
+      clearSelectedOrgId()
+      selectedOrgId.value = null
+    }
+    pushToast({ key: 'toast.orgArchived', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.orgArchiveFailed', tone: 'error' })
+  } finally {
+    archivingOrgId.value = null
+  }
+}
+
+const restoreOrg = async (org: Organization) => {
+  if (restoringOrgId.value) {
+    return
+  }
+  restoringOrgId.value = org.id
+  try {
+    const updated = await apiPost<Organization>(`/api/organizations/${org.id}/restore`, {})
+    orgs.value = orgs.value.map((item) => (item.id === org.id ? updated : item))
+    pushToast({ key: 'toast.orgRestored', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.orgRestoreFailed', tone: 'error' })
+  } finally {
+    restoringOrgId.value = null
+  }
+}
+
+const purgeOrg = async (org: Organization) => {
+  purgeErrorKey.value = null
+  if (!org.isDeleted) {
+    purgeErrorKey.value = 'admin.organizations.manage.purgeRequiresArchive'
+    return
+  }
+
+  if (!isPurgeConfirmValid(org)) {
+    purgeErrorKey.value = 'admin.organizations.manage.purgeConfirmMismatch'
+    return
+  }
+
+  purgingOrgId.value = org.id
+  try {
+    await apiDelete(`/api/organizations/${org.id}/purge`)
+    orgs.value = orgs.value.filter((item) => item.id !== org.id)
+    if (selectedOrgId.value === org.id) {
+      clearSelectedOrgId()
+      selectedOrgId.value = null
+    }
+    pushToast({ key: 'toast.orgPurged', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.orgPurgeFailed', tone: 'error' })
+  } finally {
+    purgingOrgId.value = null
+  }
+}
 const createOrg = async () => {
   createErrorKey.value = null
   createErrorMessage.value = null
@@ -140,27 +219,8 @@ const saveEdit = async (org: Organization) => {
   }
 }
 
-const deleteOrg = async (org: Organization) => {
-  const confirmed = globalThis.confirm?.(t('admin.organizations.manage.confirmDelete', { name: org.name }))
-  if (!confirmed) {
-    return
-  }
-
-  try {
-    await apiDelete(`/api/organizations/${org.id}`)
-    orgs.value = orgs.value.filter((item) => item.id !== org.id)
-    if (selectedOrgId.value === org.id) {
-      clearSelectedOrgId()
-      selectedOrgId.value = null
-    }
-    pushToast({ key: 'toast.orgDeleted', tone: 'success' })
-  } catch (err) {
-    pushToast({ key: 'toast.orgDeleteFailed', tone: 'error' })
-  }
-}
-
 const selectOrg = async (org: Organization) => {
-  if (!org.isActive) {
+  if (!org.isActive || org.isDeleted) {
     return
   }
 
@@ -180,6 +240,10 @@ onMounted(loadOrgs)
           <h1 class="text-2xl font-semibold">{{ t('admin.organizations.manage.title') }}</h1>
           <p class="mt-2 text-sm text-slate-600">{{ t('admin.organizations.manage.subtitle') }}</p>
         </div>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <input v-model="showArchived" type="checkbox" class="rounded border-slate-300" @change="loadOrgs" />
+          {{ t('admin.organizations.manage.showArchived') }}
+        </label>
       </div>
     </section>
 
@@ -258,6 +322,12 @@ onMounted(loadOrgs)
               >
                 {{ t('admin.organizations.manage.inactive') }}
               </span>
+              <span
+                v-if="org.isDeleted"
+                class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
+              >
+                {{ t('common.archived') }}
+              </span>
             </div>
             <div class="text-xs text-slate-500">{{ org.slug }}</div>
             <div v-if="selectedOrgId === org.id" class="mt-2 text-xs text-emerald-600">
@@ -269,10 +339,28 @@ onMounted(loadOrgs)
             <button
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
               type="button"
-              :disabled="!org.isActive"
+              :disabled="!org.isActive || org.isDeleted"
               @click="selectOrg(org)"
             >
               {{ selectedOrgId === org.id ? t('admin.organizations.selected') : t('admin.organizations.select') }}
+            </button>
+            <button
+              v-if="!org.isDeleted"
+              class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm hover:border-amber-300"
+              type="button"
+              :disabled="archivingOrgId === org.id"
+              @click="archiveOrg(org)"
+            >
+              {{ archivingOrgId === org.id ? t('common.saving') : t('common.archive') }}
+            </button>
+            <button
+              v-else
+              class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 shadow-sm hover:border-emerald-300"
+              type="button"
+              :disabled="restoringOrgId === org.id"
+              @click="restoreOrg(org)"
+            >
+              {{ restoringOrgId === org.id ? t('common.saving') : t('common.restore') }}
             </button>
             <button
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
@@ -280,13 +368,6 @@ onMounted(loadOrgs)
               @click="startEdit(org)"
             >
               {{ t('common.edit') }}
-            </button>
-            <button
-              class="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 shadow-sm hover:border-rose-300"
-              type="button"
-              @click="deleteOrg(org)"
-            >
-              {{ t('common.delete') }}
             </button>
           </div>
         </div>
@@ -336,6 +417,32 @@ onMounted(loadOrgs)
               @click="cancelEdit"
             >
               {{ t('common.cancel') }}
+            </button>
+          </div>
+
+          <div class="md:col-span-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <div class="text-sm font-semibold text-rose-800">{{ t('common.dangerZone') }}</div>
+            <p class="mt-1 text-xs text-rose-700">{{ t('admin.organizations.manage.purgeWarning') }}</p>
+            <p v-if="!org.isDeleted" class="mt-2 text-xs text-rose-700">
+              {{ t('admin.organizations.manage.purgeRequiresArchive') }}
+            </p>
+            <label class="mt-3 grid gap-1 text-xs text-rose-800">
+              <span>{{ t('admin.organizations.manage.purgeConfirmLabel') }}</span>
+              <input
+                v-model.trim="purgeConfirm[org.id]"
+                class="rounded border border-rose-200 bg-white px-3 py-2 text-xs focus:border-rose-400 focus:outline-none"
+                :placeholder="t('admin.organizations.manage.purgeConfirmPlaceholder')"
+                type="text"
+              />
+            </label>
+            <p v-if="purgeErrorKey" class="mt-2 text-xs text-rose-700">{{ t(purgeErrorKey) }}</p>
+            <button
+              class="mt-3 rounded border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="purgingOrgId === org.id || !org.isDeleted"
+              type="button"
+              @click="purgeOrg(org)"
+            >
+              {{ purgingOrgId === org.id ? t('common.saving') : t('common.purge') }}
             </button>
           </div>
         </div>

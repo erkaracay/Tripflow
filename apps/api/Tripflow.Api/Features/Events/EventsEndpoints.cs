@@ -15,7 +15,7 @@ public static class EventsEndpoints
 
         admin.MapGet("", EventsHandlers.GetEvents)
             .WithSummary("List events")
-            .WithDescription("Returns all events.")
+            .WithDescription("Returns all events for the organization. Set includeArchived=true to include archived events.")
             .Produces<EventListItemDto[]>(StatusCodes.Status200OK);
 
         admin.MapPost("", EventsHandlers.CreateEvent)
@@ -42,6 +42,27 @@ public static class EventsEndpoints
             .WithDescription("Updates event name and dates.")
             .Produces<EventDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/archive", EventsHandlers.ArchiveEvent)
+            .WithSummary("Archive event")
+            .WithDescription("Archives an event (soft delete).")
+            .Produces<EventDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/restore", EventsHandlers.RestoreEvent)
+            .WithSummary("Restore event")
+            .WithDescription("Restores an archived event.")
+            .Produces<EventDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/purge", EventsHandlers.PurgeEvent)
+            .WithSummary("Purge event")
+            .WithDescription("Permanently deletes an archived event and all related data.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{eventId}", EventsHandlers.GetEvent)

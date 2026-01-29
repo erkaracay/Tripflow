@@ -26,7 +26,7 @@ internal static class GuideHandlers
         }
 
         var events = await db.Events.AsNoTracking()
-            .Where(x => x.GuideUserId == userId && x.OrganizationId == orgId)
+            .Where(x => x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
             .Select(x => new EventListItemDto(
                 x.Id,
@@ -35,7 +35,8 @@ internal static class GuideHandlers
                 x.EndDate.ToString("yyyy-MM-dd"),
                 db.CheckIns.Count(c => c.EventId == x.Id),
                 db.Participants.Count(p => p.EventId == x.Id),
-                x.GuideUserId))
+                x.GuideUserId,
+                x.IsDeleted))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -65,7 +66,7 @@ internal static class GuideHandlers
         }
 
         var hasAccess = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
         if (!hasAccess)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -129,7 +130,7 @@ internal static class GuideHandlers
         }
 
         var hasAccess = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
         if (!hasAccess)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -181,7 +182,7 @@ internal static class GuideHandlers
         }
 
         var hasAccess = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
         if (!hasAccess)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -219,7 +220,7 @@ internal static class GuideHandlers
         }
 
         var hasAccess = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
         if (!hasAccess)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -252,7 +253,7 @@ internal static class GuideHandlers
         }
 
         var hasAccess = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId, ct);
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
         if (!hasAccess)
         {
             return Results.NotFound(new { message = "Event not found." });

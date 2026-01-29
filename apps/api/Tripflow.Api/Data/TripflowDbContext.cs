@@ -64,6 +64,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
             b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.IsDeleted).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CreatedAt).IsRequired();
 
             b.HasIndex(x => new { x.OrganizationId, x.StartDate });

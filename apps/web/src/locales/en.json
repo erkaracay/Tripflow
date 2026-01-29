@@ -13,6 +13,9 @@
     "saved": "Saved.",
     "cancel": "Cancel",
     "delete": "Delete",
+    "archive": "Archive",
+    "restore": "Restore",
+    "purge": "Permanently delete",
     "edit": "Edit",
     "remove": "Remove",
     "moveUp": "Up",
@@ -31,6 +34,8 @@
     "checkedIn": "Checked in",
     "undo": "Undo",
     "undoing": "Undoing...",
+    "archived": "Archived",
+    "dangerZone": "Danger zone",
     "noData": "No data available.",
     "searchPlaceholder": "Search by name, email, or phone",
     "clearSearch": "Clear"
@@ -157,6 +162,18 @@
     "orgUpdateFailed": "Failed to update organization.",
     "orgDeleted": "Organization deleted.",
     "orgDeleteFailed": "Failed to delete organization.",
+    "orgArchived": "Organization archived.",
+    "orgArchiveFailed": "Failed to archive organization.",
+    "orgRestored": "Organization restored.",
+    "orgRestoreFailed": "Failed to restore organization.",
+    "orgPurged": "Organization permanently deleted.",
+    "orgPurgeFailed": "Failed to permanently delete organization.",
+    "eventArchived": "Event archived.",
+    "eventArchiveFailed": "Failed to archive event.",
+    "eventRestored": "Event restored.",
+    "eventRestoreFailed": "Failed to restore event.",
+    "eventPurged": "Event permanently deleted.",
+    "eventPurgeFailed": "Failed to permanently delete event.",
     "portalCodeInvalid": "Code not found. Please check with your guide.",
     "portalLinkCopied": "Portal link copied.",
     "portalLinkCopyFailed": "Failed to copy portal link.",
@@ -180,6 +197,7 @@
         "title": "Existing events",
         "loading": "Loading events...",
         "empty": "No events yet. Create your first event above.",
+        "showArchived": "Show archived",
         "manage": "Manage",
         "openPortal": "Preview portal"
       }
@@ -188,6 +206,11 @@
       "loading": "Loading event details...",
       "detailsTitle": "Event Details",
       "detailsSubtitle": "Update the event name and dates.",
+      "purgeWarning": "Permanent deletion removes the event and all related data.",
+      "purgeRequiresArchive": "Archive the event before permanent deletion.",
+      "purgeConfirmLabel": "Type SIL or the event name to confirm",
+      "purgeConfirmPlaceholder": "SIL or event name",
+      "purgeConfirmMismatch": "Confirmation text does not match.",
       "form": {
         "nameLabel": "Name",
         "namePlaceholder": "Event name",
@@ -310,6 +333,7 @@
       "manage": {
         "title": "Organization management",
         "subtitle": "Create, update, and disable organizations for the pilot.",
+        "showArchived": "Show archived",
         "createTitle": "Create organization",
         "creating": "Creating...",
         "create": "Create",
@@ -324,7 +348,12 @@
         "requireLast4ForPortal": "Require last 4 digits for portal",
         "save": "Save",
         "saving": "Saving...",
-        "confirmDelete": "Delete {name}?"
+        "confirmDelete": "Delete {name}?",
+        "purgeWarning": "Permanent deletion removes the organization and all related data.",
+        "purgeRequiresArchive": "Archive the organization before permanent deletion.",
+        "purgeConfirmLabel": "Type SIL or the org slug to confirm",
+        "purgeConfirmPlaceholder": "SIL or org slug",
+        "purgeConfirmMismatch": "Confirmation text does not match."
       }
     }
   },

@@ -18,6 +18,7 @@ const listErrorMessage = ref<string | null>(null)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
+const showArchived = ref(false)
 
 const form = reactive({
   name: '',
@@ -50,7 +51,8 @@ const loadEvents = async () => {
   listErrorKey.value = null
   listErrorMessage.value = null
   try {
-    events.value = await apiGet<EventListItem[]>('/api/events')
+    const query = showArchived.value ? '?includeArchived=true' : ''
+    events.value = await apiGet<EventListItem[]>(`/api/events${query}`)
   } catch (err) {
     listErrorMessage.value = err instanceof Error ? err.message : null
     if (!listErrorMessage.value) {
@@ -176,9 +178,15 @@ onMounted(loadEvents)
     </section>
 
     <section class="space-y-4">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-lg font-semibold">{{ t('admin.events.list.title') }}</h2>
-        <span class="text-xs text-slate-500">{{ events.length }} {{ t('common.total') }}</span>
+        <div class="flex items-center gap-4 text-xs text-slate-500">
+          <label class="flex items-center gap-2 text-slate-600">
+            <input v-model="showArchived" type="checkbox" class="rounded border-slate-300" @change="loadEvents" />
+            {{ t('admin.events.list.showArchived') }}
+          </label>
+          <span>{{ events.length }} {{ t('common.total') }}</span>
+        </div>
       </div>
 
       <LoadingState v-if="loading && events.length === 0" message-key="admin.events.list.loading" />
@@ -204,7 +212,15 @@ onMounted(loadEvents)
           class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between"
         >
           <div>
-            <div class="font-medium">{{ event.name }}</div>
+            <div class="flex items-center gap-2">
+              <div class="font-medium">{{ event.name }}</div>
+              <span
+                v-if="event.isDeleted"
+                class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
+              >
+                {{ t('common.archived') }}
+              </span>
+            </div>
             <div class="text-xs text-slate-500">
               {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
             </div>

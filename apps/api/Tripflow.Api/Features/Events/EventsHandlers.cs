@@ -8,15 +8,20 @@ namespace Tripflow.Api.Features.Events;
 
 internal static class EventsHandlers
 {
-    internal static async Task<IResult> GetEvents(HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetEvents(
+        bool? includeArchived,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
     {
+        var showArchived = includeArchived ?? false;
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var error))
         {
             return error!;
         }
 
         var events = await db.Events.AsNoTracking()
-            .Where(x => x.OrganizationId == orgId)
+            .Where(x => x.OrganizationId == orgId && (showArchived || !x.IsDeleted))
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
             .Select(x => new EventListItemDto(
                 x.Id,
@@ -25,7 +30,8 @@ internal static class EventsHandlers
                 x.EndDate.ToString("yyyy-MM-dd"),
                 db.CheckIns.Count(c => c.EventId == x.Id),
                 db.Participants.Count(p => p.EventId == x.Id),
-                x.GuideUserId))
+                x.GuideUserId,
+                x.IsDeleted))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -70,6 +76,7 @@ internal static class EventsHandlers
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
+            IsDeleted = false,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -162,6 +169,123 @@ internal static class EventsHandlers
         }
 
         return Results.Ok(EventsHelpers.ToDto(entity));
+    }
+
+    internal static async Task<IResult> ArchiveEvent(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        if (!entity.IsDeleted)
+        {
+            entity.IsDeleted = true;
+            await db.SaveChangesAsync(ct);
+        }
+
+        return Results.Ok(EventsHelpers.ToDto(entity));
+    }
+
+    internal static async Task<IResult> RestoreEvent(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        if (entity.IsDeleted)
+        {
+            entity.IsDeleted = false;
+            await db.SaveChangesAsync(ct);
+        }
+
+        return Results.Ok(EventsHelpers.ToDto(entity));
+    }
+
+    internal static async Task<IResult> PurgeEvent(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        if (!entity.IsDeleted)
+        {
+            return Results.Conflict(new { message = "Event must be archived before purge." });
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        var participantIds = await db.Participants.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+
+        if (participantIds.Count > 0)
+        {
+            var access = db.ParticipantAccesses.Where(x => participantIds.Contains(x.ParticipantId));
+            db.ParticipantAccesses.RemoveRange(access);
+
+            var sessions = db.PortalSessions.Where(x => participantIds.Contains(x.ParticipantId));
+            db.PortalSessions.RemoveRange(sessions);
+        }
+
+        db.CheckIns.RemoveRange(db.CheckIns.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.Participants.RemoveRange(db.Participants.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.Events.RemoveRange(db.Events.Where(x => x.Id == id && x.OrganizationId == orgId));
+
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        return Results.NoContent();
     }
 
     internal static async Task<IResult> GetPortal(string eventId, TripflowDbContext db, CancellationToken ct)

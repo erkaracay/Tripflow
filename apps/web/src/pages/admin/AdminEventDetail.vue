@@ -74,6 +74,11 @@ const portalAccessLoading = ref<Record<string, boolean>>({})
 const whatsappLinks = ref<Record<string, string>>({})
 const missingPhoneParticipantId = ref<string | null>(null)
 const editPhoneInput = ref<HTMLInputElement | null>(null)
+const archivingEvent = ref(false)
+const restoringEvent = ref(false)
+const purgingEvent = ref(false)
+const purgeConfirmText = ref('')
+const purgeErrorKey = ref<string | null>(null)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -83,6 +88,19 @@ const isSuperAdmin = computed(() => {
   }
 
   return getTokenRole(token) === 'SuperAdmin'
+})
+
+const purgeConfirmValid = computed(() => {
+  if (!event.value) {
+    return false
+  }
+
+  const value = purgeConfirmText.value.trim()
+  if (!value) {
+    return false
+  }
+
+  return value.toLowerCase() === 'sil' || value === event.value.name
 })
 
 const form = reactive({
@@ -168,6 +186,68 @@ const showPortalSaved = () => {
     portalMessageKey.value = null
     portalSavedTimer.value = null
   }, 3000)
+}
+
+const archiveEvent = async () => {
+  if (!event.value || archivingEvent.value) {
+    return
+  }
+
+  archivingEvent.value = true
+  try {
+    const updated = await apiPost<EventDto>(`/api/events/${eventId.value}/archive`, {})
+    event.value = updated
+    pushToast({ key: 'toast.eventArchived', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.eventArchiveFailed', tone: 'error' })
+  } finally {
+    archivingEvent.value = false
+  }
+}
+
+const restoreEvent = async () => {
+  if (!event.value || restoringEvent.value) {
+    return
+  }
+
+  restoringEvent.value = true
+  try {
+    const updated = await apiPost<EventDto>(`/api/events/${eventId.value}/restore`, {})
+    event.value = updated
+    pushToast({ key: 'toast.eventRestored', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.eventRestoreFailed', tone: 'error' })
+  } finally {
+    restoringEvent.value = false
+  }
+}
+
+const purgeEvent = async () => {
+  purgeErrorKey.value = null
+  if (!event.value || purgingEvent.value) {
+    return
+  }
+
+  if (!event.value.isDeleted) {
+    purgeErrorKey.value = 'admin.eventDetail.purgeRequiresArchive'
+    return
+  }
+
+  if (!purgeConfirmValid.value) {
+    purgeErrorKey.value = 'admin.eventDetail.purgeConfirmMismatch'
+    return
+  }
+
+  purgingEvent.value = true
+  try {
+    await apiDelete(`/api/events/${eventId.value}/purge`)
+    pushToast({ key: 'toast.eventPurged', tone: 'success' })
+    globalThis.location?.assign('/admin/events')
+  } catch {
+    pushToast({ key: 'toast.eventPurgeFailed', tone: 'error' })
+  } finally {
+    purgingEvent.value = false
+  }
 }
 
 const resolvePublicBase = () => {
@@ -807,7 +887,15 @@ onMounted(loadEvent)
             {{ t('nav.backToOrganizations') }}
           </RouterLink>
         </div>
-        <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <h1 class="text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
+          <span
+            v-if="event?.isDeleted"
+            class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
+          >
+            {{ t('common.archived') }}
+          </span>
+        </div>
         <p class="text-sm text-slate-500" v-if="event">
           {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
         </p>
@@ -819,6 +907,24 @@ onMounted(loadEvent)
         >
           {{ t('common.checkIn') }}
         </RouterLink>
+        <button
+          v-if="event && !event.isDeleted"
+          class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm hover:border-amber-300"
+          :disabled="archivingEvent"
+          type="button"
+          @click="archiveEvent"
+        >
+          {{ archivingEvent ? t('common.saving') : t('common.archive') }}
+        </button>
+        <button
+          v-else-if="event"
+          class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 shadow-sm hover:border-emerald-300"
+          :disabled="restoringEvent"
+          type="button"
+          @click="restoreEvent"
+        >
+          {{ restoringEvent ? t('common.saving') : t('common.restore') }}
+        </button>
         <a
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
           :href="`/t/${eventId}?preview=1`"
@@ -1368,6 +1474,37 @@ onMounted(loadEvent)
             </div>
           </li>
         </ul>
+      </section>
+
+      <section class="rounded-lg border border-rose-200 bg-rose-50 p-6 shadow-sm">
+        <div class="flex flex-col gap-2">
+          <h2 class="text-lg font-semibold text-rose-800">{{ t('common.dangerZone') }}</h2>
+          <p class="text-sm text-rose-700">{{ t('admin.eventDetail.purgeWarning') }}</p>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <p v-if="event && !event.isDeleted" class="text-sm text-rose-700">
+            {{ t('admin.eventDetail.purgeRequiresArchive') }}
+          </p>
+          <label class="grid gap-1 text-sm text-rose-800">
+            <span>{{ t('admin.eventDetail.purgeConfirmLabel') }}</span>
+            <input
+              v-model.trim="purgeConfirmText"
+              class="rounded border border-rose-200 bg-white px-3 py-2 text-sm focus:border-rose-400 focus:outline-none"
+              :placeholder="t('admin.eventDetail.purgeConfirmPlaceholder')"
+              type="text"
+            />
+          </label>
+          <p v-if="purgeErrorKey" class="text-sm text-rose-700">{{ t(purgeErrorKey) }}</p>
+          <button
+            class="rounded border border-rose-200 bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="purgingEvent || !event?.isDeleted"
+            type="button"
+            @click="purgeEvent"
+          >
+            {{ purgingEvent ? t('common.saving') : t('common.purge') }}
+          </button>
+        </div>
       </section>
     </template>
   </div>

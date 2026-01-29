@@ -4,6 +4,7 @@ export type Event = {
   startDate: string
   endDate: string
   guideUserId?: string | null
+  isDeleted: boolean
 }
 
 export type EventListItem = {
@@ -14,6 +15,7 @@ export type EventListItem = {
   arrivedCount: number
   totalCount: number
   guideUserId?: string | null
+  isDeleted: boolean
 }
 
 export type UserListItem = {

@@ -8,6 +8,7 @@ public sealed class EventEntity
     public string Name { get; set; } = default!;
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public Guid? GuideUserId { get; set; }

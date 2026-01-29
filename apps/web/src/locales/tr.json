@@ -13,6 +13,9 @@
     "saved": "Kaydedildi.",
     "cancel": "İptal",
     "delete": "Sil",
+    "archive": "Arşivle",
+    "restore": "Geri al",
+    "purge": "Kalıcı sil",
     "edit": "Düzenle",
     "remove": "Kaldır",
     "moveUp": "Yukarı",
@@ -31,6 +34,8 @@
     "checkedIn": "Geldi işaretlendi",
     "undo": "Geri al",
     "undoing": "Geri alınıyor...",
+    "archived": "Arşivli",
+    "dangerZone": "Tehlikeli bölge",
     "noData": "Veri yok.",
     "searchPlaceholder": "İsim, e-posta veya telefon ara",
     "clearSearch": "Temizle"
@@ -157,6 +162,18 @@
     "orgUpdateFailed": "Organizasyon güncellenemedi.",
     "orgDeleted": "Organizasyon silindi.",
     "orgDeleteFailed": "Organizasyon silinemedi.",
+    "orgArchived": "Organizasyon arşivlendi.",
+    "orgArchiveFailed": "Organizasyon arşivlenemedi.",
+    "orgRestored": "Organizasyon geri alındı.",
+    "orgRestoreFailed": "Organizasyon geri alınamadı.",
+    "orgPurged": "Organizasyon kalıcı olarak silindi.",
+    "orgPurgeFailed": "Organizasyon kalıcı olarak silinemedi.",
+    "eventArchived": "Etkinlik arşivlendi.",
+    "eventArchiveFailed": "Etkinlik arşivlenemedi.",
+    "eventRestored": "Etkinlik geri alındı.",
+    "eventRestoreFailed": "Etkinlik geri alınamadı.",
+    "eventPurged": "Etkinlik kalıcı olarak silindi.",
+    "eventPurgeFailed": "Etkinlik kalıcı olarak silinemedi.",
     "portalCodeInvalid": "Kod bulunamadı. Lütfen rehberinizden kontrol edin.",
     "portalLinkCopied": "Portal linki kopyalandı.",
     "portalLinkCopyFailed": "Portal linki kopyalanamadı.",
@@ -180,6 +197,7 @@
         "title": "Mevcut etkinlikler",
         "loading": "Etkinlikler yükleniyor...",
         "empty": "Henüz etkinlik yok. Yukarıdan ilk etkinliğini oluştur.",
+        "showArchived": "Arşivlileri göster",
         "manage": "Yönet",
         "openPortal": "Portal önizleme"
       }
@@ -188,6 +206,11 @@
       "loading": "Etkinlik detayları yükleniyor...",
       "detailsTitle": "Etkinlik Detayları",
       "detailsSubtitle": "Etkinlik adı ve tarihleri güncelle.",
+      "purgeWarning": "Kalıcı silme, etkinlik ve bağlı tüm verileri kaldırır.",
+      "purgeRequiresArchive": "Kalıcı silme için önce etkinliği arşivleyin.",
+      "purgeConfirmLabel": "Onay için SIL veya etkinlik adını yazın",
+      "purgeConfirmPlaceholder": "SIL veya etkinlik adı",
+      "purgeConfirmMismatch": "Onay metni eşleşmiyor.",
       "form": {
         "nameLabel": "Ad",
         "namePlaceholder": "Etkinlik adı",
@@ -295,6 +318,7 @@
       "manage": {
         "title": "Organizasyon yönetimi",
         "subtitle": "Pilot için organizasyonları oluştur, güncelle ve pasifleştir.",
+        "showArchived": "Arşivlileri göster",
         "createTitle": "Organizasyon oluştur",
         "creating": "Oluşturuluyor...",
         "create": "Oluştur",
@@ -309,7 +333,12 @@
         "requireLast4ForPortal": "Portal için son 4 hane iste",
         "save": "Kaydet",
         "saving": "Kaydediliyor...",
-        "confirmDelete": "{name} silinsin mi?"
+        "confirmDelete": "{name} silinsin mi?",
+        "purgeWarning": "Kalıcı silme, organizasyon ve bağlı tüm verileri kaldırır.",
+        "purgeRequiresArchive": "Kalıcı silme için önce organizasyonu arşivleyin.",
+        "purgeConfirmLabel": "Onay için SIL veya slug yazın",
+        "purgeConfirmPlaceholder": "SIL veya slug",
+        "purgeConfirmMismatch": "Onay metni eşleşmiyor."
       }
     }
   },

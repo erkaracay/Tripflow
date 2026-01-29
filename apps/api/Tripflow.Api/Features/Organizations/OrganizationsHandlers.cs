@@ -7,10 +7,11 @@ namespace Tripflow.Api.Features.Organizations;
 
 internal static class OrganizationsHandlers
 {
-    internal static async Task<IResult> GetOrganizations(TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetOrganizations(bool? includeArchived, TripflowDbContext db, CancellationToken ct)
     {
+        var showArchived = includeArchived ?? false;
         var orgs = await db.Organizations.AsNoTracking()
-            .Where(x => !x.IsDeleted)
+            .Where(x => showArchived || !x.IsDeleted)
             .OrderBy(x => x.Name)
             .Select(x => new OrganizationListItemDto(
                 x.Id,
@@ -30,7 +31,7 @@ internal static class OrganizationsHandlers
     internal static async Task<IResult> GetOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
     {
         var org = await db.Organizations.AsNoTracking()
-            .Where(x => x.Id == orgId && !x.IsDeleted)
+            .Where(x => x.Id == orgId)
             .Select(x => new OrganizationDetailDto(
                 x.Id,
                 x.Name,
@@ -106,7 +107,7 @@ internal static class OrganizationsHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Id == orgId && !x.IsDeleted, ct);
+        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Id == orgId, ct);
         if (org is null)
         {
             return Results.NotFound();
@@ -153,27 +154,98 @@ internal static class OrganizationsHandlers
         return Results.Ok(dto);
     }
 
-    internal static async Task<IResult> DeleteOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> ArchiveOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
     {
-        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Id == orgId && !x.IsDeleted, ct);
+        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Id == orgId, ct);
         if (org is null)
         {
             return Results.NotFound();
         }
 
-        var hasEvents = await db.Events.AnyAsync(x => x.OrganizationId == orgId, ct);
-        if (hasEvents)
+        if (!org.IsDeleted)
         {
-            return Results.BadRequest(new { message = "Org has active data." });
+            org.IsDeleted = true;
+            org.IsActive = false;
+            org.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
         }
 
-        org.IsDeleted = true;
-        org.IsActive = false;
-        org.UpdatedAt = DateTime.UtcNow;
+        var dto = new OrganizationDetailDto(
+            org.Id,
+            org.Name,
+            org.Slug,
+            org.IsActive,
+            org.IsDeleted,
+            org.RequireLast4ForQr,
+            org.RequireLast4ForPortal,
+            org.CreatedAt,
+            org.UpdatedAt);
+
+        return Results.Ok(dto);
+    }
+
+    internal static async Task<IResult> RestoreOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
+    {
+        var org = await db.Organizations.FirstOrDefaultAsync(x => x.Id == orgId, ct);
+        if (org is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (org.IsDeleted)
+        {
+            org.IsDeleted = false;
+            org.IsActive = true;
+            org.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
+
+        var dto = new OrganizationDetailDto(
+            org.Id,
+            org.Name,
+            org.Slug,
+            org.IsActive,
+            org.IsDeleted,
+            org.RequireLast4ForQr,
+            org.RequireLast4ForPortal,
+            org.CreatedAt,
+            org.UpdatedAt);
+
+        return Results.Ok(dto);
+    }
+
+    internal static async Task<IResult> PurgeOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
+    {
+        var org = await db.Organizations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == orgId, ct);
+        if (org is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!org.IsDeleted)
+        {
+            return Results.Conflict(new { message = "Organization must be archived before purge." });
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        db.CheckIns.RemoveRange(db.CheckIns.Where(x => x.OrganizationId == orgId));
+        db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.OrganizationId == orgId));
+        db.PortalSessions.RemoveRange(db.PortalSessions.Where(x => x.OrganizationId == orgId));
+        db.ParticipantAccesses.RemoveRange(db.ParticipantAccesses.Where(x => x.OrganizationId == orgId));
+        db.Participants.RemoveRange(db.Participants.Where(x => x.OrganizationId == orgId));
+        db.Events.RemoveRange(db.Events.Where(x => x.OrganizationId == orgId));
+        db.Users.RemoveRange(db.Users.Where(x => x.OrganizationId == orgId));
+        db.Organizations.RemoveRange(db.Organizations.Where(x => x.Id == orgId));
+
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return Results.NoContent();
     }
+
+    internal static Task<IResult> DeleteOrganization(Guid orgId, TripflowDbContext db, CancellationToken ct)
+        => ArchiveOrganization(orgId, db, ct);
 
     private static string Slugify(string input)
     {
