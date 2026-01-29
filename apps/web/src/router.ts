@@ -9,6 +9,7 @@ import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
 import EventPortal from './pages/portal/EventPortal.vue'
+import PortalLogin from './pages/portal/PortalLogin.vue'
 import type { UserRole } from './types'
 
 const router = createRouter({
@@ -50,7 +51,8 @@ const router = createRouter({
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
-    { path: '/t/:eventId', component: EventPortal, props: true },
+    { path: '/e/login', component: PortalLogin },
+    { path: '/e/:eventId', component: EventPortal, props: true },
   ],
 })
 

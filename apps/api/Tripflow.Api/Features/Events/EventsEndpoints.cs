@@ -58,6 +58,18 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/access-code", EventsHandlers.GetEventAccessCode)
+            .WithSummary("Get event access code")
+            .WithDescription("Returns the event access code used for participant login.")
+            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/access-code/regenerate", EventsHandlers.RegenerateEventAccessCode)
+            .WithSummary("Regenerate event access code")
+            .WithDescription("Regenerates the event access code. Existing portal sessions remain valid.")
+            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapDelete("/{eventId}/purge", EventsHandlers.PurgeEvent)
             .WithSummary("Purge event")
             .WithDescription("Permanently deletes an archived event and all related data.")

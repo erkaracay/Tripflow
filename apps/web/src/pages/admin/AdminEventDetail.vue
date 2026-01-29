@@ -18,9 +18,9 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
   DayPlan,
+  EventAccessCodeResponse,
   LinkInfo,
   Participant,
-  ParticipantPortalAccessResponse,
   Event as EventDto,
   EventPortalInfo,
   UserListItem,
@@ -71,11 +71,11 @@ const editingParticipantId = ref<string | null>(null)
 const editParticipantSaving = ref(false)
 const editParticipantErrorKey = ref<string | null>(null)
 const editParticipantErrorMessage = ref<string | null>(null)
-const portalAccessInfo = ref<Record<string, ParticipantPortalAccessResponse>>({})
-const portalAccessLoading = ref<Record<string, boolean>>({})
-const whatsappLinks = ref<Record<string, string>>({})
 const missingPhoneParticipantId = ref<string | null>(null)
 const editPhoneInput = ref<HTMLInputElement | null>(null)
+const accessCodeLoading = ref(false)
+const accessCodeMessageKey = ref<string | null>(null)
+const accessCodeErrorKey = ref<string | null>(null)
 const archivingEvent = ref(false)
 const restoringEvent = ref(false)
 const purgingEvent = ref(false)
@@ -314,31 +314,17 @@ const resolvePublicBase = () => {
   return globalThis.location?.origin ?? ''
 }
 
-const buildPortalLink = (token: string) => {
+const buildPortalLoginLink = (code?: string) => {
   const base = resolvePublicBase()
   if (!base) {
     return ''
   }
 
-  return `${base}/t/${eventId.value}?pt=${encodeURIComponent(token)}`
-}
-
-const setPortalAccessInfo = (participantId: string, info: ParticipantPortalAccessResponse) => {
-  portalAccessInfo.value = { ...portalAccessInfo.value, [participantId]: info }
-}
-
-const withPortalAccessLoading = async (
-  participantId: string,
-  action: () => Promise<ParticipantPortalAccessResponse>
-) => {
-  portalAccessLoading.value = { ...portalAccessLoading.value, [participantId]: true }
-  try {
-    const info = await action()
-    setPortalAccessInfo(participantId, info)
-    return info
-  } finally {
-    portalAccessLoading.value = { ...portalAccessLoading.value, [participantId]: false }
+  if (code) {
+    return `${base}/e/login?code=${encodeURIComponent(code)}`
   }
+
+  return `${base}/e/login`
 }
 
 const addPortalLink = () => {
@@ -399,6 +385,8 @@ const loadEvent = async () => {
   eventMessageKey.value = null
   eventErrorKey.value = null
   eventErrorMessage.value = null
+  accessCodeMessageKey.value = null
+  accessCodeErrorKey.value = null
   dateHintKey.value = null
   editingParticipantId.value = null
   editParticipantErrorKey.value = null
@@ -754,55 +742,49 @@ const copyToClipboard = async (value: string, successKey: string, errorKey: stri
     pushToast({ key: errorKey, tone: 'error' })
   }
 }
-
-const fetchParticipantAccess = async (participant: Participant) => {
-  return withPortalAccessLoading(participant.id, async () =>
-    apiGet<ParticipantPortalAccessResponse>(
-      `/api/events/${eventId.value}/participants/${participant.id}/portal-access`
-    )
-  )
+const copyPortalLoginLink = async () => {
+  const url = buildPortalLoginLink(event.value?.eventAccessCode ?? undefined)
+  if (!url) {
+    pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
+    return
+  }
+  await copyToClipboard(url, 'toast.portalLinkCopied', 'toast.portalLinkCopyFailed')
 }
 
-const resetParticipantAccess = async (participant: Participant) => {
-  const confirmed = globalThis.confirm?.(
-    t('admin.portalAccess.resetConfirm', { name: participant.fullName })
-  )
-  if (!confirmed) {
+const copyEventAccessCode = async () => {
+  const code = event.value?.eventAccessCode ?? ''
+  if (!code) {
+    pushToast({ key: 'toast.eventAccessCodeCopyFailed', tone: 'error' })
     return
   }
 
+  await copyToClipboard(code, 'toast.eventAccessCodeCopied', 'toast.eventAccessCodeCopyFailed')
+}
+
+const regenerateEventAccessCode = async () => {
+  if (accessCodeLoading.value) {
+    return
+  }
+
+  accessCodeLoading.value = true
+  accessCodeMessageKey.value = null
+  accessCodeErrorKey.value = null
   try {
-    const info = await withPortalAccessLoading(participant.id, async () =>
-      apiPost<ParticipantPortalAccessResponse>(
-        `/api/events/${eventId.value}/participants/${participant.id}/portal-access/reset`,
-        {}
-      )
+    const response = await apiPost<EventAccessCodeResponse>(
+      `/api/events/${eventId.value}/access-code/regenerate`,
+      {}
     )
-    const url = buildPortalLink(info.token)
-    if (url) {
-      await copyToClipboard(url, 'toast.portalLinkReset', 'toast.portalLinkCopyFailed')
+    if (event.value) {
+      event.value.eventAccessCode = response.eventAccessCode
     }
+    accessCodeMessageKey.value = 'admin.eventAccess.regenerated'
+    pushToast({ key: 'toast.eventAccessCodeRegenerated', tone: 'success' })
   } catch {
-    pushToast({ key: 'toast.portalLinkResetFailed', tone: 'error' })
+    accessCodeErrorKey.value = 'errors.eventAccess.regenerate'
+    pushToast({ key: 'toast.eventAccessCodeRegenerateFailed', tone: 'error' })
+  } finally {
+    accessCodeLoading.value = false
   }
-}
-
-const copyPortalLink = async (participant: Participant) => {
-  try {
-    const info = await fetchParticipantAccess(participant)
-    const url = buildPortalLink(info.token)
-    if (!url) {
-      pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
-      return
-    }
-    await copyToClipboard(url, 'toast.portalLinkCopied', 'toast.portalLinkCopyFailed')
-  } catch {
-    pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
-  }
-}
-
-const setWhatsAppLink = (participantId: string, url: string) => {
-  whatsappLinks.value = { ...whatsappLinks.value, [participantId]: url }
 }
 
 const handleMissingWhatsAppPhone = async (participant: Participant) => {
@@ -814,40 +796,7 @@ const handleMissingWhatsAppPhone = async (participant: Participant) => {
   editPhoneInput.value?.focus()
 }
 
-const ensureWhatsAppLink = async (participant: Participant) => {
-  const cached = whatsappLinks.value[participant.id]
-  if (cached) {
-    return cached
-  }
-
-  const info = portalAccessInfo.value[participant.id] ?? (await fetchParticipantAccess(participant))
-  const portalUrl = buildPortalLink(info.token)
-  if (!portalUrl) {
-    return ''
-  }
-
-  const requiresLast4 = info.policy?.requireLast4ForQr ?? false
-  const messageKey = requiresLast4
-    ? 'admin.portalAccess.whatsappTemplateWithLast4'
-    : 'admin.portalAccess.whatsappTemplate'
-  const message = t(messageKey, {
-    name: participant.fullName,
-    url: portalUrl,
-  })
-  const waUrl = buildWhatsAppUrl(participant.phone ?? '', message)
-  if (!waUrl) {
-    return ''
-  }
-
-  setWhatsAppLink(participant.id, waUrl)
-  return waUrl
-}
-
 const openWhatsApp = async (participant: Participant) => {
-  if (portalAccessLoading.value[participant.id]) {
-    return
-  }
-
   if (!participant.phone) {
     await handleMissingWhatsAppPhone(participant)
     return
@@ -856,7 +805,22 @@ const openWhatsApp = async (participant: Participant) => {
   missingPhoneParticipantId.value = null
 
   try {
-    const waUrl = await ensureWhatsAppLink(participant)
+    const portalUrl = buildPortalLoginLink(event.value?.eventAccessCode ?? undefined)
+    if (!portalUrl) {
+      pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
+      return
+    }
+    const code = event.value?.eventAccessCode ?? ''
+    if (!code) {
+      pushToast({ key: 'toast.eventAccessCodeCopyFailed', tone: 'error' })
+      return
+    }
+    const message = t('admin.eventAccess.whatsappTemplate', {
+      name: participant.fullName,
+      code,
+      url: portalUrl,
+    })
+    const waUrl = buildWhatsAppUrl(participant.phone ?? '', message)
     if (!waUrl) {
       pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
       return
@@ -1100,7 +1064,7 @@ onMounted(loadEvent)
         </button>
         <a
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-          :href="`/t/${eventId}?preview=1`"
+          href="/e/login"
           rel="noreferrer"
           target="_blank"
         >
@@ -1497,6 +1461,51 @@ onMounted(loadEvent)
         </form>
       </section>
 
+      <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-2">
+          <h2 class="text-lg font-semibold">{{ t('admin.eventAccess.title') }}</h2>
+          <p class="text-sm text-slate-500">{{ t('admin.eventAccess.subtitle') }}</p>
+        </div>
+
+        <div class="mt-4 grid gap-3">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('admin.eventAccess.codeLabel') }}</div>
+            <div class="mt-1 font-mono text-lg tracking-[0.2em] text-slate-800">
+              {{ event?.eventAccessCode || t('admin.eventAccess.codeMissing') }}
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="!event?.eventAccessCode"
+              @click="copyEventAccessCode"
+            >
+              {{ t('admin.eventAccess.copyCode') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="copyPortalLoginLink"
+            >
+              {{ t('admin.eventAccess.copyLoginLink') }}
+            </button>
+            <button
+              class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="accessCodeLoading"
+              @click="regenerateEventAccessCode"
+            >
+              {{ accessCodeLoading ? t('common.saving') : t('admin.eventAccess.regenerate') }}
+            </button>
+          </div>
+
+          <p v-if="accessCodeMessageKey" class="text-xs text-emerald-600">{{ t(accessCodeMessageKey) }}</p>
+          <p v-if="accessCodeErrorKey" class="text-xs text-rose-600">{{ t(accessCodeErrorKey) }}</p>
+        </div>
+      </section>
+
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">{{ t('admin.participants.title') }}</h2>
@@ -1764,32 +1773,17 @@ onMounted(loadEvent)
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span class="font-mono">{{ participant.checkInCode }}</span>
-                <span
-                  v-if="portalAccessInfo[participant.id]?.isLocked"
-                  class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700"
-                >
-                  {{ t('admin.portalAccess.locked') }}
-                </span>
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <button
-                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  :disabled="portalAccessLoading[participant.id]"
-                  @click="copyPortalLink(participant)"
-                >
-                  {{ t('admin.portalAccess.copyLink') }}
-                </button>
                 <a
                   class="inline-flex items-center gap-1.5 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                   :class="
-                    portalAccessLoading[participant.id] || !participant.phone
+                    !participant.phone
                       ? 'cursor-not-allowed opacity-50'
                       : 'hover:border-emerald-300 hover:bg-emerald-100'
                   "
-                  :href="whatsappLinks[participant.id] || '#'"
                   :aria-label="t('actions.whatsappAria')"
-                  :aria-disabled="portalAccessLoading[participant.id] || !participant.phone"
+                  :aria-disabled="!participant.phone"
                   rel="noreferrer"
                   target="_blank"
                   @click.prevent="openWhatsApp(participant)"
@@ -1797,14 +1791,6 @@ onMounted(loadEvent)
                   <WhatsAppIcon class="text-emerald-700" :size="14" />
                   <span>{{ t('actions.whatsapp') }}</span>
                 </a>
-                <button
-                  class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  :disabled="portalAccessLoading[participant.id]"
-                  @click="resetParticipantAccess(participant)"
-                >
-                  {{ t('admin.portalAccess.reset') }}
-                </button>
                 <button
                   class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                   type="button"

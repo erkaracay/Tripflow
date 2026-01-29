@@ -1,9 +1,11 @@
 using System.Globalization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -77,6 +79,7 @@ internal static class EventsHandlers
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
+            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, orgId, ct),
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -156,14 +159,55 @@ internal static class EventsHandlers
         return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
-    internal static async Task<IResult> GetEvent(string eventId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetEvent(string eventId, HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
-        var entity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var session = await PortalSessionHelpers.GetValidSessionAsync(httpContext, db, ct);
+        EventEntity? entity = null;
+        if (session is not null && session.EventId == id)
+        {
+            entity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        }
+        else
+        {
+            var role = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
+            var isAdmin = string.Equals(role, "AgencyAdmin", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+            var isGuide = string.Equals(role, "Guide", StringComparison.OrdinalIgnoreCase);
+
+            if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            {
+                return orgError!;
+            }
+
+            if (isAdmin)
+            {
+                entity = await db.Events.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+            }
+            else if (isGuide)
+            {
+                var userId = httpContext.User.FindFirstValue("sub");
+                if (!Guid.TryParse(userId, out var guideId))
+                {
+                    return Results.Unauthorized();
+                }
+
+                entity = await db.Events.AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Id == id && x.OrganizationId == orgId && x.GuideUserId == guideId,
+                        ct);
+            }
+            else
+            {
+                return Results.Unauthorized();
+            }
+        }
+
         if (entity is null)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -234,6 +278,60 @@ internal static class EventsHandlers
         return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
+    internal static async Task<IResult> GetEventAccessCode(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
+    }
+
+    internal static async Task<IResult> RegenerateEventAccessCode(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        entity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, orgId, ct);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
+    }
+
     internal static async Task<IResult> PurgeEvent(
         string eventId,
         HttpContext httpContext,
@@ -292,14 +390,39 @@ internal static class EventsHandlers
         return Results.NoContent();
     }
 
-    internal static async Task<IResult> GetPortal(string eventId, TripflowDbContext db, CancellationToken ct)
+    internal static async Task<IResult> GetPortal(string eventId, HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
         }
 
-        var eventEntity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var session = await PortalSessionHelpers.GetValidSessionAsync(httpContext, db, ct);
+        EventEntity? eventEntity = null;
+        if (session is not null && session.EventId == id)
+        {
+            eventEntity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        }
+        else
+        {
+            var role = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
+            var isAdmin = string.Equals(role, "AgencyAdmin", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAdmin)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            {
+                return orgError!;
+            }
+
+            eventEntity = await db.Events.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        }
+
         if (eventEntity is null)
         {
             return Results.NotFound(new { message = "Event not found." });
@@ -571,10 +694,10 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Phone is required.");
         }
 
-        var tcNo = request.TcNo?.Trim();
-        if (string.IsNullOrWhiteSpace(tcNo))
+        var tcNo = NormalizeTcNo(request.TcNo);
+        if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
         {
-            return EventsHelpers.BadRequest("TcNo is required.");
+            return EventsHelpers.BadRequest("TcNo must be 11 digits.");
         }
 
         if (!EventsHelpers.TryParseDate(request.BirthDate, out var birthDate))
@@ -592,7 +715,7 @@ internal static class EventsHandlers
             .AnyAsync(x => x.EventId == id && x.OrganizationId == orgId && x.TcNo == tcNo, ct);
         if (tcExists)
         {
-            return Results.Conflict(new { message = "TcNo already exists for this event." });
+            httpContext.Response.Headers["X-Warning"] = "Duplicate TcNo exists for this event.";
         }
 
         var code = await EventsHelpers.GenerateUniqueCheckInCodeAsync(db, ct);
@@ -697,10 +820,10 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Phone is required.");
         }
 
-        var tcNo = request.TcNo?.Trim();
-        if (string.IsNullOrWhiteSpace(tcNo))
+        var tcNo = NormalizeTcNo(request.TcNo);
+        if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
         {
-            return EventsHelpers.BadRequest("TcNo is required.");
+            return EventsHelpers.BadRequest("TcNo must be 11 digits.");
         }
 
         if (!EventsHelpers.TryParseDate(request.BirthDate, out var birthDate))
@@ -721,7 +844,7 @@ internal static class EventsHandlers
                 .AnyAsync(x => x.EventId == id && x.OrganizationId == orgId && x.TcNo == tcNo && x.Id != entity.Id, ct);
             if (tcExists)
             {
-                return Results.Conflict(new { message = "TcNo already exists for this event." });
+                httpContext.Response.Headers["X-Warning"] = "Duplicate TcNo exists for this event.";
             }
         }
 
@@ -1206,4 +1329,7 @@ internal static class EventsHandlers
         time = null;
         return false;
     }
+
+    private static string NormalizeTcNo(string? value)
+        => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
 }

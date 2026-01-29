@@ -14,74 +14,7 @@ internal static class PortalAccessHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Pt))
-        {
-            return Results.BadRequest(new { message = "pt token is required." });
-        }
-
-        if (!Guid.TryParse(request.EventId, out var eventId))
-        {
-            return Results.BadRequest(new { message = "eventId is required." });
-        }
-
-        if (!PortalAccessHelpers.TryParseToken(request.Pt, out var tokenId, out var secret))
-        {
-            return Results.NotFound();
-        }
-
-        var access = await db.ParticipantAccesses
-            .Include(x => x.Participant)
-            .FirstOrDefaultAsync(x => x.Id == tokenId && x.RevokedAt == null, ct);
-
-        if (access is null || !PortalAccessHelpers.SecretMatches(secret, access.SecretHash))
-        {
-            return Results.NotFound();
-        }
-
-        var participant = access.Participant;
-        if (participant is null)
-        {
-            return Results.NotFound();
-        }
-
-        if (participant.EventId != eventId)
-        {
-            return Results.NotFound();
-        }
-
-        var org = await db.Organizations.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == participant.OrganizationId, ct);
-        if (org is null)
-        {
-            return Results.NotFound();
-        }
-
-        var now = DateTime.UtcNow;
-        var lockedUntil = participant.PortalLockedUntil;
-        var isLocked = lockedUntil.HasValue && lockedUntil.Value > now;
-        var lockedForSeconds = isLocked ? (int)Math.Ceiling((lockedUntil!.Value - now).TotalSeconds) : 0;
-        var attemptsRemaining = isLocked
-            ? 0
-            : Math.Max(0, PortalAccessHelpers.MaxAttempts - participant.PortalFailedAttempts);
-
-        var policy = BuildPolicy(org);
-        var portal = await GetPortalInfoAsync(db, participant.EventId, participant.OrganizationId, ct);
-        if (portal is null)
-        {
-            return Results.NotFound();
-        }
-
-        var response = new PortalAccessVerifyResponse(
-            participant.EventId,
-            portal,
-            policy,
-            BuildParticipantSummary(participant),
-            PortalAccessHelpers.BuildPhoneHint(participant.Phone),
-            isLocked,
-            lockedForSeconds,
-            attemptsRemaining);
-
-        return Results.Ok(response);
+        return Results.StatusCode(StatusCodes.Status410Gone);
     }
 
     internal static async Task<IResult> ConfirmAccess(
@@ -89,98 +22,7 @@ internal static class PortalAccessHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Pt))
-        {
-            return Results.BadRequest(new { message = "pt token is required." });
-        }
-
-        if (!Guid.TryParse(request.EventId, out var eventId))
-        {
-            return Results.BadRequest(new { message = "eventId is required." });
-        }
-
-        if (!PortalAccessHelpers.TryParseToken(request.Pt, out var tokenId, out var secret))
-        {
-            return Results.NotFound();
-        }
-
-        var access = await db.ParticipantAccesses
-            .Include(x => x.Participant)
-            .FirstOrDefaultAsync(x => x.Id == tokenId && x.RevokedAt == null, ct);
-
-        if (access is null || !PortalAccessHelpers.SecretMatches(secret, access.SecretHash))
-        {
-            return Results.NotFound();
-        }
-
-        var participant = access.Participant;
-        if (participant is null)
-        {
-            return Results.NotFound();
-        }
-
-        if (participant.EventId != eventId)
-        {
-            return Results.NotFound();
-        }
-
-        var org = await db.Organizations.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == participant.OrganizationId, ct);
-        if (org is null)
-        {
-            return Results.NotFound();
-        }
-
-        var policy = BuildPolicy(org);
-        var requiresLast4 = policy.RequireLast4ForPortal || policy.RequireLast4ForQr;
-        var now = DateTime.UtcNow;
-
-        if (requiresLast4)
-        {
-            if (participant.PortalLockedUntil.HasValue && participant.PortalLockedUntil.Value > now)
-            {
-                return Results.Json(new { message = "Too many attempts. Try later." }, statusCode: StatusCodes.Status429TooManyRequests);
-            }
-
-            var phoneLast4 = PortalAccessHelpers.ExtractLast4(participant.Phone);
-            if (string.IsNullOrWhiteSpace(phoneLast4))
-            {
-                return Results.BadRequest(new { message = "Participant phone is required." });
-            }
-
-            var providedLast4 = PortalAccessHelpers.ExtractLast4(request.Last4);
-            if (string.IsNullOrWhiteSpace(providedLast4) || !string.Equals(phoneLast4, providedLast4, StringComparison.Ordinal))
-            {
-                participant.PortalFailedAttempts += 1;
-                participant.PortalLastFailedAt = now;
-
-                if (participant.PortalFailedAttempts >= PortalAccessHelpers.MaxAttempts)
-                {
-                    participant.PortalLockedUntil = now.Add(PortalAccessHelpers.LockDuration);
-                }
-
-                await db.SaveChangesAsync(ct);
-                return Results.Unauthorized();
-            }
-
-            participant.PortalFailedAttempts = 0;
-            participant.PortalLockedUntil = null;
-            participant.PortalLastFailedAt = null;
-        }
-
-        var session = new PortalSessionEntity
-        {
-            Id = Guid.NewGuid(),
-            OrganizationId = participant.OrganizationId,
-            ParticipantId = participant.Id,
-            CreatedAt = now,
-            ExpiresAt = now.Add(PortalAccessHelpers.SessionLifetime)
-        };
-
-        db.PortalSessions.Add(session);
-        await db.SaveChangesAsync(ct);
-
-        return Results.Ok(new PortalAccessConfirmResponse(session.Id.ToString(), session.ExpiresAt, policy, BuildParticipantSummary(participant)));
+        return Results.StatusCode(StatusCodes.Status410Gone);
     }
 
     internal static async Task<IResult> GetMe(
@@ -188,44 +30,7 @@ internal static class PortalAccessHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        var sessionHeader = httpContext.Request.Headers["X-Portal-Session"].FirstOrDefault();
-        if (!Guid.TryParse(sessionHeader, out var sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        var session = await db.PortalSessions
-            .Include(x => x.Participant)
-            .FirstOrDefaultAsync(x => x.Id == sessionId, ct);
-
-        if (session is null || session.ExpiresAt <= DateTime.UtcNow)
-        {
-            return Results.Unauthorized();
-        }
-
-        var participant = session.Participant;
-        if (participant is null)
-        {
-            return Results.Unauthorized();
-        }
-
-        var org = await db.Organizations.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == participant.OrganizationId, ct);
-        if (org is null)
-        {
-            return Results.Unauthorized();
-        }
-
-        var arrived = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.ParticipantId == participant.Id && x.OrganizationId == participant.OrganizationId, ct);
-
-        return Results.Ok(new PortalAccessMeResponse(
-            participant.EventId,
-            participant.Id,
-            participant.FullName,
-            participant.CheckInCode,
-            arrived,
-            BuildPolicy(org)));
+        return Results.StatusCode(StatusCodes.Status410Gone);
     }
 
     internal static async Task<IResult> GetParticipantAccess(

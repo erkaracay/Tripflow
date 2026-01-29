@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Events;
 using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Data.Dev;
@@ -312,6 +313,12 @@ public static class DevSeed
                 db.Events.Update(eventEntity);
                 state.Seeded = true;
             }
+            if (string.IsNullOrWhiteSpace(eventEntity.EventAccessCode))
+            {
+                eventEntity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, organizationId, ct);
+                db.Events.Update(eventEntity);
+                state.Seeded = true;
+            }
             return eventEntity;
         }
 
@@ -322,6 +329,7 @@ public static class DevSeed
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
+            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, organizationId, ct),
             CreatedAt = now,
             GuideUserId = guideUserId
         };

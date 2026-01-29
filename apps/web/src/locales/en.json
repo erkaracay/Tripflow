@@ -112,6 +112,9 @@
       "update": "Failed to update organization.",
       "delete": "Failed to delete organization."
     },
+    "eventAccess": {
+      "regenerate": "Failed to regenerate access code."
+    },
     "checkIn": {
       "load": "Failed to load check-in data.",
       "failed": "Check-in failed."
@@ -185,7 +188,11 @@
     "portalLinkCopyFailed": "Failed to copy portal link.",
     "portalWhatsappCopied": "WhatsApp message copied.",
     "portalLinkReset": "Portal link reset and copied.",
-    "portalLinkResetFailed": "Failed to reset portal link."
+    "portalLinkResetFailed": "Failed to reset portal link.",
+    "eventAccessCodeCopied": "Access code copied.",
+    "eventAccessCodeCopyFailed": "Failed to copy access code.",
+    "eventAccessCodeRegenerated": "Access code regenerated.",
+    "eventAccessCodeRegenerateFailed": "Failed to regenerate access code."
   },
   "admin": {
     "events": {
@@ -205,7 +212,7 @@
         "empty": "No events yet. Create your first event above.",
         "showArchived": "Show archived",
         "manage": "Manage",
-        "openPortal": "Preview portal"
+        "openPortal": "Open portal login"
       }
     },
     "eventDetail": {
@@ -224,7 +231,7 @@
         "endDateLabel": "End date",
         "save": "Save event"
       },
-      "openPortal": "Preview portal",
+      "openPortal": "Open portal login",
       "guide": {
         "title": "Guide Assignment",
         "subtitle": "Assign a guide to run check-ins for this event.",
@@ -249,6 +256,7 @@
       "invalidCode": "Invalid code.",
       "foundParticipant": "Found",
       "scanningActive": "Point the camera at the QR code.",
+      "lastAction": "Last check-in: {name}",
       "checkInNow": "Check-in",
       "scanAgain": "Scan again",
       "autoCheckInToggle": "Auto check-in after scan",
@@ -323,6 +331,17 @@
       "locked": "Locked",
       "whatsappTemplate": "Hi {name}, your Tripflow link: {url}",
       "whatsappTemplateWithLast4": "Hi {name}, your Tripflow link: {url}\nTo view the QR, enter the last 4 digits of your phone."
+    },
+    "eventAccess": {
+      "title": "Event access",
+      "subtitle": "Participants can log in with the access code and their identity number.",
+      "codeLabel": "Access code",
+      "codeMissing": "Not available",
+      "copyCode": "Copy code",
+      "copyLoginLink": "Copy login link",
+      "regenerate": "Regenerate code",
+      "regenerated": "Access code regenerated.",
+      "whatsappTemplate": "Hi {name}, use access code {code} to log in: {url}"
     },
     "portal": {
       "title": "Portal Content",
@@ -447,6 +466,8 @@
     },
     "actions": {
       "copyPageLink": "Copy link",
+      "copyLoginLink": "Copy login link",
+      "logout": "Log out",
       "linkCopied": "Link copied.",
       "copyLinkFailed": "Unable to copy link."
     },
@@ -466,6 +487,7 @@
       "codePlaceholder": "Verify to reveal",
       "noCode": "No code yet",
       "copyCode": "Copy code",
+      "codeCopied": "Code copied.",
       "last4Prompt": "Enter the last 4 digits of your phone to view QR ({hint}).",
       "helper": "The QR opens the guide check-in screen with the code prefilled.",
       "empty": "Verify your link to generate the QR.",
@@ -494,6 +516,23 @@
       "invalidLast4": "Last 4 digits do not match.",
       "last4Required": "Enter the last 4 digits.",
       "rateLimited": "Please wait {seconds}s before trying again."
+    },
+    "login": {
+      "title": "Participant login",
+      "subtitle": "Enter the event access code and your identity number.",
+      "accessCodeLabel": "Event access code",
+      "accessCodePlaceholder": "AB12CD34",
+      "tcLabel": "Identity number (TC)",
+      "tcPlaceholder": "11 digits",
+      "submit": "Continue",
+      "submitting": "Verifying...",
+      "accessCodeRequired": "Access code is required.",
+      "tcRequired": "Identity number must be 11 digits.",
+      "failed": "Login failed. Check your details.",
+      "rateLimited": "Too many attempts. Please wait and try again.",
+      "rateLimitedWithTime": "Please wait {seconds}s before trying again.",
+      "requiredTitle": "Login required",
+      "requiredSubtitle": "Please log in to view the event portal."
     },
     "sessionExpired": {
       "message": "Your session has expired. Please verify again to continue.",

@@ -29,13 +29,37 @@ internal static class EventsHelpers
         return true;
     }
 
+    internal static async Task<string> GenerateEventAccessCodeAsync(TripflowDbContext db, Guid organizationId, CancellationToken ct)
+    {
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var buffer = new char[8];
+            for (var i = 0; i < buffer.Length; i++)
+            {
+                buffer[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
+            }
+
+            var code = new string(buffer);
+            var exists = await db.Events.AsNoTracking()
+                .AnyAsync(x => x.OrganizationId == organizationId && x.EventAccessCode == code, ct);
+            if (!exists)
+            {
+                return code;
+            }
+        }
+
+        return Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+    }
+
     internal static EventDto ToDto(EventEntity entity)
         => new(entity.Id,
             entity.Name,
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
             entity.GuideUserId,
-            entity.IsDeleted);
+            entity.IsDeleted,
+            entity.EventAccessCode);
 
     internal static EventPortalInfo? TryDeserializePortal(string json)
     {

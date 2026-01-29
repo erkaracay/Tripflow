@@ -237,7 +237,7 @@ onMounted(loadEvents)
             </RouterLink>
             <a
               class="text-slate-700 underline hover:text-slate-900"
-            :href="`/t/${event.id}?preview=1`"
+              href="/e/login"
               rel="noreferrer"
               target="_blank"
             >

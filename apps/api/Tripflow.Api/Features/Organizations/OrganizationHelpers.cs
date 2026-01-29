@@ -7,7 +7,7 @@ internal static class OrganizationHelpers
 {
     internal static bool TryResolveOrganizationId(HttpContext context, out Guid organizationId, out IResult? error)
     {
-        var role = context.User.FindFirstValue("role");
+        var role = context.User.FindFirstValue("role") ?? context.User.FindFirstValue(ClaimTypes.Role);
         if (string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
         {
             var header = context.Request.Headers["X-Org-Id"].FirstOrDefault();

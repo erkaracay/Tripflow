@@ -4,6 +4,7 @@ export type Event = {
   startDate: string
   endDate: string
   guideUserId?: string | null
+  eventAccessCode?: string | null
   isDeleted: boolean
 }
 
@@ -142,49 +143,34 @@ export type LoginResponse = {
   fullName?: string | null
 }
 
-export type PortalAccessVerifyResponse = {
-  eventId: string
-  portal: EventPortalInfo
-  policy: PortalAccessPolicy
-  participant: PortalParticipantSummary
-  phoneHint?: string | null
-  isLocked: boolean
-  lockedForSeconds: number
-  attemptsRemaining: number
-}
-
-export type PortalAccessConfirmResponse = {
-  sessionToken: string
+export type PortalLoginResponse = {
+  portalSessionToken: string
   expiresAt: string
-  policy: PortalAccessPolicy
-  participant: PortalParticipantSummary
-}
-
-export type PortalAccessMeResponse = {
   eventId: string
   participantId: string
-  participantName: string
-  checkInCode: string
-  arrived: boolean
-  policy: PortalAccessPolicy
 }
 
-export type ParticipantPortalAccessResponse = {
-  token: string
-  isLocked: boolean
-  lockedUntil?: string | null
-  failedAttempts: number
-  policy: PortalAccessPolicy
+export type PortalMeResponse = {
+  event: {
+    id: string
+    name: string
+    startDate: string
+    endDate: string
+  }
+  participant: {
+    id: string
+    fullName: string
+    phone: string
+    email?: string | null
+    tcNo: string
+    birthDate: string
+    gender: ParticipantGender
+    checkInCode: string
+  }
+  portal: EventPortalInfo
 }
 
-export type PortalAccessPolicy = {
-  requireLast4ForQr: boolean
-  requireLast4ForPortal: boolean
-  maxAttempts: number
-  lockMinutes: number
-}
-
-export type PortalParticipantSummary = {
-  displayName: string
-  hasPhone: boolean
+export type EventAccessCodeResponse = {
+  eventId: string
+  eventAccessCode: string
 }

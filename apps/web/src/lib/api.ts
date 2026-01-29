@@ -1,10 +1,6 @@
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './auth'
 import { pushToast } from './toast'
-import type {
-  PortalAccessConfirmResponse,
-  PortalAccessMeResponse,
-  PortalAccessVerifyResponse,
-} from '../types'
+import type { PortalLoginResponse, PortalMeResponse } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
@@ -36,7 +32,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
   if (response.status === 401) {
     const path = globalThis.location?.pathname ?? ''
-    const isPortal = path.startsWith('/t/')
+    const isPortal = path.startsWith('/e/')
     clearToken()
     if (!isPortal) {
       pushToast({ key: 'toast.sessionExpired', tone: 'error' })
@@ -67,8 +63,9 @@ const handlePortalResponse = async <T>(response: Response): Promise<T> => {
         ? String((data as { message?: string }).message ?? 'Request failed')
         : response.statusText
 
-    const error = new Error(message) as Error & { status?: number }
+    const error = new Error(message) as Error & { status?: number; payload?: unknown }
     error.status = response.status
+    error.payload = data
     throw error
   }
 
@@ -155,25 +152,13 @@ const portalGet = async <T>(path: string, headers?: Record<string, string>): Pro
   return handlePortalResponse<T>(response)
 }
 
-export const portalVerifyAccess = async (
-  eventId: string,
-  token: string
-): Promise<PortalAccessVerifyResponse> => {
-  return portalPost<PortalAccessVerifyResponse>('/api/portal/access/verify', { eventId, pt: token })
+export const portalLogin = async (
+  eventAccessCode: string,
+  tcNo: string
+): Promise<PortalLoginResponse> => {
+  return portalPost<PortalLoginResponse>('/api/portal/login', { eventAccessCode, tcNo })
 }
 
-export const portalConfirmAccess = async (
-  eventId: string,
-  token: string,
-  last4?: string
-): Promise<PortalAccessConfirmResponse> => {
-  return portalPost<PortalAccessConfirmResponse>('/api/portal/access/confirm', {
-    eventId,
-    pt: token,
-    last4: last4 ?? null,
-  })
-}
-
-export const portalGetMe = async (sessionToken: string): Promise<PortalAccessMeResponse> => {
-  return portalGet<PortalAccessMeResponse>('/api/portal/access/me', { 'X-Portal-Session': sessionToken })
+export const portalGetMe = async (sessionToken: string): Promise<PortalMeResponse> => {
+  return portalGet<PortalMeResponse>('/api/portal/me', { 'X-Portal-Session': sessionToken })
 }

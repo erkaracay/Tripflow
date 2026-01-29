@@ -112,6 +112,9 @@
       "update": "Organizasyon güncellenemedi.",
       "delete": "Organizasyon silinemedi."
     },
+    "eventAccess": {
+      "regenerate": "Erişim kodu yenilenemedi."
+    },
     "checkIn": {
       "load": "Yoklama verileri yüklenemedi.",
       "failed": "Yoklama başarısız."
@@ -185,7 +188,11 @@
     "portalLinkCopyFailed": "Portal linki kopyalanamadı.",
     "portalWhatsappCopied": "WhatsApp mesajı kopyalandı.",
     "portalLinkReset": "Portal linki sıfırlandı ve kopyalandı.",
-    "portalLinkResetFailed": "Portal linki sıfırlanamadı."
+    "portalLinkResetFailed": "Portal linki sıfırlanamadı.",
+    "eventAccessCodeCopied": "Erişim kodu kopyalandı.",
+    "eventAccessCodeCopyFailed": "Erişim kodu kopyalanamadı.",
+    "eventAccessCodeRegenerated": "Erişim kodu yenilendi.",
+    "eventAccessCodeRegenerateFailed": "Erişim kodu yenilenemedi."
   },
   "admin": {
     "events": {
@@ -205,7 +212,7 @@
         "empty": "Henüz etkinlik yok. Yukarıdan ilk etkinliğini oluştur.",
         "showArchived": "Arşivlileri göster",
         "manage": "Yönet",
-        "openPortal": "Portal önizleme"
+        "openPortal": "Portal girişini aç"
       }
     },
     "eventDetail": {
@@ -224,7 +231,7 @@
         "endDateLabel": "Bitiş tarihi",
         "save": "Etkinliği kaydet"
       },
-      "openPortal": "Portal önizleme",
+      "openPortal": "Portal girişini aç",
       "guide": {
         "title": "Rehber Atama",
         "subtitle": "Bu etkinlik için yoklama alacak rehberi seç.",
@@ -308,6 +315,17 @@
       "locked": "Kilitli",
       "whatsappTemplate": "Merhaba {name}, Tripflow linkin: {url}",
       "whatsappTemplateWithLast4": "Merhaba {name}, Tripflow linkin: {url}\nQR görmek için telefonunun son 4 hanesini gir."
+    },
+    "eventAccess": {
+      "title": "Etkinlik erişimi",
+      "subtitle": "Katılımcılar erişim kodu ve TC kimlik no ile giriş yapar.",
+      "codeLabel": "Erişim kodu",
+      "codeMissing": "Mevcut değil",
+      "copyCode": "Kodu kopyala",
+      "copyLoginLink": "Giriş linkini kopyala",
+      "regenerate": "Kodu yenile",
+      "regenerated": "Erişim kodu yenilendi.",
+      "whatsappTemplate": "Merhaba {name}, giriş için erişim kodu {code}: {url}"
     },
     "portal": {
       "title": "Portal İçeriği",
@@ -435,6 +453,8 @@
     },
     "actions": {
       "copyPageLink": "Bağlantıyı kopyala",
+      "copyLoginLink": "Giriş linkini kopyala",
+      "logout": "Çıkış",
       "linkCopied": "Bağlantı kopyalandı.",
       "copyLinkFailed": "Bağlantı kopyalanamadı."
     },
@@ -454,6 +474,7 @@
       "codePlaceholder": "Doğrulayınca görünür",
       "noCode": "Kod yok",
       "copyCode": "Kodu kopyala",
+      "codeCopied": "Kod kopyalandı.",
       "last4Prompt": "QR görmek için telefonunun son 4 hanesini gir ({hint}).",
       "helper": "QR, kodu hazır halde rehber yoklama ekranını açar.",
       "empty": "QR için linki doğrulayın.",
@@ -482,6 +503,23 @@
       "invalidLast4": "Son 4 hane eşleşmiyor.",
       "last4Required": "Son 4 haneyi gir.",
       "rateLimited": "Yeniden denemek için {seconds} sn bekleyin."
+    },
+    "login": {
+      "title": "Katılımcı girişi",
+      "subtitle": "Etkinlik erişim kodunu ve TC kimlik numaranı gir.",
+      "accessCodeLabel": "Etkinlik erişim kodu",
+      "accessCodePlaceholder": "AB12CD34",
+      "tcLabel": "TC kimlik no",
+      "tcPlaceholder": "11 hane",
+      "submit": "Devam et",
+      "submitting": "Doğrulanıyor...",
+      "accessCodeRequired": "Erişim kodu gerekli.",
+      "tcRequired": "TC kimlik numarası 11 hane olmalı.",
+      "failed": "Giriş başarısız. Bilgileri kontrol edin.",
+      "rateLimited": "Çok fazla deneme. Lütfen bekleyip tekrar dene.",
+      "rateLimitedWithTime": "{seconds} sn sonra tekrar dene.",
+      "requiredTitle": "Giriş gerekli",
+      "requiredSubtitle": "Etkinlik portalını görmek için giriş yap."
     },
     "sessionExpired": {
       "message": "Oturumun doldu, devam etmek için tekrar doğrulaman gerekiyor.",

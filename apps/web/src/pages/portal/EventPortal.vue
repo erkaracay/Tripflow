@@ -3,91 +3,48 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
-import { apiGet, portalConfirmAccess, portalGetMe, portalVerifyAccess } from '../../lib/api'
-import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { portalGetMe } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { useToast } from '../../lib/toast'
-import type { PortalAccessPolicy, PortalParticipantSummary, Event as EventDto, EventPortalInfo } from '../../types'
+import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
+
+type PortalParticipant = PortalMeResponse['participant']
+
+type RetryState = 'idle' | 'retrying'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { pushToast } = useToast()
 const eventId = computed(() => route.params.eventId as string)
-const previewParam = computed(() => route.query.preview)
-const isPreviewRequested = computed(() => previewParam.value === '1' || previewParam.value === 'true')
-const isAdminPreview = computed(() => {
-  if (!isPreviewRequested.value) {
-    return false
-  }
 
-  const token = getToken()
-  if (!token || isTokenExpired(token)) {
-    return false
-  }
-
-  const role = getTokenRole(token)
-  return role === 'AgencyAdmin' || role === 'SuperAdmin'
-})
-
-const event = ref<EventDto | null>(null)
+const event = ref<PortalMeResponse['event'] | null>(null)
+const participant = ref<PortalParticipant | null>(null)
 const portal = ref<EventPortalInfo | null>(null)
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const networkErrorKey = ref<string | null>(null)
-const isRetrying = ref(false)
-const copyStatusKey = ref<string | null>(null)
-const codeCopyStatusKey = ref<string | null>(null)
-const linkCopyStatusKey = ref<string | null>(null)
-const accessState = ref<'idle' | 'checking' | 'verified' | 'missing' | 'invalid'>('idle')
+const retryState = ref<RetryState>('idle')
 const sessionExpired = ref(false)
-const accessToken = ref('')
-const last4 = ref('')
-const phoneHint = ref<string | null>(null)
-const participantSummary = ref<PortalParticipantSummary | null>(null)
-const policy = ref<PortalAccessPolicy | null>(null)
-const attemptsRemaining = ref<number | null>(null)
-const lockedUntil = ref<Date | null>(null)
-const rateLimitUntil = ref<Date | null>(null)
-const verifyingAccess = ref(false)
-const confirmingAccess = ref(false)
-const sessionToken = ref('')
-const sessionExpiresAt = ref<Date | null>(null)
-const nowTick = ref(Date.now())
-const welcomeVisible = ref(false)
-const welcomeTimer = ref<number | null>(null)
-const hasLoadedOnce = ref(false)
-const qrError = ref(false)
 
 const activeTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
-const portalRequiresLast4 = computed(
-  () => (policy.value?.requireLast4ForPortal ?? false) && !sessionToken.value
-)
-const qrRequiresLast4 = computed(
-  () => (policy.value?.requireLast4ForQr ?? false) && !sessionToken.value
-)
-const isLocked = computed(() => lockRemainingSeconds.value > 0)
-const portalReady = computed(() => {
-  if (accessState.value !== 'verified') {
-    return false
-  }
 
-  if (sessionExpired.value) {
-    return false
-  }
+const checkInCode = ref('')
+const qrDataUrl = ref<string | null>(null)
+const qrError = ref(false)
 
-  if (portalRequiresLast4.value) {
-    return false
-  }
+const welcomeVisible = ref(false)
+const welcomeTimer = ref<number | null>(null)
+const hasLoadedOnce = ref(false)
 
-  return true
-})
+const sessionToken = ref('')
+const sessionExpiresAt = ref<Date | null>(null)
 
 const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'days', label: t('portal.tabs.days') },
@@ -99,8 +56,18 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
 const days = computed(() => portal.value?.days ?? [])
 const selectedDay = computed(() => days.value[selectedDayIndex.value] ?? null)
 
-const checkInCode = ref('')
-const qrDataUrl = ref<string | null>(null)
+const hasSession = computed(() => {
+  if (!sessionToken.value || !sessionExpiresAt.value) {
+    return false
+  }
+
+  return sessionExpiresAt.value > new Date()
+})
+
+const requiresLogin = computed(() => !hasSession.value || sessionExpired.value)
+
+const sessionTokenKey = computed(() => `tripflow.portal.session.${eventId.value}`)
+const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${eventId.value}`)
 
 const resolvePublicBase = () => {
   const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim()
@@ -111,111 +78,7 @@ const resolvePublicBase = () => {
   return globalThis.location?.origin ?? ''
 }
 
-const isNetworkError = (err: unknown) => {
-  if (err instanceof TypeError) {
-    return true
-  }
-
-  if (err instanceof Error) {
-    return /Failed to fetch|NetworkError/i.test(err.message)
-  }
-
-  return false
-}
-
-const getErrorStatus = (err: unknown) => {
-  if (err && typeof err === 'object' && 'status' in err) {
-    const value = (err as { status?: number }).status
-    return typeof value === 'number' ? value : null
-  }
-
-  return null
-}
-
-const setNetworkError = () => {
-  networkErrorKey.value = 'portal.networkError'
-}
-
-const clearNetworkError = () => {
-  networkErrorKey.value = null
-}
-
-const startRateLimit = (seconds = 60) => {
-  rateLimitUntil.value = new Date(Date.now() + seconds * 1000)
-}
-
-const clearRateLimit = () => {
-  rateLimitUntil.value = null
-}
-
-const welcomeStorageKey = (participantId: string) =>
-  `tf_welcome_shown:${eventId.value}:${participantId}`
-
-const showWelcomeBanner = (participantId: string) => {
-  if (!participantId) {
-    return
-  }
-
-  const key = welcomeStorageKey(participantId)
-  const alreadyShown = globalThis.localStorage?.getItem(key)
-  if (alreadyShown) {
-    return
-  }
-
-  globalThis.localStorage?.setItem(key, '1')
-  welcomeVisible.value = true
-
-  if (welcomeTimer.value) {
-    globalThis.clearTimeout(welcomeTimer.value)
-  }
-
-  welcomeTimer.value = globalThis.setTimeout(() => {
-    welcomeVisible.value = false
-    welcomeTimer.value = null
-  }, 4000)
-}
-
-const dismissWelcome = () => {
-  welcomeVisible.value = false
-  if (welcomeTimer.value) {
-    globalThis.clearTimeout(welcomeTimer.value)
-    welcomeTimer.value = null
-  }
-}
-
-const accessTokenKey = computed(() => `tripflow.portal.access.${eventId.value}`)
-const sessionTokenKey = computed(() => `tripflow.portal.session.${eventId.value}`)
-const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${eventId.value}`)
-
-const saveAccessToken = (token: string) => {
-  if (!token) {
-    return
-  }
-
-  globalThis.localStorage?.setItem(accessTokenKey.value, token)
-  accessToken.value = token
-}
-
-const clearAccessToken = () => {
-  globalThis.localStorage?.removeItem(accessTokenKey.value)
-  accessToken.value = ''
-}
-
-const saveSession = (token: string, expiresAt: Date) => {
-  globalThis.sessionStorage?.setItem(sessionTokenKey.value, token)
-  globalThis.sessionStorage?.setItem(sessionExpiryKey.value, expiresAt.toISOString())
-  sessionToken.value = token
-  sessionExpiresAt.value = expiresAt
-}
-
-const clearSession = () => {
-  globalThis.sessionStorage?.removeItem(sessionTokenKey.value)
-  globalThis.sessionStorage?.removeItem(sessionExpiryKey.value)
-  sessionToken.value = ''
-  sessionExpiresAt.value = null
-}
-
-const buildCheckInLink = (code: string) => {
+const buildGuideLink = (code: string) => {
   const base = resolvePublicBase()
   if (!base) {
     return ''
@@ -224,29 +87,62 @@ const buildCheckInLink = (code: string) => {
   return `${base}/guide/events/${eventId.value}/checkin?code=${encodeURIComponent(code)}`
 }
 
-const loadEvent = async () => {
-  errorKey.value = null
-  errorMessage.value = null
+const buildLoginLink = () => {
+  const base = resolvePublicBase()
+  if (!base) {
+    return ''
+  }
+
+  return `${base}/e/login`
+}
+
+const copyToClipboard = async (value: string, successKey: string, errorKeyValue: string) => {
+  const clipboard = globalThis.navigator?.clipboard
+  if (!clipboard?.writeText) {
+    pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+    return
+  }
 
   try {
-    const eventData = await apiGet<EventDto>(`/api/events/${eventId.value}`)
-    event.value = eventData
-    hasLoadedOnce.value = true
-    clearNetworkError()
-  } catch (err) {
-    if (isNetworkError(err)) {
-      setNetworkError()
-      if (!hasLoadedOnce.value) {
-        errorKey.value = 'errors.portal.load'
-      }
-      return
-    }
-
-    errorMessage.value = err instanceof Error ? err.message : null
-    if (!errorMessage.value) {
-      errorKey.value = 'errors.portal.load'
-    }
+    await clipboard.writeText(value)
+    pushToast({ key: successKey, tone: 'success' })
+  } catch {
+    pushToast({ key: errorKeyValue, tone: 'error' })
   }
+}
+
+const copyLoginLink = async () => {
+  const url = buildLoginLink()
+  if (!url) {
+    pushToast({ key: 'portal.actions.copyLinkFailed', tone: 'error' })
+    return
+  }
+
+  await copyToClipboard(url, 'portal.actions.linkCopied', 'portal.actions.copyLinkFailed')
+}
+
+const copyCheckInCode = async () => {
+  if (!checkInCode.value) {
+    pushToast({ key: 'portal.qr.enterCode', tone: 'error' })
+    return
+  }
+
+  await copyToClipboard(checkInCode.value, 'portal.qr.codeCopied', 'portal.actions.copyLinkFailed')
+}
+
+const copyGuideLink = async () => {
+  if (!checkInCode.value) {
+    pushToast({ key: 'portal.qr.linkNeedsCode', tone: 'error' })
+    return
+  }
+
+  const link = buildGuideLink(checkInCode.value)
+  if (!link) {
+    pushToast({ key: 'portal.actions.copyLinkFailed', tone: 'error' })
+    return
+  }
+
+  await copyToClipboard(link, 'portal.actions.linkCopied', 'portal.actions.copyLinkFailed')
 }
 
 const parseDate = (value?: string | null) => {
@@ -309,763 +205,421 @@ const setActiveTab = (value: string) => {
   activeTab.value = value as TabKey
 }
 
-const lockRemainingSeconds = computed(() => {
-  if (!lockedUntil.value) {
-    return 0
-  }
+const welcomeStorageKey = (participantId: string) =>
+  `tf_welcome_shown:${eventId.value}:${participantId}`
 
-  const diff = lockedUntil.value.getTime() - nowTick.value
-  return Math.max(0, Math.ceil(diff / 1000))
-})
-
-const rateLimitRemainingSeconds = computed(() => {
-  if (!rateLimitUntil.value) {
-    return 0
-  }
-
-  const diff = rateLimitUntil.value.getTime() - nowTick.value
-  return Math.max(0, Math.ceil(diff / 1000))
-})
-
-const isRateLimited = computed(() => rateLimitRemainingSeconds.value > 0)
-
-const applyAccessTokenFromQuery = () => {
-  const raw = route.query.pt
-  const token = typeof raw === 'string' ? raw.trim() : ''
-  if (!token) {
+const showWelcomeBanner = (participantId: string) => {
+  if (!participantId) {
     return
   }
 
-  saveAccessToken(token)
+  const key = welcomeStorageKey(participantId)
+  const alreadyShown = globalThis.localStorage?.getItem(key)
+  if (alreadyShown) {
+    return
+  }
 
-  const nextQuery = { ...route.query }
-  delete nextQuery.pt
-  router.replace({ query: nextQuery })
+  globalThis.localStorage?.setItem(key, '1')
+  welcomeVisible.value = true
+
+  if (welcomeTimer.value) {
+    globalThis.clearTimeout(welcomeTimer.value)
+  }
+
+  welcomeTimer.value = globalThis.setTimeout(() => {
+    welcomeVisible.value = false
+    welcomeTimer.value = null
+  }, 4000)
 }
 
-const restoreSession = async () => {
-  const storedToken = globalThis.sessionStorage?.getItem(sessionTokenKey.value) ?? ''
-  const storedExpiry = globalThis.sessionStorage?.getItem(sessionExpiryKey.value) ?? ''
+const dismissWelcome = () => {
+  welcomeVisible.value = false
+  if (welcomeTimer.value) {
+    globalThis.clearTimeout(welcomeTimer.value)
+    welcomeTimer.value = null
+  }
+}
 
-  if (!storedToken || !storedExpiry) {
+const setNetworkError = () => {
+  networkErrorKey.value = 'portal.networkError'
+}
+
+const clearNetworkError = () => {
+  networkErrorKey.value = null
+}
+
+const clearSession = () => {
+  globalThis.localStorage?.removeItem(sessionTokenKey.value)
+  globalThis.localStorage?.removeItem(sessionExpiryKey.value)
+  sessionToken.value = ''
+  sessionExpiresAt.value = null
+}
+
+const logoutPortal = async () => {
+  clearSession()
+  await router.push({ path: '/e/login' })
+}
+
+const restoreSession = () => {
+  const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
+  const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
+
+  if (!token || !expiry) {
     clearSession()
     return false
   }
 
-  const expiresAt = new Date(storedExpiry)
+  const expiresAt = new Date(expiry)
   if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
     clearSession()
     return false
   }
 
-  sessionToken.value = storedToken
+  sessionToken.value = token
   sessionExpiresAt.value = expiresAt
-
-  try {
-    const me = await portalGetMe(storedToken)
-    if (me.eventId !== eventId.value) {
-      clearSession()
-      return false
-    }
-    checkInCode.value = me.checkInCode
-    policy.value = me.policy
-    accessState.value = 'verified'
-    sessionExpired.value = false
-    clearRateLimit()
-    clearNetworkError()
-    return true
-  } catch (err) {
-    clearSession()
-    const status = getErrorStatus(err)
-    if (status === 401 || status === 403) {
-      sessionExpired.value = true
-      return false
-    }
-
-    if (isNetworkError(err)) {
-      setNetworkError()
-    }
-    return false
-  }
+  return true
 }
 
-const verifyAccessToken = async (token: string, tone: 'info' | 'error' = 'error') => {
-  verifyingAccess.value = true
-  phoneHint.value = null
-  participantSummary.value = null
-  attemptsRemaining.value = null
-  lockedUntil.value = null
+const loadPortal = async () => {
+  loading.value = true
+  errorKey.value = null
+  errorMessage.value = null
+  sessionExpired.value = false
+
+  if (!restoreSession()) {
+    loading.value = false
+    sessionExpired.value = false
+    return
+  }
 
   try {
-    const result = await portalVerifyAccess(eventId.value, token)
-    if (result.eventId !== eventId.value) {
-      clearAccessToken()
-      accessState.value = 'invalid'
-      pushToast({ key: 'portal.access.invalidLink', tone })
-      return
-    }
-    portal.value = result.portal
-    policy.value = result.policy
-    participantSummary.value = result.participant
+    const response = await portalGetMe(sessionToken.value)
+    event.value = response.event
+    participant.value = response.participant
+    portal.value = response.portal
+    checkInCode.value = response.participant.checkInCode
     hasLoadedOnce.value = true
-    sessionExpired.value = false
-    clearRateLimit()
     clearNetworkError()
     setDefaultDay()
-    attemptsRemaining.value = result.attemptsRemaining
-
-    if (result.isLocked) {
-      lockedUntil.value = new Date(Date.now() + result.lockedForSeconds * 1000)
-    }
-
-    phoneHint.value = result.phoneHint ?? null
-    accessState.value = 'verified'
+    showWelcomeBanner(response.participant.id)
   } catch (err) {
-    if (isNetworkError(err)) {
-      setNetworkError()
-      return
-    }
-
-    const status = getErrorStatus(err)
-    if (status === 401 || status === 403) {
-      clearSession()
-      sessionExpired.value = true
-      return
-    }
-    if (status === 429) {
-      startRateLimit()
-      codeCopyStatusKey.value = 'portal.access.rateLimited'
-      return
-    }
-
-    clearAccessToken()
-    accessState.value = 'invalid'
-    pushToast({ key: 'portal.access.invalidLink', tone })
-  } finally {
-    verifyingAccess.value = false
-  }
-}
-
-const initAccessFlow = async () => {
-  loading.value = true
-  accessState.value = 'checking'
-  checkInCode.value = ''
-  phoneHint.value = null
-  attemptsRemaining.value = null
-  lockedUntil.value = null
-  participantSummary.value = null
-  policy.value = null
-  sessionExpired.value = false
-  welcomeVisible.value = false
-  clearRateLimit()
-  clearNetworkError()
-
-  try {
-    if (isAdminPreview.value) {
-      await loadEvent()
-      const portalData = await apiGet<EventPortalInfo>(`/api/events/${eventId.value}/portal`)
-      portal.value = portalData
-      policy.value = {
-        requireLast4ForPortal: false,
-        requireLast4ForQr: false,
-        maxAttempts: 0,
-        lockMinutes: 0,
+    if (err && typeof err === 'object' && 'status' in err) {
+      const status = (err as { status?: number }).status
+      if (status === 401 || status === 403) {
+        clearSession()
+        sessionExpired.value = true
+        return
       }
-      accessState.value = 'verified'
-      hasLoadedOnce.value = true
-      sessionExpired.value = false
-      setDefaultDay()
+    }
+
+    if (err instanceof TypeError || (err instanceof Error && /Failed to fetch|NetworkError/i.test(err.message))) {
+      setNetworkError()
+      if (!hasLoadedOnce.value) {
+        errorKey.value = 'errors.portal.load'
+      }
       return
     }
 
-    await loadEvent()
-    const storedToken = globalThis.localStorage?.getItem(accessTokenKey.value) ?? ''
-    accessToken.value = storedToken
-
-    if (!storedToken) {
-      accessState.value = 'missing'
-      return
-    }
-
-    await verifyAccessToken(storedToken, 'info')
-    const hasSession = await restoreSession()
-    const currentPolicy = policy.value as PortalAccessPolicy | null
-    if (!hasSession && currentPolicy && !currentPolicy.requireLast4ForQr && !currentPolicy.requireLast4ForPortal) {
-      await confirmAccess(true)
+    errorMessage.value = err instanceof Error ? err.message : null
+    if (!errorMessage.value) {
+      errorKey.value = 'errors.portal.load'
     }
   } finally {
     loading.value = false
   }
 }
 
-const copyShareLink = async () => {
-  copyStatusKey.value = null
-  const url = globalThis.location?.href
-
-  if (!url) {
-    copyStatusKey.value = 'portal.actions.copyLinkFailed'
-    return
-  }
-
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    copyStatusKey.value = 'errors.copyNotSupported'
-    return
-  }
-
-  try {
-    await clipboard.writeText(url)
-    copyStatusKey.value = 'portal.actions.linkCopied'
-  } catch {
-    copyStatusKey.value = 'errors.copyFailed'
-  }
+const retryLoad = async () => {
+  retryState.value = 'retrying'
+  await loadPortal()
+  retryState.value = 'idle'
 }
 
+const goToLogin = async () => {
+  await router.push({ path: '/e/login', query: { eventId: eventId.value } })
+}
 
-const copyCheckInCode = async () => {
-  codeCopyStatusKey.value = null
+const generateQr = async () => {
+  qrError.value = false
+  qrDataUrl.value = null
+
   if (!checkInCode.value) {
-    codeCopyStatusKey.value = 'portal.qr.noCode'
     return
   }
 
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    codeCopyStatusKey.value = 'errors.copyNotSupported'
-    return
-  }
-
-  try {
-    await clipboard.writeText(checkInCode.value)
-    codeCopyStatusKey.value = 'common.copySuccess'
-  } catch {
-    codeCopyStatusKey.value = 'errors.copyFailed'
-  }
-}
-
-const confirmAccess = async (skipValidation = false) => {
-  if (!accessToken.value) {
-    accessState.value = 'missing'
-    return
-  }
-
-  if (isRateLimited.value) {
-    codeCopyStatusKey.value = 'portal.access.rateLimited'
-    return
-  }
-
-  const needsLast4 = (policy.value?.requireLast4ForPortal ?? false) || (policy.value?.requireLast4ForQr ?? false)
-  const value = last4.value.trim()
-  if (needsLast4 && !skipValidation && !value) {
-    codeCopyStatusKey.value = 'portal.access.last4Required'
-    return
-  }
-
-  confirmingAccess.value = true
-  codeCopyStatusKey.value = null
-  clearNetworkError()
-
-  try {
-    const result = await portalConfirmAccess(eventId.value, accessToken.value, needsLast4 ? value : undefined)
-    const expiresAt = new Date(result.expiresAt)
-    saveSession(result.sessionToken, expiresAt)
-    last4.value = ''
-    policy.value = result.policy
-    participantSummary.value = result.participant
-
-    const me = await portalGetMe(result.sessionToken)
-    if (me.eventId !== eventId.value) {
-      clearSession()
-      accessState.value = 'invalid'
-      return
-    }
-
-    checkInCode.value = me.checkInCode
-    accessState.value = 'verified'
-    sessionExpired.value = false
-    showWelcomeBanner(me.participantId)
-    clearRateLimit()
-  } catch (err) {
-    if (isNetworkError(err)) {
-      setNetworkError()
-      return
-    }
-
-    const status = getErrorStatus(err)
-    if (status === 429) {
-      startRateLimit()
-      codeCopyStatusKey.value = 'portal.access.rateLimited'
-      return
-    }
-
-    // Re-verify to refresh lock/attempts state.
-    pushToast({ key: 'portal.access.invalidLast4', tone: 'error' })
-    await verifyAccessToken(accessToken.value, 'error')
-  } finally {
-    confirmingAccess.value = false
-  }
-}
-
-const handleLast4Input = () => {
-  last4.value = last4.value.replace(/\D/g, '').slice(0, 4)
-}
-
-const copyCheckInLink = async () => {
-  linkCopyStatusKey.value = null
-  if (!checkInCode.value) {
-    linkCopyStatusKey.value = 'portal.qr.linkNeedsCode'
-    return
-  }
-
-  const link = buildCheckInLink(checkInCode.value)
+  const link = buildGuideLink(checkInCode.value)
   if (!link) {
-    linkCopyStatusKey.value = 'portal.actions.copyLinkFailed'
-    return
-  }
-
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    linkCopyStatusKey.value = 'errors.copyNotSupported'
     return
   }
 
   try {
-    await clipboard.writeText(link)
-    linkCopyStatusKey.value = 'portal.actions.linkCopied'
+    qrDataUrl.value = await QRCode.toDataURL(link, { margin: 1, width: 220 })
   } catch {
-    linkCopyStatusKey.value = 'errors.copyFailed'
-  }
-}
-
-const handleSessionContinue = async () => {
-  sessionExpired.value = false
-  if (!accessToken.value) {
-    accessState.value = 'missing'
-    return
-  }
-
-  await verifyAccessToken(accessToken.value, 'info')
-  const currentPolicy = policy.value as PortalAccessPolicy | null
-  if (currentPolicy && !currentPolicy.requireLast4ForQr && !currentPolicy.requireLast4ForPortal) {
-    await confirmAccess(true)
-  }
-}
-
-const retryPortal = async () => {
-  if (isRetrying.value) {
-    return
-  }
-
-  isRetrying.value = true
-  try {
-    await initAccessFlow()
-  } finally {
-    isRetrying.value = false
-  }
-}
-
-watch([checkInCode, () => eventId.value], async ([value]) => {
-  codeCopyStatusKey.value = null
-  linkCopyStatusKey.value = null
-  if (!value) {
-    qrDataUrl.value = null
-    qrError.value = false
-    return
-  }
-
-  try {
-    const deepLink = buildCheckInLink(value)
-    if (!deepLink) {
-      qrDataUrl.value = null
-      qrError.value = false
-      return
-    }
-
-    qrDataUrl.value = await QRCode.toDataURL(deepLink, {
-      width: 200,
-      margin: 1,
-    })
-    qrError.value = false
-  } catch {
-    qrDataUrl.value = null
     qrError.value = true
   }
-}, { immediate: true })
+}
 
-watch(rateLimitRemainingSeconds, (seconds) => {
-  if (seconds > 0) {
-    return
-  }
-
-  if (codeCopyStatusKey.value === 'portal.access.rateLimited') {
-    codeCopyStatusKey.value = null
-  }
-
-  rateLimitUntil.value = null
+watch(checkInCode, () => {
+  void generateQr()
 })
 
 watch(
-  () => [route.query.pt, route.query.preview, eventId.value],
+  () => eventId.value,
   () => {
-    applyAccessTokenFromQuery()
-    void initAccessFlow()
-  },
-  { immediate: true }
+    void loadPortal()
+  }
 )
 
-let tickHandle: number | null = null
-
 onMounted(() => {
-  tickHandle = globalThis.setInterval(() => {
-    nowTick.value = Date.now()
-  }, 1000)
+  void loadPortal()
 })
 
 onUnmounted(() => {
-  if (tickHandle) {
-    globalThis.clearInterval(tickHandle)
+  if (welcomeTimer.value) {
+    globalThis.clearTimeout(welcomeTimer.value)
   }
-  tickHandle = null
 })
 </script>
 
 <template>
-  <div class="relative">
-    <div class="space-y-6 pb-[calc(96px+env(safe-area-inset-bottom))] sm:space-y-8">
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-wide text-slate-500">{{ t('portal.header.kicker') }}</p>
-            <h1 class="mt-3 text-2xl font-semibold">
-              {{ event?.name ?? t('common.event') }}
-            </h1>
-            <p class="text-sm text-slate-500" v-if="event">
-              {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
-            </p>
-          </div>
-          <div class="flex w-full flex-col items-start gap-2 sm:w-auto sm:items-end">
-            <button
-              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-              type="button" @click="copyShareLink">
-              {{ t('portal.actions.copyPageLink') }}
-            </button>
-            <p v-if="copyStatusKey" class="text-xs text-slate-500">{{ t(copyStatusKey) }}</p>
-          </div>
-        </div>
-      </section>
+  <div class="space-y-6">
+    <div
+      v-if="welcomeVisible && event"
+      class="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+    >
+      <span>{{ t('portal.welcome', { event: event.name }) }}</span>
+      <button class="text-emerald-700" type="button" @click="dismissWelcome">×</button>
+    </div>
 
-      <section
-        v-if="welcomeVisible"
-        class="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+    <div
+      v-if="networkErrorKey"
+      class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+    >
+      <div>{{ t(networkErrorKey) }}</div>
+      <button
+        class="inline-flex w-full items-center justify-center rounded-full border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 sm:w-auto"
+        :disabled="retryState === 'retrying'"
+        @click="retryLoad"
       >
-        <span>{{ t('portal.welcome', { event: event?.name ?? t('common.event') }) }}</span>
-        <button
-          class="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:border-emerald-300"
-          type="button"
-          @click="dismissWelcome"
-        >
-          {{ t('common.dismiss') }}
-        </button>
-      </section>
+        <span v-if="retryState === 'retrying'" class="mr-2 h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent"></span>
+        {{ t('common.retry') }}
+      </button>
+    </div>
 
-      <section
-        v-if="networkErrorKey"
-        class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <span>{{ t(networkErrorKey) }}</span>
-        <button
-          class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 hover:border-amber-300"
-          type="button"
-          :disabled="isRetrying"
-          @click="retryPortal"
-        >
-          <span v-if="isRetrying" class="h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent"></span>
-          {{ t('common.retry') }}
-        </button>
-      </section>
+    <LoadingState v-if="loading && !hasLoadedOnce" message-key="portal.loading" />
 
-      <section
-        v-if="accessState !== 'verified' || portalRequiresLast4 || sessionExpired"
+    <ErrorState
+      v-else-if="errorKey && !hasLoadedOnce"
+      :message-key="errorKey"
+      :message="errorMessage"
+      @retry="retryLoad"
+    />
+
+    <section v-else class="space-y-6">
+      <div
+        v-if="requiresLogin"
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
       >
-        <h2 class="text-lg font-semibold">{{ t('portal.access.title') }}</h2>
-        <p class="mt-1 text-sm text-slate-600">{{ t('portal.access.subtitle') }}</p>
-        <div class="mt-4 space-y-3 text-sm text-slate-600">
-          <div v-if="sessionExpired" class="space-y-3">
-            <p>{{ t('portal.sessionExpired.message') }}</p>
-            <button
-              class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
-              type="button"
-              @click="handleSessionContinue"
-            >
-              {{ t('portal.sessionExpired.continue') }}
-            </button>
-          </div>
-          <template v-else>
-          <p v-if="accessState === 'checking' || verifyingAccess" class="text-xs text-slate-500">
-            {{ t('portal.access.verifying') }}
-          </p>
-          <p v-else-if="accessState === 'missing'">
-            {{ t('portal.access.missing') }}
-          </p>
-          <p v-else-if="accessState === 'invalid'">
-            {{ t('portal.access.invalid') }}
-          </p>
-          <div v-else-if="portalRequiresLast4" class="space-y-2">
-            <div v-if="isLocked" class="space-y-1">
-              <p>{{ t('portal.access.locked', { seconds: lockRemainingSeconds }) }}</p>
-              <p class="text-xs text-slate-500">{{ t('portal.access.tryLater') }}</p>
-            </div>
-            <template v-else>
-              <p v-if="phoneHint">{{ t('portal.access.phoneHint', { hint: phoneHint }) }}</p>
-              <p v-else class="text-sm text-slate-600">{{ t('portal.access.phoneMissing') }}</p>
-              <div class="flex flex-col gap-2 sm:flex-row">
-                <input
-                  v-model.trim="last4"
-                  class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-                  :placeholder="t('portal.access.last4Placeholder')"
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="4"
-                  @input="handleLast4Input"
-                />
-                  <button
-                    class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                    type="button"
-                    :disabled="confirmingAccess || verifyingAccess || !phoneHint || isRateLimited"
-                    @click="() => confirmAccess()"
-                  >
-                    {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
-                  </button>
-                </div>
-              <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
-                {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
-              </p>
-              <p v-if="isRateLimited" class="text-xs text-amber-600">
-                {{ t('portal.access.rateLimited', { seconds: rateLimitRemainingSeconds }) }}
-              </p>
-            </template>
-          </div>
-          <p v-if="codeCopyStatusKey" class="text-xs text-rose-600">
-            {{ t(codeCopyStatusKey) }}
-          </p>
-          </template>
-        </div>
-      </section>
-
-      <div
-        v-if="portalReady"
-        class="sticky top-16 z-10 hidden items-center gap-6 border-b border-slate-200 bg-slate-50/90 px-1 backdrop-blur md:flex"
-      >
+        <h2 class="text-lg font-semibold">{{ t('portal.login.requiredTitle') }}</h2>
+        <p class="mt-2 text-sm text-slate-600">
+          {{ sessionExpired ? t('portal.sessionExpired.message') : t('portal.login.requiredSubtitle') }}
+        </p>
         <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="border-b-2 pb-3 text-sm font-medium transition"
-          :class="
-            activeTab === tab.id
-              ? 'border-slate-900 text-slate-900'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          "
-          type="button"
-          @click="setActiveTab(tab.id)"
+          class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+          @click="goToLogin"
         >
-          {{ tab.label }}
+          {{ t('portal.sessionExpired.continue') }}
         </button>
       </div>
 
-      <LoadingState v-if="loading" message-key="portal.loading" />
-      <ErrorState
-        v-else-if="errorKey || errorMessage"
-        :message="errorMessage ?? undefined"
-        :message-key="errorKey ?? undefined"
-        @retry="initAccessFlow"
-      />
-
-      <template v-else>
-        <div v-if="portal && portalReady" class="space-y-6 sm:space-y-8">
-          <section v-if="activeTab === 'days'"
-            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
-            <div v-if="days.length === 0"
-              class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-              {{ t('portal.days.empty') }}
+      <div v-else class="space-y-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('portal.header.kicker') }}</div>
+              <h1 class="mt-3 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
+              <p class="mt-1 text-sm text-slate-500" v-if="event">
+                {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+              </p>
             </div>
-            <template v-else>
-              <div class="mt-4 flex gap-2 overflow-x-auto pb-2">
-                <button v-for="(day, index) in days" :key="day.day"
-                  class="shrink-0 rounded-full border px-4 py-2 text-xs font-medium" :class="selectedDayIndex === index
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-white text-slate-600'
-                    " type="button" @click="selectDay(index)">
-                  {{ t('portal.days.dayLabel', { day: day.day }) }}
-                </button>
-              </div>
-
-              <div v-if="selectedDay" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                <div class="text-sm font-semibold text-slate-800">
-                  {{ t('portal.days.dayTitle', { day: selectedDay.day, title: selectedDay.title }) }}
-                </div>
-                <ul class="mt-3 space-y-2 text-sm text-slate-600">
-                  <li v-for="item in selectedDay.items" :key="item" class="flex items-start gap-2">
-                    <span class="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400"></span>
-                    <span>{{ item }}</span>
-                  </li>
-                </ul>
-              </div>
-            </template>
-          </section>
-
-          <section v-if="activeTab === 'docs'"
-            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">{{ t('portal.docs.title') }}</h2>
-            <div v-if="portal.links.length === 0"
-              class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-              {{ t('portal.docs.empty') }}
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
+                @click="copyLoginLink"
+              >
+                {{ t('portal.actions.copyLoginLink') }}
+              </button>
+              <button
+                class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
+                @click="logoutPortal"
+              >
+                {{ t('portal.actions.logout') }}
+              </button>
             </div>
-            <ul v-else class="mt-4 space-y-3 text-sm">
-              <li v-for="link in portal.links" :key="link.url"
-                class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <span class="font-medium text-slate-700">{{ link.label }}</span>
-                <a class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-                  :href="link.url" rel="noreferrer" target="_blank">
-                  {{ t('common.open') }}
-                </a>
-              </li>
-            </ul>
-          </section>
+          </div>
+        </div>
 
-          <section v-if="activeTab === 'qr'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-semibold">{{ t('portal.qr.title') }}</h2>
-            <div class="mt-4 space-y-4">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.qr.codeLabel') }}</p>
-                <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-mono text-slate-800">
-                    {{ checkInCode || t('portal.qr.codePlaceholder') }}
-                  </div>
-                  <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                    <button
-                      class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                      type="button"
-                      :disabled="!checkInCode"
-                      @click="copyCheckInCode"
-                    >
-                      {{ t('portal.qr.copyCode') }}
-                    </button>
-                  </div>
-                </div>
-                <p v-if="codeCopyStatusKey" class="mt-2 text-xs text-slate-500">{{ t(codeCopyStatusKey) }}</p>
-                <div v-if="qrRequiresLast4" class="mt-4 space-y-2 text-sm text-slate-600">
-                  <div v-if="isLocked" class="space-y-1">
-                    <p>{{ t('portal.access.locked', { seconds: lockRemainingSeconds }) }}</p>
-                    <p class="text-xs text-slate-500">{{ t('portal.access.tryLater') }}</p>
-                  </div>
-                  <template v-else>
-                    <p v-if="phoneHint">{{ t('portal.qr.last4Prompt', { hint: phoneHint }) }}</p>
-                    <p v-else class="text-sm text-slate-600">{{ t('portal.access.phoneMissing') }}</p>
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                      <input
-                        v-model.trim="last4"
-                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
-                        :placeholder="t('portal.access.last4Placeholder')"
-                        type="text"
-                        inputmode="numeric"
-                        maxlength="4"
-                        @input="handleLast4Input"
-                      />
-                      <button
-                        class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                        type="button"
-                        :disabled="confirmingAccess || verifyingAccess || !phoneHint || isRateLimited"
-                        @click="() => confirmAccess()"
-                      >
-                        {{ confirmingAccess ? t('portal.access.confirming') : t('portal.access.confirm') }}
-                      </button>
-                    </div>
-                    <p v-if="attemptsRemaining !== null" class="text-xs text-slate-500">
-                      {{ t('portal.access.attemptsRemaining', { count: attemptsRemaining }) }}
-                    </p>
-                    <p v-if="isRateLimited" class="text-xs text-amber-600">
-                      {{ t('portal.access.rateLimited', { seconds: rateLimitRemainingSeconds }) }}
-                    </p>
-                  </template>
-                </div>
-                <p v-else-if="checkInCode" class="mt-3 text-xs text-slate-500">{{ t('portal.qr.helper') }}</p>
-              </div>
+        <div class="hidden md:flex gap-4 border-b border-slate-200 text-sm">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="-mb-px border-b-2 px-1 pb-2 transition"
+            :class="
+              activeTab === tab.id
+                ? 'border-slate-900 text-slate-900'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            "
+            @click="setActiveTab(tab.id)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.qr.title') }}</p>
-                <div class="mt-4 flex items-center justify-center">
-                  <div v-if="qrDataUrl"
-                    class="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-4">
-                    <img :src="qrDataUrl" :alt="t('portal.qr.imageAlt')" class="h-40 w-40" />
-                  </div>
-                  <div v-else class="text-sm text-slate-500">
-                    {{ qrError ? t('portal.qr.failed') : t('portal.qr.empty') }}
-                  </div>
-                </div>
-                <div class="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-6">
+          <section v-if="activeTab === 'days'" class="space-y-4">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
+              <p class="mt-1 text-sm text-slate-500" v-if="days.length === 0">
+                {{ t('portal.days.empty') }}
+              </p>
+              <div v-else class="mt-4 space-y-4">
+                <div class="flex gap-2 overflow-x-auto">
                   <button
-                    class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-                    type="button"
-                    @click="copyCheckInLink"
+                    v-for="(day, index) in days"
+                    :key="day.day"
+                    class="whitespace-nowrap rounded-full border px-3 py-1 text-xs"
+                    :class="
+                      index === selectedDayIndex
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 text-slate-600'
+                    "
+                    @click="selectDay(index)"
+                  >
+                    {{ t('portal.days.dayLabel', { day: day.day }) }}
+                  </button>
+                </div>
+                <div v-if="selectedDay" class="space-y-3">
+                  <div class="text-sm font-semibold text-slate-900">
+                    {{ t('portal.days.dayTitle', { day: selectedDay.day, title: selectedDay.title || '' }) }}
+                  </div>
+                  <ul class="list-disc space-y-2 pl-5 text-sm text-slate-600">
+                    <li v-for="item in selectedDay.items" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section v-else-if="activeTab === 'docs'" class="space-y-4">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 class="text-lg font-semibold">{{ t('portal.docs.title') }}</h2>
+              <p class="mt-1 text-sm text-slate-500" v-if="portal?.links.length === 0">
+                {{ t('portal.docs.empty') }}
+              </p>
+              <div v-else class="mt-4 grid gap-3">
+                <a
+                  v-for="link in portal?.links"
+                  :key="link.url"
+                  :href="link.url"
+                  class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>{{ link.label }}</span>
+                  <span class="text-xs text-slate-400">↗</span>
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <section v-else-if="activeTab === 'qr'" class="space-y-4">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 class="text-lg font-semibold">{{ t('portal.qr.title') }}</h2>
+              <p class="mt-1 text-sm text-slate-500">{{ t('portal.qr.helper') }}</p>
+
+              <div class="mt-5 flex flex-col items-center gap-4">
+                <div class="text-center">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('portal.qr.codeLabel') }}</div>
+                  <div class="mt-1 text-2xl font-semibold tracking-[0.2em]">
+                    {{ checkInCode || t('portal.qr.noCode') }}
+                  </div>
+                </div>
+
+                <div v-if="qrError" class="text-sm text-rose-600">
+                  {{ t('portal.qr.failed') }}
+                </div>
+                <img
+                  v-else-if="qrDataUrl"
+                  :src="qrDataUrl"
+                  :alt="t('portal.qr.imageAlt')"
+                  class="h-56 w-56 rounded-xl border border-slate-200 bg-white p-2"
+                />
+                <div v-else class="text-sm text-slate-500">{{ t('portal.qr.empty') }}</div>
+
+                <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
+                  <button
+                    class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
+                    @click="copyCheckInCode"
+                  >
+                    {{ t('portal.qr.copyCode') }}
+                  </button>
+                  <button
+                    class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
+                    @click="copyGuideLink"
                   >
                     {{ t('portal.qr.copyGuideLink') }}
                   </button>
-                  <p v-if="linkCopyStatusKey" class="text-xs text-slate-500">{{ t(linkCopyStatusKey) }}</p>
                 </div>
               </div>
             </div>
           </section>
 
-          <section v-if="activeTab === 'info'" class="space-y-4">
+          <section v-else class="space-y-4">
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.info.meetingTitle') }}</h2>
-              <div class="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.time') }}</p>
-                  <p class="mt-1 font-medium">{{ portal.meeting.time }}</p>
+              <div class="mt-4 space-y-3 text-sm text-slate-600">
+                <div>
+                  <div class="text-xs uppercase text-slate-400">{{ t('portal.info.time') }}</div>
+                  <div class="mt-1 font-medium text-slate-800">{{ portal?.meeting.time || '-' }}</div>
                 </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.place') }}</p>
-                  <p class="mt-1 font-medium">{{ portal.meeting.place }}</p>
+                <div>
+                  <div class="text-xs uppercase text-slate-400">{{ t('portal.info.place') }}</div>
+                  <div class="mt-1 font-medium text-slate-800">{{ portal?.meeting.place || '-' }}</div>
                 </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.maps') }}</p>
-                  <a class="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 sm:w-auto"
-                    :href="portal.meeting.mapsUrl" rel="noreferrer" target="_blank">
+                <div>
+                  <div class="text-xs uppercase text-slate-400">{{ t('portal.info.maps') }}</div>
+                  <a
+                    v-if="portal?.meeting.mapsUrl"
+                    :href="portal.meeting.mapsUrl"
+                    class="mt-1 inline-flex text-sm text-slate-700 underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     {{ t('portal.info.openMaps') }}
                   </a>
+                  <div v-else class="mt-1 text-sm text-slate-500">-</div>
                 </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-                  <p class="text-xs uppercase tracking-wide text-slate-400">{{ t('portal.info.note') }}</p>
-                  <p class="mt-2 text-sm text-slate-600">{{ portal.meeting.note }}</p>
+                <div>
+                  <div class="text-xs uppercase text-slate-400">{{ t('portal.info.note') }}</div>
+                  <div class="mt-1 text-sm text-slate-600">{{ portal?.meeting.note || '-' }}</div>
                 </div>
               </div>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.info.notesTitle') }}</h2>
-              <div v-if="portal.notes.length === 0"
-                class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              <p v-if="portal?.notes.length === 0" class="mt-2 text-sm text-slate-500">
                 {{ t('portal.info.notesEmpty') }}
-              </div>
-              <ul v-else class="mt-4 space-y-2 text-sm text-slate-600">
-                <li v-for="note in portal.notes" :key="note"
-                  class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  {{ note }}
-                </li>
+              </p>
+              <ul v-else class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                <li v-for="note in portal?.notes" :key="note">{{ note }}</li>
               </ul>
             </div>
           </section>
         </div>
+      </div>
+    </section>
 
-        <div v-else-if="portalReady" class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-          {{ t('portal.empty') }}
-        </div>
-      </template>
-    </div>
-
-    <PortalTabBar v-if="portalReady" :tabs="tabs" :active="activeTab" @select="setActiveTab" />
+    <PortalTabBar class="md:hidden" :tabs="tabs" :active="activeTab" @select="setActiveTab" />
   </div>
 </template>
