@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -122,8 +123,17 @@ builder.Services.AddCors(options =>
                 return allowedOrigins.Contains(normalizedOrigin);
             })
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .WithExposedHeaders("X-Warning", "X-Tripflow-Warn");
     });
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 var app = builder.Build();
@@ -145,6 +155,10 @@ if (app.Environment.IsDevelopment())
     .WithOpenApi();
 }
 
+if (app.Environment.IsProduction())
+{
+    app.UseForwardedHeaders();
+}
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();

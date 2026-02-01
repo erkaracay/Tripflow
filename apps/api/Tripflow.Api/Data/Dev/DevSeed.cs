@@ -315,7 +315,7 @@ public static class DevSeed
             }
             if (string.IsNullOrWhiteSpace(eventEntity.EventAccessCode))
             {
-                eventEntity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, organizationId, ct);
+                eventEntity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
                 db.Events.Update(eventEntity);
                 state.Seeded = true;
             }
@@ -329,7 +329,7 @@ public static class DevSeed
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
-            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, organizationId, ct),
+            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
             CreatedAt = now,
             GuideUserId = guideUserId
         };

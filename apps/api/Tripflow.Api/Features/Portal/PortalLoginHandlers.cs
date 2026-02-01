@@ -32,19 +32,19 @@ internal static class PortalLoginHandlers
         if (IsRateLimited(attemptKey, out var retryAfter))
         {
             httpContext.Response.Headers["Retry-After"] = retryAfter.ToString();
-            return Results.Json(new { retryAfterSeconds = retryAfter }, statusCode: StatusCodes.Status429TooManyRequests);
+            return Results.Json(new { code = "rate_limited", retryAfterSeconds = retryAfter }, statusCode: StatusCodes.Status429TooManyRequests);
         }
 
         if (string.IsNullOrWhiteSpace(code) || code.Length != 8)
         {
             RegisterFailure(attemptKey);
-            return Results.BadRequest(new { message = "Event access code is required." });
+            return Results.BadRequest(new { code = "invalid_access_code_format" });
         }
 
         if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
         {
             RegisterFailure(attemptKey);
-            return Results.BadRequest(new { message = "TcNo must be 11 digits." });
+            return Results.BadRequest(new { code = "invalid_tcno_format" });
         }
 
         var matchingEvents = await db.Events.AsNoTracking()
@@ -54,24 +54,33 @@ internal static class PortalLoginHandlers
         if (matchingEvents.Count == 0)
         {
             RegisterFailure(attemptKey);
-            return Results.Unauthorized();
+            return Results.BadRequest(new { code = "invalid_event_access_code" });
         }
 
         if (matchingEvents.Count > 1)
         {
             RegisterFailure(attemptKey);
-            return Results.BadRequest(new { message = "Ambiguous access code." });
+            return Results.BadRequest(new { code = "ambiguous_event_access_code" });
         }
 
         var eventEntity = matchingEvents[0];
-        var participant = await db.Participants.FirstOrDefaultAsync(
-            x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId && x.TcNo == tcNo, ct);
+        var participants = await db.Participants
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId && x.TcNo == tcNo)
+            .ToListAsync(ct);
 
-        if (participant is null)
+        if (participants.Count == 0)
         {
             RegisterFailure(attemptKey);
-            return Results.Unauthorized();
+            return Results.BadRequest(new { code = "tcno_not_found" });
         }
+
+        if (participants.Count > 1)
+        {
+            RegisterFailure(attemptKey);
+            return Results.Conflict(new { code = "ambiguous_tcno" });
+        }
+
+        var participant = participants[0];
 
         var now = DateTime.UtcNow;
         var token = PortalSessionHelpers.CreateToken();

@@ -70,7 +70,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.CreatedAt).IsRequired();
 
             b.HasIndex(x => new { x.OrganizationId, x.StartDate });
-            b.HasIndex(x => new { x.OrganizationId, x.EventAccessCode }).IsUnique();
+            b.HasIndex(x => x.EventAccessCode).IsUnique();
 
             b.HasOne(x => x.Organization)
                 .WithMany(x => x.Events)

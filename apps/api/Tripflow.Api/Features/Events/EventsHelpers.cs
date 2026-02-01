@@ -29,7 +29,7 @@ internal static class EventsHelpers
         return true;
     }
 
-    internal static async Task<string> GenerateEventAccessCodeAsync(TripflowDbContext db, Guid organizationId, CancellationToken ct)
+    internal static async Task<string> GenerateEventAccessCodeAsync(TripflowDbContext db, CancellationToken ct)
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         for (var attempt = 0; attempt < 20; attempt++)
@@ -42,7 +42,7 @@ internal static class EventsHelpers
 
             var code = new string(buffer);
             var exists = await db.Events.AsNoTracking()
-                .AnyAsync(x => x.OrganizationId == organizationId && x.EventAccessCode == code, ct);
+                .AnyAsync(x => x.EventAccessCode == code, ct);
             if (!exists)
             {
                 return code;

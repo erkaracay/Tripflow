@@ -79,7 +79,7 @@ internal static class EventsHandlers
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
-            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, orgId, ct),
+            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -326,7 +326,7 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        entity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, orgId, ct);
+        entity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
         await db.SaveChangesAsync(ct);
 
         return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
