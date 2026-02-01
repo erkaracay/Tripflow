@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { portalLogin } from '../../lib/api'
@@ -14,6 +14,7 @@ const submitting = ref(false)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const retryAfterSeconds = ref<number | null>(null)
+const retryTimer = ref<number | null>(null)
 
 const sessionTokenKey = (eventId: string) => `tripflow.portal.session.${eventId}`
 const sessionExpiryKey = (eventId: string) => `tripflow.portal.session.exp.${eventId}`
@@ -23,15 +24,23 @@ const sanitizeAccessCode = (value: string) =>
 
 const sanitizeTcNo = (value: string) => value.replace(/\D/g, '').slice(0, 11)
 
+const clearRetryTimer = () => {
+  if (retryTimer.value) {
+    globalThis.clearInterval(retryTimer.value)
+    retryTimer.value = null
+  }
+  retryAfterSeconds.value = null
+}
+
 const handleAccessCodeInput = () => {
   errorKey.value = null
-  retryAfterSeconds.value = null
+  clearRetryTimer()
   accessCode.value = sanitizeAccessCode(accessCode.value)
 }
 
 const handleTcNoInput = () => {
   errorKey.value = null
-  retryAfterSeconds.value = null
+  clearRetryTimer()
   tcNo.value = sanitizeTcNo(tcNo.value)
 }
 
@@ -71,16 +80,38 @@ const submitLogin = async () => {
     await router.replace(`/e/${response.eventId}`)
   } catch (err) {
     const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: number }).status : null
-    if (status === 429) {
-      const payload = (err as { payload?: { retryAfterSeconds?: number } }).payload
-      retryAfterSeconds.value = payload?.retryAfterSeconds ?? null
-      errorKey.value = 'portal.login.rateLimited'
+    const payload = (err as { payload?: { code?: string; retryAfterSeconds?: number } }).payload
+    const code = payload?.code
+    if (status === 429 || code === 'rate_limited') {
+      const seconds = payload?.retryAfterSeconds ?? 0
+      retryAfterSeconds.value = seconds || null
+      errorKey.value = seconds ? 'portal.login.rateLimitedWithTime' : 'portal.login.rateLimited'
+      startRetryCountdown()
       return
     }
 
-    errorMessage.value = err instanceof Error ? err.message : null
-    if (!errorMessage.value) {
-      errorKey.value = 'portal.login.failed'
+    const mappedKey =
+      code === 'invalid_access_code_format'
+        ? 'portal.login.accessCodeRequired'
+        : code === 'invalid_tcno_format'
+          ? 'portal.login.tcRequired'
+          : code === 'invalid_event_access_code'
+            ? 'portal.login.invalidEventCode'
+            : code === 'tcno_not_found'
+              ? 'portal.login.tcNotFound'
+              : code === 'ambiguous_event_access_code'
+                ? 'portal.login.ambiguousEventCode'
+                : code === 'ambiguous_tcno'
+                  ? 'portal.login.ambiguousTcNo'
+                  : null
+
+    if (mappedKey) {
+      errorKey.value = mappedKey
+    } else {
+      errorMessage.value = err instanceof Error ? err.message : null
+      if (!errorMessage.value) {
+        errorKey.value = 'portal.login.failed'
+      }
     }
   } finally {
     submitting.value = false
@@ -92,6 +123,36 @@ const rateLimitMessage = computed(() => {
     return null
   }
   return t('portal.login.rateLimitedWithTime', { seconds: retryAfterSeconds.value })
+})
+
+const startRetryCountdown = () => {
+  if (retryTimer.value) {
+    globalThis.clearInterval(retryTimer.value)
+    retryTimer.value = null
+  }
+
+  if (!retryAfterSeconds.value || retryAfterSeconds.value <= 0) {
+    return
+  }
+
+  retryTimer.value = globalThis.setInterval(() => {
+    if (!retryAfterSeconds.value) {
+      return
+    }
+    retryAfterSeconds.value = Math.max(0, retryAfterSeconds.value - 1)
+    if (retryAfterSeconds.value === 0) {
+      if (retryTimer.value) {
+        globalThis.clearInterval(retryTimer.value)
+        retryTimer.value = null
+      }
+    }
+  }, 1000)
+}
+
+onUnmounted(() => {
+  if (retryTimer.value) {
+    globalThis.clearInterval(retryTimer.value)
+  }
 })
 
 onMounted(() => {
@@ -135,7 +196,7 @@ onMounted(() => {
         </label>
         <button
           class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-          :disabled="submitting"
+          :disabled="submitting || (retryAfterSeconds ?? 0) > 0"
           @click="submitLogin"
         >
           <span v-if="submitting" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>

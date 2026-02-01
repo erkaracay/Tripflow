@@ -48,7 +48,8 @@
     "whatsappAria": "WhatsApp mesajını aç"
   },
   "warnings": {
-    "phoneRequiredForWhatsapp": "WhatsApp için telefon gerekli."
+    "phoneRequiredForWhatsapp": "WhatsApp için telefon gerekli.",
+    "tcNoDuplicate": "Bu etkinlikte aynı TC kimlik numarası başka bir katılımcıda da var."
   },
   "nav": {
     "organizations": "Organizasyonlar",
@@ -515,6 +516,10 @@
       "submitting": "Doğrulanıyor...",
       "accessCodeRequired": "Erişim kodu gerekli.",
       "tcRequired": "TC kimlik numarası 11 hane olmalı.",
+      "invalidEventCode": "Etkinlik erişim kodu geçersiz.",
+      "tcNotFound": "Bu etkinlikte TC kimlik numarası bulunamadı.",
+      "ambiguousEventCode": "Erişim kodu karışık görünüyor. Destekle iletişime geçin.",
+      "ambiguousTcNo": "Aynı TC kimlik numarası birden fazla kişide var. Destekle iletişime geçin.",
       "failed": "Giriş başarısız. Bilgileri kontrol edin.",
       "rateLimited": "Çok fazla deneme. Lütfen bekleyip tekrar dene.",
       "rateLimitedWithTime": "{seconds} sn sonra tekrar dene.",

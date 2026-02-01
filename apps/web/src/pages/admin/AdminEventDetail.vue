@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
+import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import {
   formatPhoneDisplay,
@@ -76,6 +76,7 @@ const editPhoneInput = ref<HTMLInputElement | null>(null)
 const accessCodeLoading = ref(false)
 const accessCodeMessageKey = ref<string | null>(null)
 const accessCodeErrorKey = ref<string | null>(null)
+const tcNoWarnings = ref<Record<string, string>>({})
 const archivingEvent = ref(false)
 const restoringEvent = ref(false)
 const purgingEvent = ref(false)
@@ -516,16 +517,24 @@ const addParticipant = async () => {
 
   submitting.value = true
   try {
-    const created = await apiPost<Participant>(`/api/events/${eventId.value}/participants`, {
-      fullName,
-      phone: normalizedPhone || undefined,
-      email: normalizeEmail(form.email) || undefined,
-      tcNo,
-      birthDate: form.birthDate,
-      gender: form.gender,
-    })
+    const { data: created, headers } = await apiPostWithHeaders<Participant>(
+      `/api/events/${eventId.value}/participants`,
+      {
+        fullName,
+        phone: normalizedPhone || undefined,
+        email: normalizeEmail(form.email) || undefined,
+        tcNo,
+        birthDate: form.birthDate,
+        gender: form.gender,
+      }
+    )
 
     participants.value = [...participants.value, created]
+    const warning = headers.get('X-Warning') || headers.get('X-Tripflow-Warn')
+    if (warning) {
+      tcNoWarnings.value = { ...tcNoWarnings.value, [created.id]: warning }
+      pushToast({ key: 'warnings.tcNoDuplicate', tone: 'info' })
+    }
     form.fullName = ''
     form.tcNo = ''
     form.birthDate = ''
@@ -652,7 +661,7 @@ const saveParticipant = async (participant: Participant) => {
 
   editParticipantSaving.value = true
   try {
-    const updated = await apiPut<Participant>(
+    const { data: updated, headers } = await apiPutWithHeaders<Participant>(
       `/api/events/${eventId.value}/participants/${participant.id}`,
       {
         fullName,
@@ -695,6 +704,15 @@ const saveParticipant = async (participant: Participant) => {
     participants.value = participants.value.map((item) =>
       item.id === participant.id ? updated : item
     )
+    const warning = headers.get('X-Warning') || headers.get('X-Tripflow-Warn')
+    if (warning) {
+      tcNoWarnings.value = { ...tcNoWarnings.value, [participant.id]: warning }
+      pushToast({ key: 'warnings.tcNoDuplicate', tone: 'info' })
+    } else if (tcNoWarnings.value[participant.id]) {
+      const next = { ...tcNoWarnings.value }
+      delete next[participant.id]
+      tcNoWarnings.value = next
+    }
     editingParticipantId.value = null
     if (missingPhoneParticipantId.value === participant.id) {
       missingPhoneParticipantId.value = null
@@ -1556,6 +1574,9 @@ onMounted(loadEvent)
                     type="text"
                     @input="handleEditTcNoInput"
                   />
+                  <span v-if="tcNoWarnings[participant.id]" class="text-xs text-amber-600">
+                    {{ t('warnings.tcNoDuplicate') }}
+                  </span>
                 </label>
                 <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participants.form.birthDate') }}</span>

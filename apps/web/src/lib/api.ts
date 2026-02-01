@@ -115,6 +115,20 @@ export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   return handleResponse<T>(response)
 }
 
+export const apiPostWithHeaders = async <T>(
+  path: string,
+  body: unknown
+): Promise<{ data: T; headers: Headers }> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: buildHeaders('application/json'),
+    body: JSON.stringify(body),
+  })
+
+  const data = await handleResponse<T>(response)
+  return { data, headers: response.headers }
+}
+
 export const apiPut = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'PUT',
@@ -123,6 +137,20 @@ export const apiPut = async <T>(path: string, body: unknown): Promise<T> => {
   })
 
   return handleResponse<T>(response)
+}
+
+export const apiPutWithHeaders = async <T>(
+  path: string,
+  body: unknown
+): Promise<{ data: T; headers: Headers }> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'PUT',
+    headers: buildHeaders('application/json'),
+    body: JSON.stringify(body),
+  })
+
+  const data = await handleResponse<T>(response)
+  return { data, headers: response.headers }
 }
 
 export const apiDelete = async <T>(path: string): Promise<T> => {

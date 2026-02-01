@@ -48,7 +48,8 @@
     "whatsappAria": "Open WhatsApp message"
   },
   "warnings": {
-    "phoneRequiredForWhatsapp": "Phone number required for WhatsApp."
+    "phoneRequiredForWhatsapp": "Phone number required for WhatsApp.",
+    "tcNoDuplicate": "Another participant in this event uses the same identity number."
   },
   "nav": {
     "organizations": "Organizations",
@@ -528,6 +529,10 @@
       "submitting": "Verifying...",
       "accessCodeRequired": "Access code is required.",
       "tcRequired": "Identity number must be 11 digits.",
+      "invalidEventCode": "Event access code is not valid.",
+      "tcNotFound": "Identity number not found for this event.",
+      "ambiguousEventCode": "Access code is ambiguous. Please contact support.",
+      "ambiguousTcNo": "Multiple participants share this identity number. Contact support.",
       "failed": "Login failed. Check your details.",
       "rateLimited": "Too many attempts. Please wait and try again.",
       "rateLimitedWithTime": "Please wait {seconds}s before trying again.",
