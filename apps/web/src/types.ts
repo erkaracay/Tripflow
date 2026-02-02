@@ -17,6 +17,7 @@ export type EventListItem = {
   totalCount: number
   guideUserId?: string | null
   isDeleted: boolean
+  eventAccessCode: string
 }
 
 export type UserListItem = {
@@ -134,6 +135,12 @@ export type CheckInUndoResponse = {
   totalCount: number
 }
 
+export type ResetAllCheckInsResponse = {
+  removedCount: number
+  arrivedCount: number
+  totalCount: number
+}
+
 export type UserRole = 'SuperAdmin' | 'AgencyAdmin' | 'Guide'
 
 export type LoginResponse = {
@@ -173,4 +180,29 @@ export type PortalMeResponse = {
 export type EventAccessCodeResponse = {
   eventId: string
   eventAccessCode: string
+}
+
+export type ParticipantImportError = {
+  row: number
+  tcNo?: string | null
+  message: string
+  fields: string[]
+}
+
+export type ParticipantImportWarning = {
+  row: number
+  tcNo?: string | null
+  message: string
+  code: string
+}
+
+export type ParticipantImportReport = {
+  totalRows: number
+  imported: number
+  created: number
+  updated: number
+  failed: number
+  ignoredColumns: string[]
+  errors: ParticipantImportError[]
+  warnings: ParticipantImportWarning[]
 }

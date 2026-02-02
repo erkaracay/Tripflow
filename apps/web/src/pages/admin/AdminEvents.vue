@@ -4,12 +4,14 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Event as EventDto, EventListItem } from '../../types'
 
 const router = useRouter()
 const { t } = useI18n()
+const { pushToast } = useToast()
 const events = ref<EventListItem[]>([])
 const loading = ref(true)
 const submitting = ref(false)
@@ -98,6 +100,46 @@ const createEvent = async () => {
     }
   } finally {
     submitting.value = false
+  }
+}
+
+const copyText = async (value: string) => {
+  if (!value) {
+    return false
+  }
+
+  if (!globalThis.navigator?.clipboard?.writeText) {
+    return false
+  }
+
+  await globalThis.navigator.clipboard.writeText(value)
+  return true
+}
+
+const copyEventAccessCode = async (code: string) => {
+  try {
+    const ok = await copyText(code)
+    if (!ok) {
+      pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+      return
+    }
+    pushToast({ key: 'toast.eventAccessCodeCopied', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.eventAccessCodeCopyFailed', tone: 'error' })
+  }
+}
+
+const copyPortalLoginLink = async () => {
+  const loginUrl = `${globalThis.location.origin}/e/login`
+  try {
+    const ok = await copyText(loginUrl)
+    if (!ok) {
+      pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+      return
+    }
+    pushToast({ key: 'toast.portalLinkCopied', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.portalLinkCopyFailed', tone: 'error' })
   }
 }
 
@@ -226,6 +268,25 @@ onMounted(loadEvents)
             </div>
             <div class="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
               {{ t('common.arrivedSummary', { arrived: event.arrivedCount, total: event.totalCount }) }}
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span class="text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                {{ t('admin.events.list.accessCode') }}
+              </span>
+              <button
+                class="rounded border border-slate-200 bg-white px-2 py-1 font-mono tracking-[0.12em] text-slate-700 hover:border-slate-300"
+                type="button"
+                @click="copyEventAccessCode(event.eventAccessCode)"
+              >
+                {{ event.eventAccessCode }}
+              </button>
+              <button
+                class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:border-slate-300"
+                type="button"
+                @click="copyPortalLoginLink"
+              >
+                {{ t('admin.events.list.copyLoginLink') }}
+              </button>
             </div>
           </div>
           <div class="flex items-center gap-4 text-sm">

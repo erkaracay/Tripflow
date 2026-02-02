@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
@@ -27,6 +27,7 @@ import type {
 } from '../../types'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const eventId = computed(() => route.params.eventId as string)
 
@@ -82,6 +83,8 @@ const restoringEvent = ref(false)
 const purgingEvent = ref(false)
 const purgeConfirmText = ref('')
 const purgeErrorKey = ref<string | null>(null)
+const resettingAllCheckIns = ref(false)
+const deletingAllParticipants = ref(false)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -746,6 +749,42 @@ const deleteParticipant = async (participant: Participant) => {
   }
 }
 
+const resetAllCheckIns = async () => {
+  const confirmed = globalThis.confirm?.(t('admin.participants.resetAllConfirm'))
+  if (!confirmed || resettingAllCheckIns.value) {
+    return
+  }
+
+  resettingAllCheckIns.value = true
+  try {
+    await apiPost(`/api/events/${eventId.value}/checkins/reset-all`, {})
+    participants.value = participants.value.map((item) => ({ ...item, arrived: false }))
+    pushToast({ key: 'toast.checkInsResetAll', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.checkInsResetAllFailed', tone: 'error' })
+  } finally {
+    resettingAllCheckIns.value = false
+  }
+}
+
+const deleteAllParticipants = async () => {
+  const confirmed = globalThis.confirm?.(t('admin.participants.deleteAllConfirm'))
+  if (!confirmed || deletingAllParticipants.value) {
+    return
+  }
+
+  deletingAllParticipants.value = true
+  try {
+    await apiDelete(`/api/events/${eventId.value}/participants`)
+    participants.value = []
+    pushToast({ key: 'toast.participantsDeletedAll', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.participantsDeleteAllFailed', tone: 'error' })
+  } finally {
+    deletingAllParticipants.value = false
+  }
+}
+
 const copyToClipboard = async (value: string, successKey: string, errorKey: string) => {
   const clipboard = globalThis.navigator?.clipboard
   if (!clipboard?.writeText) {
@@ -1020,6 +1059,20 @@ watch(
   }
 )
 
+watch(
+  () => route.query.imported,
+  async (value) => {
+    if (!value) {
+      return
+    }
+
+    await loadEvent()
+    const nextQuery = { ...route.query }
+    delete nextQuery.imported
+    await router.replace({ path: route.path, query: nextQuery })
+  }
+)
+
 onMounted(loadEvent)
 </script>
 
@@ -1153,6 +1206,51 @@ onMounted(loadEvent)
             <span v-if="dateHintKey" class="text-xs text-slate-500">{{ t(dateHintKey) }}</span>
           </div>
         </form>
+      </section>
+
+      <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-2">
+          <h2 class="text-lg font-semibold">{{ t('admin.eventAccess.title') }}</h2>
+          <p class="text-sm text-slate-500">{{ t('admin.eventAccess.subtitle') }}</p>
+        </div>
+
+        <div class="mt-4 grid gap-3">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('admin.eventAccess.codeLabel') }}</div>
+            <div class="mt-1 font-mono text-lg tracking-[0.2em] text-slate-800">
+              {{ event?.eventAccessCode || t('admin.eventAccess.codeMissing') }}
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="!event?.eventAccessCode"
+              @click="copyEventAccessCode"
+            >
+              {{ t('admin.eventAccess.copyCode') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="copyPortalLoginLink"
+            >
+              {{ t('admin.eventAccess.copyLoginLink') }}
+            </button>
+            <button
+              class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="accessCodeLoading"
+              @click="regenerateEventAccessCode"
+            >
+              {{ accessCodeLoading ? t('common.saving') : t('admin.eventAccess.regenerate') }}
+            </button>
+          </div>
+
+          <p v-if="accessCodeMessageKey" class="text-xs text-emerald-600">{{ t(accessCodeMessageKey) }}</p>
+          <p v-if="accessCodeErrorKey" class="text-xs text-rose-600">{{ t(accessCodeErrorKey) }}</p>
+        </div>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -1479,55 +1577,32 @@ onMounted(loadEvent)
         </form>
       </section>
 
-      <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="flex flex-col gap-2">
-          <h2 class="text-lg font-semibold">{{ t('admin.eventAccess.title') }}</h2>
-          <p class="text-sm text-slate-500">{{ t('admin.eventAccess.subtitle') }}</p>
-        </div>
-
-        <div class="mt-4 grid gap-3">
-          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('admin.eventAccess.codeLabel') }}</div>
-            <div class="mt-1 font-mono text-lg tracking-[0.2em] text-slate-800">
-              {{ event?.eventAccessCode || t('admin.eventAccess.codeMissing') }}
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="!event?.eventAccessCode"
-              @click="copyEventAccessCode"
-            >
-              {{ t('admin.eventAccess.copyCode') }}
-            </button>
-            <button
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
-              type="button"
-              @click="copyPortalLoginLink"
-            >
-              {{ t('admin.eventAccess.copyLoginLink') }}
-            </button>
-            <button
-              class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="accessCodeLoading"
-              @click="regenerateEventAccessCode"
-            >
-              {{ accessCodeLoading ? t('common.saving') : t('admin.eventAccess.regenerate') }}
-            </button>
-          </div>
-
-          <p v-if="accessCodeMessageKey" class="text-xs text-emerald-600">{{ t(accessCodeMessageKey) }}</p>
-          <p v-if="accessCodeErrorKey" class="text-xs text-rose-600">{{ t(accessCodeErrorKey) }}</p>
-        </div>
-      </section>
-
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">{{ t('admin.participants.title') }}</h2>
           <div class="flex items-center gap-3">
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="participants.length === 0 || resettingAllCheckIns"
+              @click="resetAllCheckIns"
+            >
+              {{ resettingAllCheckIns ? t('common.saving') : t('admin.participants.resetAll') }}
+            </button>
+            <button
+              class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="participants.length === 0 || deletingAllParticipants"
+              @click="deleteAllParticipants"
+            >
+              {{ deletingAllParticipants ? t('common.saving') : t('admin.participants.deleteAll') }}
+            </button>
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              :to="`/admin/events/${eventId}/participants/import`"
+            >
+              {{ t('admin.participants.import') }}
+            </RouterLink>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button
               class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"

@@ -193,7 +193,13 @@
     "eventAccessCodeCopied": "Erişim kodu kopyalandı.",
     "eventAccessCodeCopyFailed": "Erişim kodu kopyalanamadı.",
     "eventAccessCodeRegenerated": "Erişim kodu yenilendi.",
-    "eventAccessCodeRegenerateFailed": "Erişim kodu yenilenemedi."
+    "eventAccessCodeRegenerateFailed": "Erişim kodu yenilenemedi.",
+    "checkInsResetAll": "Tüm yoklamalar sıfırlandı.",
+    "checkInsResetAllFailed": "Yoklamalar sıfırlanamadı.",
+    "participantsResetAll": "Tüm katılımcı erişim linkleri sıfırlandı.",
+    "participantsResetAllFailed": "Katılımcı erişim linkleri sıfırlanamadı.",
+    "participantsDeletedAll": "Tüm katılımcılar silindi.",
+    "participantsDeleteAllFailed": "Tüm katılımcılar silinemedi."
   },
   "admin": {
     "events": {
@@ -212,6 +218,8 @@
         "loading": "Etkinlikler yükleniyor...",
         "empty": "Henüz etkinlik yok. Yukarıdan ilk etkinliğini oluştur.",
         "showArchived": "Arşivlileri göster",
+        "accessCode": "Erişim kodu",
+        "copyLoginLink": "Giriş linkini kopyala",
         "manage": "Yönet",
         "openPortal": "Portal girişini aç"
       }
@@ -255,6 +263,11 @@
     },
     "participants": {
       "title": "Katılımcılar",
+      "import": "İçe aktar",
+      "resetAll": "Tüm yoklamaları sıfırla",
+      "deleteAll": "Tümünü sil",
+      "resetAllConfirm": "Tüm katılımcı yoklamaları sıfırlansın mı?",
+      "deleteAllConfirm": "Bu etkinlikteki tüm katılımcılar silinsin mi?",
       "addTitle": "Katılımcı ekle",
       "exportCsv": "CSV indir",
       "empty": "Henüz katılımcı yok. Yukarıdan ekle.",
@@ -308,6 +321,74 @@
         "returnPnr": "Dönüş PNR",
         "returnBaggageAllowance": "Dönüş bagaj hakkı"
       }
+    },
+    "import": {
+      "title": "Katılımcı İçe Aktar",
+      "backToEvent": "Etkinliğe dön",
+      "backToParticipants": "Katılımcı listesine dön",
+      "stepTemplate": "Adım A - Şablon",
+      "stepUpload": "Adım B - Yükle",
+      "stepPreview": "Adım C - Önizleme",
+      "stepApply": "Adım D - Uygula",
+      "fileFormat": "Dosya formatı",
+      "headerLanguage": "Başlık dili",
+      "headerLangAuto": "Otomatik",
+      "headerLangTr": "Türkçe",
+      "headerLangEn": "İngilizce",
+      "templateNote": "Türkçe ve İngilizce başlıklar desteklenir. Otomatik eşleme önerilir.",
+      "autoDetectRecommended": "Seçili başlık modu: {language}. İçe aktarma için otomatik algılama önerilir.",
+      "downloadTemplate": "Şablonu indir",
+      "dropzoneTitle": "Dosyayı buraya sürükleyin veya seçmek için tıklayın",
+      "dropzoneHint": "Desteklenen formatlar: CSV ve XLSX",
+      "fileTypeError": "Lütfen CSV veya XLSX dosyası yükleyin.",
+      "fileSizeError": "Dosya çok büyük. En fazla 10 MB olabilir.",
+      "formatMismatch": "Seçilen dosya {format} formatıyla uyuşmuyor.",
+      "previewImport": "İçe aktarmayı önizle",
+      "applyImport": "İçe aktarmayı uygula",
+      "applyDone": "İçe aktarma başarıyla tamamlandı.",
+      "previewReadyToast": "Önizleme hazır.",
+      "applySuccessToast": "İçe aktarma tamamlandı.",
+      "applyErrorToast": "İçe aktarma başarısız oldu.",
+      "rateLimited": "Çok fazla deneme yapıldı. {seconds}s sonra tekrar deneyin.",
+      "summary": {
+        "totalRows": "Toplam satır",
+        "validRows": "Geçerli satır",
+        "importedWouldBe": "İçe aktarılacak",
+        "updatedWouldBe": "Güncellenecek",
+        "skippedRows": "Atlanan satır",
+        "errorRows": "Hatalı satır"
+      },
+      "filters": {
+        "all": "Tümü",
+        "errors": "Sadece hatalar",
+        "warnings": "Sadece uyarılar"
+      },
+      "searchPlaceholder": "Satır, kimlik no veya mesaja göre ara",
+      "table": {
+        "row": "Satır",
+        "status": "Durum",
+        "participant": "Katılımcı",
+        "message": "Mesaj",
+        "statusOk": "Tamam",
+        "statusWarn": "Uyarı",
+        "statusError": "Hata"
+      },
+      "messages": {
+        "duplicateTcNo": "Dosyada kimlik numarası tekrar ediyor. Son satır dikkate alınacak.",
+        "fullNameRequired": "Ad soyad zorunludur.",
+        "phoneRequired": "Telefon zorunludur.",
+        "tcNoInvalid": "Kimlik numarası 11 haneli olmalıdır.",
+        "birthDateInvalid": "Doğum tarihi formatı geçersiz.",
+        "genderInvalid": "Cinsiyet değeri geçersiz.",
+        "hotelCheckInInvalid": "Otel giriş tarihi formatı geçersiz.",
+        "hotelCheckOutInvalid": "Otel çıkış tarihi formatı geçersiz.",
+        "arrivalDepartureInvalid": "Geliş kalkış saati formatı geçersiz.",
+        "arrivalArrivalInvalid": "Geliş varış saati formatı geçersiz.",
+        "returnDepartureInvalid": "Dönüş kalkış saati formatı geçersiz.",
+        "returnArrivalInvalid": "Dönüş varış saati formatı geçersiz."
+      },
+      "noRows": "Bu filtre için gösterilecek satır yok.",
+      "downloadReport": "Raporu indir (CSV)"
     },
     "portalAccess": {
       "copyLink": "Portal linkini kopyala",
@@ -432,6 +513,8 @@
       "useManualCode": "Elle kod gir",
       "participantsTitle": "Katılımcılar",
       "lastAction": "Son yoklama: {name}",
+      "resetAll": "Tüm yoklamaları sıfırla",
+      "resetAllConfirm": "Tüm katılımcı yoklamaları sıfırlansın mı?",
       "empty": "Katılımcı bulunamadı.",
       "markArrived": "Geldi olarak işaretle",
       "success": "Geldi olarak işaretlendi.",

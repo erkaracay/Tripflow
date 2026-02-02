@@ -193,7 +193,13 @@
     "eventAccessCodeCopied": "Access code copied.",
     "eventAccessCodeCopyFailed": "Failed to copy access code.",
     "eventAccessCodeRegenerated": "Access code regenerated.",
-    "eventAccessCodeRegenerateFailed": "Failed to regenerate access code."
+    "eventAccessCodeRegenerateFailed": "Failed to regenerate access code.",
+    "checkInsResetAll": "All check-ins were reset.",
+    "checkInsResetAllFailed": "Failed to reset all check-ins.",
+    "participantsResetAll": "All participant access links were reset.",
+    "participantsResetAllFailed": "Failed to reset all participant access links.",
+    "participantsDeletedAll": "All participants were deleted.",
+    "participantsDeleteAllFailed": "Failed to delete all participants."
   },
   "admin": {
     "events": {
@@ -212,6 +218,8 @@
         "loading": "Loading events...",
         "empty": "No events yet. Create your first event above.",
         "showArchived": "Show archived",
+        "accessCode": "Access code",
+        "copyLoginLink": "Copy login link",
         "manage": "Manage",
         "openPortal": "Open portal login"
       }
@@ -271,6 +279,11 @@
     },
     "participants": {
       "title": "Participants",
+      "import": "Import",
+      "resetAll": "Reset all check-ins",
+      "deleteAll": "Delete all",
+      "resetAllConfirm": "Reset check-ins for all participants?",
+      "deleteAllConfirm": "Delete all participants in this event?",
       "addTitle": "Add participant",
       "exportCsv": "Download CSV",
       "empty": "No participants yet. Add someone above.",
@@ -324,6 +337,74 @@
         "returnPnr": "Return PNR",
         "returnBaggageAllowance": "Return baggage allowance"
       }
+    },
+    "import": {
+      "title": "Participants Import",
+      "backToEvent": "Back to event",
+      "backToParticipants": "Back to participants list",
+      "stepTemplate": "Step A - Template",
+      "stepUpload": "Step B - Upload",
+      "stepPreview": "Step C - Preview",
+      "stepApply": "Step D - Apply",
+      "fileFormat": "File format",
+      "headerLanguage": "Header language",
+      "headerLangAuto": "Auto",
+      "headerLangTr": "Turkish",
+      "headerLangEn": "English",
+      "templateNote": "Turkish and English headers are supported. Auto matching is recommended.",
+      "autoDetectRecommended": "Selected header mode: {language}. Auto-detect is recommended for import.",
+      "downloadTemplate": "Download template",
+      "dropzoneTitle": "Drag and drop file here, or click to choose",
+      "dropzoneHint": "Accepted formats: CSV and XLSX",
+      "fileTypeError": "Please upload a CSV or XLSX file.",
+      "fileSizeError": "File is too large. Maximum size is 10 MB.",
+      "formatMismatch": "Selected file does not match {format} format.",
+      "previewImport": "Preview import",
+      "applyImport": "Apply import",
+      "applyDone": "Import applied successfully.",
+      "previewReadyToast": "Preview is ready.",
+      "applySuccessToast": "Import completed.",
+      "applyErrorToast": "Import failed.",
+      "rateLimited": "Too many attempts. Try again in {seconds}s.",
+      "summary": {
+        "totalRows": "Total rows",
+        "validRows": "Valid rows",
+        "importedWouldBe": "Rows to import",
+        "updatedWouldBe": "Rows to update",
+        "skippedRows": "Skipped rows",
+        "errorRows": "Rows with errors"
+      },
+      "filters": {
+        "all": "All",
+        "errors": "Only errors",
+        "warnings": "Only warnings"
+      },
+      "searchPlaceholder": "Search by row, identity number, or message",
+      "table": {
+        "row": "Row",
+        "status": "Status",
+        "participant": "Participant",
+        "message": "Message",
+        "statusOk": "OK",
+        "statusWarn": "Warning",
+        "statusError": "Error"
+      },
+      "messages": {
+        "duplicateTcNo": "Duplicate identity number in file. Last row will be used.",
+        "fullNameRequired": "Full name is required.",
+        "phoneRequired": "Phone is required.",
+        "tcNoInvalid": "Identity number must be 11 digits.",
+        "birthDateInvalid": "Birth date format is invalid.",
+        "genderInvalid": "Gender value is invalid.",
+        "hotelCheckInInvalid": "Hotel check-in date format is invalid.",
+        "hotelCheckOutInvalid": "Hotel check-out date format is invalid.",
+        "arrivalDepartureInvalid": "Arrival departure time format is invalid.",
+        "arrivalArrivalInvalid": "Arrival arrival time format is invalid.",
+        "returnDepartureInvalid": "Return departure time format is invalid.",
+        "returnArrivalInvalid": "Return arrival time format is invalid."
+      },
+      "noRows": "No rows to display for this filter.",
+      "downloadReport": "Download report (CSV)"
     },
     "portalAccess": {
       "copyLink": "Copy portal link",
@@ -445,6 +526,9 @@
       "autoCheckInToggle": "Auto check-in after scan",
       "useManualCode": "Enter code manually",
       "participantsTitle": "Participants",
+      "lastAction": "Last check-in: {name}",
+      "resetAll": "Reset all check-ins",
+      "resetAllConfirm": "Reset check-ins for all participants?",
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
       "success": "Check-in successful.",

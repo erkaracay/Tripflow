@@ -72,6 +72,40 @@ const handlePortalResponse = async <T>(response: Response): Promise<T> => {
   return data as T
 }
 
+const throwApiError = (response: Response, data: unknown): never => {
+  const message =
+    data && typeof data === 'object' && 'message' in data
+      ? String((data as { message?: string }).message ?? 'Request failed')
+      : response.statusText
+
+  const error = new Error(message) as Error & { status?: number; payload?: unknown }
+  error.status = response.status
+  error.payload = data
+  throw error
+}
+
+const handleResponseWithPayload = async <T>(response: Response): Promise<T> => {
+  const data = await parseBody(response)
+
+  if (response.status === 401) {
+    const path = globalThis.location?.pathname ?? ''
+    const isPortal = path.startsWith('/e/')
+    clearToken()
+    if (!isPortal) {
+      pushToast({ key: 'toast.sessionExpired', tone: 'error' })
+      if (path !== '/login') {
+        globalThis.location?.assign('/login')
+      }
+    }
+  }
+
+  if (!response.ok) {
+    throwApiError(response, data)
+  }
+
+  return data as T
+}
+
 const buildHeaders = (contentType?: string) => {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -160,6 +194,29 @@ export const apiDelete = async <T>(path: string): Promise<T> => {
   })
 
   return handleResponse<T>(response)
+}
+
+export const apiDownload = async (path: string): Promise<Blob> => {
+  const response = await fetch(buildUrl(path), {
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    const data = await parseBody(response)
+    throwApiError(response, data)
+  }
+
+  return response.blob()
+}
+
+export const apiPostForm = async <T>(path: string, formData: FormData): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: formData,
+  })
+
+  return handleResponseWithPayload<T>(response)
 }
 
 const portalPost = async <T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> => {
