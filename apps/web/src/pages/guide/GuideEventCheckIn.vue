@@ -12,6 +12,7 @@ import type {
   CheckInResponse,
   CheckInSummary,
   CheckInUndoResponse,
+  ResetAllCheckInsResponse,
   Participant,
   ParticipantResolve,
   Event as EventDto,
@@ -51,6 +52,7 @@ const scanFoundParticipant = ref<ParticipantResolve | null>(null)
 const scanResolving = ref(false)
 const highlightParticipantId = ref<string | null>(null)
 const undoingParticipantId = ref<string | null>(null)
+const resettingAllCheckIns = ref(false)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
 let highlightTimer: number | undefined
 let lastActionTimer: number | undefined
@@ -167,6 +169,32 @@ const undoCheckIn = async (participantId: string) => {
     pushToast({ key: 'toast.undoFailed', tone: 'error' })
   } finally {
     undoingParticipantId.value = null
+  }
+}
+
+const resetAllCheckIns = async () => {
+  const confirmed = globalThis.confirm?.(t('guide.checkIn.resetAllConfirm'))
+  if (!confirmed || resettingAllCheckIns.value) {
+    return
+  }
+
+  resettingAllCheckIns.value = true
+  try {
+    const response = await apiPost<ResetAllCheckInsResponse>(
+      `/api/guide/events/${eventId.value}/checkins/reset-all`,
+      {}
+    )
+    summary.value = {
+      arrivedCount: response.arrivedCount,
+      totalCount: response.totalCount,
+    }
+    participants.value = participants.value.map((participant) => ({ ...participant, arrived: false }))
+    lastAction.value = null
+    pushToast({ key: 'toast.checkInsResetAll', tone: 'success' })
+  } catch {
+    pushToast({ key: 'toast.checkInsResetAllFailed', tone: 'error' })
+  } finally {
+    resettingAllCheckIns.value = false
   }
 }
 
@@ -632,9 +660,19 @@ onUnmounted(() => {
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">{{ t('guide.checkIn.participantsTitle') }}</h2>
-          <span class="text-xs text-slate-500">
-            {{ t('common.shown', { count: filteredParticipants.length }) }}
-          </span>
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="participants.length === 0 || resettingAllCheckIns"
+              @click="resetAllCheckIns"
+            >
+              {{ resettingAllCheckIns ? t('common.saving') : t('guide.checkIn.resetAll') }}
+            </button>
+            <span class="text-xs text-slate-500">
+              {{ t('common.shown', { count: filteredParticipants.length }) }}
+            </span>
+          </div>
         </div>
 
         <div
