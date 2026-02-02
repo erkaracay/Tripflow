@@ -9,28 +9,28 @@ namespace Tripflow.Api.Features.Portal;
 
 internal static class PortalAccessHandlers
 {
-    internal static async Task<IResult> VerifyAccess(
+    internal static Task<IResult> VerifyAccess(
         PortalAccessVerifyRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        return Results.StatusCode(StatusCodes.Status410Gone);
+        return Task.FromResult<IResult>(Results.StatusCode(StatusCodes.Status410Gone));
     }
 
-    internal static async Task<IResult> ConfirmAccess(
+    internal static Task<IResult> ConfirmAccess(
         PortalAccessConfirmRequest request,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        return Results.StatusCode(StatusCodes.Status410Gone);
+        return Task.FromResult<IResult>(Results.StatusCode(StatusCodes.Status410Gone));
     }
 
-    internal static async Task<IResult> GetMe(
+    internal static Task<IResult> GetMe(
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        return Results.StatusCode(StatusCodes.Status410Gone);
+        return Task.FromResult<IResult>(Results.StatusCode(StatusCodes.Status410Gone));
     }
 
     internal static async Task<IResult> GetParticipantAccess(

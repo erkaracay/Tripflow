@@ -52,6 +52,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapPost("/events/{eventId}/checkins/reset-all", GuideHandlers.ResetAllCheckIns)
+            .WithSummary("Guide reset all check-ins")
+            .WithDescription("Removes all check-ins for a guide event.")
+            .Produces<ResetAllCheckInsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 }

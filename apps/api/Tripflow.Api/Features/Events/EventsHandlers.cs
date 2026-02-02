@@ -34,7 +34,8 @@ internal static class EventsHandlers
                 db.CheckIns.Count(c => c.EventId == x.Id),
                 db.Participants.Count(p => p.EventId == x.Id),
                 x.GuideUserId,
-                x.IsDeleted))
+                x.IsDeleted,
+                x.EventAccessCode))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -939,6 +940,70 @@ internal static class EventsHandlers
         return Results.NoContent();
     }
 
+    internal static async Task<IResult> DeleteAllParticipants(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var participants = await db.Participants
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        if (participants.Count == 0)
+        {
+            return Results.NoContent();
+        }
+
+        var participantIds = participants.Select(x => x.Id).ToArray();
+
+        var checkIns = await db.CheckIns
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+        if (checkIns.Count > 0)
+        {
+            db.CheckIns.RemoveRange(checkIns);
+        }
+
+        var portalSessions = await db.PortalSessions
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+        if (portalSessions.Count > 0)
+        {
+            db.PortalSessions.RemoveRange(portalSessions);
+        }
+
+        var accessTokens = await db.ParticipantAccesses
+            .Where(x => x.OrganizationId == orgId && participantIds.Contains(x.ParticipantId))
+            .ToListAsync(ct);
+        if (accessTokens.Count > 0)
+        {
+            db.ParticipantAccesses.RemoveRange(accessTokens);
+        }
+
+        db.Participants.RemoveRange(participants);
+        await db.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+
     internal static async Task<IResult> CheckIn(
         string eventId,
         CheckInRequest request,
@@ -1116,6 +1181,55 @@ internal static class EventsHandlers
             .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
+    }
+
+    internal static async Task<IResult> ResetAllCheckIns(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        return await ResetAllCheckInsForOrg(orgId, eventId, db, ct);
+    }
+
+    internal static async Task<IResult> ResetAllCheckInsForOrg(
+        Guid orgId,
+        string eventId,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var checkIns = await db.CheckIns
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var removedCount = checkIns.Count;
+        if (removedCount > 0)
+        {
+            db.CheckIns.RemoveRange(checkIns);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+
+        return Results.Ok(new ResetAllCheckInsResponse(removedCount, 0, totalCount));
     }
 
     internal static async Task<IResult> CheckInByCode(

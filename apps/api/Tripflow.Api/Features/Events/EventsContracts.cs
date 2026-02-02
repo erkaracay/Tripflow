@@ -12,7 +12,8 @@ public sealed record EventListItemDto(
     int ArrivedCount,
     int TotalCount,
     Guid? GuideUserId,
-    bool IsDeleted);
+    bool IsDeleted,
+    string EventAccessCode);
 
 public sealed record EventPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
 public sealed record MeetingInfo(string Time, string Place, string MapsUrl, string Note);
@@ -109,6 +110,7 @@ public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? M
 public sealed record CheckInCodeRequest(string? CheckInCode);
 public sealed record CheckInUndoRequest(Guid? ParticipantId, string? CheckInCode);
 public sealed record CheckInSummary(int ArrivedCount, int TotalCount);
+public sealed record ResetAllCheckInsResponse(int RemovedCount, int ArrivedCount, int TotalCount);
 public sealed record CheckInResponse(Guid ParticipantId, string ParticipantName, bool AlreadyArrived, int ArrivedCount, int TotalCount);
 public sealed record CheckInUndoResponse(Guid ParticipantId, bool AlreadyUndone, int ArrivedCount, int TotalCount);
 public sealed record VerifyCheckInCodeRequest(string? CheckInCode);

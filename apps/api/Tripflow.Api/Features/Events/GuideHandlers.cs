@@ -36,7 +36,8 @@ internal static class GuideHandlers
                 db.CheckIns.Count(c => c.EventId == x.Id),
                 db.Participants.Count(p => p.EventId == x.Id),
                 x.GuideUserId,
-                x.IsDeleted))
+                x.IsDeleted,
+                x.EventAccessCode))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -264,6 +265,38 @@ internal static class GuideHandlers
         }
 
         return await EventsHandlers.UndoCheckInForOrg(orgId, eventId, request, db, ct);
+    }
+
+    internal static async Task<IResult> ResetAllCheckIns(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        return await EventsHandlers.ResetAllCheckInsForOrg(orgId, eventId, db, ct);
     }
 
     private static bool TryGetUserId(ClaimsPrincipal user, out Guid userId, out IResult? error)

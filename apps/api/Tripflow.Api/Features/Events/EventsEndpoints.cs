@@ -173,6 +173,22 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/participants/import/template", ParticipantImportHandlers.DownloadImportTemplate)
+            .WithSummary("Download participant import template")
+            .WithDescription("Downloads a CSV or XLSX import template for participants.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/participants/import", ParticipantImportHandlers.ImportParticipants)
+            .WithSummary("Import participants")
+            .WithDescription("Imports participants from CSV/XLSX. Use mode=apply or mode=dryrun.")
+            .Accepts<IFormFile>("multipart/form-data")
+            .DisableAntiforgery()
+            .Produces<ParticipantImportReport>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/checkins/summary", EventsHandlers.GetCheckInSummary)
             .WithSummary("Check-in summary")
             .WithDescription("Returns arrived/total counts for an event.")
@@ -201,6 +217,13 @@ public static class EventsEndpoints
             .WithSummary("Undo check-in")
             .WithDescription("Reverts a participant check-in.")
             .Produces<CheckInUndoResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/checkins/reset-all", EventsHandlers.ResetAllCheckIns)
+            .WithSummary("Reset all check-ins")
+            .WithDescription("Removes all check-ins for the event and marks everyone as not arrived.")
+            .Produces<ResetAllCheckInsResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
@@ -248,6 +271,13 @@ public static class EventsEndpoints
         admin.MapDelete("/{eventId}/participants/{participantId}", EventsHandlers.DeleteParticipant)
             .WithSummary("Delete participant")
             .WithDescription("Removes a participant from the event.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/participants", EventsHandlers.DeleteAllParticipants)
+            .WithSummary("Delete all participants")
+            .WithDescription("Removes all participants (and related check-ins/access) from the event.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
