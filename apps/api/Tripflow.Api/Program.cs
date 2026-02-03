@@ -198,7 +198,6 @@ app.MapOrganizationEndpoints();
 app.MapGuideEndpoints();
 app.MapUsersEndpoints();
 app.MapEventsEndpoints();
-app.MapPortalAccessEndpoints();
 app.MapPortalLoginEndpoints();
 
 app.Run();

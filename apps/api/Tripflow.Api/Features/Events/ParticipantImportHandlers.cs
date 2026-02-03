@@ -218,7 +218,6 @@ internal static class ParticipantImportHandlers
             }
         }
 
-        var hasFatalFileErrors = duplicateTcInFile.Count > 0;
         var blockedRows = new HashSet<int>(errors.Select(x => x.Row));
 
         var existingParticipants = await db.Participants
@@ -245,7 +244,7 @@ internal static class ParticipantImportHandlers
         var created = 0;
         var updated = 0;
         var now = DateTime.UtcNow;
-        await using var transaction = importMode == ParticipantImportMode.Apply && !hasFatalFileErrors
+        await using var transaction = importMode == ParticipantImportMode.Apply
             ? await db.Database.BeginTransactionAsync(ct)
             : null;
 
@@ -412,7 +411,6 @@ internal static class ParticipantImportHandlers
                             BirthDate = birthDate,
                             Gender = gender,
                             CheckInCode = GenerateUniqueCheckInCode(usedCodes),
-                            PortalFailedAttempts = 0,
                             CreatedAt = now
                         };
 
@@ -444,11 +442,6 @@ internal static class ParticipantImportHandlers
             if (importMode == ParticipantImportMode.DryRun)
             {
                 return Results.Ok(report);
-            }
-
-            if (hasFatalFileErrors)
-            {
-                return Results.BadRequest(report);
             }
 
             if (createdParticipants.Count > 0)

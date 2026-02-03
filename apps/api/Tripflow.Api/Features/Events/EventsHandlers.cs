@@ -370,9 +370,6 @@ internal static class EventsHandlers
 
         if (participantIds.Count > 0)
         {
-            var access = db.ParticipantAccesses.Where(x => participantIds.Contains(x.ParticipantId));
-            db.ParticipantAccesses.RemoveRange(access);
-
             var sessions = db.PortalSessions.Where(x => participantIds.Contains(x.ParticipantId));
             db.PortalSessions.RemoveRange(sessions);
 
@@ -988,14 +985,6 @@ internal static class EventsHandlers
         if (portalSessions.Count > 0)
         {
             db.PortalSessions.RemoveRange(portalSessions);
-        }
-
-        var accessTokens = await db.ParticipantAccesses
-            .Where(x => x.OrganizationId == orgId && participantIds.Contains(x.ParticipantId))
-            .ToListAsync(ct);
-        if (accessTokens.Count > 0)
-        {
-            db.ParticipantAccesses.RemoveRange(accessTokens);
         }
 
         db.Participants.RemoveRange(participants);

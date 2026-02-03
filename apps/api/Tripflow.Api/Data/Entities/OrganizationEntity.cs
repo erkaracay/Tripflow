@@ -7,15 +7,12 @@ public sealed class OrganizationEntity
     public string Slug { get; set; } = default!;
     public bool IsActive { get; set; }
     public bool IsDeleted { get; set; }
-    public bool RequireLast4ForQr { get; set; }
-    public bool RequireLast4ForPortal { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     public List<UserEntity> Users { get; set; } = new();
     public List<EventEntity> Events { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
-    public List<ParticipantAccessEntity> ParticipantAccesses { get; set; } = new();
     public List<PortalSessionEntity> PortalSessions { get; set; } = new();
     public List<CheckInEntity> CheckIns { get; set; } = new();
     public List<EventPortalEntity> Portals { get; set; } = new();

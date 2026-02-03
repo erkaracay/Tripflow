@@ -10,7 +10,6 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventEntity> Events => Set<EventEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
-    public DbSet<ParticipantAccessEntity> ParticipantAccesses => Set<ParticipantAccessEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
     public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
@@ -28,8 +27,6 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Slug).HasMaxLength(64).IsRequired();
             b.Property(x => x.IsActive).IsRequired();
             b.Property(x => x.IsDeleted).IsRequired();
-            b.Property(x => x.RequireLast4ForQr).IsRequired().HasDefaultValue(false);
-            b.Property(x => x.RequireLast4ForPortal).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CreatedAt).IsRequired();
             b.Property(x => x.UpdatedAt).IsRequired();
 
@@ -112,10 +109,6 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.CheckInCode).HasMaxLength(64).IsRequired();
             b.HasIndex(x => x.CheckInCode).IsUnique();
 
-            b.Property(x => x.PortalFailedAttempts).IsRequired();
-            b.Property(x => x.PortalLockedUntil);
-            b.Property(x => x.PortalLastFailedAt);
-
             b.Property(x => x.CreatedAt).IsRequired();
             b.HasIndex(x => x.EventId);
             b.HasIndex(x => x.OrganizationId);
@@ -173,33 +166,6 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnPnr).HasMaxLength(100);
             b.Property(x => x.ReturnBaggageAllowance).HasMaxLength(100);
 
-        });
-
-        modelBuilder.Entity<ParticipantAccessEntity>(b =>
-        {
-            b.ToTable("participant_access");
-            b.HasKey(x => x.Id);
-
-            b.Property(x => x.OrganizationId).IsRequired();
-            b.Property(x => x.ParticipantId).IsRequired();
-            b.Property(x => x.Version).IsRequired();
-            b.Property(x => x.Secret).HasMaxLength(128).IsRequired();
-            b.Property(x => x.SecretHash).HasMaxLength(64).IsRequired();
-            b.Property(x => x.CreatedAt).IsRequired();
-            b.Property(x => x.RevokedAt);
-
-            b.HasIndex(x => x.OrganizationId);
-            b.HasIndex(x => x.ParticipantId);
-
-            b.HasOne(x => x.Organization)
-                .WithMany(x => x.ParticipantAccesses)
-                .HasForeignKey(x => x.OrganizationId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasOne(x => x.Participant)
-                .WithMany()
-                .HasForeignKey(x => x.ParticipantId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PortalSessionEntity>(b =>

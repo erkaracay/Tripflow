@@ -254,20 +254,6 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        admin.MapGet("/{eventId}/participants/{participantId}/portal-access", PortalAccessHandlers.GetParticipantAccess)
-            .WithSummary("Get participant portal access")
-            .WithDescription("Returns the portal access token for a participant.")
-            .Produces<ParticipantPortalAccessResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
-
-        admin.MapPost("/{eventId}/participants/{participantId}/portal-access/reset", PortalAccessHandlers.ResetParticipantAccess)
-            .WithSummary("Reset participant portal access")
-            .WithDescription("Revokes existing access and creates a new portal token.")
-            .Produces<ParticipantPortalAccessResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
-
         admin.MapDelete("/{eventId}/participants/{participantId}", EventsHandlers.DeleteParticipant)
             .WithSummary("Delete participant")
             .WithDescription("Removes a participant from the event.")

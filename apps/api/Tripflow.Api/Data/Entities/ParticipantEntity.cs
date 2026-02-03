@@ -28,9 +28,5 @@ public sealed class ParticipantEntity
 
     public ParticipantDetailsEntity? Details { get; set; }
 
-    public int PortalFailedAttempts { get; set; }
-    public DateTime? PortalLockedUntil { get; set; }
-    public DateTime? PortalLastFailedAt { get; set; }
-
     public DateTime CreatedAt { get; set; }
 }
