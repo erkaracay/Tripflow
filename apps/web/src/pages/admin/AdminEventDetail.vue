@@ -15,6 +15,7 @@ import { useToast } from '../../lib/toast'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
   DayPlan,
@@ -84,6 +85,10 @@ const purgingEvent = ref(false)
 const purgeConfirmText = ref('')
 const purgeErrorKey = ref<string | null>(null)
 const resettingAllCheckIns = ref(false)
+const confirmOpen = ref(false)
+const confirmTone = ref<'default' | 'danger'>('default')
+const confirmMessageKey = ref<string | null>(null)
+const confirmAction = ref<'resetCheckIns' | 'deleteAll' | null>(null)
 const deletingAllParticipants = ref(false)
 
 const { pushToast } = useToast()
@@ -749,9 +754,15 @@ const deleteParticipant = async (participant: Participant) => {
   }
 }
 
+const requestResetAllCheckIns = () => {
+  confirmAction.value = 'resetCheckIns'
+  confirmTone.value = 'default'
+  confirmMessageKey.value = 'admin.participants.resetAllConfirm'
+  confirmOpen.value = true
+}
+
 const resetAllCheckIns = async () => {
-  const confirmed = globalThis.confirm?.(t('admin.participants.resetAllConfirm'))
-  if (!confirmed || resettingAllCheckIns.value) {
+  if (resettingAllCheckIns.value) {
     return
   }
 
@@ -767,9 +778,15 @@ const resetAllCheckIns = async () => {
   }
 }
 
+const requestDeleteAllParticipants = () => {
+  confirmAction.value = 'deleteAll'
+  confirmTone.value = 'danger'
+  confirmMessageKey.value = 'admin.participants.deleteAllConfirm'
+  confirmOpen.value = true
+}
+
 const deleteAllParticipants = async () => {
-  const confirmed = globalThis.confirm?.(t('admin.participants.deleteAllConfirm'))
-  if (!confirmed || deletingAllParticipants.value) {
+  if (deletingAllParticipants.value) {
     return
   }
 
@@ -783,6 +800,15 @@ const deleteAllParticipants = async () => {
   } finally {
     deletingAllParticipants.value = false
   }
+}
+
+const handleConfirm = async () => {
+  if (confirmAction.value === 'resetCheckIns') {
+    await resetAllCheckIns()
+  } else if (confirmAction.value === 'deleteAll') {
+    await deleteAllParticipants()
+  }
+  confirmAction.value = null
 }
 
 const copyToClipboard = async (value: string, successKey: string, errorKey: string) => {
@@ -1585,7 +1611,7 @@ onMounted(loadEvent)
               class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               :disabled="participants.length === 0 || resettingAllCheckIns"
-              @click="resetAllCheckIns"
+              @click="requestResetAllCheckIns"
             >
               {{ resettingAllCheckIns ? t('common.saving') : t('admin.participants.resetAll') }}
             </button>
@@ -1593,7 +1619,7 @@ onMounted(loadEvent)
               class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               :disabled="participants.length === 0 || deletingAllParticipants"
-              @click="deleteAllParticipants"
+              @click="requestDeleteAllParticipants"
             >
               {{ deletingAllParticipants ? t('common.saving') : t('admin.participants.deleteAll') }}
             </button>
@@ -1945,4 +1971,14 @@ onMounted(loadEvent)
       </section>
     </template>
   </div>
+
+  <ConfirmDialog
+    v-model:open="confirmOpen"
+    :title="t('common.confirm')"
+    :message="confirmMessageKey ? t(confirmMessageKey) : ''"
+    :confirm-label="confirmTone === 'danger' ? t('common.delete') : t('common.confirm')"
+    :cancel-label="t('common.cancel')"
+    :tone="confirmTone"
+    @confirm="handleConfirm"
+  />
 </template>

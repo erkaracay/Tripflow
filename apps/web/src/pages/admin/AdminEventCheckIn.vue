@@ -8,6 +8,7 @@ import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import type {
   CheckInResponse,
   CheckInSummary,
@@ -42,6 +43,8 @@ const lastResult = ref<CheckInResponse | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const undoingParticipantId = ref<string | null>(null)
 const resettingAllCheckIns = ref(false)
+const confirmOpen = ref(false)
+const confirmMessageKey = ref<string | null>(null)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
@@ -142,9 +145,13 @@ const undoCheckIn = async (participantId: string) => {
   }
 }
 
+const requestResetAllCheckIns = () => {
+  confirmMessageKey.value = 'admin.participants.resetAllConfirm'
+  confirmOpen.value = true
+}
+
 const resetAllCheckIns = async () => {
-  const confirmed = globalThis.confirm?.(t('admin.participants.resetAllConfirm'))
-  if (!confirmed || resettingAllCheckIns.value) {
+  if (resettingAllCheckIns.value) {
     return
   }
 
@@ -165,6 +172,10 @@ const resetAllCheckIns = async () => {
   } finally {
     resettingAllCheckIns.value = false
   }
+}
+
+const handleConfirm = async () => {
+  await resetAllCheckIns()
 }
 
 const submitCheckIn = async (code: string) => {
@@ -410,7 +421,7 @@ onMounted(() => {
               class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               :disabled="participants.length === 0 || resettingAllCheckIns"
-              @click="resetAllCheckIns"
+              @click="requestResetAllCheckIns"
             >
               {{ resettingAllCheckIns ? t('common.saving') : t('admin.participants.resetAll') }}
             </button>
@@ -503,4 +514,13 @@ onMounted(() => {
       </template>
     </template>
   </div>
+
+  <ConfirmDialog
+    v-model:open="confirmOpen"
+    :title="t('common.confirm')"
+    :message="confirmMessageKey ? t(confirmMessageKey) : ''"
+    :confirm-label="t('common.confirm')"
+    :cancel-label="t('common.cancel')"
+    @confirm="handleConfirm"
+  />
 </template>

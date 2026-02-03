@@ -8,6 +8,7 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import QrScannerModal from '../../components/QrScannerModal.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import type {
   CheckInResponse,
   CheckInSummary,
@@ -53,6 +54,8 @@ const scanResolving = ref(false)
 const highlightParticipantId = ref<string | null>(null)
 const undoingParticipantId = ref<string | null>(null)
 const resettingAllCheckIns = ref(false)
+const confirmOpen = ref(false)
+const confirmMessageKey = ref<string | null>(null)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
 let highlightTimer: number | undefined
 let lastActionTimer: number | undefined
@@ -172,9 +175,13 @@ const undoCheckIn = async (participantId: string) => {
   }
 }
 
+const requestResetAllCheckIns = () => {
+  confirmMessageKey.value = 'guide.checkIn.resetAllConfirm'
+  confirmOpen.value = true
+}
+
 const resetAllCheckIns = async () => {
-  const confirmed = globalThis.confirm?.(t('guide.checkIn.resetAllConfirm'))
-  if (!confirmed || resettingAllCheckIns.value) {
+  if (resettingAllCheckIns.value) {
     return
   }
 
@@ -196,6 +203,10 @@ const resetAllCheckIns = async () => {
   } finally {
     resettingAllCheckIns.value = false
   }
+}
+
+const handleConfirm = async () => {
+  await resetAllCheckIns()
 }
 
 const submitCheckIn = async (code: string) => {
@@ -665,7 +676,7 @@ onUnmounted(() => {
               class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               :disabled="participants.length === 0 || resettingAllCheckIns"
-              @click="resetAllCheckIns"
+              @click="requestResetAllCheckIns"
             >
               {{ resettingAllCheckIns ? t('common.saving') : t('guide.checkIn.resetAll') }}
             </button>
@@ -783,4 +794,12 @@ onUnmounted(() => {
     </template>
   </div>
   <QrScannerModal :open="scannerOpen" @close="scannerOpen = false" @result="handleScanResult" />
+  <ConfirmDialog
+    v-model:open="confirmOpen"
+    :title="t('common.confirm')"
+    :message="confirmMessageKey ? t(confirmMessageKey) : ''"
+    :confirm-label="t('common.confirm')"
+    :cancel-label="t('common.cancel')"
+    @confirm="handleConfirm"
+  />
 </template>
