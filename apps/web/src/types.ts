@@ -33,8 +33,6 @@ export type Organization = {
   slug: string
   isActive: boolean
   isDeleted: boolean
-  requireLast4ForQr: boolean
-  requireLast4ForPortal: boolean
   createdAt: string
   updatedAt: string
 }
