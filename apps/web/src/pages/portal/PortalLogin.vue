@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { portalLogin } from '../../lib/api'
@@ -10,11 +10,24 @@ const { t } = useI18n()
 
 const accessCode = ref('')
 const tcNo = ref('')
+const accessCodeInput = ref<HTMLInputElement | null>(null)
+const tcNoInput = ref<HTMLInputElement | null>(null)
 const submitting = ref(false)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const retryAfterSeconds = ref<number | null>(null)
 const retryTimer = ref<number | null>(null)
+const errorId = 'portal-login-error'
+
+const isAccessCodeError = computed(
+  () => errorKey.value === 'portal.login.accessCodeRequired' || errorKey.value === 'portal.login.invalidEventCode'
+)
+const isTcError = computed(
+  () =>
+    errorKey.value === 'portal.login.tcRequired' ||
+    errorKey.value === 'portal.login.tcNotFound' ||
+    errorKey.value === 'portal.login.ambiguousTcNo'
+)
 
 const sessionTokenKey = (eventId: string) => `tripflow.portal.session.${eventId}`
 const sessionExpiryKey = (eventId: string) => `tripflow.portal.session.exp.${eventId}`
@@ -38,10 +51,18 @@ const handleAccessCodeInput = () => {
   accessCode.value = sanitizeAccessCode(accessCode.value)
 }
 
+const handleAccessCodeBlur = () => {
+  accessCode.value = sanitizeAccessCode(accessCode.value.trim())
+}
+
 const handleTcNoInput = () => {
   errorKey.value = null
   clearRetryTimer()
   tcNo.value = sanitizeTcNo(tcNo.value)
+}
+
+const handleTcNoBlur = () => {
+  tcNo.value = sanitizeTcNo(tcNo.value.trim())
 }
 
 const setSession = (eventId: string, token: string, expiresAt: string) => {
@@ -54,6 +75,9 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
 }
 
 const submitLogin = async () => {
+  if (submitting.value) {
+    return
+  }
   errorKey.value = null
   errorMessage.value = null
   retryAfterSeconds.value = null
@@ -65,11 +89,15 @@ const submitLogin = async () => {
 
   if (normalizedCode.length !== 8) {
     errorKey.value = 'portal.login.accessCodeRequired'
+    await nextTick()
+    accessCodeInput.value?.focus()
     return
   }
 
   if (normalizedTcNo.length !== 11) {
     errorKey.value = 'portal.login.tcRequired'
+    await nextTick()
+    tcNoInput.value?.focus()
     return
   }
 
@@ -107,6 +135,16 @@ const submitLogin = async () => {
 
     if (mappedKey) {
       errorKey.value = mappedKey
+      await nextTick()
+      if (mappedKey === 'portal.login.accessCodeRequired' || mappedKey === 'portal.login.invalidEventCode') {
+        accessCodeInput.value?.focus()
+      } else if (
+        mappedKey === 'portal.login.tcRequired' ||
+        mappedKey === 'portal.login.tcNotFound' ||
+        mappedKey === 'portal.login.ambiguousTcNo'
+      ) {
+        tcNoInput.value?.focus()
+      }
     } else {
       errorMessage.value = err instanceof Error ? err.message : null
       if (!errorMessage.value) {
@@ -170,42 +208,64 @@ onMounted(() => {
         <h1 class="text-2xl font-semibold">{{ t('portal.login.title') }}</h1>
         <p class="text-sm text-slate-600">{{ t('portal.login.subtitle') }}</p>
       </div>
-      <div class="mt-6 grid gap-4">
-        <label class="grid gap-1 text-sm">
+      <form class="mt-6 grid gap-4" @submit.prevent="submitLogin">
+        <label class="grid gap-1 text-sm" for="portal-access-code">
           <span class="text-slate-600">{{ t('portal.login.accessCodeLabel') }}</span>
           <input
+            id="portal-access-code"
             v-model.trim="accessCode"
+            ref="accessCodeInput"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-widest focus:border-slate-400 focus:outline-none"
             :placeholder="t('portal.login.accessCodePlaceholder')"
             maxlength="8"
             autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            :disabled="submitting"
+            :aria-invalid="isAccessCodeError"
+            :aria-describedby="isAccessCodeError && (errorKey || errorMessage) ? errorId : undefined"
             @input="handleAccessCodeInput"
+            @blur="handleAccessCodeBlur"
           />
         </label>
-        <label class="grid gap-1 text-sm">
+        <label class="grid gap-1 text-sm" for="portal-tc-no">
           <span class="text-slate-600">{{ t('portal.login.tcLabel') }}</span>
           <input
+            id="portal-tc-no"
             v-model.trim="tcNo"
+            ref="tcNoInput"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
             :placeholder="t('portal.login.tcPlaceholder')"
             maxlength="11"
             inputmode="numeric"
+            pattern="[0-9]*"
             autocomplete="off"
+            spellcheck="false"
+            :disabled="submitting"
+            :aria-invalid="isTcError"
+            :aria-describedby="isTcError && (errorKey || errorMessage) ? errorId : undefined"
             @input="handleTcNoInput"
+            @blur="handleTcNoBlur"
           />
         </label>
         <button
           class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
           :disabled="submitting || (retryAfterSeconds ?? 0) > 0"
-          @click="submitLogin"
+          type="submit"
         >
           <span v-if="submitting" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
           <span class="ml-2">{{ submitting ? t('portal.login.submitting') : t('portal.login.submit') }}</span>
         </button>
-        <p v-if="rateLimitMessage" class="text-sm text-amber-600">{{ rateLimitMessage }}</p>
-        <p v-else-if="errorKey" class="text-sm text-rose-600">{{ t(errorKey) }}</p>
-        <p v-else-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
-      </div>
+        <p v-if="rateLimitMessage" class="text-sm text-amber-600" :id="errorId" aria-live="polite">
+          {{ rateLimitMessage }}
+        </p>
+        <p v-else-if="errorKey" class="text-sm text-rose-600" :id="errorId" aria-live="polite">
+          {{ t(errorKey) }}
+        </p>
+        <p v-else-if="errorMessage" class="text-sm text-rose-600" :id="errorId" aria-live="polite">
+          {{ errorMessage }}
+        </p>
+      </form>
     </section>
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
@@ -7,7 +7,7 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
-import type { Event, EventActivity, EventDay } from '../../types'
+import type { Event as EventDto, EventActivity, EventDay } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -15,7 +15,7 @@ const { pushToast } = useToast()
 
 const eventId = computed(() => route.params.eventId as string)
 
-const event = ref<Event | null>(null)
+const event = ref<EventDto | null>(null)
 const days = ref<EventDay[]>([])
 const selectedDayId = ref<string | null>(null)
 const activities = ref<EventActivity[]>([])
@@ -34,6 +34,15 @@ const savingActivity = ref(false)
 
 const editingDayId = ref<string | null>(null)
 const editingActivityId = ref<string | null>(null)
+const dayDateInput = ref<HTMLInputElement | null>(null)
+const activityTitleInput = ref<HTMLInputElement | null>(null)
+const dayTriggerEl = ref<HTMLElement | null>(null)
+const activityTriggerEl = ref<HTMLElement | null>(null)
+const dayModalRef = ref<HTMLElement | null>(null)
+const activityModalRef = ref<HTMLElement | null>(null)
+const bodyOverflow = ref<string | null>(null)
+const dayModalTitleId = 'admin-program-day-title'
+const activityModalTitleId = 'admin-program-activity-title'
 const dayForm = ref({
   date: '',
   title: '',
@@ -130,19 +139,24 @@ const loadAll = async () => {
   }
 }
 
-const openCreateDay = () => {
+const openCreateDay = (event?: MouseEvent) => {
+  dayTriggerEl.value = (event?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null)
   editingDayId.value = null
   resetDayForm(selectedDay.value ?? undefined)
   dayModalOpen.value = true
 }
 
-const openEditDay = (day: EventDay) => {
+const openEditDay = (day: EventDay, event?: MouseEvent) => {
+  dayTriggerEl.value = (event?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null)
   editingDayId.value = day.id
   resetDayForm(day)
   dayModalOpen.value = true
 }
 
 const saveDay = async () => {
+  if (savingDay.value) {
+    return
+  }
   const payload = {
     date: dayForm.value.date,
     title: dayForm.value.title,
@@ -214,19 +228,22 @@ const moveDay = async (index: number, direction: -1 | 1) => {
   selectedDayId.value = current
 }
 
-const openCreateActivity = () => {
+const openCreateActivity = (event?: MouseEvent) => {
+  activityTriggerEl.value = (event?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null)
   editingActivityId.value = null
   resetActivityForm()
   activityModalOpen.value = true
 }
 
-const openEditActivity = (activity: EventActivity) => {
+const openEditActivity = (activity: EventActivity, event?: MouseEvent) => {
+  activityTriggerEl.value = (event?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null)
   editingActivityId.value = activity.id
   resetActivityForm(activity)
   activityModalOpen.value = true
 }
 
-const duplicateActivity = (activity: EventActivity) => {
+const duplicateActivity = (activity: EventActivity, event?: MouseEvent) => {
+  activityTriggerEl.value = (event?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null)
   editingActivityId.value = null
   resetActivityForm(activity)
   activityModalOpen.value = true
@@ -249,6 +266,97 @@ const buildMapsLink = (activity: { locationName?: string | null; address?: strin
   return `https://maps.google.com/?q=${encodeURIComponent(query)}`
 }
 
+const handleKeydown = (event: KeyboardEvent) => {
+  const activeModal = dayModalOpen.value ? dayModalRef.value : activityModalOpen.value ? activityModalRef.value : null
+
+  if (event.key === 'Tab' && activeModal) {
+    const focusable = Array.from(
+      activeModal.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex=\"-1\"])'
+      )
+    ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true')
+
+    if (focusable.length === 0) {
+      event.preventDefault()
+      return
+    }
+
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    const current = document.activeElement as HTMLElement | null
+    const isInside = !!current && activeModal.contains(current)
+
+    if (event.shiftKey) {
+      if (!isInside || current === first) {
+        event.preventDefault()
+        last.focus()
+      }
+    } else if (!isInside || current === last) {
+      event.preventDefault()
+      first.focus()
+    }
+    return
+  }
+
+  if (event.key !== 'Escape') return
+  if (dayModalOpen.value) {
+    if (!savingDay.value) {
+      dayModalOpen.value = false
+    }
+    return
+  }
+  if (activityModalOpen.value) {
+    if (!savingActivity.value) {
+      activityModalOpen.value = false
+    }
+  }
+}
+
+watch(dayModalOpen, async (open) => {
+  if (open) {
+    await nextTick()
+    dayDateInput.value?.focus()
+  } else {
+    await nextTick()
+    dayTriggerEl.value?.focus()
+    dayTriggerEl.value = null
+  }
+})
+
+watch(activityModalOpen, async (open) => {
+  if (open) {
+    await nextTick()
+    activityTitleInput.value?.focus()
+  } else {
+    await nextTick()
+    activityTriggerEl.value?.focus()
+    activityTriggerEl.value = null
+  }
+})
+
+watch(
+  () => dayModalOpen.value || activityModalOpen.value,
+  (open) => {
+    if (open) {
+      if (bodyOverflow.value === null) {
+        bodyOverflow.value = document.body.style.overflow
+      }
+      document.body.style.overflow = 'hidden'
+      window.addEventListener('keydown', handleKeydown)
+    } else {
+      document.body.style.overflow = bodyOverflow.value ?? ''
+      bodyOverflow.value = null
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }
+)
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  document.body.style.overflow = bodyOverflow.value ?? ''
+  bodyOverflow.value = null
+})
+
 const timeError = computed(() => {
   const start = parseTimeToMinutes(activityForm.value.startTime)
   const end = parseTimeToMinutes(activityForm.value.endTime)
@@ -266,6 +374,9 @@ const canSaveActivity = computed(() => {
 })
 
 const saveActivity = async () => {
+  if (savingActivity.value) {
+    return
+  }
   if (!selectedDayId.value) {
     return
   }
@@ -375,7 +486,7 @@ onMounted(loadAll)
           <button
             class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-slate-300"
             type="button"
-            @click="openCreateDay"
+            @click="openCreateDay($event)"
           >
             {{ t('admin.program.days.add') }}
           </button>
@@ -417,7 +528,7 @@ onMounted(loadAll)
               <button
                 class="rounded border border-white/30 px-2 py-1 text-[10px]"
                 type="button"
-                @click="openEditDay(day)"
+                @click="openEditDay(day, $event)"
               >
                 {{ t('admin.program.days.edit') }}
               </button>
@@ -443,7 +554,7 @@ onMounted(loadAll)
             class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
             type="button"
             :disabled="!selectedDayId"
-            @click="openCreateActivity"
+            @click="openCreateActivity($event)"
           >
             {{ t('admin.program.activities.add') }}
           </button>
@@ -488,10 +599,10 @@ onMounted(loadAll)
             </div>
             <div class="mt-2 text-xs text-slate-500" v-if="activity.notes">{{ activity.notes }}</div>
             <div class="mt-3 flex flex-wrap gap-2">
-              <button class="rounded border border-slate-200 px-2 py-1 text-[10px]" type="button" @click="openEditActivity(activity)">
+              <button class="rounded border border-slate-200 px-2 py-1 text-[10px]" type="button" @click="openEditActivity(activity, $event)">
                 {{ t('admin.program.activities.edit') }}
               </button>
-              <button class="rounded border border-slate-200 px-2 py-1 text-[10px]" type="button" @click="duplicateActivity(activity)">
+              <button class="rounded border border-slate-200 px-2 py-1 text-[10px]" type="button" @click="duplicateActivity(activity, $event)">
                 {{ t('admin.program.activities.duplicate') }}
               </button>
               <button class="rounded border border-slate-200 px-2 py-1 text-[10px]" type="button" @click="confirmDeleteActivity(activity)">
@@ -522,15 +633,31 @@ onMounted(loadAll)
   />
 
   <teleport to="body">
-    <div v-if="dayModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="dayModalOpen = false">
-      <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
-        <h3 class="text-lg font-semibold text-slate-900">
+    <div
+      v-if="dayModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+      @click.self="!savingDay && (dayModalOpen = false)"
+    >
+      <form
+        ref="dayModalRef"
+        class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="dayModalTitleId"
+        @submit.prevent="saveDay"
+      >
+        <h3 :id="dayModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingDayId ? t('admin.program.days.edit') : t('admin.program.days.add') }}
         </h3>
         <div class="mt-4 grid gap-3">
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.date') }}</span>
-            <input v-model="dayForm.date" type="date" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              ref="dayDateInput"
+              v-model="dayForm.date"
+              type="date"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+            />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.title') }}</span>
@@ -550,27 +677,48 @@ onMounted(loadAll)
           </label>
         </div>
         <div class="mt-6 flex justify-end gap-2">
-          <button class="rounded border border-slate-200 px-3 py-2 text-sm" type="button" @click="dayModalOpen = false">
+          <button
+            class="rounded border border-slate-200 px-3 py-2 text-sm"
+            type="button"
+            @click="dayModalOpen = false"
+            :disabled="savingDay"
+          >
             {{ t('common.cancel') }}
           </button>
-          <button class="rounded bg-slate-900 px-3 py-2 text-sm text-white" type="button" :disabled="savingDay" @click="saveDay">
+          <button class="rounded bg-slate-900 px-3 py-2 text-sm text-white" type="submit" :disabled="savingDay">
             {{ savingDay ? t('common.saving') : t('common.save') }}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   </teleport>
 
   <teleport to="body">
-    <div v-if="activityModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="activityModalOpen = false">
-      <div class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
-        <h3 class="text-lg font-semibold text-slate-900">
+    <div
+      v-if="activityModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+      @click.self="!savingActivity && (activityModalOpen = false)"
+    >
+      <form
+        ref="activityModalRef"
+        class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="activityModalTitleId"
+        @submit.prevent="saveActivity"
+      >
+        <h3 :id="activityModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingActivityId ? t('admin.program.activities.edit') : t('admin.program.activities.add') }}
         </h3>
         <div class="mt-4 grid gap-3 md:grid-cols-2">
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.title') }}</span>
-            <input v-model="activityForm.title" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              ref="activityTitleInput"
+              v-model="activityForm.title"
+              type="text"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+            />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.type') }}</span>
@@ -629,19 +777,23 @@ onMounted(loadAll)
         </div>
         <p v-if="timeError" class="mt-3 text-xs text-rose-600">{{ timeError }}</p>
         <div class="mt-6 flex justify-end gap-2">
-          <button class="rounded border border-slate-200 px-3 py-2 text-sm" type="button" @click="activityModalOpen = false">
+          <button
+            class="rounded border border-slate-200 px-3 py-2 text-sm"
+            type="button"
+            @click="activityModalOpen = false"
+            :disabled="savingActivity"
+          >
             {{ t('common.cancel') }}
           </button>
           <button
             class="rounded bg-slate-900 px-3 py-2 text-sm text-white"
-            type="button"
+            type="submit"
             :disabled="savingActivity || !canSaveActivity"
-            @click="saveActivity"
           >
             {{ savingActivity ? t('common.saving') : t('common.save') }}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   </teleport>
 </template>
