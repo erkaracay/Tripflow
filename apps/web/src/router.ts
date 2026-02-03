@@ -4,11 +4,13 @@ import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
 import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
 import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
+import AdminEventProgram from './pages/admin/AdminEventProgram.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
 import AdminUsers from './pages/admin/AdminUsers.vue'
 import AdminGuides from './pages/admin/AdminGuides.vue'
 import GuideEvents from './pages/guide/GuideEvents.vue'
 import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
+import GuideEventProgram from './pages/guide/GuideEventProgram.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
 import EventPortal from './pages/portal/EventPortal.vue'
@@ -35,6 +37,12 @@ const router = createRouter({
     {
       path: '/admin/events/:eventId/checkin',
       component: AdminEventCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/program',
+      component: AdminEventProgram,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
@@ -67,6 +75,12 @@ const router = createRouter({
     {
       path: '/guide/events/:eventId/checkin',
       component: GuideEventCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
+      path: '/guide/events/:eventId/program',
+      component: GuideEventProgram,
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },

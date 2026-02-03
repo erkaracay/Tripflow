@@ -25,6 +25,7 @@ const eventId = computed(() => route.params.eventId as string)
 const event = ref<PortalMeResponse['event'] | null>(null)
 const participant = ref<PortalParticipant | null>(null)
 const portal = ref<EventPortalInfo | null>(null)
+const schedule = ref<PortalMeResponse['schedule'] | null>(null)
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
@@ -53,8 +54,8 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'info', label: t('portal.tabs.info') },
 ])
 
-const days = computed(() => portal.value?.days ?? [])
-const selectedDay = computed(() => days.value[selectedDayIndex.value] ?? null)
+const scheduleDays = computed(() => schedule.value?.days ?? [])
+const selectedDay = computed(() => scheduleDays.value[selectedDayIndex.value] ?? null)
 
 const hasSession = computed(() => {
   if (!sessionToken.value || !sessionExpiresAt.value) {
@@ -94,6 +95,33 @@ const buildLoginLink = () => {
   }
 
   return `${base}/e/login`
+}
+
+const formatActivityType = (type?: string | null) => {
+  if (type === 'Meal') {
+    return t('portal.schedule.typeMeal')
+  }
+  return t('portal.schedule.typeOther')
+}
+
+const formatActivityTime = (activity: { startTime?: string | null; endTime?: string | null }) => {
+  const start = activity.startTime?.trim()
+  const end = activity.endTime?.trim()
+  if (start && end) {
+    return `${start} – ${end}`
+  }
+  if (start) {
+    return start
+  }
+  return t('portal.schedule.timeTba')
+}
+
+const buildMapsLink = (activity: { locationName?: string | null; address?: string | null }) => {
+  const query = activity.address?.trim() || activity.locationName?.trim()
+  if (!query) {
+    return ''
+  }
+  return `https://maps.google.com/?q=${encodeURIComponent(query)}`
 }
 
 const copyToClipboard = async (value: string, successKey: string, errorKeyValue: string) => {
@@ -168,33 +196,21 @@ const parseDate = (value?: string | null) => {
 
 const toDateOnly = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
-const diffDays = (start: Date, end: Date) => {
-  const ms = toDateOnly(end).getTime() - toDateOnly(start).getTime()
-  return Math.floor(ms / (24 * 60 * 60 * 1000))
-}
-
 const setDefaultDay = () => {
-  const dayCount = days.value.length
+  const dayCount = scheduleDays.value.length
   if (dayCount === 0) {
     selectedDayIndex.value = 0
     return
   }
 
-  const startDate = parseDate(event.value?.startDate)
-  const endDate = parseDate(event.value?.endDate)
   const today = toDateOnly(new Date())
 
-  if (!startDate || !endDate) {
-    selectedDayIndex.value = 0
-    return
-  }
+  const index = scheduleDays.value.findIndex((day) => {
+    const date = parseDate(day.date)
+    return date && toDateOnly(date).getTime() === today.getTime()
+  })
 
-  let index = 0
-  if (today >= toDateOnly(startDate) && today <= toDateOnly(endDate)) {
-    index = diffDays(startDate, today)
-  }
-
-  selectedDayIndex.value = Math.min(Math.max(index, 0), dayCount - 1)
+  selectedDayIndex.value = index >= 0 ? index : 0
 }
 
 const selectDay = (index: number) => {
@@ -297,6 +313,7 @@ const loadPortal = async () => {
     event.value = response.event
     participant.value = response.participant
     portal.value = response.portal
+    schedule.value = response.schedule
     checkInCode.value = response.participant.checkInCode
     hasLoadedOnce.value = true
     clearNetworkError()
@@ -479,15 +496,15 @@ onUnmounted(() => {
           <section v-if="activeTab === 'days'" class="space-y-4">
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
-              <p class="mt-1 text-sm text-slate-500" v-if="days.length === 0">
-                {{ t('portal.days.empty') }}
+              <p class="mt-1 text-sm text-slate-500" v-if="scheduleDays.length === 0">
+                {{ t('portal.schedule.empty') }}
               </p>
               <div v-else class="mt-4 space-y-4">
                 <div class="flex gap-2 overflow-x-auto">
                   <button
-                    v-for="(day, index) in days"
-                    :key="day.day"
-                    class="whitespace-nowrap rounded-full border px-3 py-1 text-xs"
+                    v-for="(day, index) in scheduleDays"
+                    :key="day.id"
+                    class="min-w-[120px] rounded-2xl border px-3 py-2 text-left text-xs"
                     :class="
                       index === selectedDayIndex
                         ? 'border-slate-900 bg-slate-900 text-white'
@@ -495,16 +512,94 @@ onUnmounted(() => {
                     "
                     @click="selectDay(index)"
                   >
-                    {{ t('portal.days.dayLabel', { day: day.day }) }}
+                    <div class="text-[10px] uppercase tracking-[0.15em] text-slate-400" :class="index === selectedDayIndex ? 'text-white/70' : ''">
+                      {{ t('portal.schedule.dayLabel', { day: index + 1 }) }}
+                    </div>
+                    <div class="mt-1 text-sm font-semibold">
+                      {{ day.title || t('portal.schedule.dayFallback', { day: index + 1 }) }}
+                    </div>
+                    <div class="mt-1 text-[11px] text-slate-400" :class="index === selectedDayIndex ? 'text-white/70' : ''">
+                      {{ day.date }}
+                    </div>
                   </button>
                 </div>
-                <div v-if="selectedDay" class="space-y-3">
-                  <div class="text-sm font-semibold text-slate-900">
-                    {{ t('portal.days.dayTitle', { day: selectedDay.day, title: selectedDay.title || '' }) }}
+
+                <div v-if="selectedDay" class="space-y-4">
+                  <div>
+                    <div class="text-sm font-semibold text-slate-900">
+                      {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
+                    </div>
+                    <div class="text-xs text-slate-500">{{ selectedDay.date }}</div>
+                    <div v-if="selectedDay.notes" class="mt-2 text-sm text-slate-600">
+                      {{ selectedDay.notes }}
+                    </div>
                   </div>
-                  <ul class="list-disc space-y-2 pl-5 text-sm text-slate-600">
-                    <li v-for="item in selectedDay.items" :key="item">{{ item }}</li>
-                  </ul>
+
+                  <div v-if="selectedDay.activities.length === 0" class="text-sm text-slate-500">
+                    {{ t('portal.schedule.noActivities') }}
+                  </div>
+
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="activity in selectedDay.activities"
+                      :key="activity.id"
+                      class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            {{ formatActivityTime(activity) }}
+                          </div>
+                          <div class="mt-1 text-base font-semibold text-slate-900">{{ activity.title }}</div>
+                        </div>
+                        <span
+                          class="rounded-full border px-3 py-1 text-xs font-semibold"
+                          :class="activity.type === 'Meal' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600'"
+                        >
+                          {{ formatActivityType(activity.type) }}
+                        </span>
+                      </div>
+
+                      <div v-if="activity.locationName || activity.address" class="mt-3 text-sm text-slate-600">
+                        <div class="font-medium text-slate-700" v-if="activity.locationName">{{ activity.locationName }}</div>
+                        <div v-if="activity.address">{{ activity.address }}</div>
+                        <a
+                          v-if="buildMapsLink(activity)"
+                          :href="buildMapsLink(activity)"
+                          target="_blank"
+                          rel="noreferrer"
+                          class="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 underline"
+                        >
+                          {{ t('portal.schedule.openMap') }}
+                        </a>
+                      </div>
+
+                      <div v-if="activity.directions" class="mt-2 text-sm text-slate-500">
+                        {{ activity.directions }}
+                      </div>
+
+                      <div v-if="activity.menuText" class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+                          {{ t('portal.schedule.menuLabel') }}
+                        </div>
+                        <div class="mt-1 whitespace-pre-line">{{ activity.menuText }}</div>
+                      </div>
+
+                      <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
+                        {{ activity.notes }}
+                      </div>
+
+                      <a
+                        v-if="activity.surveyUrl"
+                        :href="activity.surveyUrl"
+                        target="_blank"
+                        rel="noreferrer"
+                        class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 underline"
+                      >
+                        {{ t('portal.schedule.openSurvey') }}
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

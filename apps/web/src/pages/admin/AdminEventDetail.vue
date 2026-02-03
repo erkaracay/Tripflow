@@ -18,7 +18,6 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
-  DayPlan,
   EventAccessCodeResponse,
   LinkInfo,
   Participant,
@@ -35,7 +34,6 @@ const eventId = computed(() => route.params.eventId as string)
 const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
 const portal = ref<EventPortalInfo | null>(null)
-const portalDays = ref<DayPlan[]>([])
 const eventForm = reactive({
   name: '',
   startDate: '',
@@ -205,13 +203,6 @@ const portalForm = reactive({
   links: [] as LinkInfo[],
 })
 
-const normalizeDays = (days: DayPlan[]) =>
-  days.map((day, index) => ({
-    day: index + 1,
-    title: day.title ?? '',
-    items: day.items ?? [],
-  }))
-
 const setEventForm = (data: EventDto) => {
   eventForm.name = data.name
   eventForm.startDate = data.startDate
@@ -227,7 +218,6 @@ const setPortalForm = (data: EventPortalInfo) => {
 
   const normalizedLinks = data.links.length > 0 ? data.links : [{ label: '', url: '' }]
   portalForm.links.splice(0, portalForm.links.length, ...normalizedLinks)
-  portalDays.value = normalizeDays(data.days)
 }
 
 const showEventSaved = () => {
@@ -345,41 +335,6 @@ const removePortalLink = (index: number) => {
   if (portalForm.links.length === 0) {
     portalForm.links.push({ label: '', url: '' })
   }
-}
-
-const updateDayItems = (index: number, value: string) => {
-  const items = value.split(/\r?\n/)
-
-  portalDays.value = portalDays.value.map((day, idx) =>
-    idx === index ? { ...day, items } : day
-  )
-}
-
-const addDay = () => {
-  const next = [...portalDays.value, { day: portalDays.value.length + 1, title: '', items: [] }]
-  portalDays.value = normalizeDays(next)
-}
-
-const removeDay = (index: number) => {
-  portalDays.value = normalizeDays(portalDays.value.filter((_, idx) => idx !== index))
-}
-
-const moveDay = (index: number, direction: number) => {
-  const next = [...portalDays.value]
-  const target = index + direction
-  if (target < 0 || target >= next.length) {
-    return
-  }
-
-  const current = next[index]
-  const swap = next[target]
-  if (!current || !swap) {
-    return
-  }
-
-  next[index] = swap
-  next[target] = current
-  portalDays.value = normalizeDays(next)
 }
 
 const loadEvent = async () => {
@@ -993,21 +948,6 @@ const savePortal = async () => {
     .map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
     .filter((link) => link.label || link.url)
 
-  const days = portalDays.value
-    .map((day, index) => {
-      const title = day.title.trim()
-      const items = day.items.map((item) => item.trim()).filter(Boolean)
-      if (!title && items.length === 0) {
-        return null
-      }
-      return {
-        day: index + 1,
-        title: title || `Day ${index + 1}`,
-        items,
-      }
-    })
-    .filter((day): day is DayPlan => day !== null)
-
   const payload: EventPortalInfo = {
     meeting: {
       time: meetingTime,
@@ -1016,7 +956,7 @@ const savePortal = async () => {
       note: meetingNote,
     },
     links,
-    days,
+    days: [],
     notes,
   }
 
@@ -1024,7 +964,6 @@ const savePortal = async () => {
   try {
     const saved = await apiPut<EventPortalInfo>(`/api/events/${eventId.value}/portal`, payload)
     portal.value = saved
-    portalDays.value = normalizeDays(saved.days)
     showPortalSaved()
     pushToast({ key: 'toast.portalSaved', tone: 'success' })
   } catch (err) {
@@ -1140,6 +1079,12 @@ onMounted(loadEvent)
           :to="`/admin/events/${eventId}/checkin`"
         >
           {{ t('common.checkIn') }}
+        </RouterLink>
+        <RouterLink
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          :to="`/admin/events/${eventId}/program`"
+        >
+          {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
         <button
           v-if="event && !event.isDeleted"
@@ -1400,9 +1345,17 @@ onMounted(loadEvent)
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">{{ t('admin.portal.title') }}</h2>
-          <span class="text-xs text-slate-500">{{ t('admin.portal.subtitle') }}</span>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold">{{ t('admin.portal.title') }}</h2>
+            <span class="text-xs text-slate-500">{{ t('admin.portal.subtitle') }}</span>
+          </div>
+          <RouterLink
+            class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+            :to="`/admin/events/${eventId}/program`"
+          >
+            {{ t('admin.eventDetail.openProgram') }}
+          </RouterLink>
         </div>
 
         <form class="mt-4 space-y-6" @submit.prevent="savePortal">
@@ -1497,93 +1450,16 @@ onMounted(loadEvent)
             </div>
 
             <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.days.title') }}</h3>
-                <button
-                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
-                  type="button"
-                  @click="addDay"
-                >
-                  {{ t('admin.portal.days.add') }}
-                </button>
-              </div>
-              <div
-                v-if="portalDays.length === 0"
-                class="rounded border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"
-              >
-                {{ t('admin.portal.days.empty') }}
-              </div>
-              <div v-else class="space-y-4">
-                <div
-                  v-for="(day, index) in portalDays"
-                  :key="day.day"
-                  class="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                >
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="text-sm font-semibold text-slate-700">
-                    {{ t('admin.portal.days.dayLabel', { day: index + 1 }) }}
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
-                      :disabled="index === 0"
-                      type="button"
-                      @click="moveDay(index, -1)"
-                    >
-                      {{ t('common.moveUp') }}
-                    </button>
-                    <button
-                      class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
-                      :disabled="index === portalDays.length - 1"
-                      type="button"
-                      @click="moveDay(index, 1)"
-                    >
-                      {{ t('common.moveDown') }}
-                    </button>
-                    <button
-                      class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
-                      type="button"
-                      @click="removeDay(index)"
-                    >
-                      {{ t('common.remove') }}
-                    </button>
-                  </div>
-                </div>
-                <div class="mt-3 grid gap-3 md:grid-cols-2">
-                  <label class="grid gap-1 text-sm md:col-span-2">
-                    <span class="text-slate-600">{{ t('admin.portal.days.titleLabel') }}</span>
-                    <input
-                      v-model.trim="day.title"
-                      class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                      :placeholder="t('admin.portal.days.titlePlaceholder')"
-                      type="text"
-                    />
-                  </label>
-                  <label class="grid gap-1 text-sm md:col-span-2">
-                    <span class="text-slate-600">{{ t('admin.portal.days.itemsLabel') }}</span>
-                    <textarea
-                      class="min-h-24 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                      :value="day.items.join('\n')"
-                      :placeholder="t('admin.portal.days.itemsPlaceholder')"
-                      @input="updateDayItems(index, ($event.target as HTMLTextAreaElement).value)"
-                    ></textarea>
-                  </label>
-                </div>
-              </div>
+              <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.notes.title') }}</h3>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.portal.notes.label') }}</span>
+                <textarea
+                  v-model="portalForm.notesText"
+                  class="min-h-30 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :placeholder="t('admin.portal.notes.placeholder')"
+                ></textarea>
+              </label>
             </div>
-          </div>
-
-          <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.notes.title') }}</h3>
-            <label class="grid gap-1 text-sm">
-              <span class="text-slate-600">{{ t('admin.portal.notes.label') }}</span>
-              <textarea
-                v-model="portalForm.notesText"
-                class="min-h-30 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                :placeholder="t('admin.portal.notes.placeholder')"
-              ></textarea>
-            </label>
-          </div>
           </fieldset>
 
           <div class="flex flex-wrap items-center gap-3">

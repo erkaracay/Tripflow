@@ -325,6 +325,7 @@
         "endDateLabel": "End date",
         "save": "Save event"
       },
+      "openProgram": "Program",
       "openPortal": "Open portal login",
       "guide": {
         "title": "Guide Assignment",
@@ -333,6 +334,65 @@
         "empty": "No guide users found.",
         "selectPlaceholder": "Select a guide",
         "save": "Save guide"
+      }
+    },
+    "program": {
+      "loading": "Loading program...",
+      "subtitle": "Manage days and activities for this event.",
+      "days": {
+        "title": "Days",
+        "add": "Add day",
+        "empty": "No days yet. Add one to start building the schedule.",
+        "fallback": "Day {day}",
+        "count": "{count} activities",
+        "up": "Move up",
+        "down": "Move down",
+        "edit": "Edit",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this day and all its activities?",
+        "validation": {
+          "dateRequired": "Date is required."
+        },
+        "form": {
+          "date": "Date",
+          "title": "Title",
+          "notes": "Notes",
+          "sortOrder": "Sort order",
+          "active": "Active"
+        }
+      },
+      "activities": {
+        "title": "Activities",
+        "add": "Add activity",
+        "selectDay": "Select a day to manage activities.",
+        "empty": "No activities yet.",
+        "loading": "Loading activities...",
+        "timeTba": "Time TBA",
+        "typeMeal": "Meal",
+        "typeOther": "Other",
+        "edit": "Edit",
+        "duplicate": "Duplicate",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this activity?",
+        "validation": {
+          "timeRange": "End time must be after start time."
+        },
+        "form": {
+          "title": "Title",
+          "type": "Type",
+          "startTime": "Start time",
+          "endTime": "End time",
+          "locationName": "Location name",
+          "address": "Address",
+          "directions": "Directions",
+          "notes": "Notes",
+          "menuText": "Menu",
+          "surveyUrl": "Survey URL",
+          "checkInEnabled": "Enable check-in (later)",
+          "checkInMode": "Check-in mode"
+        },
+        "checkInModeEntry": "Entry only",
+        "checkInModeEntryExit": "Entry + exit"
       }
     },
     "checkIn": {
@@ -583,7 +643,8 @@
       "subtitle": "Check-in your assigned events.",
       "loading": "Loading events...",
       "empty": "No events assigned yet.",
-      "openCheckIn": "Open check-in"
+      "openCheckIn": "Open check-in",
+      "openProgram": "View program"
     },
     "checkIn": {
       "title": "Event check-in",
@@ -610,6 +671,13 @@
       "markArrived": "Mark arrived",
       "success": "Check-in successful.",
       "alreadyCheckedIn": "Already checked in."
+    },
+    "program": {
+      "title": "Program",
+      "subtitle": "Review the event schedule and activity details.",
+      "loading": "Loading program...",
+      "empty": "Program has not been published yet.",
+      "checkInEnabled": "Check-in enabled"
     }
   },
   "portal": {
@@ -642,6 +710,18 @@
     "docs": {
       "title": "Documents",
       "empty": "No documents yet."
+    },
+    "schedule": {
+      "empty": "Program not published yet.",
+      "dayLabel": "Day {day}",
+      "dayFallback": "Day {day}",
+      "noActivities": "No activities scheduled yet.",
+      "timeTba": "Time TBA",
+      "typeMeal": "Meal",
+      "typeOther": "Other",
+      "menuLabel": "Menu",
+      "openSurvey": "Open survey",
+      "openMap": "Open in maps"
     },
     "qr": {
       "title": "Your QR",

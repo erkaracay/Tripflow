@@ -325,6 +325,7 @@
         "endDateLabel": "Bitiş tarihi",
         "save": "Etkinliği kaydet"
       },
+      "openProgram": "Program",
       "openPortal": "Portal girişini aç",
       "guide": {
         "title": "Rehber Atama",
@@ -333,6 +334,65 @@
         "empty": "Rehber bulunamadı.",
         "selectPlaceholder": "Rehber seç",
         "save": "Rehberi kaydet"
+      }
+    },
+    "program": {
+      "loading": "Program yükleniyor...",
+      "subtitle": "Etkinlik günlerini ve aktivitelerini yönetin.",
+      "days": {
+        "title": "Günler",
+        "add": "Gün ekle",
+        "empty": "Henüz gün yok. Program için gün ekleyin.",
+        "fallback": "Gün {day}",
+        "count": "{count} aktivite",
+        "up": "Yukarı taşı",
+        "down": "Aşağı taşı",
+        "edit": "Düzenle",
+        "delete": "Sil",
+        "deleteConfirm": "Bu günü ve tüm aktivitelerini silmek istiyor musun?",
+        "validation": {
+          "dateRequired": "Tarih gerekli."
+        },
+        "form": {
+          "date": "Tarih",
+          "title": "Başlık",
+          "notes": "Notlar",
+          "sortOrder": "Sıra",
+          "active": "Aktif"
+        }
+      },
+      "activities": {
+        "title": "Aktiviteler",
+        "add": "Aktivite ekle",
+        "selectDay": "Aktivite yönetmek için bir gün seç.",
+        "empty": "Henüz aktivite yok.",
+        "loading": "Aktiviteler yükleniyor...",
+        "timeTba": "Saat netleşmedi",
+        "typeMeal": "Yemek",
+        "typeOther": "Diğer",
+        "edit": "Düzenle",
+        "duplicate": "Kopyala",
+        "delete": "Sil",
+        "deleteConfirm": "Bu aktivite silinsin mi?",
+        "validation": {
+          "timeRange": "Bitiş saati başlangıçtan sonra olmalı."
+        },
+        "form": {
+          "title": "Başlık",
+          "type": "Tip",
+          "startTime": "Başlangıç saati",
+          "endTime": "Bitiş saati",
+          "locationName": "Mekan adı",
+          "address": "Adres",
+          "directions": "Tarif",
+          "notes": "Notlar",
+          "menuText": "Menü",
+          "surveyUrl": "Anket linki",
+          "checkInEnabled": "Check-in (sonra)",
+          "checkInMode": "Check-in modu"
+        },
+        "checkInModeEntry": "Giriş",
+        "checkInModeEntryExit": "Giriş + çıkış"
       }
     },
     "checkIn": {
@@ -568,7 +628,8 @@
       "subtitle": "Atandığın etkinliklerde yoklama al.",
       "loading": "Etkinlikler yükleniyor...",
       "empty": "Henüz atanmış etkinlik yok.",
-      "openCheckIn": "Yoklama al"
+      "openCheckIn": "Yoklama al",
+      "openProgram": "Programı gör"
     },
     "checkIn": {
       "title": "Etkinlik yoklaması",
@@ -597,6 +658,13 @@
       "markArrived": "Geldi olarak işaretle",
       "success": "Geldi olarak işaretlendi.",
       "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş."
+    },
+    "program": {
+      "title": "Program",
+      "subtitle": "Etkinlik akışını ve aktiviteleri görüntüle.",
+      "loading": "Program yükleniyor...",
+      "empty": "Program henüz yayınlanmadı.",
+      "checkInEnabled": "Check-in açık"
     }
   },
   "portal": {
@@ -629,6 +697,18 @@
     "docs": {
       "title": "Belgeler",
       "empty": "Henüz belge yok."
+    },
+    "schedule": {
+      "empty": "Program henüz yayınlanmadı.",
+      "dayLabel": "Gün {day}",
+      "dayFallback": "Gün {day}",
+      "noActivities": "Henüz aktivite yok.",
+      "timeTba": "Saat netleşmedi",
+      "typeMeal": "Yemek",
+      "typeOther": "Diğer",
+      "menuLabel": "Menü",
+      "openSurvey": "Anketi aç",
+      "openMap": "Haritada aç"
     },
     "qr": {
       "title": "QR",

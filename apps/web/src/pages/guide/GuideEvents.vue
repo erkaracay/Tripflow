@@ -75,12 +75,20 @@ onMounted(loadEvents)
             {{ t('common.arrivedSummary', { arrived: event.arrivedCount, total: event.totalCount }) }}
           </div>
         </div>
-        <RouterLink
-          class="w-full rounded-xl bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
-          :to="`/guide/events/${event.id}/checkin`"
-        >
-          {{ t('guide.events.openCheckIn') }}
-        </RouterLink>
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <RouterLink
+            class="w-full rounded-xl bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+            :to="`/guide/events/${event.id}/checkin`"
+          >
+            {{ t('guide.events.openCheckIn') }}
+          </RouterLink>
+          <RouterLink
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
+            :to="`/guide/events/${event.id}/program`"
+          >
+            {{ t('guide.events.openProgram') }}
+          </RouterLink>
+        </div>
       </li>
     </ul>
   </div>

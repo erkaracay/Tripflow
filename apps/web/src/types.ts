@@ -113,6 +113,47 @@ export type EventPortalInfo = {
   notes: string[]
 }
 
+export type EventDay = {
+  id: string
+  date: string
+  title?: string | null
+  notes?: string | null
+  sortOrder: number
+  isActive: boolean
+  activityCount: number
+}
+
+export type EventActivity = {
+  id: string
+  eventDayId: string
+  title: string
+  type: string
+  startTime?: string | null
+  endTime?: string | null
+  locationName?: string | null
+  address?: string | null
+  directions?: string | null
+  notes?: string | null
+  checkInEnabled: boolean
+  checkInMode: string
+  menuText?: string | null
+  surveyUrl?: string | null
+}
+
+export type EventScheduleDay = {
+  id: string
+  date: string
+  title?: string | null
+  notes?: string | null
+  sortOrder: number
+  isActive: boolean
+  activities: EventActivity[]
+}
+
+export type EventSchedule = {
+  days: EventScheduleDay[]
+}
+
 export type CheckInSummary = {
   arrivedCount: number
   totalCount: number
@@ -173,6 +214,7 @@ export type PortalMeResponse = {
     checkInCode: string
   }
   portal: EventPortalInfo
+  schedule: EventSchedule
 }
 
 export type EventAccessCodeResponse = {
