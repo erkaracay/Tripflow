@@ -18,6 +18,8 @@ const userRole = computed(() => {
 })
 const showOrgLink = computed(() => userRole.value === 'SuperAdmin')
 const showAuthActions = computed(() => Boolean(userRole.value))
+const showUsersLink = computed(() => userRole.value === 'SuperAdmin')
+const showGuidesLink = computed(() => userRole.value === 'AgencyAdmin')
 const eventsPath = computed(() => {
   if (userRole.value === 'Guide') {
     return '/guide/events'
@@ -84,6 +86,12 @@ const switchLocale = (value: Locale) => {
                     </RouterLink>
                     <RouterLink v-if="eventsPath" class="hover:text-slate-900" :to="eventsPath">
                         {{ t('nav.events') }}
+                    </RouterLink>
+                    <RouterLink v-if="showUsersLink" class="hover:text-slate-900" to="/admin/users">
+                        {{ t('nav.users') }}
+                    </RouterLink>
+                    <RouterLink v-if="showGuidesLink" class="hover:text-slate-900" to="/admin/guides">
+                        {{ t('nav.guides') }}
                     </RouterLink>
                     <button
                         v-if="showAuthActions"

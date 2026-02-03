@@ -55,6 +55,8 @@
   "nav": {
     "organizations": "Organizasyonlar",
     "events": "Etkinlikler",
+    "users": "Kullanıcılar",
+    "guides": "Rehberler",
     "logout": "Çıkış",
     "backToOrganizations": "Organizasyonlara dön",
     "backToEvents": "Etkinliklere dön",
@@ -83,6 +85,12 @@
   },
   "errors": {
     "generic": "Bir şeyler ters gitti.",
+    "users": {
+      "load": "Kullanıcılar yüklenemedi.",
+      "create": "Kullanıcı oluşturulamadı.",
+      "emailExists": "Bu e-posta zaten kayıtlı.",
+      "orgRequired": "Organizasyon gerekli."
+    },
     "events": {
       "load": "Etkinlikler yüklenemedi.",
       "create": "Etkinlik oluşturulamadı."
@@ -106,7 +114,8 @@
       "assign": "Rehber atanamadı."
     },
     "guides": {
-      "load": "Rehberler yüklenemedi."
+      "load": "Rehberler yüklenemedi.",
+      "create": "Rehber oluşturulamadı."
     },
     "organizations": {
       "load": "Organizasyonlar yüklenemedi.",
@@ -129,6 +138,8 @@
     "startEndRequired": "Başlangıç ve bitiş tarihleri gerekli.",
     "endAfterStart": "Bitiş tarihi başlangıçtan önce olamaz.",
     "endDateAdjusted": "Bitiş tarihi başlangıca göre güncellendi.",
+    "userEmailPasswordRequired": "E-posta ve şifre gerekli.",
+    "passwordMin": "Şifre en az 8 karakter olmalı.",
     "fullNameRequired": "Ad soyad gerekli.",
     "meetingTimeRequired": "Buluşma saati gerekli.",
     "meetingPlaceRequired": "Buluşma yeri gerekli.",
@@ -195,6 +206,10 @@
     "eventAccessCodeCopyFailed": "Erişim kodu kopyalanamadı.",
     "eventAccessCodeRegenerated": "Erişim kodu yenilendi.",
     "eventAccessCodeRegenerateFailed": "Erişim kodu yenilenemedi.",
+    "userCreated": "Kullanıcı oluşturuldu.",
+    "userCreateFailed": "Kullanıcı oluşturulamadı.",
+    "guideCreated": "Rehber oluşturuldu.",
+    "guideCreateFailed": "Rehber oluşturulamadı.",
     "checkInsResetAll": "Tüm yoklamalar sıfırlandı.",
     "checkInsResetAllFailed": "Yoklamalar sıfırlanamadı.",
     "participantsResetAll": "Tüm katılımcı erişim linkleri sıfırlandı.",
@@ -203,6 +218,48 @@
     "participantsDeleteAllFailed": "Tüm katılımcılar silinemedi."
   },
   "admin": {
+    "users": {
+      "title": "Kullanıcı yönetimi",
+      "subtitle": "Seçili organizasyon için admin ve rehber oluşturun.",
+      "orgRequired": "Kullanıcı yönetimi için önce organizasyon seçin.",
+      "loading": "Kullanıcılar yükleniyor...",
+      "empty": "Kullanıcı bulunamadı.",
+      "createTitle": "Kullanıcı oluştur",
+      "creating": "Oluşturuluyor...",
+      "create": "Kullanıcı oluştur",
+      "listTitle": "Kullanıcılar",
+      "roles": {
+        "admin": "Admin",
+        "guide": "Rehber"
+      },
+      "form": {
+        "roleLabel": "Rol",
+        "emailLabel": "E-posta",
+        "emailPlaceholder": "user{'@'}demo.local",
+        "passwordLabel": "Şifre",
+        "passwordPlaceholder": "Parola123!",
+        "fullNameLabel": "İsim (opsiyonel)",
+        "fullNamePlaceholder": "Ayşe Demir"
+      }
+    },
+    "guides": {
+      "title": "Rehberler",
+      "subtitle": "Organizasyonundaki rehberleri yönet.",
+      "loading": "Rehberler yükleniyor...",
+      "empty": "Rehber bulunamadı.",
+      "createTitle": "Rehber oluştur",
+      "creating": "Oluşturuluyor...",
+      "create": "Rehber oluştur",
+      "listTitle": "Rehberler",
+      "form": {
+        "emailLabel": "E-posta",
+        "emailPlaceholder": "guide{'@'}demo.local",
+        "passwordLabel": "Şifre",
+        "passwordPlaceholder": "TempPass123!",
+        "fullNameLabel": "İsim (opsiyonel)",
+        "fullNamePlaceholder": "Ayşe Demir"
+      }
+    },
     "events": {
       "title": "Etkinlikler",
       "subtitle": "Etkinlik oluştur, katılımcı ekle ve portalı aç.",

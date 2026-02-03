@@ -55,6 +55,8 @@
   "nav": {
     "organizations": "Organizations",
     "events": "Events",
+    "users": "Users",
+    "guides": "Guides",
     "logout": "Logout",
     "backToOrganizations": "Back to organizations",
     "backToEvents": "Back to events",
@@ -83,6 +85,12 @@
   },
   "errors": {
     "generic": "Something went wrong.",
+    "users": {
+      "load": "Failed to load users.",
+      "create": "Failed to create user.",
+      "emailExists": "Email already exists.",
+      "orgRequired": "Organization is required."
+    },
     "events": {
       "load": "Failed to load events.",
       "create": "Failed to create event."
@@ -106,7 +114,8 @@
       "assign": "Failed to assign guide."
     },
     "guides": {
-      "load": "Failed to load guides."
+      "load": "Failed to load guides.",
+      "create": "Failed to create guide."
     },
     "organizations": {
       "load": "Failed to load organizations.",
@@ -129,6 +138,8 @@
     "startEndRequired": "Start and end dates are required.",
     "endAfterStart": "End date must be on or after start date.",
     "endDateAdjusted": "End date was adjusted to match start date.",
+    "userEmailPasswordRequired": "Email and password are required.",
+    "passwordMin": "Password must be at least 8 characters.",
     "fullNameRequired": "Full name is required.",
     "meetingTimeRequired": "Meeting time is required.",
     "meetingPlaceRequired": "Meeting place is required.",
@@ -195,6 +206,10 @@
     "eventAccessCodeCopyFailed": "Failed to copy access code.",
     "eventAccessCodeRegenerated": "Access code regenerated.",
     "eventAccessCodeRegenerateFailed": "Failed to regenerate access code.",
+    "userCreated": "User created.",
+    "userCreateFailed": "Failed to create user.",
+    "guideCreated": "Guide created.",
+    "guideCreateFailed": "Failed to create guide.",
     "checkInsResetAll": "All check-ins were reset.",
     "checkInsResetAllFailed": "Failed to reset all check-ins.",
     "participantsResetAll": "All participant access links were reset.",
@@ -203,6 +218,48 @@
     "participantsDeleteAllFailed": "Failed to delete all participants."
   },
   "admin": {
+    "users": {
+      "title": "User management",
+      "subtitle": "Create admins and guides for the selected organization.",
+      "orgRequired": "Select an organization first to manage users.",
+      "loading": "Loading users...",
+      "empty": "No users found.",
+      "createTitle": "Create user",
+      "creating": "Creating...",
+      "create": "Create user",
+      "listTitle": "Users",
+      "roles": {
+        "admin": "Admin",
+        "guide": "Guide"
+      },
+      "form": {
+        "roleLabel": "Role",
+        "emailLabel": "Email",
+        "emailPlaceholder": "user{'@'}demo.local",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "Password123!",
+        "fullNameLabel": "Name (optional)",
+        "fullNamePlaceholder": "Alex Johnson"
+      }
+    },
+    "guides": {
+      "title": "Guides",
+      "subtitle": "Manage guides in your organization.",
+      "loading": "Loading guides...",
+      "empty": "No guides found.",
+      "createTitle": "Create guide",
+      "creating": "Creating...",
+      "create": "Create guide",
+      "listTitle": "Guides",
+      "form": {
+        "emailLabel": "Email",
+        "emailPlaceholder": "guide{'@'}demo.local",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "TempPass123!",
+        "fullNameLabel": "Name (optional)",
+        "fullNamePlaceholder": "Jamie Carter"
+      }
+    },
     "events": {
       "title": "Events",
       "subtitle": "Create an event, add participants, and open the portal.",
@@ -272,7 +329,6 @@
       "autoCheckInToggle": "Auto check-in after scan",
       "useManualCode": "Enter code manually",
       "participantsTitle": "Participants",
-      "lastAction": "Last check-in: {name}",
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
       "success": "Check-in successful.",

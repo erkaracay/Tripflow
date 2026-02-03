@@ -5,6 +5,8 @@ import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
 import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
 import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
+import AdminUsers from './pages/admin/AdminUsers.vue'
+import AdminGuides from './pages/admin/AdminGuides.vue'
 import GuideEvents from './pages/guide/GuideEvents.vue'
 import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
 import Login from './pages/Login.vue'
@@ -46,6 +48,16 @@ const router = createRouter({
       path: '/admin/orgs',
       component: AdminOrganizations,
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
+    },
+    {
+      path: '/admin/users',
+      component: AdminUsers,
+      meta: { requiresAuth: true, roles: ['SuperAdmin'] },
+    },
+    {
+      path: '/admin/guides',
+      component: AdminGuides,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/guide/events',
