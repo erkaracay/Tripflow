@@ -5,3 +5,5 @@ public sealed record UserListItemDto(Guid Id, string Email, string? FullName, st
 public sealed record CreateUserRequest(string Email, string Password, string Role, Guid OrganizationId, string? FullName);
 
 public sealed record CreateGuideRequest(string Email, string Password, string? FullName);
+
+public sealed record ChangePasswordRequest(string NewPassword);

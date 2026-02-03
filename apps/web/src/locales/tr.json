@@ -13,6 +13,10 @@
     "saved": "Kaydedildi.",
     "cancel": "İptal",
     "confirm": "Onayla",
+    "newPassword": "Yeni parola",
+    "confirmPassword": "Parolayı doğrula",
+    "show": "Göster",
+    "hide": "Gizle",
     "delete": "Sil",
     "archive": "Arşivle",
     "restore": "Geri al",
@@ -89,7 +93,16 @@
       "load": "Kullanıcılar yüklenemedi.",
       "create": "Kullanıcı oluşturulamadı.",
       "emailExists": "Bu e-posta zaten kayıtlı.",
-      "orgRequired": "Organizasyon gerekli."
+      "orgRequired": "Organizasyon gerekli.",
+      "password": {
+        "required": "Parola ve doğrulama zorunlu.",
+        "mismatch": "Parolalar eşleşmiyor.",
+        "tooShort": "Parola en az 8 karakter olmalı.",
+        "invalidRole": "Bu rol için parola değiştirilemez.",
+        "forbidden": "Bu parolayı değiştirme yetkin yok.",
+        "notFound": "Kullanıcı bulunamadı.",
+        "failed": "Parola güncellenemedi."
+      }
     },
     "events": {
       "load": "Etkinlikler yüklenemedi.",
@@ -210,6 +223,8 @@
     "userCreateFailed": "Kullanıcı oluşturulamadı.",
     "guideCreated": "Rehber oluşturuldu.",
     "guideCreateFailed": "Rehber oluşturulamadı.",
+    "passwordUpdated": "Parola güncellendi.",
+    "passwordUpdateFailed": "Parola güncellenemedi.",
     "checkInsResetAll": "Tüm yoklamalar sıfırlandı.",
     "checkInsResetAllFailed": "Yoklamalar sıfırlanamadı.",
     "participantsResetAll": "Tüm katılımcı erişim linkleri sıfırlandı.",
@@ -228,6 +243,12 @@
       "creating": "Oluşturuluyor...",
       "create": "Kullanıcı oluştur",
       "listTitle": "Kullanıcılar",
+      "actions": {
+        "changePassword": "Parola değiştir"
+      },
+      "password": {
+        "title": "Parola değiştir"
+      },
       "roles": {
         "admin": "Admin",
         "guide": "Rehber"
@@ -251,6 +272,12 @@
       "creating": "Oluşturuluyor...",
       "create": "Rehber oluştur",
       "listTitle": "Rehberler",
+      "actions": {
+        "changePassword": "Parola değiştir"
+      },
+      "password": {
+        "title": "Parola değiştir"
+      },
       "form": {
         "emailLabel": "E-posta",
         "emailPlaceholder": "guide{'@'}demo.local",
@@ -407,6 +434,8 @@
       "previewReadyToast": "Önizleme hazır.",
       "applySuccessToast": "İçe aktarma tamamlandı.",
       "applyErrorToast": "İçe aktarma başarısız oldu.",
+      "previewBlocked": "Önizleme hatalar içeriyor. Aşağıdaki raporu inceleyin.",
+      "applyBlocked": "Hatalar nedeniyle içe aktarma durduruldu. Düzenleyip tekrar deneyin.",
       "rateLimited": "Çok fazla deneme yapıldı. {seconds}s sonra tekrar deneyin.",
       "summary": {
         "totalRows": "Toplam satır",
@@ -433,6 +462,7 @@
       },
       "messages": {
         "duplicateTcNo": "Dosyada kimlik numarası tekrar ediyor. Son satır dikkate alınacak.",
+        "tcNoAmbiguous": "Kimlik numarası etkinlikte birden fazla katılımcıyla eşleşiyor.",
         "fullNameRequired": "Ad soyad zorunludur.",
         "phoneRequired": "Telefon zorunludur.",
         "tcNoInvalid": "Kimlik numarası 11 haneli olmalıdır.",

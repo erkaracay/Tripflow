@@ -247,6 +247,19 @@ const extractRetryAfter = (error: ApiError) => {
   return value
 }
 
+const extractReport = (error: ApiError): ParticipantImportReport | null => {
+  if (!error.payload || typeof error.payload !== 'object') {
+    return null
+  }
+
+  const payload = error.payload as ParticipantImportReport
+  if (typeof payload.totalRows !== 'number' || !Array.isArray(payload.errors) || !Array.isArray(payload.warnings)) {
+    return null
+  }
+
+  return payload
+}
+
 const runPreview = async () => {
   if (!selectedFile.value || !canPreview.value) {
     return
@@ -265,6 +278,13 @@ const runPreview = async () => {
     pushToast({ key: 'admin.import.previewReadyToast', tone: 'success' })
   } catch (err) {
     const apiError = err as ApiError
+    const payloadReport = extractReport(apiError)
+    if (payloadReport) {
+      report.value = payloadReport
+      finalReport.value = null
+      reportError.value = t('admin.import.previewBlocked')
+      return
+    }
     if (apiError.status === 429) {
       const seconds = extractRetryAfter(apiError) || 60
       startRetryCountdown(seconds)
@@ -292,9 +312,18 @@ const applyImport = async () => {
     )
     finalReport.value = response
     report.value = response
+    reportError.value = null
     pushToast({ key: 'admin.import.applySuccessToast', tone: 'success' })
   } catch (err) {
     const apiError = err as ApiError
+    const payloadReport = extractReport(apiError)
+    if (payloadReport) {
+      finalReport.value = payloadReport
+      report.value = payloadReport
+      reportError.value = t('admin.import.applyBlocked')
+      pushToast({ key: 'admin.import.applyErrorToast', tone: 'error' })
+      return
+    }
     if (apiError.status === 429) {
       const seconds = extractRetryAfter(apiError) || 60
       startRetryCountdown(seconds)
@@ -372,6 +401,8 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
 
 const translateImportError = (error: ParticipantImportError) => {
   const message = error.message.toLowerCase()
+  if (message.includes('duplicate tcno in file')) return t('admin.import.messages.duplicateTcNo')
+  if (message.includes('matches multiple existing participants')) return t('admin.import.messages.tcNoAmbiguous')
   if (message.includes('full_name required')) return t('admin.import.messages.fullNameRequired')
   if (message.includes('phone required')) return t('admin.import.messages.phoneRequired')
   if (message.includes('tc_no must be 11 digits')) return t('admin.import.messages.tcNoInvalid')

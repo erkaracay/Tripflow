@@ -13,6 +13,10 @@
     "saved": "Saved.",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "show": "Show",
+    "hide": "Hide",
     "delete": "Delete",
     "archive": "Archive",
     "restore": "Restore",
@@ -89,7 +93,16 @@
       "load": "Failed to load users.",
       "create": "Failed to create user.",
       "emailExists": "Email already exists.",
-      "orgRequired": "Organization is required."
+      "orgRequired": "Organization is required.",
+      "password": {
+        "required": "Password and confirmation are required.",
+        "mismatch": "Passwords do not match.",
+        "tooShort": "Password must be at least 8 characters.",
+        "invalidRole": "You cannot change password for this role.",
+        "forbidden": "You do not have permission to change this password.",
+        "notFound": "User not found.",
+        "failed": "Failed to update password."
+      }
     },
     "events": {
       "load": "Failed to load events.",
@@ -210,6 +223,8 @@
     "userCreateFailed": "Failed to create user.",
     "guideCreated": "Guide created.",
     "guideCreateFailed": "Failed to create guide.",
+    "passwordUpdated": "Password updated.",
+    "passwordUpdateFailed": "Failed to update password.",
     "checkInsResetAll": "All check-ins were reset.",
     "checkInsResetAllFailed": "Failed to reset all check-ins.",
     "participantsResetAll": "All participant access links were reset.",
@@ -228,6 +243,12 @@
       "creating": "Creating...",
       "create": "Create user",
       "listTitle": "Users",
+      "actions": {
+        "changePassword": "Change password"
+      },
+      "password": {
+        "title": "Change password"
+      },
       "roles": {
         "admin": "Admin",
         "guide": "Guide"
@@ -251,6 +272,12 @@
       "creating": "Creating...",
       "create": "Create guide",
       "listTitle": "Guides",
+      "actions": {
+        "changePassword": "Change password"
+      },
+      "password": {
+        "title": "Change password"
+      },
       "form": {
         "emailLabel": "Email",
         "emailPlaceholder": "guide{'@'}demo.local",
@@ -422,6 +449,8 @@
       "previewReadyToast": "Preview is ready.",
       "applySuccessToast": "Import completed.",
       "applyErrorToast": "Import failed.",
+      "previewBlocked": "Preview completed with errors. Review the report below.",
+      "applyBlocked": "Import blocked due to errors. Fix them and try again.",
       "rateLimited": "Too many attempts. Try again in {seconds}s.",
       "summary": {
         "totalRows": "Total rows",
@@ -448,6 +477,7 @@
       },
       "messages": {
         "duplicateTcNo": "Duplicate identity number in file. Last row will be used.",
+        "tcNoAmbiguous": "Identity number matches multiple participants in this event.",
         "fullNameRequired": "Full name is required.",
         "phoneRequired": "Phone is required.",
         "tcNoInvalid": "Identity number must be 11 digits.",

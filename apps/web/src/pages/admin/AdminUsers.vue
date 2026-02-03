@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { apiGet, apiPost } from '../../lib/api'
+import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
 import { getSelectedOrgId } from '../../lib/auth'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import PasswordModal from '../../components/ui/PasswordModal.vue'
 import type { UserListItem } from '../../types'
 
 type CreateRole = 'Admin' | 'Guide'
@@ -28,6 +29,11 @@ const createForm = reactive({
 const creating = ref(false)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
+const passwordOpen = ref(false)
+const passwordUser = ref<UserListItem | null>(null)
+const passwordErrorKey = ref<string | null>(null)
+const passwordErrorMessage = ref<string | null>(null)
+const passwordSaving = ref(false)
 
 const loadUsers = async () => {
   if (!selectedOrgId.value) {
@@ -106,6 +112,72 @@ const createUser = async () => {
     pushToast({ key: 'toast.userCreateFailed', tone: 'error' })
   } finally {
     creating.value = false
+  }
+}
+
+const openPasswordModal = (user: UserListItem) => {
+  passwordUser.value = user
+  passwordErrorKey.value = null
+  passwordErrorMessage.value = null
+  passwordOpen.value = true
+}
+
+const closePasswordModal = () => {
+  passwordOpen.value = false
+  passwordUser.value = null
+}
+
+const submitPassword = async (payload: { password: string; confirm: string }) => {
+  passwordErrorKey.value = null
+  passwordErrorMessage.value = null
+
+  if (!payload.password || !payload.confirm) {
+    passwordErrorKey.value = 'errors.users.password.required'
+    return
+  }
+
+  if (payload.password.length < 8) {
+    passwordErrorKey.value = 'errors.users.password.tooShort'
+    return
+  }
+
+  if (payload.password !== payload.confirm) {
+    passwordErrorKey.value = 'errors.users.password.mismatch'
+    return
+  }
+
+  if (!passwordUser.value) {
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await apiPostWithPayload<void>(`/api/users/${passwordUser.value.id}/password`, {
+      newPassword: payload.password,
+    })
+    pushToast({ key: 'toast.passwordUpdated', tone: 'success' })
+    closePasswordModal()
+  } catch (err) {
+    const payloadError = err as { payload?: unknown }
+    const code =
+      payloadError?.payload && typeof payloadError.payload === 'object' && 'code' in payloadError.payload
+        ? String((payloadError.payload as { code?: string }).code ?? '')
+        : ''
+
+    if (code === 'password_too_short') {
+      passwordErrorKey.value = 'errors.users.password.tooShort'
+    } else if (code === 'invalid_role_target') {
+      passwordErrorKey.value = 'errors.users.password.invalidRole'
+    } else if (code === 'user_not_found') {
+      passwordErrorKey.value = 'errors.users.password.notFound'
+    } else if (code === 'forbidden') {
+      passwordErrorKey.value = 'errors.users.password.forbidden'
+    } else {
+      passwordErrorMessage.value = err instanceof Error ? err.message : t('errors.users.password.failed')
+    }
+    pushToast({ key: 'toast.passwordUpdateFailed', tone: 'error' })
+  } finally {
+    passwordSaving.value = false
   }
 }
 
@@ -203,11 +275,32 @@ onMounted(loadUsers)
             <div class="font-medium text-slate-900">{{ user.fullName || user.email }}</div>
             <div class="text-xs text-slate-500">{{ user.email }}</div>
           </div>
-          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-            {{ roleLabel(user.role) }}
-          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              type="button"
+              @click="openPasswordModal(user)"
+            >
+              {{ t('admin.users.actions.changePassword') }}
+            </button>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              {{ roleLabel(user.role) }}
+            </span>
+          </div>
         </div>
       </div>
     </section>
+
+    <PasswordModal
+      :open="passwordOpen"
+      :title="t('admin.users.password.title')"
+      :name="passwordUser?.fullName ?? null"
+      :email="passwordUser?.email ?? null"
+      :loading="passwordSaving"
+      :error-key="passwordErrorKey"
+      :error-message="passwordErrorMessage"
+      @close="closePasswordModal"
+      @submit="submitPassword"
+    />
   </div>
 </template>

@@ -74,6 +74,31 @@ public static class UsersEndpoints
                 return op;
             });
 
+        group.MapPost("/{userId:guid}/password", UsersHandlers.ChangePassword)
+            .WithSummary("Change user password")
+            .WithDescription("SuperAdmin can change any user password. Admin can change guide passwords within their organization.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .WithOpenApi(op =>
+            {
+                op.RequestBody = new OpenApiRequestBody
+                {
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType
+                        {
+                            Example = new OpenApiObject
+                            {
+                                ["newPassword"] = new OpenApiString("StrongPass123!")
+                            }
+                        }
+                    }
+                };
+                return op;
+            });
+
         return app;
     }
 }

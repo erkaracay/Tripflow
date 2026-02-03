@@ -149,6 +149,16 @@ export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   return handleResponse<T>(response)
 }
 
+export const apiPostWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: buildHeaders('application/json'),
+    body: JSON.stringify(body),
+  })
+
+  return handleResponseWithPayload<T>(response)
+}
+
 export const apiPostWithHeaders = async <T>(
   path: string,
   body: unknown
