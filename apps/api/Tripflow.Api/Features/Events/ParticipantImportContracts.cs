@@ -8,9 +8,12 @@ public enum ParticipantImportMode
 
 public sealed record ParticipantImportReport(
     int TotalRows,
+    int ValidRows,
     int Imported,
     int Created,
     int Updated,
+    int Skipped,
+    int ErrorCount,
     int Failed,
     string[] IgnoredColumns,
     ParticipantImportError[] Errors,

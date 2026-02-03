@@ -189,219 +189,292 @@ internal static class ParticipantImportHandlers
         var errors = new List<ParticipantImportError>();
         var warnings = new List<ParticipantImportWarning>();
 
+        if (payload.MissingRequiredColumns.Length > 0)
+        {
+            errors.Add(new ParticipantImportError(
+                1,
+                null,
+                $"Missing required columns: {string.Join(", ", payload.MissingRequiredColumns)}",
+                payload.MissingRequiredColumns));
+
+            var missingColumnsReport = BuildReport(payload, 0, 0, 0, errors, warnings);
+            return Results.BadRequest(missingColumnsReport);
+        }
+
+        var fileTcRows = BuildFileTcRowMap(payload.Rows);
+        var duplicateTcInFile = fileTcRows
+            .Where(x => x.Value.Count > 1)
+            .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
+
+        foreach (var duplicate in duplicateTcInFile)
+        {
+            foreach (var rowNo in duplicate.Value)
+            {
+                errors.Add(new ParticipantImportError(
+                    rowNo,
+                    duplicate.Key,
+                    "Duplicate tcNo in file.",
+                    ["tc_no"]));
+            }
+        }
+
+        var hasFatalFileErrors = duplicateTcInFile.Count > 0;
+        var blockedRows = new HashSet<int>(errors.Select(x => x.Row));
+
         var existingParticipants = await db.Participants
             .Include(x => x.Details)
             .Where(x => x.EventId == id && x.OrganizationId == orgId)
             .ToListAsync(ct);
 
         var existingByTc = existingParticipants
-            .GroupBy(x => x.TcNo, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            .GroupBy(x => NormalizeTcNo(x.TcNo), StringComparer.Ordinal)
+            .Where(g => g.Key.Length > 0)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var ambiguousDbTc = existingByTc
+            .Where(x => x.Value.Count > 1)
+            .Select(x => x.Key)
+            .ToHashSet(StringComparer.Ordinal);
 
         var usedCodes = new HashSet<string>(
             existingParticipants.Select(x => x.CheckInCode),
             StringComparer.Ordinal);
 
-        var seenTc = new HashSet<string>(StringComparer.Ordinal);
-
+        var createdParticipants = new List<ParticipantEntity>();
         var imported = 0;
         var created = 0;
         var updated = 0;
+        var now = DateTime.UtcNow;
+        await using var transaction = importMode == ParticipantImportMode.Apply && !hasFatalFileErrors
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
 
-        foreach (var row in payload.Rows)
+        try
         {
-            if (errors.Count > MaxRows)
+            foreach (var row in payload.Rows)
             {
-                break;
-            }
-
-            var tcNoRaw = row.GetValue("tc_no");
-            var tcNo = NormalizeTcNo(tcNoRaw);
-
-            var fullName = NormalizeName(row.GetValue("full_name"));
-            if (string.IsNullOrWhiteSpace(fullName))
-            {
-                fullName = NormalizeName(JoinFirstLast(row.GetValue("first_name"), row.GetValue("last_name")));
-            }
-
-            var phone = NormalizePhone(row.GetValue("phone"));
-            var email = NormalizeEmail(row.GetValue("email"));
-            var genderRaw = row.GetValue("gender");
-
-            var rowErrors = new List<string>();
-            var errorFields = new List<string>();
-
-            if (string.IsNullOrWhiteSpace(fullName))
-            {
-                rowErrors.Add("full_name required");
-                errorFields.Add("full_name");
-            }
-
-            if (string.IsNullOrWhiteSpace(phone))
-            {
-                rowErrors.Add("phone required");
-                errorFields.Add("phone");
-            }
-
-            if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
-            {
-                rowErrors.Add("tc_no must be 11 digits");
-                errorFields.Add("tc_no");
-            }
-
-            if (!TryParseDate(row.GetValue("birth_date"), out var birthDate))
-            {
-                rowErrors.Add("birth_date invalid");
-                errorFields.Add("birth_date");
-            }
-
-            if (!TryParseGender(genderRaw, out var gender))
-            {
-                rowErrors.Add("gender invalid");
-                errorFields.Add("gender");
-            }
-
-            if (!TryParseOptionalDate(row.GetValue("hotel_check_in_date"), out var hotelCheckIn))
-            {
-                rowErrors.Add("hotel_check_in_date invalid");
-                errorFields.Add("hotel_check_in_date");
-            }
-
-            if (!TryParseOptionalDate(row.GetValue("hotel_check_out_date"), out var hotelCheckOut))
-            {
-                rowErrors.Add("hotel_check_out_date invalid");
-                errorFields.Add("hotel_check_out_date");
-            }
-
-            if (!TryParseOptionalTime(row.GetValue("arrival_departure_time"), out var arrivalDepartureTime))
-            {
-                rowErrors.Add("arrival_departure_time invalid");
-                errorFields.Add("arrival_departure_time");
-            }
-
-            if (!TryParseOptionalTime(row.GetValue("arrival_arrival_time"), out var arrivalArrivalTime))
-            {
-                rowErrors.Add("arrival_arrival_time invalid");
-                errorFields.Add("arrival_arrival_time");
-            }
-
-            if (!TryParseOptionalTime(row.GetValue("return_departure_time"), out var returnDepartureTime))
-            {
-                rowErrors.Add("return_departure_time invalid");
-                errorFields.Add("return_departure_time");
-            }
-
-            if (!TryParseOptionalTime(row.GetValue("return_arrival_time"), out var returnArrivalTime))
-            {
-                rowErrors.Add("return_arrival_time invalid");
-                errorFields.Add("return_arrival_time");
-            }
-
-            if (rowErrors.Count > 0)
-            {
-                errors.Add(new ParticipantImportError(
-                    row.RowNumber,
-                    string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
-                    string.Join("; ", rowErrors),
-                    errorFields.ToArray()));
-                continue;
-            }
-
-            if (!seenTc.Add(tcNo))
-            {
-                warnings.Add(new ParticipantImportWarning(
-                    row.RowNumber,
-                    tcNo,
-                    "Duplicate tcNo in file. Last row wins.",
-                    "duplicate_tcno"));
-            }
-
-            var hasDetails = row.HasAnyDetails || hotelCheckIn is not null || hotelCheckOut is not null
-                || arrivalDepartureTime is not null || arrivalArrivalTime is not null
-                || returnDepartureTime is not null || returnArrivalTime is not null;
-
-            if (existingByTc.TryGetValue(tcNo, out var participant))
-            {
-                updated++;
-                if (importMode == ParticipantImportMode.Apply)
+                if (blockedRows.Contains(row.RowNumber))
                 {
-                    participant.FullName = fullName;
-                    participant.Phone = phone;
-                    participant.Email = email;
-                    participant.TcNo = tcNo;
-                    participant.BirthDate = birthDate;
-                    participant.Gender = gender;
-
-                    if (hasDetails)
-                    {
-                        participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
-                        ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                            arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
-                    }
+                    continue;
                 }
-            }
-            else
-            {
-                created++;
-                if (importMode == ParticipantImportMode.Apply)
+
+                var tcNoRaw = row.GetValue("tc_no");
+                var tcNo = NormalizeTcNo(tcNoRaw);
+
+                var fullName = NormalizeName(row.GetValue("full_name"));
+                if (string.IsNullOrWhiteSpace(fullName))
                 {
-                    var newParticipant = new ParticipantEntity
-                    {
-                        Id = Guid.NewGuid(),
-                        EventId = id,
-                        OrganizationId = orgId,
-                        FullName = fullName,
-                        Phone = phone,
-                        Email = email,
-                        TcNo = tcNo,
-                        BirthDate = birthDate,
-                        Gender = gender,
-                        CheckInCode = GenerateUniqueCheckInCode(usedCodes),
-                        PortalFailedAttempts = 0,
-                        CreatedAt = DateTime.UtcNow
-                    };
+                    fullName = NormalizeName(JoinFirstLast(row.GetValue("first_name"), row.GetValue("last_name")));
+                }
 
-                    if (hasDetails)
+                var phone = NormalizePhone(row.GetValue("phone"));
+                var email = NormalizeEmail(row.GetValue("email"));
+                var genderRaw = row.GetValue("gender");
+
+                var rowErrors = new List<string>();
+                var errorFields = new List<string>();
+
+                if (string.IsNullOrWhiteSpace(fullName))
+                {
+                    rowErrors.Add("full_name required");
+                    errorFields.Add("full_name");
+                }
+
+                if (string.IsNullOrWhiteSpace(phone))
+                {
+                    rowErrors.Add("phone required");
+                    errorFields.Add("phone");
+                }
+
+                if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
+                {
+                    rowErrors.Add("tc_no must be 11 digits");
+                    errorFields.Add("tc_no");
+                }
+
+                if (!TryParseDate(row.GetValue("birth_date"), out var birthDate))
+                {
+                    rowErrors.Add("birth_date invalid");
+                    errorFields.Add("birth_date");
+                }
+
+                if (!TryParseGender(genderRaw, out var gender))
+                {
+                    rowErrors.Add("gender invalid");
+                    errorFields.Add("gender");
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("hotel_check_in_date"), out var hotelCheckIn))
+                {
+                    rowErrors.Add("hotel_check_in_date invalid");
+                    errorFields.Add("hotel_check_in_date");
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("hotel_check_out_date"), out var hotelCheckOut))
+                {
+                    rowErrors.Add("hotel_check_out_date invalid");
+                    errorFields.Add("hotel_check_out_date");
+                }
+
+                if (!TryParseOptionalTime(row.GetValue("arrival_departure_time"), out var arrivalDepartureTime))
+                {
+                    rowErrors.Add("arrival_departure_time invalid");
+                    errorFields.Add("arrival_departure_time");
+                }
+
+                if (!TryParseOptionalTime(row.GetValue("arrival_arrival_time"), out var arrivalArrivalTime))
+                {
+                    rowErrors.Add("arrival_arrival_time invalid");
+                    errorFields.Add("arrival_arrival_time");
+                }
+
+                if (!TryParseOptionalTime(row.GetValue("return_departure_time"), out var returnDepartureTime))
+                {
+                    rowErrors.Add("return_departure_time invalid");
+                    errorFields.Add("return_departure_time");
+                }
+
+                if (!TryParseOptionalTime(row.GetValue("return_arrival_time"), out var returnArrivalTime))
+                {
+                    rowErrors.Add("return_arrival_time invalid");
+                    errorFields.Add("return_arrival_time");
+                }
+
+                if (rowErrors.Count > 0)
+                {
+                    errors.Add(new ParticipantImportError(
+                        row.RowNumber,
+                        string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
+                        string.Join("; ", rowErrors),
+                        errorFields.ToArray()));
+                    continue;
+                }
+
+                if (ambiguousDbTc.Contains(tcNo))
+                {
+                    errors.Add(new ParticipantImportError(
+                        row.RowNumber,
+                        tcNo,
+                        "tc_no matches multiple existing participants in this event.",
+                        ["tc_no"]));
+                    continue;
+                }
+
+                var hasDetails = row.HasAnyDetails || hotelCheckIn is not null || hotelCheckOut is not null
+                    || arrivalDepartureTime is not null || arrivalArrivalTime is not null
+                    || returnDepartureTime is not null || returnArrivalTime is not null;
+
+                if (existingByTc.TryGetValue(tcNo, out var matches) && matches.Count == 1)
+                {
+                    updated++;
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNo,
+                        "tc_no already exists in event; row will update existing participant.",
+                        "duplicate_tcno"));
+
+                    if (importMode == ParticipantImportMode.Apply)
                     {
-                        var details = new ParticipantDetailsEntity
+                        var participant = matches[0];
+                        participant.FullName = fullName;
+                        participant.Phone = phone;
+                        participant.Email = email;
+                        participant.TcNo = tcNo;
+                        participant.BirthDate = birthDate;
+                        participant.Gender = gender;
+
+                        if (hasDetails)
                         {
-                            ParticipantId = newParticipant.Id
-                        };
-                        ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                            arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
-                        newParticipant.Details = details;
+                            participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+                            ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
+                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
+                        }
+                        else if (participant.Details is not null)
+                        {
+                            participant.Details = null;
+                        }
                     }
-
-                    db.Participants.Add(newParticipant);
-                    existingByTc[tcNo] = newParticipant;
                 }
                 else
                 {
-                    existingByTc[tcNo] = new ParticipantEntity { Id = Guid.NewGuid(), TcNo = tcNo };
+                    created++;
+                    if (importMode == ParticipantImportMode.Apply)
+                    {
+                        var newParticipant = new ParticipantEntity
+                        {
+                            Id = Guid.NewGuid(),
+                            EventId = id,
+                            OrganizationId = orgId,
+                            FullName = fullName,
+                            Phone = phone,
+                            Email = email,
+                            TcNo = tcNo,
+                            BirthDate = birthDate,
+                            Gender = gender,
+                            CheckInCode = GenerateUniqueCheckInCode(usedCodes),
+                            PortalFailedAttempts = 0,
+                            CreatedAt = now
+                        };
+
+                        if (hasDetails)
+                        {
+                            var details = new ParticipantDetailsEntity
+                            {
+                                ParticipantId = newParticipant.Id
+                            };
+                            ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
+                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
+                            newParticipant.Details = details;
+                        }
+
+                        createdParticipants.Add(newParticipant);
+                        existingByTc[tcNo] = [newParticipant];
+                    }
+                    else
+                    {
+                        existingByTc[tcNo] = [new ParticipantEntity { Id = Guid.NewGuid(), TcNo = tcNo }];
+                    }
                 }
+
+                imported++;
             }
 
-            imported++;
-        }
+            var report = BuildReport(payload, imported, created, updated, errors, warnings);
 
-        if (importMode == ParticipantImportMode.Apply)
-        {
-            using var transaction = await db.Database.BeginTransactionAsync(ct);
+            if (importMode == ParticipantImportMode.DryRun)
+            {
+                return Results.Ok(report);
+            }
+
+            if (hasFatalFileErrors)
+            {
+                return Results.BadRequest(report);
+            }
+
+            if (createdParticipants.Count > 0)
+            {
+                db.Participants.AddRange(createdParticipants);
+            }
+
             await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+            return Results.Ok(report);
         }
+        catch (Exception)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
 
-        var report = new ParticipantImportReport(
-            payload.Rows.Count,
-            imported,
-            created,
-            updated,
-            errors.Count,
-            payload.IgnoredColumns,
-            errors.ToArray(),
-            warnings.ToArray());
-
-        return Results.Ok(report);
+            return Results.Problem(
+                title: "Participant import failed",
+                detail: "No rows were written. Please retry with the same file.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 
     private static byte[] BuildCsvTemplate()
@@ -457,7 +530,7 @@ internal static class ParticipantImportHandlers
 
         if (!csv.Read())
         {
-            return new ImportPayload([], [], false);
+            return new ImportPayload([], [], false, []);
         }
 
         csv.ReadHeader();
@@ -491,7 +564,7 @@ internal static class ParticipantImportHandlers
             rows.Add(new ImportRow(rows.Count + 2, rowValues, headerMap.HasDetails));
         }
 
-        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails);
+        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails, headerMap.MissingRequiredColumns);
     }
 
     private static ImportPayload ReadXlsx(Stream stream)
@@ -502,7 +575,7 @@ internal static class ParticipantImportHandlers
         var lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
         if (lastColumn == 0)
         {
-            return new ImportPayload([], [], false);
+            return new ImportPayload([], [], false, []);
         }
 
         var headers = new List<string>();
@@ -541,7 +614,7 @@ internal static class ParticipantImportHandlers
             rows.Add(new ImportRow(row, rowValues, headerMap.HasDetails));
         }
 
-        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails);
+        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails, headerMap.MissingRequiredColumns);
     }
 
     private static HeaderMap BuildHeaderMap(IReadOnlyList<string> headers)
@@ -588,7 +661,15 @@ internal static class ParticipantImportHandlers
 
         var hasDetails = canonicalIndexes.Keys.Any(key => key is not "full_name" and not "phone" and not "tc_no" and not "birth_date" and not "gender" and not "email");
 
-        return new HeaderMap(canonicalIndexes, firstNameIndex, lastNameIndex, ignored.ToArray(), hasDetails);
+        var missingRequiredColumns = GetMissingRequiredColumns(canonicalIndexes, firstNameIndex, lastNameIndex);
+
+        return new HeaderMap(
+            canonicalIndexes,
+            firstNameIndex,
+            lastNameIndex,
+            ignored.ToArray(),
+            hasDetails,
+            missingRequiredColumns);
     }
 
     private static Dictionary<string, string> BuildAliasMap()
@@ -858,7 +939,94 @@ internal static class ParticipantImportHandlers
         details.ReturnBaggageAllowance = row.GetValue("return_baggage_allowance");
     }
 
-    private sealed record ImportPayload(List<ImportRow> Rows, string[] IgnoredColumns, bool HasDetails);
+    private static Dictionary<string, List<int>> BuildFileTcRowMap(List<ImportRow> rows)
+    {
+        var map = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        foreach (var row in rows)
+        {
+            var tc = NormalizeTcNo(row.GetValue("tc_no"));
+            if (string.IsNullOrWhiteSpace(tc))
+            {
+                continue;
+            }
+
+            if (!map.TryGetValue(tc, out var rowNumbers))
+            {
+                rowNumbers = [];
+                map[tc] = rowNumbers;
+            }
+
+            rowNumbers.Add(row.RowNumber);
+        }
+
+        return map;
+    }
+
+    private static string[] GetMissingRequiredColumns(
+        Dictionary<string, int> canonicalIndexes,
+        int? firstNameIndex,
+        int? lastNameIndex)
+    {
+        var missing = new List<string>();
+
+        var hasFullName = canonicalIndexes.ContainsKey("full_name")
+                          || (firstNameIndex is not null && lastNameIndex is not null);
+
+        if (!hasFullName)
+        {
+            missing.Add("full_name");
+        }
+
+        if (!canonicalIndexes.ContainsKey("phone"))
+        {
+            missing.Add("phone");
+        }
+
+        if (!canonicalIndexes.ContainsKey("tc_no"))
+        {
+            missing.Add("tc_no");
+        }
+
+        if (!canonicalIndexes.ContainsKey("birth_date"))
+        {
+            missing.Add("birth_date");
+        }
+
+        if (!canonicalIndexes.ContainsKey("gender"))
+        {
+            missing.Add("gender");
+        }
+
+        return missing.ToArray();
+    }
+
+    private static ParticipantImportReport BuildReport(
+        ImportPayload payload,
+        int imported,
+        int created,
+        int updated,
+        List<ParticipantImportError> errors,
+        List<ParticipantImportWarning> warnings)
+    {
+        var totalRows = payload.Rows.Count;
+        var validRows = Math.Max(totalRows - errors.Count, 0);
+        var skipped = Math.Max(totalRows - imported, 0);
+
+        return new ParticipantImportReport(
+            totalRows,
+            validRows,
+            imported,
+            created,
+            updated,
+            skipped,
+            errors.Count,
+            errors.Count,
+            payload.IgnoredColumns,
+            errors.OrderBy(x => x.Row).ToArray(),
+            warnings.OrderBy(x => x.Row).ToArray());
+    }
+
+    private sealed record ImportPayload(List<ImportRow> Rows, string[] IgnoredColumns, bool HasDetails, string[] MissingRequiredColumns);
     private sealed record ImportRow(int RowNumber, Dictionary<string, string?> Values, bool HasAnyDetails)
     {
         public string? GetValue(string key)
@@ -870,5 +1038,6 @@ internal static class ParticipantImportHandlers
         int? FirstNameIndex,
         int? LastNameIndex,
         string[] IgnoredColumns,
-        bool HasDetails);
+        bool HasDetails,
+        string[] MissingRequiredColumns);
 }
