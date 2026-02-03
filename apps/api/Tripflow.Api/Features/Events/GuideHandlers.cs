@@ -201,6 +201,39 @@ internal static class GuideHandlers
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }
 
+    internal static async Task<IResult> GetSchedule(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var schedule = await EventsHandlers.BuildScheduleAsync(id, orgId, db, ct);
+        return Results.Ok(schedule);
+    }
+
     internal static async Task<IResult> CheckInByCode(
         string eventId,
         CheckInCodeRequest request,

@@ -97,6 +97,7 @@ internal static class EventsHandlers
             PortalJson = portalJson,
             UpdatedAt = DateTime.UtcNow
         });
+        db.EventDays.AddRange(EventsHelpers.CreateDefaultDays(entity));
         await db.SaveChangesAsync(ct);
 
         var dto = EventsHelpers.ToDto(entity);
@@ -158,6 +159,562 @@ internal static class EventsHandlers
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(EventsHelpers.ToDto(entity));
+    }
+
+    internal static async Task<IResult> GetEventDays(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventEntity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (eventEntity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var days = await EnsureEventDaysAsync(eventEntity, db, ct);
+
+        var activityCounts = await db.EventActivities.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .GroupBy(x => x.EventDayId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+
+        var result = days
+            .OrderBy(x => x.SortOrder)
+            .Select(day => new EventDayDto(
+                day.Id,
+                day.Date.ToString("yyyy-MM-dd"),
+                day.Title,
+                day.Notes,
+                day.SortOrder,
+                day.IsActive,
+                activityCounts.TryGetValue(day.Id, out var count) ? count : 0))
+            .ToArray();
+
+        return Results.Ok(result);
+    }
+
+    internal static async Task<IResult> CreateEventDay(
+        string eventId,
+        CreateEventDayRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventEntity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (eventEntity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (!EventsHelpers.TryParseDate(request.Date, out var date))
+        {
+            return EventsHelpers.BadRequest("Date must be in YYYY-MM-DD format.");
+        }
+
+        var sortOrder = request.SortOrder
+            ?? await db.EventDays.AsNoTracking()
+                .Where(x => x.EventId == id && x.OrganizationId == orgId)
+                .Select(x => (int?)x.SortOrder)
+                .MaxAsync(ct) + 1
+            ?? 1;
+
+        var entity = new EventDayEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            EventId = id,
+            Date = date,
+            Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim(),
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            SortOrder = sortOrder,
+            IsActive = request.IsActive ?? true
+        };
+
+        db.EventDays.Add(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new EventDayDto(
+            entity.Id,
+            entity.Date.ToString("yyyy-MM-dd"),
+            entity.Title,
+            entity.Notes,
+            entity.SortOrder,
+            entity.IsActive,
+            0));
+    }
+
+    internal static async Task<IResult> UpdateEventDay(
+        string eventId,
+        string dayId,
+        UpdateEventDayRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(dayId, out var dayGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid day id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.EventDays.FirstOrDefaultAsync(
+            x => x.Id == dayGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Day not found." });
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (request.Date is not null)
+        {
+            if (!EventsHelpers.TryParseDate(request.Date, out var date))
+            {
+                return EventsHelpers.BadRequest("Date must be in YYYY-MM-DD format.");
+            }
+            entity.Date = date;
+        }
+
+        if (request.Title is not null)
+        {
+            entity.Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim();
+        }
+
+        if (request.Notes is not null)
+        {
+            entity.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        }
+
+        if (request.SortOrder.HasValue)
+        {
+            entity.SortOrder = request.SortOrder.Value;
+        }
+
+        if (request.IsActive.HasValue)
+        {
+            entity.IsActive = request.IsActive.Value;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var activityCount = await db.EventActivities.AsNoTracking()
+            .CountAsync(x => x.EventDayId == entity.Id && x.OrganizationId == orgId, ct);
+
+        return Results.Ok(new EventDayDto(
+            entity.Id,
+            entity.Date.ToString("yyyy-MM-dd"),
+            entity.Title,
+            entity.Notes,
+            entity.SortOrder,
+            entity.IsActive,
+            activityCount));
+    }
+
+    internal static async Task<IResult> DeleteEventDay(
+        string eventId,
+        string dayId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(dayId, out var dayGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid day id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.EventDays.FirstOrDefaultAsync(
+            x => x.Id == dayGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Day not found." });
+        }
+
+        db.EventDays.Remove(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+
+    internal static async Task<IResult> GetEventActivities(
+        string eventId,
+        string dayId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(dayId, out var dayGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid day id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var dayExists = await db.EventDays.AsNoTracking()
+            .AnyAsync(x => x.Id == dayGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (!dayExists)
+        {
+            return Results.NotFound(new { message = "Day not found." });
+        }
+
+        var activities = await db.EventActivities.AsNoTracking()
+            .Where(x => x.EventDayId == dayGuid && x.OrganizationId == orgId)
+            .OrderBy(x => x.StartTime)
+            .ThenBy(x => x.Title)
+            .ToListAsync(ct);
+
+        return Results.Ok(activities.Select(EventsHelpers.ToActivityDto).ToArray());
+    }
+
+    internal static async Task<IResult> CreateEventActivity(
+        string eventId,
+        string dayId,
+        CreateEventActivityRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(dayId, out var dayGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid day id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        var day = await db.EventDays.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == dayGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (day is null)
+        {
+            return Results.NotFound(new { message = "Day not found." });
+        }
+
+        var title = request.Title?.Trim();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return EventsHelpers.BadRequest("Title is required.");
+        }
+
+        if (!EventsHelpers.TryParseOptionalTime(request.StartTime, out var startTime))
+        {
+            return EventsHelpers.BadRequest("Start time is invalid.");
+        }
+
+        if (!EventsHelpers.TryParseOptionalTime(request.EndTime, out var endTime))
+        {
+            return EventsHelpers.BadRequest("End time is invalid.");
+        }
+
+        if (startTime.HasValue && endTime.HasValue && endTime < startTime)
+        {
+            return EventsHelpers.BadRequest("End time must be after start time.");
+        }
+
+        var entity = new EventActivityEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            EventId = eventGuid,
+            EventDayId = dayGuid,
+            Title = title,
+            Type = string.IsNullOrWhiteSpace(request.Type) ? "Other" : request.Type.Trim(),
+            StartTime = startTime,
+            EndTime = endTime,
+            LocationName = string.IsNullOrWhiteSpace(request.LocationName) ? null : request.LocationName.Trim(),
+            Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
+            Directions = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim(),
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            CheckInEnabled = request.CheckInEnabled ?? false,
+            CheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim(),
+            MenuText = string.IsNullOrWhiteSpace(request.MenuText) ? null : request.MenuText.Trim(),
+            SurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim()
+        };
+
+        db.EventActivities.Add(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(EventsHelpers.ToActivityDto(entity));
+    }
+
+    internal static async Task<IResult> UpdateEventActivity(
+        string eventId,
+        string activityId,
+        UpdateEventActivityRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(activityId, out var activityGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid activity id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        var entity = await db.EventActivities.FirstOrDefaultAsync(
+            x => x.Id == activityGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Activity not found." });
+        }
+
+        if (request.Title is not null)
+        {
+            var title = request.Title.Trim();
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return EventsHelpers.BadRequest("Title is required.");
+            }
+            entity.Title = title;
+        }
+
+        if (request.Type is not null)
+        {
+            entity.Type = string.IsNullOrWhiteSpace(request.Type) ? "Other" : request.Type.Trim();
+        }
+
+        if (request.StartTime is not null)
+        {
+            if (!EventsHelpers.TryParseOptionalTime(request.StartTime, out var startTime))
+            {
+                return EventsHelpers.BadRequest("Start time is invalid.");
+            }
+            entity.StartTime = startTime;
+        }
+
+        if (request.EndTime is not null)
+        {
+            if (!EventsHelpers.TryParseOptionalTime(request.EndTime, out var endTime))
+            {
+                return EventsHelpers.BadRequest("End time is invalid.");
+            }
+            entity.EndTime = endTime;
+        }
+
+        if (entity.StartTime.HasValue && entity.EndTime.HasValue && entity.EndTime < entity.StartTime)
+        {
+            return EventsHelpers.BadRequest("End time must be after start time.");
+        }
+
+        if (request.LocationName is not null)
+        {
+            entity.LocationName = string.IsNullOrWhiteSpace(request.LocationName) ? null : request.LocationName.Trim();
+        }
+
+        if (request.Address is not null)
+        {
+            entity.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+        }
+
+        if (request.Directions is not null)
+        {
+            entity.Directions = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim();
+        }
+
+        if (request.Notes is not null)
+        {
+            entity.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        }
+
+        if (request.CheckInEnabled.HasValue)
+        {
+            entity.CheckInEnabled = request.CheckInEnabled.Value;
+        }
+
+        if (request.CheckInMode is not null)
+        {
+            entity.CheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim();
+        }
+
+        if (request.MenuText is not null)
+        {
+            entity.MenuText = string.IsNullOrWhiteSpace(request.MenuText) ? null : request.MenuText.Trim();
+        }
+
+        if (request.SurveyUrl is not null)
+        {
+            entity.SurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim();
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(EventsHelpers.ToActivityDto(entity));
+    }
+
+    internal static async Task<IResult> DeleteEventActivity(
+        string eventId,
+        string activityId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(activityId, out var activityGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid activity id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.EventActivities.FirstOrDefaultAsync(
+            x => x.Id == activityGuid && x.EventId == eventGuid && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Activity not found." });
+        }
+
+        db.EventActivities.Remove(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+
+    internal static async Task<EventScheduleDto> BuildScheduleAsync(
+        Guid eventId,
+        Guid orgId,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var days = await db.EventDays.AsNoTracking()
+            .Where(x => x.EventId == eventId && x.OrganizationId == orgId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+
+        if (days.Count == 0)
+        {
+            var eventEntity = await db.Events.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == eventId && x.OrganizationId == orgId, ct);
+            if (eventEntity is null)
+            {
+                return new EventScheduleDto(Array.Empty<EventScheduleDayDto>());
+            }
+
+            var created = EventsHelpers.CreateDefaultDays(eventEntity);
+            db.EventDays.AddRange(created);
+            await db.SaveChangesAsync(ct);
+            days = created;
+        }
+
+        var dayIds = days.Select(x => x.Id).ToArray();
+        var activities = dayIds.Length == 0
+            ? new List<EventActivityEntity>()
+            : await db.EventActivities.AsNoTracking()
+                .Where(x => x.EventId == eventId && x.OrganizationId == orgId && dayIds.Contains(x.EventDayId))
+                .ToListAsync(ct);
+
+        return EventsHelpers.ToScheduleDto(days, activities);
+    }
+
+    private static async Task<List<EventDayEntity>> EnsureEventDaysAsync(
+        EventEntity eventEntity,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var days = await db.EventDays.AsNoTracking()
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+
+        if (days.Count > 0)
+        {
+            return days;
+        }
+
+        var created = EventsHelpers.CreateDefaultDays(eventEntity);
+        db.EventDays.AddRange(created);
+        await db.SaveChangesAsync(ct);
+        return created;
     }
 
     internal static async Task<IResult> GetEvent(string eventId, HttpContext httpContext, TripflowDbContext db, CancellationToken ct)
@@ -378,6 +935,8 @@ internal static class EventsHandlers
         }
 
         db.CheckIns.RemoveRange(db.CheckIns.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.EventActivities.RemoveRange(db.EventActivities.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.EventDays.RemoveRange(db.EventDays.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Participants.RemoveRange(db.Participants.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Events.RemoveRange(db.Events.Where(x => x.Id == id && x.OrganizationId == orgId));

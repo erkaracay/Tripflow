@@ -140,6 +140,11 @@ public static class DevSeed
         await EnsurePortalAsync(db, eventB1, orgB.Id, now, ct, state);
         await EnsurePortalAsync(db, eventB2, orgB.Id, now, ct, state);
 
+        await EnsureScheduleAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsureScheduleAsync(db, eventA2, orgA.Id, now, ct, state);
+        await EnsureScheduleAsync(db, eventB1, orgB.Id, now, ct, state);
+        await EnsureScheduleAsync(db, eventB2, orgB.Id, now, ct, state);
+
         await EnsureParticipantsAsync(db, eventA1, orgA.Id, "A1", 30, now, ct, state);
         await EnsureParticipantsAsync(db, eventA2, orgA.Id, "A2", 30, now, ct, state);
         await EnsureParticipantsAsync(db, eventB1, orgB.Id, "B1", 30, now, ct, state);
@@ -475,6 +480,90 @@ public static class DevSeed
         {
             state.Seeded = true;
         }
+    }
+
+    private static async Task EnsureScheduleAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var days = await db.EventDays
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+
+        if (days.Count == 0)
+        {
+            days = EventsHelpers.CreateDefaultDays(eventEntity);
+            db.EventDays.AddRange(days);
+            state.Seeded = true;
+        }
+
+        var hasActivities = await db.EventActivities.AsNoTracking()
+            .AnyAsync(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId, ct);
+        if (hasActivities)
+        {
+            return;
+        }
+
+        foreach (var day in days)
+        {
+            db.EventActivities.Add(new EventActivityEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                EventDayId = day.Id,
+                Title = "Breakfast",
+                Type = "Meal",
+                StartTime = new TimeOnly(8, 30),
+                EndTime = new TimeOnly(9, 15),
+                LocationName = "Hotel Restaurant",
+                Notes = "Breakfast buffet",
+                CheckInEnabled = false,
+                CheckInMode = "EntryOnly",
+                MenuText = "Tea, coffee, eggs, fresh bread"
+            });
+
+            db.EventActivities.Add(new EventActivityEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                EventDayId = day.Id,
+                Title = "City walk",
+                Type = "Other",
+                StartTime = new TimeOnly(10, 30),
+                EndTime = new TimeOnly(12, 0),
+                LocationName = "Main square",
+                Address = "Old Town",
+                Directions = "Meet by the fountain",
+                Notes = "Bring comfortable shoes",
+                CheckInEnabled = false,
+                CheckInMode = "EntryOnly"
+            });
+
+            db.EventActivities.Add(new EventActivityEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                EventDayId = day.Id,
+                Title = "Feedback",
+                Type = "Other",
+                StartTime = null,
+                EndTime = null,
+                Notes = "Share your thoughts",
+                SurveyUrl = "https://example.com/tripflow/survey",
+                CheckInEnabled = false,
+                CheckInMode = "EntryOnly"
+            });
+        }
+
+        state.Seeded = true;
     }
 
     private static string CreatePortalJson(string eventName, string time, string place, string mapsUrl)

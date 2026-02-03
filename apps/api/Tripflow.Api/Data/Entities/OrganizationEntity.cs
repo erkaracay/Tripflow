@@ -13,6 +13,8 @@ public sealed class OrganizationEntity
     public List<UserEntity> Users { get; set; } = new();
     public List<EventEntity> Events { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
+    public List<EventDayEntity> EventDays { get; set; } = new();
+    public List<EventActivityEntity> EventActivities { get; set; } = new();
     public List<PortalSessionEntity> PortalSessions { get; set; } = new();
     public List<CheckInEntity> CheckIns { get; set; } = new();
     public List<EventPortalEntity> Portals { get; set; } = new();

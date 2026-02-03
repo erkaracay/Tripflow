@@ -17,6 +17,111 @@ internal static class EventsHelpers
     internal static bool TryParseDate(string? value, out DateOnly date)
         => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
+    internal static bool TryParseOptionalTime(string? value, out TimeOnly? time)
+    {
+        time = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (TimeOnly.TryParseExact(value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            time = parsed;
+            return true;
+        }
+
+        if (TimeOnly.TryParseExact(value, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        {
+            time = parsed;
+            return true;
+        }
+
+        if (TimeOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        {
+            time = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    internal static string? FormatTime(TimeOnly? value)
+        => value?.ToString("HH:mm");
+
+    internal static List<EventDayEntity> CreateDefaultDays(EventEntity eventEntity)
+    {
+        var days = new List<EventDayEntity>();
+        var totalDays = (eventEntity.EndDate.DayNumber - eventEntity.StartDate.DayNumber) + 1;
+        if (totalDays < 1)
+        {
+            totalDays = 1;
+        }
+
+        for (var i = 0; i < totalDays; i++)
+        {
+            var date = eventEntity.StartDate.AddDays(i);
+            days.Add(new EventDayEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = eventEntity.OrganizationId,
+                EventId = eventEntity.Id,
+                Date = date,
+                Title = $"Day {i + 1}",
+                Notes = null,
+                SortOrder = i + 1,
+                IsActive = true
+            });
+        }
+
+        return days;
+    }
+
+    internal static EventScheduleDto ToScheduleDto(
+        IEnumerable<EventDayEntity> days,
+        IEnumerable<EventActivityEntity> activities)
+    {
+        var activityGroups = activities
+            .GroupBy(x => x.EventDayId)
+            .ToDictionary(g => g.Key, g => g
+                .OrderBy(x => x.StartTime)
+                .ThenBy(x => x.Title)
+                .Select(ToActivityDto)
+                .ToArray());
+
+        var scheduleDays = days
+            .OrderBy(x => x.SortOrder)
+            .Select(day => new EventScheduleDayDto(
+                day.Id,
+                day.Date.ToString("yyyy-MM-dd"),
+                day.Title,
+                day.Notes,
+                day.SortOrder,
+                day.IsActive,
+                activityGroups.TryGetValue(day.Id, out var list) ? list : Array.Empty<EventActivityDto>()
+            ))
+            .ToArray();
+
+        return new EventScheduleDto(scheduleDays);
+    }
+
+    internal static EventActivityDto ToActivityDto(EventActivityEntity activity)
+        => new(
+            activity.Id,
+            activity.EventDayId,
+            activity.Title,
+            activity.Type,
+            FormatTime(activity.StartTime),
+            FormatTime(activity.EndTime),
+            activity.LocationName,
+            activity.Address,
+            activity.Directions,
+            activity.Notes,
+            activity.CheckInEnabled,
+            activity.CheckInMode,
+            activity.MenuText,
+            activity.SurveyUrl);
+
     internal static bool TryParseEventId(string eventIdValue, out Guid eventId, out IResult? error)
     {
         if (!Guid.TryParse(eventIdValue, out eventId))

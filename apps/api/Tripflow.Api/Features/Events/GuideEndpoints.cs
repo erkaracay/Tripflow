@@ -59,6 +59,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/events/{eventId}/schedule", GuideHandlers.GetSchedule)
+            .WithSummary("Guide schedule")
+            .WithDescription("Returns schedule days and activities for a guide event.")
+            .Produces<EventScheduleDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 }

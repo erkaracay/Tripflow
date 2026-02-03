@@ -214,6 +214,8 @@ internal static class OrganizationsHandlers
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         db.CheckIns.RemoveRange(db.CheckIns.Where(x => x.OrganizationId == orgId));
+        db.EventActivities.RemoveRange(db.EventActivities.Where(x => x.OrganizationId == orgId));
+        db.EventDays.RemoveRange(db.EventDays.Where(x => x.OrganizationId == orgId));
         db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.OrganizationId == orgId));
         db.PortalSessions.RemoveRange(db.PortalSessions.Where(x => x.OrganizationId == orgId));
         db.ParticipantDetails.RemoveRange(db.ParticipantDetails.Where(x => x.Participant.OrganizationId == orgId));

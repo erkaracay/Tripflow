@@ -13,7 +13,8 @@ public sealed record PortalLoginResponse(
 public sealed record PortalMeResponse(
     PortalEventSummary Event,
     PortalParticipantSummaryFull Participant,
-    EventPortalInfo Portal);
+    EventPortalInfo Portal,
+    EventScheduleDto Schedule);
 
 public sealed record PortalEventSummary(
     Guid Id,

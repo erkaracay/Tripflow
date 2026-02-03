@@ -8,6 +8,8 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<OrganizationEntity> Organizations => Set<OrganizationEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
+    public DbSet<EventDayEntity> EventDays => Set<EventDayEntity>();
+    public DbSet<EventActivityEntity> EventActivities => Set<EventActivityEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
@@ -87,6 +89,78 @@ public sealed class TripflowDbContext : DbContext
             b.HasOne(x => x.Portal)
                 .WithOne(x => x.Event)
                 .HasForeignKey<EventPortalEntity>(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EventDayEntity>(b =>
+        {
+            b.ToTable("event_days");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.Date).HasColumnType("date").IsRequired();
+            b.Property(x => x.Title).HasMaxLength(200);
+            b.Property(x => x.Notes).HasMaxLength(2000);
+            b.Property(x => x.SortOrder).IsRequired();
+            b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.Date });
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.SortOrder });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.EventDays)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.Days)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.Activities)
+                .WithOne(x => x.Day)
+                .HasForeignKey(x => x.EventDayId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EventActivityEntity>(b =>
+        {
+            b.ToTable("event_activities", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_event_activities_time_range",
+                    "\"EndTime\" IS NULL OR \"StartTime\" IS NULL OR \"EndTime\" >= \"StartTime\"");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.EventDayId).IsRequired();
+            b.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Type).HasMaxLength(32).IsRequired();
+            b.Property(x => x.StartTime).HasColumnType("time without time zone");
+            b.Property(x => x.EndTime).HasColumnType("time without time zone");
+            b.Property(x => x.LocationName).HasMaxLength(200);
+            b.Property(x => x.Address).HasMaxLength(500);
+            b.Property(x => x.Directions).HasMaxLength(2000);
+            b.Property(x => x.Notes).HasMaxLength(2000);
+            b.Property(x => x.CheckInEnabled).IsRequired().HasDefaultValue(false);
+            b.Property(x => x.CheckInMode).HasMaxLength(32).IsRequired().HasDefaultValue("EntryOnly");
+            b.Property(x => x.MenuText).HasMaxLength(2000);
+            b.Property(x => x.SurveyUrl).HasMaxLength(500);
+
+            b.HasIndex(x => new { x.OrganizationId, x.EventDayId, x.StartTime });
+            b.HasIndex(x => new { x.OrganizationId, x.EventId });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.EventActivities)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany()
+                .HasForeignKey(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

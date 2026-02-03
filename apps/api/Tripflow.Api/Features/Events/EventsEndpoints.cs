@@ -70,6 +70,61 @@ public static class EventsEndpoints
             .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/days", EventsHandlers.GetEventDays)
+            .WithSummary("List event days")
+            .WithDescription("Returns schedule days for the event. If none exist, auto-creates based on the event date range.")
+            .Produces<EventDayDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/days", EventsHandlers.CreateEventDay)
+            .WithSummary("Create event day")
+            .WithDescription("Creates a new schedule day for the event.")
+            .Produces<EventDayDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/days/{dayId}", EventsHandlers.UpdateEventDay)
+            .WithSummary("Update event day")
+            .WithDescription("Updates a schedule day for the event.")
+            .Produces<EventDayDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/days/{dayId}", EventsHandlers.DeleteEventDay)
+            .WithSummary("Delete event day")
+            .WithDescription("Deletes a schedule day and its activities.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/days/{dayId}/activities", EventsHandlers.GetEventActivities)
+            .WithSummary("List day activities")
+            .WithDescription("Returns activities for a schedule day.")
+            .Produces<EventActivityDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/days/{dayId}/activities", EventsHandlers.CreateEventActivity)
+            .WithSummary("Create activity")
+            .WithDescription("Creates a new activity for a schedule day.")
+            .Produces<EventActivityDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/activities/{activityId}", EventsHandlers.UpdateEventActivity)
+            .WithSummary("Update activity")
+            .WithDescription("Updates an activity.")
+            .Produces<EventActivityDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/activities/{activityId}", EventsHandlers.DeleteEventActivity)
+            .WithSummary("Delete activity")
+            .WithDescription("Deletes an activity.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapDelete("/{eventId}/purge", EventsHandlers.PurgeEvent)
             .WithSummary("Purge event")
             .WithDescription("Permanently deletes an archived event and all related data.")

@@ -17,4 +17,5 @@ public sealed class EventEntity
 
     public List<ParticipantEntity> Participants { get; set; } = new();
     public EventPortalEntity? Portal { get; set; }
+    public List<EventDayEntity> Days { get; set; } = new();
 }

@@ -151,6 +151,8 @@ internal static class PortalLoginHandlers
             return Results.NotFound();
         }
 
+        var schedule = await EventsHandlers.BuildScheduleAsync(eventEntity.Id, eventEntity.OrganizationId, db, ct);
+
         var response = new PortalMeResponse(
             new PortalEventSummary(
                 eventEntity.Id,
@@ -166,7 +168,8 @@ internal static class PortalLoginHandlers
                 participant.BirthDate.ToString("yyyy-MM-dd"),
                 participant.Gender.ToString(),
                 participant.CheckInCode),
-            portal);
+            portal,
+            schedule);
 
         return Results.Ok(response);
     }

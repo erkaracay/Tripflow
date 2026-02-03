@@ -20,6 +20,84 @@ public sealed record MeetingInfo(string Time, string Place, string MapsUrl, stri
 public sealed record LinkInfo(string Label, string Url);
 public sealed record DayPlan(int Day, string Title, string[] Items);
 
+public sealed record EventDayDto(
+    Guid Id,
+    string Date,
+    string? Title,
+    string? Notes,
+    int SortOrder,
+    bool IsActive,
+    int ActivityCount);
+
+public sealed record CreateEventDayRequest(
+    string? Date,
+    string? Title,
+    string? Notes,
+    int? SortOrder,
+    bool? IsActive);
+
+public sealed record UpdateEventDayRequest(
+    string? Date,
+    string? Title,
+    string? Notes,
+    int? SortOrder,
+    bool? IsActive);
+
+public sealed record EventActivityDto(
+    Guid Id,
+    Guid EventDayId,
+    string Title,
+    string Type,
+    string? StartTime,
+    string? EndTime,
+    string? LocationName,
+    string? Address,
+    string? Directions,
+    string? Notes,
+    bool CheckInEnabled,
+    string CheckInMode,
+    string? MenuText,
+    string? SurveyUrl);
+
+public sealed record CreateEventActivityRequest(
+    string? Title,
+    string? Type,
+    string? StartTime,
+    string? EndTime,
+    string? LocationName,
+    string? Address,
+    string? Directions,
+    string? Notes,
+    bool? CheckInEnabled,
+    string? CheckInMode,
+    string? MenuText,
+    string? SurveyUrl);
+
+public sealed record UpdateEventActivityRequest(
+    string? Title,
+    string? Type,
+    string? StartTime,
+    string? EndTime,
+    string? LocationName,
+    string? Address,
+    string? Directions,
+    string? Notes,
+    bool? CheckInEnabled,
+    string? CheckInMode,
+    string? MenuText,
+    string? SurveyUrl);
+
+public sealed record EventScheduleDayDto(
+    Guid Id,
+    string Date,
+    string? Title,
+    string? Notes,
+    int SortOrder,
+    bool IsActive,
+    EventActivityDto[] Activities);
+
+public sealed record EventScheduleDto(EventScheduleDayDto[] Days);
+
 public sealed record CreateParticipantRequest(
     string? FullName,
     string? Phone,
