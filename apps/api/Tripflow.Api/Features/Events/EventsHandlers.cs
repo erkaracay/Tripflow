@@ -1215,6 +1215,65 @@ internal static class EventsHandlers
         return Results.Ok(participants);
     }
 
+    internal static async Task<IResult> GetParticipantProfile(
+        string eventId,
+        string participantId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        var participant = await db.Participants.AsNoTracking()
+            .Include(x => x.Details)
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var arrivedAt = await db.CheckIns.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId && x.ParticipantId == participantGuid)
+            .Select(x => (DateTime?)x.CheckedInAt)
+            .FirstOrDefaultAsync(ct);
+
+        var tcNoDuplicate = await db.Participants.AsNoTracking()
+            .AnyAsync(x => x.EventId == id
+                           && x.OrganizationId == orgId
+                           && x.TcNo == participant.TcNo
+                           && x.Id != participantGuid, ct);
+
+        var dto = new ParticipantProfileDto(
+            participant.Id,
+            participant.FullName,
+            participant.Phone,
+            participant.Email,
+            participant.TcNo,
+            participant.BirthDate.ToString("yyyy-MM-dd"),
+            participant.Gender.ToString(),
+            participant.CheckInCode,
+            arrivedAt.HasValue,
+            arrivedAt?.ToString("yyyy-MM-dd HH:mm"),
+            tcNoDuplicate,
+            MapDetails(participant.Details));
+
+        return Results.Ok(dto);
+    }
+
     internal static async Task<IResult> CreateParticipant(
         string eventId,
         CreateParticipantRequest request,
@@ -1878,6 +1937,8 @@ internal static class EventsHandlers
             details.ArrivalArrivalTime?.ToString("HH:mm"),
             details.ArrivalPnr,
             details.ArrivalBaggageAllowance,
+            details.ArrivalBaggagePieces,
+            details.ArrivalBaggageTotalKg,
             details.ReturnAirline,
             details.ReturnDepartureAirport,
             details.ReturnArrivalAirport,
@@ -1885,7 +1946,9 @@ internal static class EventsHandlers
             details.ReturnDepartureTime?.ToString("HH:mm"),
             details.ReturnArrivalTime?.ToString("HH:mm"),
             details.ReturnPnr,
-            details.ReturnBaggageAllowance);
+            details.ReturnBaggageAllowance,
+            details.ReturnBaggagePieces,
+            details.ReturnBaggageTotalKg);
     }
 
     private static bool TryApplyDetails(
@@ -1931,6 +1994,8 @@ internal static class EventsHandlers
         details.ArrivalArrivalTime = arrivalArrival;
         details.ArrivalPnr = request.ArrivalPnr;
         details.ArrivalBaggageAllowance = request.ArrivalBaggageAllowance;
+        details.ArrivalBaggagePieces = request.ArrivalBaggagePieces;
+        details.ArrivalBaggageTotalKg = request.ArrivalBaggageTotalKg;
         details.ReturnAirline = request.ReturnAirline;
         details.ReturnDepartureAirport = request.ReturnDepartureAirport;
         details.ReturnArrivalAirport = request.ReturnArrivalAirport;
@@ -1949,6 +2014,8 @@ internal static class EventsHandlers
         details.ReturnArrivalTime = returnArrival;
         details.ReturnPnr = request.ReturnPnr;
         details.ReturnBaggageAllowance = request.ReturnBaggageAllowance;
+        details.ReturnBaggagePieces = request.ReturnBaggagePieces;
+        details.ReturnBaggageTotalKg = request.ReturnBaggageTotalKg;
         error = string.Empty;
         return true;
     }

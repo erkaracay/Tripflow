@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CsvHelper;
 using CsvHelper.Configuration;
@@ -16,6 +17,7 @@ internal static class ParticipantImportHandlers
 {
     private const int MaxRows = 2000;
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+    private const int PreviewRowLimit = 200;
 
     private static readonly string[] CanonicalHeaders =
     [
@@ -41,7 +43,8 @@ internal static class ParticipantImportHandlers
         "arrival_departure_time",
         "arrival_arrival_time",
         "arrival_pnr",
-        "arrival_baggage_allowance",
+        "arrival_baggage_pieces",
+        "arrival_baggage_total_kg",
         "return_airline",
         "return_departure_airport",
         "return_arrival_airport",
@@ -49,7 +52,8 @@ internal static class ParticipantImportHandlers
         "return_departure_time",
         "return_arrival_time",
         "return_pnr",
-        "return_baggage_allowance"
+        "return_baggage_pieces",
+        "return_baggage_total_kg"
     ];
 
     private static readonly string[] ExampleRow =
@@ -76,7 +80,8 @@ internal static class ParticipantImportHandlers
         "08:15",
         "09:35",
         "PNR123",
-        "1PC",
+        "1",
+        "23",
         "Turkish Airlines",
         "ASR",
         "IST",
@@ -84,8 +89,33 @@ internal static class ParticipantImportHandlers
         "18:45",
         "20:10",
         "PNR456",
-        "1PC"
+        "1",
+        "23"
     ];
+
+    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd.MM.yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yy"];
+    private static readonly string[] TimeFormats = ["HH:mm", "HH:mm:ss", "HH.mm", "H:mm"];
+
+    private static readonly HashSet<string> DateColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "birth_date",
+        "hotel_check_in_date",
+        "hotel_check_out_date"
+    };
+
+    private static readonly HashSet<string> TimeColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "arrival_departure_time",
+        "arrival_arrival_time",
+        "return_departure_time",
+        "return_arrival_time"
+    };
+
+    private static readonly Regex BaggagePiecesRegex =
+        new(@"(?<value>\d+(?:[.,]\d+)?)\s*(pc|pcs|piece|pieces|parca)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex BaggageKgRegex =
+        new(@"(?<value>\d+(?:[.,]\d+)?)\s*(kg|kgs|kilo|kilogram|kilograms)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     internal static async Task<IResult> DownloadImportTemplate(
         string eventId,
@@ -176,9 +206,16 @@ internal static class ParticipantImportHandlers
         ImportPayload payload;
         using (var stream = file.OpenReadStream())
         {
-            payload = extension == ".csv"
-                ? ReadCsv(stream)
-                : ReadXlsx(stream);
+            try
+            {
+                payload = extension == ".csv"
+                    ? ReadCsv(stream)
+                    : ReadXlsx(stream);
+            }
+            catch (Exception)
+            {
+                return EventsHelpers.BadRequest("Invalid file format. Please upload a valid CSV or XLSX.");
+            }
         }
 
         if (payload.Rows.Count > MaxRows)
@@ -188,6 +225,16 @@ internal static class ParticipantImportHandlers
 
         var errors = new List<ParticipantImportError>();
         var warnings = new List<ParticipantImportWarning>();
+        var previewRows = new List<ParticipantImportPreviewRow>();
+
+        if (payload.LegacyHeadersDetected)
+        {
+            warnings.Add(new ParticipantImportWarning(
+                1,
+                null,
+                "Legacy template headers detected. Please use the latest import template.",
+                "legacy_template_detected"));
+        }
 
         if (payload.MissingRequiredColumns.Length > 0)
         {
@@ -195,9 +242,12 @@ internal static class ParticipantImportHandlers
                 1,
                 null,
                 $"Missing required columns: {string.Join(", ", payload.MissingRequiredColumns)}",
-                payload.MissingRequiredColumns));
+                payload.MissingRequiredColumns)
+            {
+                Code = "missing_required_columns"
+            });
 
-            var missingColumnsReport = BuildReport(payload, 0, 0, 0, errors, warnings);
+            var missingColumnsReport = BuildReport(payload, 0, 0, 0, errors, warnings, previewRows);
             return Results.BadRequest(missingColumnsReport);
         }
 
@@ -214,7 +264,11 @@ internal static class ParticipantImportHandlers
                     rowNo,
                     duplicate.Key,
                     "Duplicate tcNo in file.",
-                    ["tc_no"]));
+                    ["tc_no"])
+                {
+                    Code = "duplicate_tcno_file",
+                    Field = "tc_no"
+                });
             }
         }
 
@@ -272,6 +326,7 @@ internal static class ParticipantImportHandlers
 
                 var rowErrors = new List<string>();
                 var errorFields = new List<string>();
+                var tcNoForIssues = string.IsNullOrWhiteSpace(tcNo) ? null : tcNo;
 
                 if (string.IsNullOrWhiteSpace(fullName))
                 {
@@ -291,13 +346,15 @@ internal static class ParticipantImportHandlers
                     errorFields.Add("tc_no");
                 }
 
-                if (!TryParseDate(row.GetValue("birth_date"), out var birthDate))
+                var birthDateValid = TryParseDate(row.GetValue("birth_date"), out var birthDate);
+                if (!birthDateValid)
                 {
                     rowErrors.Add("birth_date invalid");
                     errorFields.Add("birth_date");
                 }
 
-                if (!TryParseGender(genderRaw, out var gender))
+                var genderValid = TryParseGender(genderRaw, out var gender);
+                if (!genderValid)
                 {
                     rowErrors.Add("gender invalid");
                     errorFields.Add("gender");
@@ -305,47 +362,325 @@ internal static class ParticipantImportHandlers
 
                 if (!TryParseOptionalDate(row.GetValue("hotel_check_in_date"), out var hotelCheckIn))
                 {
-                    rowErrors.Add("hotel_check_in_date invalid");
-                    errorFields.Add("hotel_check_in_date");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "hotel_check_in_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "hotel_check_in_date"
+                    });
                 }
 
                 if (!TryParseOptionalDate(row.GetValue("hotel_check_out_date"), out var hotelCheckOut))
                 {
-                    rowErrors.Add("hotel_check_out_date invalid");
-                    errorFields.Add("hotel_check_out_date");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "hotel_check_out_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "hotel_check_out_date"
+                    });
                 }
 
                 if (!TryParseOptionalTime(row.GetValue("arrival_departure_time"), out var arrivalDepartureTime))
                 {
-                    rowErrors.Add("arrival_departure_time invalid");
-                    errorFields.Add("arrival_departure_time");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_departure_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "arrival_departure_time"
+                    });
                 }
 
                 if (!TryParseOptionalTime(row.GetValue("arrival_arrival_time"), out var arrivalArrivalTime))
                 {
-                    rowErrors.Add("arrival_arrival_time invalid");
-                    errorFields.Add("arrival_arrival_time");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_arrival_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "arrival_arrival_time"
+                    });
                 }
 
                 if (!TryParseOptionalTime(row.GetValue("return_departure_time"), out var returnDepartureTime))
                 {
-                    rowErrors.Add("return_departure_time invalid");
-                    errorFields.Add("return_departure_time");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_departure_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "return_departure_time"
+                    });
                 }
 
                 if (!TryParseOptionalTime(row.GetValue("return_arrival_time"), out var returnArrivalTime))
                 {
-                    rowErrors.Add("return_arrival_time invalid");
-                    errorFields.Add("return_arrival_time");
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_arrival_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "return_arrival_time"
+                    });
+                }
+
+                if (!TryParseOptionalBaggagePieces(
+                        row.GetValue("arrival_baggage_pieces"),
+                        out var arrivalBaggagePieces,
+                        out _))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_baggage_pieces invalid",
+                        "invalid_baggage_pieces")
+                    {
+                        Field = "arrival_baggage_pieces"
+                    });
+                }
+
+                if (!TryParseOptionalBaggageTotalKg(
+                        row.GetValue("arrival_baggage_total_kg"),
+                        out var arrivalBaggageTotalKg,
+                        out var arrivalKgRounded))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_baggage_total_kg invalid",
+                        "invalid_baggage_total_kg")
+                    {
+                        Field = "arrival_baggage_total_kg"
+                    });
+                }
+                else if (arrivalKgRounded)
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_baggage_total_kg decimal rounded to nearest integer",
+                        "baggage_total_kg_rounded")
+                    {
+                        Field = "arrival_baggage_total_kg"
+                    });
+                }
+
+                if (!TryParseOptionalBaggagePieces(
+                        row.GetValue("return_baggage_pieces"),
+                        out var returnBaggagePieces,
+                        out _))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_baggage_pieces invalid",
+                        "invalid_baggage_pieces")
+                    {
+                        Field = "return_baggage_pieces"
+                    });
+                }
+
+                if (!TryParseOptionalBaggageTotalKg(
+                        row.GetValue("return_baggage_total_kg"),
+                        out var returnBaggageTotalKg,
+                        out var returnKgRounded))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_baggage_total_kg invalid",
+                        "invalid_baggage_total_kg")
+                    {
+                        Field = "return_baggage_total_kg"
+                    });
+                }
+                else if (returnKgRounded)
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_baggage_total_kg decimal rounded to nearest integer",
+                        "baggage_total_kg_rounded")
+                    {
+                        Field = "return_baggage_total_kg"
+                    });
+                }
+
+                var arrivalBaggageAllowance = row.GetValue("arrival_baggage_allowance");
+                if ((!arrivalBaggagePieces.HasValue || !arrivalBaggageTotalKg.HasValue)
+                    && !string.IsNullOrWhiteSpace(arrivalBaggageAllowance))
+                {
+                    var needsPieces = !arrivalBaggagePieces.HasValue;
+                    var needsKg = !arrivalBaggageTotalKg.HasValue;
+                    var allowance = TryParseBaggageAllowance(arrivalBaggageAllowance);
+
+                    if (needsPieces && allowance.Pieces.HasValue)
+                    {
+                        arrivalBaggagePieces = allowance.Pieces;
+                    }
+
+                    if (needsKg && allowance.TotalKg.HasValue)
+                    {
+                        arrivalBaggageTotalKg = allowance.TotalKg;
+                    }
+
+                    if (needsPieces && (allowance.PiecesDecimal || allowance.PiecesInvalid))
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "arrival_baggage_allowance contains invalid piece value",
+                            "invalid_baggage_pieces")
+                        {
+                            Field = "arrival_baggage_allowance"
+                        });
+                    }
+
+                    if (needsKg && allowance.KgInvalid)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "arrival_baggage_allowance contains invalid kg value",
+                            "invalid_baggage_total_kg")
+                        {
+                            Field = "arrival_baggage_allowance"
+                        });
+                    }
+
+                    if (needsKg && allowance.KgRounded)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "arrival_baggage_total_kg decimal rounded to nearest integer",
+                            "baggage_total_kg_rounded")
+                        {
+                            Field = "arrival_baggage_total_kg"
+                        });
+                    }
+
+                    if (needsPieces && needsKg && allowance.Pieces is null && allowance.TotalKg is null)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "arrival_baggage_allowance could not be parsed",
+                            "invalid_baggage_allowance")
+                        {
+                            Field = "arrival_baggage_allowance"
+                        });
+                    }
+                }
+
+                var returnBaggageAllowance = row.GetValue("return_baggage_allowance");
+                if ((!returnBaggagePieces.HasValue || !returnBaggageTotalKg.HasValue)
+                    && !string.IsNullOrWhiteSpace(returnBaggageAllowance))
+                {
+                    var needsPieces = !returnBaggagePieces.HasValue;
+                    var needsKg = !returnBaggageTotalKg.HasValue;
+                    var allowance = TryParseBaggageAllowance(returnBaggageAllowance);
+
+                    if (needsPieces && allowance.Pieces.HasValue)
+                    {
+                        returnBaggagePieces = allowance.Pieces;
+                    }
+
+                    if (needsKg && allowance.TotalKg.HasValue)
+                    {
+                        returnBaggageTotalKg = allowance.TotalKg;
+                    }
+
+                    if (needsPieces && (allowance.PiecesDecimal || allowance.PiecesInvalid))
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "return_baggage_allowance contains invalid piece value",
+                            "invalid_baggage_pieces")
+                        {
+                            Field = "return_baggage_allowance"
+                        });
+                    }
+
+                    if (needsKg && allowance.KgInvalid)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "return_baggage_allowance contains invalid kg value",
+                            "invalid_baggage_total_kg")
+                        {
+                            Field = "return_baggage_allowance"
+                        });
+                    }
+
+                    if (needsKg && allowance.KgRounded)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "return_baggage_total_kg decimal rounded to nearest integer",
+                            "baggage_total_kg_rounded")
+                        {
+                            Field = "return_baggage_total_kg"
+                        });
+                    }
+
+                    if (needsPieces && needsKg && allowance.Pieces is null && allowance.TotalKg is null)
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "return_baggage_allowance could not be parsed",
+                            "invalid_baggage_allowance")
+                        {
+                            Field = "return_baggage_allowance"
+                        });
+                    }
+                }
+
+                if (previewRows.Count < PreviewRowLimit)
+                {
+                    previewRows.Add(new ParticipantImportPreviewRow(
+                        row.RowNumber,
+                        string.IsNullOrWhiteSpace(fullName) ? null : fullName,
+                        string.IsNullOrWhiteSpace(phone) ? null : phone,
+                        string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
+                        birthDateValid ? birthDate.ToString("yyyy-MM-dd") : null,
+                        genderValid ? gender.ToString() : null,
+                        hotelCheckIn?.ToString("yyyy-MM-dd"),
+                        hotelCheckOut?.ToString("yyyy-MM-dd"),
+                        arrivalDepartureTime?.ToString("HH:mm"),
+                        arrivalArrivalTime?.ToString("HH:mm"),
+                        returnDepartureTime?.ToString("HH:mm"),
+                        returnArrivalTime?.ToString("HH:mm"),
+                        arrivalBaggagePieces,
+                        arrivalBaggageTotalKg,
+                        returnBaggagePieces,
+                        returnBaggageTotalKg));
                 }
 
                 if (rowErrors.Count > 0)
                 {
+                    var primaryField = errorFields.Count == 1 ? errorFields[0] : null;
                     errors.Add(new ParticipantImportError(
                         row.RowNumber,
-                        string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
+                        tcNoForIssues,
                         string.Join("; ", rowErrors),
-                        errorFields.ToArray()));
+                        errorFields.ToArray())
+                    {
+                        Field = primaryField,
+                        Code = primaryField is null ? "invalid_required_fields" : $"invalid_{primaryField}"
+                    });
                     continue;
                 }
 
@@ -355,7 +690,11 @@ internal static class ParticipantImportHandlers
                         row.RowNumber,
                         tcNo,
                         "tc_no matches multiple existing participants in this event.",
-                        ["tc_no"]));
+                        ["tc_no"])
+                    {
+                        Code = "tcno_ambiguous",
+                        Field = "tc_no"
+                    });
                     continue;
                 }
 
@@ -370,7 +709,10 @@ internal static class ParticipantImportHandlers
                         row.RowNumber,
                         tcNo,
                         "tc_no already exists in event; row will update existing participant.",
-                        "duplicate_tcno"));
+                        "duplicate_tcno")
+                    {
+                        Field = "tc_no"
+                    });
 
                     if (importMode == ParticipantImportMode.Apply)
                     {
@@ -386,7 +728,8 @@ internal static class ParticipantImportHandlers
                         {
                             participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
                             ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
+                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
+                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
                         }
                         else if (participant.Details is not null)
                         {
@@ -421,7 +764,8 @@ internal static class ParticipantImportHandlers
                                 ParticipantId = newParticipant.Id
                             };
                             ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime);
+                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
+                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
                             newParticipant.Details = details;
                         }
 
@@ -437,7 +781,7 @@ internal static class ParticipantImportHandlers
                 imported++;
             }
 
-            var report = BuildReport(payload, imported, created, updated, errors, warnings);
+            var report = BuildReport(payload, imported, created, updated, errors, warnings, previewRows);
 
             if (importMode == ParticipantImportMode.DryRun)
             {
@@ -523,7 +867,7 @@ internal static class ParticipantImportHandlers
 
         if (!csv.Read())
         {
-            return new ImportPayload([], [], false, []);
+            return new ImportPayload([], [], false, [], false);
         }
 
         csv.ReadHeader();
@@ -557,18 +901,27 @@ internal static class ParticipantImportHandlers
             rows.Add(new ImportRow(rows.Count + 2, rowValues, headerMap.HasDetails));
         }
 
-        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails, headerMap.MissingRequiredColumns);
+        return new ImportPayload(
+            rows,
+            headerMap.IgnoredColumns,
+            headerMap.HasDetails,
+            headerMap.MissingRequiredColumns,
+            headerMap.LegacyHeadersDetected);
     }
 
     private static ImportPayload ReadXlsx(Stream stream)
     {
         using var workbook = new XLWorkbook(stream);
-        var worksheet = workbook.Worksheets.First();
+        var worksheet = workbook.Worksheets.FirstOrDefault();
+        if (worksheet is null)
+        {
+            return new ImportPayload([], [], false, [], false);
+        }
 
         var lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
         if (lastColumn == 0)
         {
-            return new ImportPayload([], [], false, []);
+            return new ImportPayload([], [], false, [], false);
         }
 
         var headers = new List<string>();
@@ -586,7 +939,7 @@ internal static class ParticipantImportHandlers
             var rowValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var pair in headerMap.CanonicalIndexes)
             {
-                rowValues[pair.Key] = worksheet.Cell(row, pair.Value + 1).GetString().Trim();
+                rowValues[pair.Key] = ReadCellValue(worksheet.Cell(row, pair.Value + 1), pair.Key);
             }
 
             if (headerMap.FirstNameIndex is not null)
@@ -607,7 +960,35 @@ internal static class ParticipantImportHandlers
             rows.Add(new ImportRow(row, rowValues, headerMap.HasDetails));
         }
 
-        return new ImportPayload(rows, headerMap.IgnoredColumns, headerMap.HasDetails, headerMap.MissingRequiredColumns);
+        return new ImportPayload(
+            rows,
+            headerMap.IgnoredColumns,
+            headerMap.HasDetails,
+            headerMap.MissingRequiredColumns,
+            headerMap.LegacyHeadersDetected);
+    }
+
+    private static string? ReadCellValue(IXLCell cell, string canonicalHeader)
+    {
+        if (DateColumns.Contains(canonicalHeader) && cell.TryGetValue<DateTime>(out var dateValue))
+        {
+            return DateOnly.FromDateTime(dateValue).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        if (TimeColumns.Contains(canonicalHeader))
+        {
+            if (cell.TryGetValue<TimeSpan>(out var timeValue))
+            {
+                return TimeOnly.FromTimeSpan(timeValue).ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            }
+
+            if (cell.TryGetValue<DateTime>(out var dateTimeValue))
+            {
+                return TimeOnly.FromDateTime(dateTimeValue).ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            }
+        }
+
+        return cell.GetString().Trim();
     }
 
     private static HeaderMap BuildHeaderMap(IReadOnlyList<string> headers)
@@ -617,6 +998,7 @@ internal static class ParticipantImportHandlers
         var ignored = new List<string>();
         int? firstNameIndex = null;
         int? lastNameIndex = null;
+        var legacyHeadersDetected = false;
 
         for (var i = 0; i < headers.Count; i++)
         {
@@ -632,6 +1014,14 @@ internal static class ParticipantImportHandlers
             {
                 ignored.Add(header);
                 continue;
+            }
+
+            var canonicalNormalized = NormalizeHeader(canonical);
+            if (!normalized.Equals(canonicalNormalized, StringComparison.OrdinalIgnoreCase)
+                || canonical.Equals("arrival_baggage_allowance", StringComparison.OrdinalIgnoreCase)
+                || canonical.Equals("return_baggage_allowance", StringComparison.OrdinalIgnoreCase))
+            {
+                legacyHeadersDetected = true;
             }
 
             if (canonical.Equals("first_name", StringComparison.OrdinalIgnoreCase))
@@ -662,7 +1052,8 @@ internal static class ParticipantImportHandlers
             lastNameIndex,
             ignored.ToArray(),
             hasDetails,
-            missingRequiredColumns);
+            missingRequiredColumns,
+            legacyHeadersDetected);
     }
 
     private static Dictionary<string, string> BuildAliasMap()
@@ -708,6 +1099,7 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("gelis kalkis saati")] = "arrival_departure_time";
         map[NormalizeHeader("gelis varis saati")] = "arrival_arrival_time";
         map[NormalizeHeader("gelis pnr")] = "arrival_pnr";
+        map[NormalizeHeader("arrival_baggage_allowance")] = "arrival_baggage_allowance";
         map[NormalizeHeader("gelis bagajhakki")] = "arrival_baggage_allowance";
         map[NormalizeHeader("gidis bagajhakki")] = "arrival_baggage_allowance";
 
@@ -718,6 +1110,7 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("donus kalkis saati")] = "return_departure_time";
         map[NormalizeHeader("donus varis saati")] = "return_arrival_time";
         map[NormalizeHeader("donus pnr")] = "return_pnr";
+        map[NormalizeHeader("return_baggage_allowance")] = "return_baggage_allowance";
         map[NormalizeHeader("donus bagajhakki")] = "return_baggage_allowance";
 
         return map;
@@ -798,8 +1191,13 @@ internal static class ParticipantImportHandlers
 
     private static bool TryParseDate(string? value, out DateOnly date)
     {
-        var formats = new[] { "yyyy-MM-dd", "dd.MM.yyyy", "dd/MM/yyyy" };
-        return DateOnly.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            date = default;
+            return false;
+        }
+
+        return DateOnly.TryParseExact(value.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
     }
 
     private static bool TryParseOptionalDate(string? value, out DateOnly? date)
@@ -828,8 +1226,7 @@ internal static class ParticipantImportHandlers
             return true;
         }
 
-        if (TimeOnly.TryParseExact(value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
-            || TimeOnly.TryParseExact(value, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        if (TimeOnly.TryParseExact(value.Trim(), TimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
         {
             time = parsed;
             return true;
@@ -837,6 +1234,174 @@ internal static class ParticipantImportHandlers
 
         time = null;
         return false;
+    }
+
+    private static bool TryParseOptionalBaggagePieces(string? value, out int? pieces, out bool decimalProvided)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            pieces = null;
+            decimalProvided = false;
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        var pieceMatch = BaggagePiecesRegex.Match(trimmed);
+        var numericValue = pieceMatch.Success ? pieceMatch.Groups["value"].Value : trimmed;
+
+        return TryParseBaggagePiecesValue(numericValue, out pieces, out decimalProvided);
+    }
+
+    private static bool TryParseOptionalBaggageTotalKg(string? value, out int? totalKg, out bool rounded)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            totalKg = null;
+            rounded = false;
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        var kgMatch = BaggageKgRegex.Match(trimmed);
+        var numericValue = kgMatch.Success ? kgMatch.Groups["value"].Value : trimmed;
+
+        return TryParseBaggageKgValue(numericValue, out totalKg, out rounded);
+    }
+
+    private static BaggageAllowanceParseResult TryParseBaggageAllowance(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return BaggageAllowanceParseResult.Empty;
+        }
+
+        int? pieces = null;
+        int? totalKg = null;
+        var piecesDecimal = false;
+        var piecesInvalid = false;
+        var kgRounded = false;
+        var kgInvalid = false;
+
+        var trimmed = value.Trim();
+        var pieceMatch = BaggagePiecesRegex.Match(trimmed);
+        if (pieceMatch.Success)
+        {
+            if (!TryParseBaggagePiecesValue(pieceMatch.Groups["value"].Value, out pieces, out piecesDecimal))
+            {
+                piecesInvalid = !piecesDecimal;
+            }
+        }
+
+        var kgMatch = BaggageKgRegex.Match(trimmed);
+        if (kgMatch.Success)
+        {
+            if (!TryParseBaggageKgValue(kgMatch.Groups["value"].Value, out totalKg, out kgRounded))
+            {
+                kgInvalid = true;
+            }
+        }
+
+        return new BaggageAllowanceParseResult(pieces, totalKg, piecesDecimal, piecesInvalid, kgRounded, kgInvalid);
+    }
+
+    private static bool TryParseBaggagePiecesValue(string value, out int? pieces, out bool decimalProvided)
+    {
+        if (!TryParseNumeric(value, out var number))
+        {
+            pieces = null;
+            decimalProvided = false;
+            return false;
+        }
+
+        if (!IsWholeNumber(number))
+        {
+            pieces = null;
+            decimalProvided = true;
+            return false;
+        }
+
+        var intValue = (int)Math.Round(number, MidpointRounding.AwayFromZero);
+        if (intValue <= 0)
+        {
+            pieces = null;
+            decimalProvided = false;
+            return false;
+        }
+
+        pieces = intValue;
+        decimalProvided = false;
+        return true;
+    }
+
+    private static bool TryParseBaggageKgValue(string value, out int? totalKg, out bool rounded)
+    {
+        if (!TryParseNumeric(value, out var number))
+        {
+            totalKg = null;
+            rounded = false;
+            return false;
+        }
+
+        if (number <= 0)
+        {
+            totalKg = null;
+            rounded = false;
+            return false;
+        }
+
+        if (IsWholeNumber(number))
+        {
+            totalKg = (int)Math.Round(number, MidpointRounding.AwayFromZero);
+            rounded = false;
+            return true;
+        }
+
+        rounded = true;
+        totalKg = RoundToInt(number);
+        if (totalKg <= 0)
+        {
+            totalKg = null;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseNumeric(string value, out double number)
+    {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out number))
+        {
+            return true;
+        }
+
+        if (value.Contains(','))
+        {
+            var normalized = value.Replace(',', '.');
+            if (double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out number))
+            {
+                return true;
+            }
+        }
+
+        number = 0;
+        return false;
+    }
+
+    private static int RoundToInt(double value)
+        => (int)Math.Round(value, MidpointRounding.AwayFromZero);
+
+    private static bool IsWholeNumber(double value)
+        => Math.Abs(value % 1) < 0.0001;
+
+    private sealed record BaggageAllowanceParseResult(
+        int? Pieces,
+        int? TotalKg,
+        bool PiecesDecimal,
+        bool PiecesInvalid,
+        bool KgRounded,
+        bool KgInvalid)
+    {
+        public static readonly BaggageAllowanceParseResult Empty = new(null, null, false, false, false, false);
     }
 
     private static bool TryParseGender(string? value, out ParticipantGender gender)
@@ -902,7 +1467,11 @@ internal static class ParticipantImportHandlers
         TimeOnly? arrivalDeparture,
         TimeOnly? arrivalArrival,
         TimeOnly? returnDeparture,
-        TimeOnly? returnArrival)
+        TimeOnly? returnArrival,
+        int? arrivalBaggagePieces,
+        int? arrivalBaggageTotalKg,
+        int? returnBaggagePieces,
+        int? returnBaggageTotalKg)
     {
         details.RoomNo = row.GetValue("room_no");
         details.RoomType = row.GetValue("room_type");
@@ -922,6 +1491,8 @@ internal static class ParticipantImportHandlers
         details.ArrivalArrivalTime = arrivalArrival;
         details.ArrivalPnr = row.GetValue("arrival_pnr");
         details.ArrivalBaggageAllowance = row.GetValue("arrival_baggage_allowance");
+        details.ArrivalBaggagePieces = arrivalBaggagePieces;
+        details.ArrivalBaggageTotalKg = arrivalBaggageTotalKg;
         details.ReturnAirline = row.GetValue("return_airline");
         details.ReturnDepartureAirport = row.GetValue("return_departure_airport");
         details.ReturnArrivalAirport = row.GetValue("return_arrival_airport");
@@ -930,6 +1501,8 @@ internal static class ParticipantImportHandlers
         details.ReturnArrivalTime = returnArrival;
         details.ReturnPnr = row.GetValue("return_pnr");
         details.ReturnBaggageAllowance = row.GetValue("return_baggage_allowance");
+        details.ReturnBaggagePieces = returnBaggagePieces;
+        details.ReturnBaggageTotalKg = returnBaggageTotalKg;
     }
 
     private static Dictionary<string, List<int>> BuildFileTcRowMap(List<ImportRow> rows)
@@ -999,11 +1572,13 @@ internal static class ParticipantImportHandlers
         int created,
         int updated,
         List<ParticipantImportError> errors,
-        List<ParticipantImportWarning> warnings)
+        List<ParticipantImportWarning> warnings,
+        List<ParticipantImportPreviewRow> previewRows)
     {
         var totalRows = payload.Rows.Count;
         var validRows = Math.Max(totalRows - errors.Count, 0);
         var skipped = Math.Max(totalRows - imported, 0);
+        var previewTruncated = totalRows > PreviewRowLimit;
 
         return new ParticipantImportReport(
             totalRows,
@@ -1014,12 +1589,20 @@ internal static class ParticipantImportHandlers
             skipped,
             errors.Count,
             errors.Count,
+            PreviewRowLimit,
+            previewTruncated,
             payload.IgnoredColumns,
             errors.OrderBy(x => x.Row).ToArray(),
-            warnings.OrderBy(x => x.Row).ToArray());
+            warnings.OrderBy(x => x.Row).ToArray(),
+            previewRows.OrderBy(x => x.RowIndex).ToArray());
     }
 
-    private sealed record ImportPayload(List<ImportRow> Rows, string[] IgnoredColumns, bool HasDetails, string[] MissingRequiredColumns);
+    private sealed record ImportPayload(
+        List<ImportRow> Rows,
+        string[] IgnoredColumns,
+        bool HasDetails,
+        string[] MissingRequiredColumns,
+        bool LegacyHeadersDetected);
     private sealed record ImportRow(int RowNumber, Dictionary<string, string?> Values, bool HasAnyDetails)
     {
         public string? GetValue(string key)
@@ -1032,5 +1615,6 @@ internal static class ParticipantImportHandlers
         int? LastNameIndex,
         string[] IgnoredColumns,
         bool HasDetails,
-        string[] MissingRequiredColumns);
+        string[] MissingRequiredColumns,
+        bool LegacyHeadersDetected);
 }

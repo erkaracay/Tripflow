@@ -206,6 +206,18 @@ public sealed class TripflowDbContext : DbContext
                 table.HasCheckConstraint(
                     "CK_participant_details_hotel_dates",
                     "\"HotelCheckOutDate\" IS NULL OR \"HotelCheckInDate\" IS NULL OR \"HotelCheckOutDate\" >= \"HotelCheckInDate\"");
+                table.HasCheckConstraint(
+                    "CK_participant_details_arrival_baggage_pieces",
+                    "\"ArrivalBaggagePieces\" IS NULL OR \"ArrivalBaggagePieces\" > 0");
+                table.HasCheckConstraint(
+                    "CK_participant_details_arrival_baggage_total_kg",
+                    "\"ArrivalBaggageTotalKg\" IS NULL OR \"ArrivalBaggageTotalKg\" > 0");
+                table.HasCheckConstraint(
+                    "CK_participant_details_return_baggage_pieces",
+                    "\"ReturnBaggagePieces\" IS NULL OR \"ReturnBaggagePieces\" > 0");
+                table.HasCheckConstraint(
+                    "CK_participant_details_return_baggage_total_kg",
+                    "\"ReturnBaggageTotalKg\" IS NULL OR \"ReturnBaggageTotalKg\" > 0");
             });
             b.HasKey(x => x.ParticipantId);
 
@@ -230,6 +242,8 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ArrivalArrivalTime).HasColumnType("time without time zone");
             b.Property(x => x.ArrivalPnr).HasMaxLength(100);
             b.Property(x => x.ArrivalBaggageAllowance).HasMaxLength(100);
+            b.Property(x => x.ArrivalBaggagePieces);
+            b.Property(x => x.ArrivalBaggageTotalKg);
 
             b.Property(x => x.ReturnAirline).HasMaxLength(100);
             b.Property(x => x.ReturnDepartureAirport).HasMaxLength(100);
@@ -239,6 +253,8 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnArrivalTime).HasColumnType("time without time zone");
             b.Property(x => x.ReturnPnr).HasMaxLength(100);
             b.Property(x => x.ReturnBaggageAllowance).HasMaxLength(100);
+            b.Property(x => x.ReturnBaggagePieces);
+            b.Property(x => x.ReturnBaggageTotalKg);
 
         });
 

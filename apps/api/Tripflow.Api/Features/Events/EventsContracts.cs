@@ -134,6 +134,8 @@ public sealed record ParticipantDetailsRequest(
     string? ArrivalArrivalTime,
     string? ArrivalPnr,
     string? ArrivalBaggageAllowance,
+    int? ArrivalBaggagePieces,
+    int? ArrivalBaggageTotalKg,
     string? ReturnAirline,
     string? ReturnDepartureAirport,
     string? ReturnArrivalAirport,
@@ -141,7 +143,9 @@ public sealed record ParticipantDetailsRequest(
     string? ReturnDepartureTime,
     string? ReturnArrivalTime,
     string? ReturnPnr,
-    string? ReturnBaggageAllowance);
+    string? ReturnBaggageAllowance,
+    int? ReturnBaggagePieces,
+    int? ReturnBaggageTotalKg);
 
 public sealed record ParticipantDetailsDto(
     string? RoomNo,
@@ -162,6 +166,8 @@ public sealed record ParticipantDetailsDto(
     string? ArrivalArrivalTime,
     string? ArrivalPnr,
     string? ArrivalBaggageAllowance,
+    int? ArrivalBaggagePieces,
+    int? ArrivalBaggageTotalKg,
     string? ReturnAirline,
     string? ReturnDepartureAirport,
     string? ReturnArrivalAirport,
@@ -169,7 +175,9 @@ public sealed record ParticipantDetailsDto(
     string? ReturnDepartureTime,
     string? ReturnArrivalTime,
     string? ReturnPnr,
-    string? ReturnBaggageAllowance);
+    string? ReturnBaggageAllowance,
+    int? ReturnBaggagePieces,
+    int? ReturnBaggageTotalKg);
 
 public sealed record ParticipantDto(
     Guid Id,
@@ -181,6 +189,20 @@ public sealed record ParticipantDto(
     string Gender,
     string CheckInCode,
     bool Arrived,
+    ParticipantDetailsDto? Details);
+
+public sealed record ParticipantProfileDto(
+    Guid Id,
+    string FullName,
+    string Phone,
+    string? Email,
+    string TcNo,
+    string BirthDate,
+    string Gender,
+    string CheckInCode,
+    bool Arrived,
+    string? ArrivedAt,
+    bool TcNoDuplicate,
     ParticipantDetailsDto? Details);
 public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
 

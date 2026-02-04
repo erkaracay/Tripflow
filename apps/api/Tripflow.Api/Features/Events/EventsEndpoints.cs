@@ -228,6 +228,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/participants/{participantId}", EventsHandlers.GetParticipantProfile)
+            .WithSummary("Participant profile")
+            .WithDescription("Returns participant details for an event (includes arrived status).")
+            .Produces<ParticipantProfileDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/participants/import/template", ParticipantImportHandlers.DownloadImportTemplate)
             .WithSummary("Download participant import template")
             .WithDescription("Downloads a CSV or XLSX import template for participants.")
