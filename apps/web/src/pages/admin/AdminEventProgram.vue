@@ -95,7 +95,7 @@ const resetActivityForm = (activity?: EventActivity) => {
 }
 
 const loadEvent = async () => {
-  event.value = await apiGet<Event>(`/api/events/${eventId.value}`)
+  event.value = await apiGet<EventDto>(`/api/events/${eventId.value}`)
 }
 
 const loadDays = async () => {
@@ -283,6 +283,9 @@ const handleKeydown = (event: KeyboardEvent) => {
 
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
+    if (!first || !last) {
+      return
+    }
     const current = document.activeElement as HTMLElement | null
     const isInside = !!current && activeModal.contains(current)
 

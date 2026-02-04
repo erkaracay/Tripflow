@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiPost } from '../lib/api'
@@ -11,17 +11,29 @@ const { t } = useI18n()
 
 const email = ref('')
 const password = ref('')
+const emailInput = ref<HTMLInputElement | null>(null)
+const passwordInput = ref<HTMLInputElement | null>(null)
 const loading = ref(false)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
+const errorId = 'auth-login-error'
 
 const submit = async () => {
+  if (loading.value) {
+    return
+  }
   errorKey.value = null
   errorMessage.value = null
 
   const normalizedEmail = email.value.trim().toLowerCase()
   if (!normalizedEmail || !password.value) {
     errorKey.value = 'auth.login.errors.required'
+    await nextTick()
+    if (!normalizedEmail) {
+      emailInput.value?.focus()
+    } else {
+      passwordInput.value?.focus()
+    }
     return
   }
 
@@ -64,9 +76,14 @@ const submit = async () => {
         <span class="text-slate-600">{{ t('auth.login.emailLabel') }}</span>
         <input
           v-model.trim="email"
+          ref="emailInput"
           class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
           :placeholder="t('auth.login.emailPlaceholder')"
           type="email"
+          autocomplete="email"
+          :disabled="loading"
+          :aria-invalid="errorKey === 'auth.login.errors.required' && !email.trim()"
+          :aria-describedby="errorKey ? errorId : undefined"
         />
       </label>
 
@@ -74,9 +91,14 @@ const submit = async () => {
         <span class="text-slate-600">{{ t('auth.login.passwordLabel') }}</span>
         <input
           v-model="password"
+          ref="passwordInput"
           class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
           :placeholder="t('auth.login.passwordPlaceholder')"
           type="password"
+          autocomplete="current-password"
+          :disabled="loading"
+          :aria-invalid="errorKey === 'auth.login.errors.required' && !password"
+          :aria-describedby="errorKey ? errorId : undefined"
         />
       </label>
 
@@ -89,7 +111,7 @@ const submit = async () => {
       </button>
     </form>
 
-    <p v-if="errorKey || errorMessage" class="text-sm text-rose-600">
+    <p v-if="errorKey || errorMessage" class="text-sm text-rose-600" :id="errorId" aria-live="polite">
       {{ errorKey ? t(errorKey) : errorMessage }}
     </p>
   </div>

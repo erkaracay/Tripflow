@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
 import { getSelectedOrgId } from '../../lib/auth'
@@ -26,6 +26,8 @@ const createForm = reactive({
   password: '',
   fullName: '',
 })
+const emailInput = ref<HTMLInputElement | null>(null)
+const passwordInput = ref<HTMLInputElement | null>(null)
 const creating = ref(false)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
@@ -68,6 +70,9 @@ const roleLabel = (role: string) => {
 }
 
 const createUser = async () => {
+  if (creating.value) {
+    return
+  }
   formErrorKey.value = null
   formErrorMessage.value = null
 
@@ -78,11 +83,19 @@ const createUser = async () => {
 
   if (!createForm.email.trim() || !createForm.password.trim()) {
     formErrorKey.value = 'validation.userEmailPasswordRequired'
+    await nextTick()
+    if (!createForm.email.trim()) {
+      emailInput.value?.focus()
+    } else {
+      passwordInput.value?.focus()
+    }
     return
   }
 
   if (createForm.password.trim().length < 8) {
     formErrorKey.value = 'validation.passwordMin'
+    await nextTick()
+    passwordInput.value?.focus()
     return
   }
 
@@ -202,6 +215,7 @@ onMounted(loadUsers)
           <select
             v-model="createForm.role"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+            :disabled="creating"
           >
             <option value="Admin">{{ t('admin.users.roles.admin') }}</option>
             <option value="Guide">{{ t('admin.users.roles.guide') }}</option>
@@ -211,18 +225,24 @@ onMounted(loadUsers)
           <span class="text-slate-600">{{ t('admin.users.form.emailLabel') }}</span>
           <input
             v-model.trim="createForm.email"
+            ref="emailInput"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
             type="email"
             :placeholder="t('admin.users.form.emailPlaceholder')"
+            autocomplete="email"
+            :disabled="creating"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
           <span class="text-slate-600">{{ t('admin.users.form.passwordLabel') }}</span>
           <input
             v-model.trim="createForm.password"
+            ref="passwordInput"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
             type="password"
             :placeholder="t('admin.users.form.passwordPlaceholder')"
+            autocomplete="new-password"
+            :disabled="creating"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
@@ -232,6 +252,7 @@ onMounted(loadUsers)
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
             type="text"
             :placeholder="t('admin.users.form.fullNamePlaceholder')"
+            :disabled="creating"
           />
         </label>
         <div class="md:col-span-2 flex flex-wrap items-center gap-3">
