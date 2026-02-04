@@ -1481,11 +1481,11 @@ onMounted(loadEvent)
       </section>
 
       <section class="space-y-4">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <h2 class="text-lg font-semibold">{{ t('admin.participants.title') }}</h2>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2 md:justify-end md:gap-3">
             <button
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
               type="button"
               :disabled="participants.length === 0 || resettingAllCheckIns"
               @click="requestResetAllCheckIns"
@@ -1493,7 +1493,7 @@ onMounted(loadEvent)
               {{ resettingAllCheckIns ? t('common.saving') : t('admin.participants.resetAll') }}
             </button>
             <button
-              class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium leading-tight text-rose-700 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
               type="button"
               :disabled="participants.length === 0 || deletingAllParticipants"
               @click="requestDeleteAllParticipants"
@@ -1501,20 +1501,20 @@ onMounted(loadEvent)
               {{ deletingAllParticipants ? t('common.saving') : t('admin.participants.deleteAll') }}
             </button>
             <RouterLink
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 md:px-3 md:py-1.5"
               :to="`/admin/events/${eventId}/participants/import`"
             >
               {{ t('admin.participants.import') }}
             </RouterLink>
             <RouterLink
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 md:px-3 md:py-1.5"
               :to="`/admin/events/${eventId}/participants/table`"
             >
               {{ t('admin.participants.tableView') }}
             </RouterLink>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
               type="button"
               :disabled="participants.length === 0"
               @click="downloadParticipantsCsv"
