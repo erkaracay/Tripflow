@@ -204,6 +204,25 @@ public sealed record ParticipantProfileDto(
     string? ArrivedAt,
     bool TcNoDuplicate,
     ParticipantDetailsDto? Details);
+
+public sealed record ParticipantTableItemDto(
+    Guid Id,
+    string FullName,
+    string Phone,
+    string? Email,
+    string TcNo,
+    string BirthDate,
+    string Gender,
+    string CheckInCode,
+    bool Arrived,
+    string? ArrivedAt,
+    ParticipantDetailsDto? Details);
+
+public sealed record ParticipantTableResponseDto(
+    int Page,
+    int PageSize,
+    int Total,
+    ParticipantTableItemDto[] Items);
 public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
 
 public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method);

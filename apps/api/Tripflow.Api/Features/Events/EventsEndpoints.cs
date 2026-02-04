@@ -228,7 +228,14 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        admin.MapGet("/{eventId}/participants/{participantId}", EventsHandlers.GetParticipantProfile)
+        admin.MapGet("/{eventId}/participants/table", EventsHandlers.GetParticipantsTable)
+            .WithSummary("Participants table")
+            .WithDescription("Returns participants for an event with pagination and search.")
+            .Produces<ParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/participants/{participantId:guid}", EventsHandlers.GetParticipantProfile)
             .WithSummary("Participant profile")
             .WithDescription("Returns participant details for an event (includes arrived status).")
             .Produces<ParticipantProfileDto>(StatusCodes.Status200OK)

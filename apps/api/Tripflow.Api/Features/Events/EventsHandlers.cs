@@ -1215,6 +1215,173 @@ internal static class EventsHandlers
         return Results.Ok(participants);
     }
 
+    internal static async Task<IResult> GetParticipantsTable(
+        string eventId,
+        string? query,
+        string? status,
+        int? page,
+        int? pageSize,
+        string? sort,
+        string? dir,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var resolvedPage = page.GetValueOrDefault(1);
+        if (resolvedPage < 1)
+        {
+            resolvedPage = 1;
+        }
+
+        var resolvedPageSize = pageSize.GetValueOrDefault(50);
+        if (resolvedPageSize < 1)
+        {
+            resolvedPageSize = 50;
+        }
+        resolvedPageSize = Math.Min(resolvedPageSize, 200);
+
+        var arrivedLookup = db.CheckIns.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .GroupBy(x => x.ParticipantId)
+            .Select(g => new { ParticipantId = g.Key, ArrivedAt = g.Min(x => x.CheckedInAt) });
+
+        var participantsQuery = db.Participants.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
+
+        var search = query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            participantsQuery = participantsQuery.Where(x =>
+                EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.TcNo, pattern)
+                || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern))
+                || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
+                || EF.Functions.ILike(x.CheckInCode, pattern)
+                || (x.Details != null && (
+                    (x.Details.RoomNo != null && EF.Functions.ILike(x.Details.RoomNo, pattern))
+                    || (x.Details.TicketNo != null && EF.Functions.ILike(x.Details.TicketNo, pattern))
+                    || (x.Details.ArrivalPnr != null && EF.Functions.ILike(x.Details.ArrivalPnr, pattern))
+                    || (x.Details.ReturnPnr != null && EF.Functions.ILike(x.Details.ReturnPnr, pattern))
+                    || (x.Details.AgencyName != null && EF.Functions.ILike(x.Details.AgencyName, pattern))
+                )));
+        }
+
+        var statusValue = (status ?? "all").Trim().ToLowerInvariant();
+        if (statusValue is "arrived" or "not_arrived")
+        {
+            participantsQuery = statusValue == "arrived"
+                ? participantsQuery.Where(x => db.CheckIns.Any(c =>
+                    c.EventId == id && c.OrganizationId == orgId && c.ParticipantId == x.Id))
+                : participantsQuery.Where(x => !db.CheckIns.Any(c =>
+                    c.EventId == id && c.OrganizationId == orgId && c.ParticipantId == x.Id));
+        }
+
+        var total = await participantsQuery.CountAsync(ct);
+
+        var baseQuery =
+            from participant in participantsQuery
+            join details in db.ParticipantDetails.AsNoTracking()
+                on participant.Id equals details.ParticipantId into detailsJoin
+            from details in detailsJoin.DefaultIfEmpty()
+            join arrived in arrivedLookup
+                on participant.Id equals arrived.ParticipantId into arrivedJoin
+            from arrived in arrivedJoin.DefaultIfEmpty()
+            select new { participant, details, arrivedAt = (DateTime?)arrived.ArrivedAt };
+
+        var sortValue = (sort ?? "fullName").Trim().ToLowerInvariant();
+        var dirValue = (dir ?? "asc").Trim().ToLowerInvariant();
+        var descending = dirValue == "desc";
+
+        baseQuery = sortValue switch
+        {
+            "arrivedat" => descending
+                ? baseQuery.OrderByDescending(x => x.arrivedAt ?? DateTime.MinValue).ThenBy(x => x.participant.FullName)
+                : baseQuery.OrderBy(x => x.arrivedAt ?? DateTime.MinValue).ThenBy(x => x.participant.FullName),
+            "roomno" => descending
+                ? baseQuery.OrderByDescending(x => x.details!.RoomNo ?? string.Empty).ThenBy(x => x.participant.FullName)
+                : baseQuery.OrderBy(x => x.details!.RoomNo ?? string.Empty).ThenBy(x => x.participant.FullName),
+            "agencyname" => descending
+                ? baseQuery.OrderByDescending(x => x.details!.AgencyName ?? string.Empty).ThenBy(x => x.participant.FullName)
+                : baseQuery.OrderBy(x => x.details!.AgencyName ?? string.Empty).ThenBy(x => x.participant.FullName),
+            _ => descending
+                ? baseQuery.OrderByDescending(x => x.participant.FullName)
+                : baseQuery.OrderBy(x => x.participant.FullName)
+        };
+
+        var pageItems = await baseQuery
+            .Skip((resolvedPage - 1) * resolvedPageSize)
+            .Take(resolvedPageSize)
+            .ToListAsync(ct);
+
+        var items = pageItems.Select(row => new ParticipantTableItemDto(
+            row.participant.Id,
+            row.participant.FullName,
+            row.participant.Phone,
+            row.participant.Email,
+            row.participant.TcNo,
+            row.participant.BirthDate.ToString("yyyy-MM-dd"),
+            row.participant.Gender.ToString(),
+            row.participant.CheckInCode,
+            row.arrivedAt.HasValue,
+            row.arrivedAt?.ToString("yyyy-MM-dd HH:mm"),
+            row.details is null ? null : new ParticipantDetailsDto(
+                row.details.RoomNo,
+                row.details.RoomType,
+                row.details.PersonNo,
+                row.details.AgencyName,
+                row.details.City,
+                row.details.FlightCity,
+                row.details.HotelCheckInDate?.ToString("yyyy-MM-dd"),
+                row.details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
+                row.details.TicketNo,
+                row.details.AttendanceStatus,
+                row.details.ArrivalAirline,
+                row.details.ArrivalDepartureAirport,
+                row.details.ArrivalArrivalAirport,
+                row.details.ArrivalFlightCode,
+                row.details.ArrivalDepartureTime?.ToString("HH:mm"),
+                row.details.ArrivalArrivalTime?.ToString("HH:mm"),
+                row.details.ArrivalPnr,
+                row.details.ArrivalBaggageAllowance,
+                row.details.ArrivalBaggagePieces,
+                row.details.ArrivalBaggageTotalKg,
+                row.details.ReturnAirline,
+                row.details.ReturnDepartureAirport,
+                row.details.ReturnArrivalAirport,
+                row.details.ReturnFlightCode,
+                row.details.ReturnDepartureTime?.ToString("HH:mm"),
+                row.details.ReturnArrivalTime?.ToString("HH:mm"),
+                row.details.ReturnPnr,
+                row.details.ReturnBaggageAllowance,
+                row.details.ReturnBaggagePieces,
+                row.details.ReturnBaggageTotalKg)))
+            .ToArray();
+
+        return Results.Ok(new ParticipantTableResponseDto(
+            resolvedPage,
+            resolvedPageSize,
+            total,
+            items));
+    }
+
     internal static async Task<IResult> GetParticipantProfile(
         string eventId,
         string participantId,
