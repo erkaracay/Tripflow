@@ -78,6 +78,8 @@ export type ParticipantDetails = {
   arrivalArrivalTime?: string | null
   arrivalPnr?: string | null
   arrivalBaggageAllowance?: string | null
+  arrivalBaggagePieces?: number | null
+  arrivalBaggageTotalKg?: number | null
   returnAirline?: string | null
   returnDepartureAirport?: string | null
   returnArrivalAirport?: string | null
@@ -86,6 +88,23 @@ export type ParticipantDetails = {
   returnArrivalTime?: string | null
   returnPnr?: string | null
   returnBaggageAllowance?: string | null
+  returnBaggagePieces?: number | null
+  returnBaggageTotalKg?: number | null
+}
+
+export type ParticipantProfile = {
+  id: string
+  fullName: string
+  phone: string
+  email?: string | null
+  tcNo: string
+  birthDate: string
+  gender: ParticipantGender
+  checkInCode: string
+  arrived: boolean
+  arrivedAt?: string | null
+  tcNoDuplicate: boolean
+  details?: ParticipantDetails | null
 }
 
 export type MeetingInfo = {
@@ -224,25 +243,55 @@ export type EventAccessCodeResponse = {
 
 export type ParticipantImportError = {
   row: number
+  rowIndex?: number
   tcNo?: string | null
+  field?: string | null
+  code?: string | null
   message: string
   fields: string[]
 }
 
 export type ParticipantImportWarning = {
   row: number
+  rowIndex?: number
   tcNo?: string | null
+  field?: string | null
   message: string
   code: string
 }
 
+export type ParticipantImportPreviewRow = {
+  rowIndex: number
+  fullName?: string | null
+  phone?: string | null
+  tcNo?: string | null
+  birthDate?: string | null
+  gender?: string | null
+  hotelCheckInDate?: string | null
+  hotelCheckOutDate?: string | null
+  arrivalDepartureTime?: string | null
+  arrivalArrivalTime?: string | null
+  returnDepartureTime?: string | null
+  returnArrivalTime?: string | null
+  arrivalBaggagePieces?: number | null
+  arrivalBaggageTotalKg?: number | null
+  returnBaggagePieces?: number | null
+  returnBaggageTotalKg?: number | null
+}
+
 export type ParticipantImportReport = {
   totalRows: number
+  validRows?: number
   imported: number
   created: number
   updated: number
   failed: number
+  skipped?: number
+  errorCount?: number
+  previewLimit?: number
+  previewTruncated?: boolean
   ignoredColumns: string[]
   errors: ParticipantImportError[]
   warnings: ParticipantImportWarning[]
+  parsedPreviewRows?: ParticipantImportPreviewRow[]
 }

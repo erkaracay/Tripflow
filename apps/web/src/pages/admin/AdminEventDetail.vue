@@ -855,6 +855,7 @@ const openWhatsApp = async (participant: Participant) => {
     }
     const message = t('admin.eventAccess.whatsappTemplate', {
       name: participant.fullName,
+      eventName: event.value?.name ?? t('admin.eventAccess.eventNameFallback'),
       code,
       url: portalUrl,
     })
@@ -1789,6 +1790,12 @@ onMounted(loadEvent)
                   <WhatsAppIcon class="text-emerald-700" :size="14" />
                   <span>{{ t('actions.whatsapp') }}</span>
                 </a>
+                <RouterLink
+                  class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+                  :to="`/admin/events/${eventId}/participants/${participant.id}`"
+                >
+                  {{ t('admin.participants.detailsButton') }}
+                </RouterLink>
                 <button
                   class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
                   type="button"

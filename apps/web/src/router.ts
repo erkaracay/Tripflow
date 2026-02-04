@@ -4,6 +4,7 @@ import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
 import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
 import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
+import AdminParticipantProfile from './pages/admin/AdminParticipantProfile.vue'
 import AdminEventProgram from './pages/admin/AdminEventProgram.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
 import AdminUsers from './pages/admin/AdminUsers.vue'
@@ -49,6 +50,12 @@ const router = createRouter({
     {
       path: '/admin/events/:eventId/participants/import',
       component: AdminParticipantsImport,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/participants/:participantId',
+      component: AdminParticipantProfile,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },

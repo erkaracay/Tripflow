@@ -3,10 +3,17 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDownload, apiGet, apiPostForm } from '../../lib/api'
+import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { Event as EventDto, ParticipantImportError, ParticipantImportReport, ParticipantImportWarning } from '../../types'
+import type {
+  Event as EventDto,
+  ParticipantImportError,
+  ParticipantImportPreviewRow,
+  ParticipantImportReport,
+  ParticipantImportWarning,
+} from '../../types'
 
 type ImportFormat = 'xlsx' | 'csv'
 type HeaderLanguage = 'auto' | 'tr' | 'en'
@@ -59,14 +66,19 @@ const summary = computed(() => {
     return null
   }
 
-  const validRows = Math.max(current.totalRows - current.failed, 0)
+  const validRows =
+    typeof current.validRows === 'number'
+      ? current.validRows
+      : Math.max(current.totalRows - current.failed, 0)
+  const skippedRows = typeof current.skipped === 'number' ? current.skipped : current.failed
+  const errorRows = typeof current.errorCount === 'number' ? current.errorCount : current.errors.length
   return {
     totalRows: current.totalRows,
     validRows,
     importedWouldBe: current.imported,
     updatedWouldBe: current.updated,
-    skippedRows: current.failed,
-    errorRows: current.errors.length,
+    skippedRows,
+    errorRows,
   }
 })
 
@@ -85,6 +97,21 @@ const issueRows = computed<ImportIssueRow[]>(() => {
   }
 
   return rows.sort((a, b) => a.row - b.row)
+})
+
+const previewRows = computed<ParticipantImportPreviewRow[]>(() => {
+  const current = finalReport.value ?? report.value
+  return current?.parsedPreviewRows ?? []
+})
+
+const previewLimit = computed(() => {
+  const current = finalReport.value ?? report.value
+  return current?.previewLimit ?? 0
+})
+
+const previewTruncated = computed(() => {
+  const current = finalReport.value ?? report.value
+  return current?.previewTruncated ?? false
 })
 
 const filteredIssueRows = computed(() => {
@@ -395,6 +422,9 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'duplicate_tcno') {
     return t('admin.import.messages.duplicateTcNo')
   }
+  if (warning.code === 'legacy_template_detected') {
+    return t('admin.import.messages.legacyTemplateDetected')
+  }
 
   return warning.message
 }
@@ -623,6 +653,57 @@ onBeforeUnmount(() => {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div v-if="previewRows.length > 0" class="mt-6 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-slate-900">{{ t('admin.import.previewTitle') }}</h3>
+              <span v-if="previewTruncated && previewLimit" class="text-xs text-slate-500">
+                {{ t('admin.import.previewTruncated', { count: previewLimit }) }}
+              </span>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-slate-200">
+              <div class="max-h-96 overflow-auto">
+                <table class="min-w-full text-sm">
+                  <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+                    <tr>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.row') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.name') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.tcNo') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.birthDate') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.arrivalTime') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.returnTime') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.arrivalBaggage') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.returnBaggage') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in previewRows"
+                      :key="`preview-${row.rowIndex}`"
+                      class="odd:bg-white even:bg-slate-50"
+                    >
+                      <td class="px-3 py-2 font-mono text-xs">{{ row.rowIndex }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ row.fullName ?? t('common.noData') }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ row.tcNo ?? t('common.noData') }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.birthDate) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">
+                        {{ formatTime(row.arrivalDepartureTime) }} → {{ formatTime(row.arrivalArrivalTime) }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-slate-700">
+                        {{ formatTime(row.returnDepartureTime) }} → {{ formatTime(row.returnArrivalTime) }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-slate-700">
+                        {{ formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg) }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-slate-700">
+                        {{ formatBaggage(row.returnBaggagePieces, row.returnBaggageTotalKg) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 

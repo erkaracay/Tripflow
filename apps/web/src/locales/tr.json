@@ -217,6 +217,7 @@
     "portalLinkResetFailed": "Portal linki sıfırlanamadı.",
     "eventAccessCodeCopied": "Erişim kodu kopyalandı.",
     "eventAccessCodeCopyFailed": "Erişim kodu kopyalanamadı.",
+    "copied": "Kopyalandı.",
     "eventAccessCodeRegenerated": "Erişim kodu yenilendi.",
     "eventAccessCodeRegenerateFailed": "Erişim kodu yenilenemedi.",
     "userCreated": "Kullanıcı oluşturuldu.",
@@ -414,6 +415,7 @@
       "resetAllConfirm": "Tüm katılımcı yoklamaları sıfırlansın mı?",
       "deleteAllConfirm": "Bu etkinlikteki tüm katılımcılar silinsin mi?",
       "addTitle": "Katılımcı ekle",
+      "detailsButton": "Bilgiler",
       "exportCsv": "CSV indir",
       "empty": "Henüz katılımcı yok. Yukarıdan ekle.",
       "editTitle": "Katılımcıyı düzenle",
@@ -465,6 +467,54 @@
         "returnArrivalTime": "Dönüş varış saati",
         "returnPnr": "Dönüş PNR",
         "returnBaggageAllowance": "Dönüş bagaj hakkı"
+      }
+    },
+    "participantProfile": {
+      "title": "Katılımcı profili",
+      "tcNoDuplicate": "TC çakışması",
+      "sections": {
+        "core": "Temel",
+        "hotel": "Otel / Oda",
+        "flights": "Uçuşlar",
+        "other": "Diğer"
+      },
+      "fields": {
+        "fullName": "Ad soyad",
+        "phone": "Telefon",
+        "email": "E-posta",
+        "tcNo": "TC kimlik no",
+        "birthDate": "Doğum tarihi",
+        "gender": "Cinsiyet",
+        "checkInCode": "Check-in kodu",
+        "arrivedAt": "Giriş zamanı",
+        "roomNo": "Oda no",
+        "roomType": "Oda tipi",
+        "personNo": "Kişi no",
+        "hotelCheckInDate": "Otel giriş tarihi",
+        "hotelCheckOutDate": "Otel çıkış tarihi",
+        "arrivalTitle": "Geliş",
+        "arrivalAirline": "Geliş havayolu",
+        "arrivalDepartureAirport": "Kalkış havalimanı",
+        "arrivalArrivalAirport": "Varış havalimanı",
+        "arrivalFlightCode": "Uçuş kodu",
+        "arrivalDepartureTime": "Kalkış saati",
+        "arrivalArrivalTime": "Varış saati",
+        "arrivalPnr": "PNR",
+        "arrivalBaggage": "Bagaj",
+        "returnTitle": "Dönüş",
+        "returnAirline": "Dönüş havayolu",
+        "returnDepartureAirport": "Kalkış havalimanı",
+        "returnArrivalAirport": "Varış havalimanı",
+        "returnFlightCode": "Uçuş kodu",
+        "returnDepartureTime": "Kalkış saati",
+        "returnArrivalTime": "Varış saati",
+        "returnPnr": "PNR",
+        "returnBaggage": "Bagaj",
+        "agencyName": "Acenta adı",
+        "city": "Şehir",
+        "flightCity": "Uçuş şehri",
+        "ticketNo": "Bilet no",
+        "attendanceStatus": "Katılım durumu"
       }
     },
     "import": {
@@ -520,8 +570,21 @@
         "statusWarn": "Uyarı",
         "statusError": "Hata"
       },
+      "previewTitle": "Ön izleme (parse)",
+      "previewTruncated": "İlk {count} satır gösteriliyor.",
+      "previewTable": {
+        "row": "Satır",
+        "name": "Ad",
+        "tcNo": "Kimlik No",
+        "birthDate": "Doğum tarihi",
+        "arrivalTime": "Geliş saati",
+        "returnTime": "Dönüş saati",
+        "arrivalBaggage": "Geliş bagajı",
+        "returnBaggage": "Dönüş bagajı"
+      },
       "messages": {
         "duplicateTcNo": "Dosyada kimlik numarası tekrar ediyor. Son satır dikkate alınacak.",
+        "legacyTemplateDetected": "Eski şablon başlıkları tespit edildi. Lütfen güncel şablonu kullanın.",
         "tcNoAmbiguous": "Kimlik numarası etkinlikte birden fazla katılımcıyla eşleşiyor.",
         "fullNameRequired": "Ad soyad zorunludur.",
         "phoneRequired": "Telefon zorunludur.",
@@ -547,7 +610,8 @@
       "copyLoginLink": "Giriş linkini kopyala",
       "regenerate": "Kodu yenile",
       "regenerated": "Erişim kodu yenilendi.",
-      "whatsappTemplate": "Merhaba {name}, giriş için erişim kodu {code}: {url}"
+      "eventNameFallback": "etkinlik",
+      "whatsappTemplate": "Merhaba {name}, {eventName} etkinliğine ait tüm bilgiler için giriş erişim kodu {code}: {url}"
     },
     "portal": {
       "title": "Portal İçeriği",
