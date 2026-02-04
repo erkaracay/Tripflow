@@ -92,6 +92,27 @@ export type ParticipantDetails = {
   returnBaggageTotalKg?: number | null
 }
 
+export type ParticipantTableItem = {
+  id: string
+  fullName: string
+  phone: string
+  email?: string | null
+  tcNo: string
+  birthDate: string
+  gender: string
+  checkInCode: string
+  arrived: boolean
+  arrivedAt?: string | null
+  details?: ParticipantDetails | null
+}
+
+export type ParticipantTableResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: ParticipantTableItem[]
+}
+
 export type ParticipantProfile = {
   id: string
   fullName: string

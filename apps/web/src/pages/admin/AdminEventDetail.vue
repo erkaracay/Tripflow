@@ -1506,6 +1506,12 @@ onMounted(loadEvent)
             >
               {{ t('admin.participants.import') }}
             </RouterLink>
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              :to="`/admin/events/${eventId}/participants/table`"
+            >
+              {{ t('admin.participants.tableView') }}
+            </RouterLink>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button
               class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
