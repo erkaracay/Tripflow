@@ -216,6 +216,7 @@ onMounted(loadUsers)
             v-model="createForm.role"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
             :disabled="creating"
+            name="role"
           >
             <option value="Admin">{{ t('admin.users.roles.admin') }}</option>
             <option value="Guide">{{ t('admin.users.roles.guide') }}</option>
@@ -231,6 +232,7 @@ onMounted(loadUsers)
             :placeholder="t('admin.users.form.emailPlaceholder')"
             autocomplete="email"
             :disabled="creating"
+            name="email"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
@@ -243,6 +245,7 @@ onMounted(loadUsers)
             :placeholder="t('admin.users.form.passwordPlaceholder')"
             autocomplete="new-password"
             :disabled="creating"
+            name="password"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
@@ -253,6 +256,7 @@ onMounted(loadUsers)
             type="text"
             :placeholder="t('admin.users.form.fullNamePlaceholder')"
             :disabled="creating"
+            name="fullName"
           />
         </label>
         <div class="md:col-span-2 flex flex-wrap items-center gap-3">

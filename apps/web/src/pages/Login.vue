@@ -80,7 +80,9 @@ const submit = async () => {
           class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
           :placeholder="t('auth.login.emailPlaceholder')"
           type="email"
+          name="email"
           autocomplete="email"
+          autofocus
           :disabled="loading"
           :aria-invalid="errorKey === 'auth.login.errors.required' && !email.trim()"
           :aria-describedby="errorKey ? errorId : undefined"
@@ -95,6 +97,7 @@ const submit = async () => {
           class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:border-slate-400 focus:outline-none"
           :placeholder="t('auth.login.passwordPlaceholder')"
           type="password"
+          name="password"
           autocomplete="current-password"
           :disabled="loading"
           :aria-invalid="errorKey === 'auth.login.errors.required' && !password"

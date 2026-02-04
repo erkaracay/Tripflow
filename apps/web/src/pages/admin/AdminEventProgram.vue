@@ -660,22 +660,49 @@ onMounted(loadAll)
               v-model="dayForm.date"
               type="date"
               class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="dayDate"
+              :disabled="savingDay"
             />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.title') }}</span>
-            <input v-model="dayForm.title" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="dayForm.title"
+              type="text"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="dayTitle"
+              :disabled="savingDay"
+            />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.notes') }}</span>
-            <textarea v-model="dayForm.notes" rows="3" class="rounded border border-slate-200 px-3 py-2 text-sm"></textarea>
+            <textarea
+              v-model="dayForm.notes"
+              rows="3"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="dayNotes"
+              :disabled="savingDay"
+            ></textarea>
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.sortOrder') }}</span>
-            <input v-model="dayForm.sortOrder" type="number" min="1" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="dayForm.sortOrder"
+              type="number"
+              min="1"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="daySortOrder"
+              :disabled="savingDay"
+            />
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input v-model="dayForm.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+            <input
+              v-model="dayForm.isActive"
+              type="checkbox"
+              class="h-4 w-4 rounded border-slate-300"
+              name="dayIsActive"
+              :disabled="savingDay"
+            />
             {{ t('admin.program.days.form.active') }}
           </label>
         </div>
@@ -721,38 +748,81 @@ onMounted(loadAll)
               v-model="activityForm.title"
               type="text"
               class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityTitle"
+              :disabled="savingActivity"
             />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.type') }}</span>
-            <select v-model="activityForm.type" class="rounded border border-slate-200 px-3 py-2 text-sm">
+            <select
+              v-model="activityForm.type"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityType"
+              :disabled="savingActivity"
+            >
               <option value="Meal">{{ t('admin.program.activities.typeMeal') }}</option>
               <option value="Other">{{ t('admin.program.activities.typeOther') }}</option>
             </select>
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.startTime') }}</span>
-            <input v-model="activityForm.startTime" type="time" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="activityForm.startTime"
+              type="time"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityStartTime"
+              :disabled="savingActivity"
+            />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.endTime') }}</span>
-            <input v-model="activityForm.endTime" type="time" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="activityForm.endTime"
+              type="time"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityEndTime"
+              :disabled="savingActivity"
+            />
           </label>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.locationName') }}</span>
-            <input v-model="activityForm.locationName" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="activityForm.locationName"
+              type="text"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityLocationName"
+              :disabled="savingActivity"
+            />
           </label>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.address') }}</span>
-            <input v-model="activityForm.address" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="activityForm.address"
+              type="text"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityAddress"
+              :disabled="savingActivity"
+            />
           </label>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.directions') }}</span>
-            <textarea v-model="activityForm.directions" rows="2" class="rounded border border-slate-200 px-3 py-2 text-sm"></textarea>
+            <textarea
+              v-model="activityForm.directions"
+              rows="2"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityDirections"
+              :disabled="savingActivity"
+            ></textarea>
           </label>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.notes') }}</span>
-            <textarea v-model="activityForm.notes" rows="2" class="rounded border border-slate-200 px-3 py-2 text-sm"></textarea>
+            <textarea
+              v-model="activityForm.notes"
+              rows="2"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityNotes"
+              :disabled="savingActivity"
+            ></textarea>
           </label>
           <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.type === 'Meal'">
             <span class="text-slate-600">{{ t('admin.program.activities.form.menuText') }}</span>
@@ -760,19 +830,38 @@ onMounted(loadAll)
               v-model="activityForm.menuText"
               rows="4"
               class="min-h-24 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              name="activityMenuText"
+              :disabled="savingActivity"
             ></textarea>
           </label>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.surveyUrl') }}</span>
-            <input v-model="activityForm.surveyUrl" type="url" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            <input
+              v-model="activityForm.surveyUrl"
+              type="url"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activitySurveyUrl"
+              :disabled="savingActivity"
+            />
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-slate-600 md:col-span-2">
-            <input v-model="activityForm.checkInEnabled" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+            <input
+              v-model="activityForm.checkInEnabled"
+              type="checkbox"
+              class="h-4 w-4 rounded border-slate-300"
+              name="activityCheckInEnabled"
+              :disabled="savingActivity"
+            />
             {{ t('admin.program.activities.form.checkInEnabled') }}
           </label>
           <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.checkInEnabled">
             <span class="text-slate-600">{{ t('admin.program.activities.form.checkInMode') }}</span>
-            <select v-model="activityForm.checkInMode" class="rounded border border-slate-200 px-3 py-2 text-sm">
+            <select
+              v-model="activityForm.checkInMode"
+              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              name="activityCheckInMode"
+              :disabled="savingActivity"
+            >
               <option value="EntryOnly">{{ t('admin.program.activities.checkInModeEntry') }}</option>
               <option value="EntryExit">{{ t('admin.program.activities.checkInModeEntryExit') }}</option>
             </select>

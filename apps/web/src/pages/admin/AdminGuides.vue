@@ -188,6 +188,7 @@ onMounted(loadGuides)
             :placeholder="t('admin.guides.form.emailPlaceholder')"
             autocomplete="email"
             :disabled="creating"
+            name="email"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
@@ -200,6 +201,7 @@ onMounted(loadGuides)
             :placeholder="t('admin.guides.form.passwordPlaceholder')"
             autocomplete="new-password"
             :disabled="creating"
+            name="password"
           />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
@@ -210,6 +212,7 @@ onMounted(loadGuides)
             type="text"
             :placeholder="t('admin.guides.form.fullNamePlaceholder')"
             :disabled="creating"
+            name="fullName"
           />
         </label>
         <div class="md:col-span-3 flex flex-wrap items-center gap-3">
