@@ -966,19 +966,35 @@ internal static class EventsHandlers
             var role = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
             var isAdmin = string.Equals(role, "AgencyAdmin", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
-
-            if (!isAdmin)
-            {
-                return Results.Unauthorized();
-            }
+            var isGuide = string.Equals(role, "Guide", StringComparison.OrdinalIgnoreCase);
 
             if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
             {
                 return orgError!;
             }
 
-            eventEntity = await db.Events.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+            if (isAdmin)
+            {
+                eventEntity = await db.Events.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+            }
+            else if (isGuide)
+            {
+                var userId = httpContext.User.FindFirstValue("sub");
+                if (!Guid.TryParse(userId, out var guideId))
+                {
+                    return Results.Unauthorized();
+                }
+
+                eventEntity = await db.Events.AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Id == id && x.OrganizationId == orgId && x.GuideUserId == guideId,
+                        ct);
+            }
+            else
+            {
+                return Results.Unauthorized();
+            }
         }
 
         if (eventEntity is null)
@@ -1195,7 +1211,10 @@ internal static class EventsHandlers
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var logsQuery = db.EventParticipantLogs.AsNoTracking()
-            .Where(x => x.OrganizationId == orgId && x.EventId == id && x.ParticipantId != null);
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ParticipantId != null
+                        && (x.Result == CheckInLogResults.Success || x.Result == CheckInLogResults.AlreadyArrived));
 
         var rows = await participantsQuery
             .OrderBy(x => x.FullName)
@@ -1213,6 +1232,7 @@ internal static class EventsHandlers
                     participant.BirthDate,
                     participant.Gender,
                     participant.CheckInCode,
+                    participant.WillNotAttend,
                     Arrived = checkIns.Any(),
                     Details = MapDetails(participant.Details),
                     LastLog = logsQuery
@@ -1233,6 +1253,7 @@ internal static class EventsHandlers
                 row.Gender.ToString(),
                 row.CheckInCode,
                 row.Arrived,
+                row.WillNotAttend,
                 row.Details,
                 row.LastLog is null
                     ? null
@@ -1575,6 +1596,7 @@ internal static class EventsHandlers
                 entity.Gender.ToString(),
                 entity.CheckInCode,
                 false,
+                false,
                 MapDetails(entity.Details)));
     }
 
@@ -1700,7 +1722,77 @@ internal static class EventsHandlers
             entity.Gender.ToString(),
             entity.CheckInCode,
             arrived,
+            entity.WillNotAttend,
             MapDetails(entity.Details)));
+    }
+
+    internal static async Task<IResult> SetParticipantWillNotAttend(
+        string eventId,
+        string participantId,
+        ParticipantWillNotAttendRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (request is null || !request.WillNotAttend.HasValue)
+        {
+            return EventsHelpers.BadRequest("willNotAttend is required.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var entity = await db.Participants
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        entity.WillNotAttend = request.WillNotAttend.Value;
+        await db.SaveChangesAsync(ct);
+
+        var arrived = await db.CheckIns.AsNoTracking()
+            .AnyAsync(x => x.EventId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
+
+        var lastLog = await db.EventParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ParticipantId == entity.Id
+                        && (x.Result == CheckInLogResults.Success || x.Result == CheckInLogResults.AlreadyArrived))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ParticipantLastLogDto(
+                x.Direction.ToString(),
+                x.Method.ToString(),
+                x.Result,
+                x.CreatedAt))
+            .FirstOrDefaultAsync(ct);
+
+        return Results.Ok(new ParticipantWillNotAttendResponseDto(
+            entity.Id,
+            entity.WillNotAttend,
+            arrived,
+            lastLog));
     }
 
     internal static async Task<IResult> DeleteParticipant(
@@ -1944,6 +2036,37 @@ internal static class EventsHandlers
                 });
             }
 
+            if (direction == EventParticipantLogDirection.Entry && participant.WillNotAttend)
+            {
+                logResult = CheckInLogResults.InvalidRequest;
+                db.EventParticipantLogs.Add(new EventParticipantLogEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = orgId,
+                    EventId = id,
+                    ParticipantId = participant.Id,
+                    Direction = direction,
+                    Method = logMethod,
+                    Result = logResult,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    ActorUserId = actorUserId,
+                    ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                    CreatedAt = loggedAt
+                });
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                return Results.Conflict(new
+                {
+                    code = "will_not_attend",
+                    message = "Participant is marked as will-not-attend.",
+                    direction = direction.ToString(),
+                    loggedAt,
+                    result = logResult
+                });
+            }
+
             alreadyCheckedIn = await db.CheckIns.AsNoTracking()
                 .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
 
@@ -2051,10 +2174,7 @@ internal static class EventsHandlers
             }, statusCode: StatusCodes.Status500InternalServerError);
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
-        var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+        var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
 
         return Results.Ok(new CheckInResponse(
             participant!.Id,
@@ -2144,10 +2264,7 @@ internal static class EventsHandlers
             await db.SaveChangesAsync(ct);
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
-        var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+        var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
 
         return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
     }
@@ -2195,10 +2312,8 @@ internal static class EventsHandlers
             await db.SaveChangesAsync(ct);
         }
 
-        var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
-
-        return Results.Ok(new ResetAllCheckInsResponse(removedCount, 0, totalCount));
+        var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
+        return Results.Ok(new ResetAllCheckInsResponse(removedCount, arrivedCount, totalCount));
     }
 
     internal static async Task<IResult> CheckInByCode(
@@ -2371,6 +2486,21 @@ internal static class EventsHandlers
         internal const string Failed = "Failed";
     }
 
+    private static async Task<(int ArrivedCount, int TotalCount)> GetCheckInCountsAsync(
+        TripflowDbContext db,
+        Guid eventId,
+        Guid organizationId,
+        CancellationToken ct)
+    {
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.EventId == eventId && x.OrganizationId == organizationId, ct);
+
+        var arrivedCount = await db.CheckIns.AsNoTracking()
+            .CountAsync(x => x.EventId == eventId && x.OrganizationId == organizationId, ct);
+
+        return (arrivedCount, totalCount);
+    }
+
     internal static async Task<IResult> GetCheckInSummary(
         string eventId,
         HttpContext httpContext,
@@ -2394,10 +2524,7 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
-        var totalCount = await db.Participants.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+        var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
     }

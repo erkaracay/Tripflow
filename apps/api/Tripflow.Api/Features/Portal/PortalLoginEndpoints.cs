@@ -25,6 +25,14 @@ public static class PortalLoginEndpoints
             .Produces<PortalMeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/resolve", PortalLoginHandlers.ResolveEventAccessCode)
+            .AllowAnonymous()
+            .WithSummary("Resolve event access code")
+            .WithDescription("Resolves eventId for a given event access code.")
+            .Produces<PortalResolveEventResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 }

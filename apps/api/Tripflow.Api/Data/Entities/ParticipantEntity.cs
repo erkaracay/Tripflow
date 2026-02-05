@@ -23,6 +23,8 @@ public sealed class ParticipantEntity
     public DateOnly BirthDate { get; set; }
     public ParticipantGender Gender { get; set; }
 
+    public bool WillNotAttend { get; set; }
+
     // QR / check-in için tekil kod (GUID string de olabilir)
     public string CheckInCode { get; set; } = default!;
 

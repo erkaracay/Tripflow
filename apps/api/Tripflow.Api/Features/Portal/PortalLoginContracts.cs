@@ -10,6 +10,8 @@ public sealed record PortalLoginResponse(
     Guid EventId,
     Guid ParticipantId);
 
+public sealed record PortalResolveEventResponse(Guid EventId, string EventTitle);
+
 public sealed record PortalMeResponse(
     PortalEventSummary Event,
     PortalParticipantSummaryFull Participant,
@@ -20,7 +22,8 @@ public sealed record PortalEventSummary(
     Guid Id,
     string Name,
     string StartDate,
-    string EndDate);
+    string EndDate,
+    string? LogoUrl);
 
 public sealed record PortalParticipantSummaryFull(
     Guid Id,

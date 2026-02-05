@@ -8,6 +8,7 @@ public sealed class EventEntity
     public string Name { get; set; } = default!;
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
+    public string? LogoUrl { get; set; }
     public string EventAccessCode { get; set; } = default!;
     public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }

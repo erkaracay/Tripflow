@@ -24,6 +24,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapPatch("/events/{eventId}/participants/{participantId}/will-not-attend", GuideHandlers.SetParticipantWillNotAttend)
+            .WithSummary("Guide participant will-not-attend")
+            .WithDescription("Marks a participant as will-not-attend for the guide's event.")
+            .Produces<ParticipantWillNotAttendResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/events/{eventId}/participants/resolve", GuideHandlers.ResolveParticipantByCode)
             .WithSummary("Resolve participant by check-in code")
             .WithDescription("Resolves a participant using check-in code for a guide event.")

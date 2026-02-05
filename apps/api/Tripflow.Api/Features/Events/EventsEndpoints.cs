@@ -332,6 +332,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPatch("/{eventId}/participants/{participantId}/will-not-attend", EventsHandlers.SetParticipantWillNotAttend)
+            .WithSummary("Set participant will-not-attend")
+            .WithDescription("Marks a participant as will-not-attend (excluded from check-in totals).")
+            .Produces<ParticipantWillNotAttendResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapDelete("/{eventId}/participants/{participantId}", EventsHandlers.DeleteParticipant)
             .WithSummary("Delete participant")
             .WithDescription("Removes a participant from the event.")

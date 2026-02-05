@@ -3,7 +3,7 @@ namespace Tripflow.Api.Features.Events;
 public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate);
 public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
 
-public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, Guid? GuideUserId, bool IsDeleted, string EventAccessCode);
+public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? LogoUrl, Guid? GuideUserId, bool IsDeleted, string EventAccessCode);
 public sealed record EventListItemDto(
     Guid Id,
     string Name,
@@ -189,6 +189,7 @@ public sealed record ParticipantDto(
     string Gender,
     string CheckInCode,
     bool Arrived,
+    bool WillNotAttend,
     ParticipantDetailsDto? Details,
     ParticipantLastLogDto? LastLog = null);
 
@@ -197,6 +198,13 @@ public sealed record ParticipantLastLogDto(
     string Method,
     string Result,
     DateTime CreatedAt);
+
+public sealed record ParticipantWillNotAttendRequest(bool? WillNotAttend);
+public sealed record ParticipantWillNotAttendResponseDto(
+    Guid Id,
+    bool WillNotAttend,
+    bool Arrived,
+    ParticipantLastLogDto? LastLog);
 
 public sealed record ParticipantProfileDto(
     Guid Id,

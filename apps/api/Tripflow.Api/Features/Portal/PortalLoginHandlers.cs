@@ -158,7 +158,8 @@ internal static class PortalLoginHandlers
                 eventEntity.Id,
                 eventEntity.Name,
                 eventEntity.StartDate.ToString("yyyy-MM-dd"),
-                eventEntity.EndDate.ToString("yyyy-MM-dd")),
+                eventEntity.EndDate.ToString("yyyy-MM-dd"),
+                eventEntity.LogoUrl),
             new PortalParticipantSummaryFull(
                 participant.Id,
                 participant.FullName,
@@ -172,6 +173,28 @@ internal static class PortalLoginHandlers
             schedule);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> ResolveEventAccessCode(
+        string? eventAccessCode,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var code = NormalizeCode(eventAccessCode);
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 8)
+        {
+            return Results.BadRequest(new { code = "invalid_event_access_code_format" });
+        }
+
+        var eventEntity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EventAccessCode == code, ct);
+
+        if (eventEntity is null)
+        {
+            return Results.NotFound(new { code = "event_access_code_not_found" });
+        }
+
+        return Results.Ok(new PortalResolveEventResponse(eventEntity.Id, eventEntity.Name));
     }
 
     private static string NormalizeCode(string? value)

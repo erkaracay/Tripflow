@@ -65,6 +65,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
             b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.LogoUrl).HasMaxLength(500);
             b.Property(x => x.EventAccessCode).HasMaxLength(16).IsRequired();
             b.Property(x => x.IsDeleted).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CreatedAt).IsRequired();
@@ -180,6 +181,8 @@ public sealed class TripflowDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(16)
                 .IsRequired();
+
+            b.Property(x => x.WillNotAttend).HasDefaultValue(false).IsRequired();
 
             b.Property(x => x.CheckInCode).HasMaxLength(64).IsRequired();
             b.HasIndex(x => x.CheckInCode).IsUnique();

@@ -162,6 +162,7 @@ internal static class EventsHelpers
             entity.Name,
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
+            entity.LogoUrl,
             entity.GuideUserId,
             entity.IsDeleted,
             entity.EventAccessCode);

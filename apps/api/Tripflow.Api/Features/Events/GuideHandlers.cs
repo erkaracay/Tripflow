@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
+using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
 
 namespace Tripflow.Api.Features.Events;
@@ -74,6 +75,7 @@ internal static class GuideHandlers
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
+            .Include(x => x.Details)
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var search = query?.Trim();
@@ -90,7 +92,10 @@ internal static class GuideHandlers
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
         var logsQuery = db.EventParticipantLogs.AsNoTracking()
-            .Where(x => x.OrganizationId == orgId && x.EventId == id && x.ParticipantId != null);
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ParticipantId != null
+                        && (x.Result == "Success" || x.Result == "AlreadyArrived"));
 
         var rows = await participantsQuery
             .OrderBy(x => x.FullName)
@@ -108,7 +113,9 @@ internal static class GuideHandlers
                     participant.BirthDate,
                     participant.Gender,
                     participant.CheckInCode,
+                    participant.WillNotAttend,
                     Arrived = checkIns.Any(),
+                    Details = MapDetails(participant.Details),
                     LastLog = logsQuery
                         .Where(log => log.ParticipantId == participant.Id)
                         .OrderByDescending(log => log.CreatedAt)
@@ -127,7 +134,8 @@ internal static class GuideHandlers
                 row.Gender.ToString(),
                 row.CheckInCode,
                 row.Arrived,
-                null,
+                row.WillNotAttend,
+                row.Details,
                 row.LastLog is null
                     ? null
                     : new ParticipantLastLogDto(
@@ -138,6 +146,81 @@ internal static class GuideHandlers
             .ToArray();
 
         return Results.Ok(participants);
+    }
+
+    internal static async Task<IResult> SetParticipantWillNotAttend(
+        string eventId,
+        string participantId,
+        ParticipantWillNotAttendRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (request is null || !request.WillNotAttend.HasValue)
+        {
+            return EventsHelpers.BadRequest("willNotAttend is required.");
+        }
+
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var participant = await db.Participants
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        participant.WillNotAttend = request.WillNotAttend.Value;
+        await db.SaveChangesAsync(ct);
+
+        var arrived = await db.CheckIns.AsNoTracking()
+            .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
+
+        var lastLog = await db.EventParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ParticipantId == participant.Id
+                        && (x.Result == "Success" || x.Result == "AlreadyArrived"))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ParticipantLastLogDto(
+                x.Direction.ToString(),
+                x.Method.ToString(),
+                x.Result,
+                x.CreatedAt))
+            .FirstOrDefaultAsync(ct);
+
+        return Results.Ok(new ParticipantWillNotAttendResponseDto(
+            participant.Id,
+            participant.WillNotAttend,
+            arrived,
+            lastLog));
     }
 
     internal static async Task<IResult> ResolveParticipantByCode(
@@ -222,9 +305,10 @@ internal static class GuideHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        var arrivedCount = await db.CheckIns.AsNoTracking()
-            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
         var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+
+        var arrivedCount = await db.CheckIns.AsNoTracking()
             .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
@@ -392,5 +476,45 @@ internal static class GuideHandlers
         var cleaned = raw.Trim().ToUpperInvariant();
         var normalized = new string(cleaned.Where(char.IsLetterOrDigit).ToArray());
         return normalized;
+    }
+
+    private static ParticipantDetailsDto? MapDetails(ParticipantDetailsEntity? details)
+    {
+        if (details is null)
+        {
+            return null;
+        }
+
+        return new ParticipantDetailsDto(
+            details.RoomNo,
+            details.RoomType,
+            details.PersonNo,
+            details.AgencyName,
+            details.City,
+            details.FlightCity,
+            details.HotelCheckInDate?.ToString("yyyy-MM-dd"),
+            details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
+            details.TicketNo,
+            details.AttendanceStatus,
+            details.ArrivalAirline,
+            details.ArrivalDepartureAirport,
+            details.ArrivalArrivalAirport,
+            details.ArrivalFlightCode,
+            details.ArrivalDepartureTime?.ToString("HH:mm"),
+            details.ArrivalArrivalTime?.ToString("HH:mm"),
+            details.ArrivalPnr,
+            details.ArrivalBaggageAllowance,
+            details.ArrivalBaggagePieces,
+            details.ArrivalBaggageTotalKg,
+            details.ReturnAirline,
+            details.ReturnDepartureAirport,
+            details.ReturnArrivalAirport,
+            details.ReturnFlightCode,
+            details.ReturnDepartureTime?.ToString("HH:mm"),
+            details.ReturnArrivalTime?.ToString("HH:mm"),
+            details.ReturnPnr,
+            details.ReturnBaggageAllowance,
+            details.ReturnBaggagePieces,
+            details.ReturnBaggageTotalKg);
     }
 }
