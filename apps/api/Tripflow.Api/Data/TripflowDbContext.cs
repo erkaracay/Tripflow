@@ -15,6 +15,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
     public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
+    public DbSet<EventParticipantLogEntity> EventParticipantLogs => Set<EventParticipantLogEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
 
@@ -327,6 +328,47 @@ public sealed class TripflowDbContext : DbContext
 
             b.HasOne(x => x.Organization)
                 .WithMany(x => x.CheckIns)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EventParticipantLogEntity>(b =>
+        {
+            b.ToTable("event_participant_logs");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ParticipantId);
+
+            b.Property(x => x.Direction)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsRequired();
+
+            b.Property(x => x.Method)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsRequired();
+
+            b.Property(x => x.Result).HasMaxLength(32).IsRequired().HasDefaultValue("Success");
+
+            b.Property(x => x.IpAddress);
+            b.Property(x => x.UserAgent);
+
+            b.Property(x => x.ActorUserId);
+            b.Property(x => x.ActorRole).HasMaxLength(32);
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.CreatedAt })
+                .IsDescending(false, false, true);
+            b.HasIndex(x => new { x.OrganizationId, x.ParticipantId, x.CreatedAt })
+                .IsDescending(false, false, true);
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ParticipantId, x.CreatedAt })
+                .IsDescending(false, false, false, true);
+
+            b.HasOne(x => x.Organization)
+                .WithMany()
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

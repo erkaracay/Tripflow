@@ -265,6 +265,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/logs", EventsHandlers.GetEventParticipantLogs)
+            .WithSummary("Event participant logs")
+            .WithDescription("Returns recent entry/exit logs for an event with pagination and filters.")
+            .Produces<EventParticipantLogListResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{eventId}/checkins", EventsHandlers.CheckInByCode)
             .WithSummary("Check-in by code")
             .WithDescription("Marks participant as arrived using checkInCode.")
@@ -276,7 +283,9 @@ public static class EventsEndpoints
                 AddJsonExample(op,
                     new OpenApiObject
                     {
-                        ["checkInCode"] = new OpenApiString("QQTL4S88")
+                        ["checkInCode"] = new OpenApiString("QQTL4S88"),
+                        ["direction"] = new OpenApiString("Entry"),
+                        ["method"] = new OpenApiString("QrScan")
                     }
                 );
                 return op;
@@ -349,6 +358,7 @@ public static class EventsEndpoints
                     new OpenApiObject
                     {
                         ["code"] = new OpenApiString("A7K3Q9ZP"),
+                        ["direction"] = new OpenApiString("Entry"),
                         ["method"] = new OpenApiString("manual")
                     }
                 );

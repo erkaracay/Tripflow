@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
@@ -1193,24 +1194,54 @@ internal static class EventsHandlers
         var checkinsQuery = db.CheckIns.AsNoTracking()
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
-        var participants = await participantsQuery
+        var logsQuery = db.EventParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId && x.EventId == id && x.ParticipantId != null);
+
+        var rows = await participantsQuery
             .OrderBy(x => x.FullName)
             .GroupJoin(
                 checkinsQuery,
                 participant => participant.Id,
                 checkIn => checkIn.ParticipantId,
-                (participant, checkIns) => new ParticipantDto(
+                (participant, checkIns) => new
+                {
                     participant.Id,
                     participant.FullName,
                     participant.Phone,
                     participant.Email,
                     participant.TcNo,
-                    participant.BirthDate.ToString("yyyy-MM-dd"),
-                    participant.Gender.ToString(),
+                    participant.BirthDate,
+                    participant.Gender,
                     participant.CheckInCode,
-                    checkIns.Any(),
-                    MapDetails(participant.Details)))
-            .ToArrayAsync(ct);
+                    Arrived = checkIns.Any(),
+                    Details = MapDetails(participant.Details),
+                    LastLog = logsQuery
+                        .Where(log => log.ParticipantId == participant.Id)
+                        .OrderByDescending(log => log.CreatedAt)
+                        .Select(log => new { log.Direction, log.Method, log.Result, log.CreatedAt })
+                        .FirstOrDefault()
+                })
+            .ToListAsync(ct);
+
+        var participants = rows.Select(row => new ParticipantDto(
+                row.Id,
+                row.FullName,
+                row.Phone,
+                row.Email,
+                row.TcNo,
+                row.BirthDate.ToString("yyyy-MM-dd"),
+                row.Gender.ToString(),
+                row.CheckInCode,
+                row.Arrived,
+                row.Details,
+                row.LastLog is null
+                    ? null
+                    : new ParticipantLastLogDto(
+                        row.LastLog.Direction.ToString(),
+                        row.LastLog.Method.ToString(),
+                        row.LastLog.Result,
+                        row.LastLog.CreatedAt)))
+            .ToArray();
 
         return Results.Ok(participants);
     }
@@ -1790,13 +1821,27 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        return await CheckInForOrg(orgId, eventId, request, db, ct);
+        var actorUserId = TryGetActorUserId(httpContext.User);
+        var actorRole = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
+
+        var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            userAgent = null;
+        }
+
+        return await CheckInForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, db, ct);
     }
 
     internal static async Task<IResult> CheckInForOrg(
         Guid orgId,
         string eventId,
         CheckInRequest request,
+        Guid? actorUserId,
+        string? actorRole,
+        string? ipAddress,
+        string? userAgent,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -1812,56 +1857,198 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
+        var direction = NormalizeLogDirection(request.Direction);
+        var logMethod = NormalizeLogMethod(request.Method);
+        var checkInMethod = logMethod == EventParticipantLogMethod.QrScan ? "qr" : "manual";
+        var loggedAt = DateTime.UtcNow;
+
         ParticipantEntity? participant = null;
+        var logResult = CheckInLogResults.Success;
+        var alreadyCheckedIn = false;
 
-        if (request.ParticipantId.HasValue)
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        try
         {
-            participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.EventId == id && x.OrganizationId == orgId, ct);
-        }
-        else if (!string.IsNullOrWhiteSpace(request.Code))
-        {
-            var code = request.Code.Trim().ToUpperInvariant();
-            participant = await db.Participants
-                .FirstOrDefaultAsync(x => x.EventId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
-        }
-        else
-        {
-            return EventsHelpers.BadRequest("Provide either participantId or code.");
-        }
+            if (request.ParticipantId.HasValue)
+            {
+                participant = await db.Participants
+                    .FirstOrDefaultAsync(x => x.Id == request.ParticipantId.Value && x.EventId == id && x.OrganizationId == orgId, ct);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.Code))
+            {
+                var code = request.Code.Trim().ToUpperInvariant();
+                participant = await db.Participants
+                    .FirstOrDefaultAsync(x => x.EventId == id && x.CheckInCode == code && x.OrganizationId == orgId, ct);
+            }
+            else
+            {
+                logResult = CheckInLogResults.InvalidRequest;
+            }
 
-        if (participant is null)
-        {
-            return Results.NotFound(new { message = "Participant not found." });
-        }
+            if (logResult == CheckInLogResults.InvalidRequest)
+            {
+                db.EventParticipantLogs.Add(new EventParticipantLogEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = orgId,
+                    EventId = id,
+                    ParticipantId = null,
+                    Direction = direction,
+                    Method = logMethod,
+                    Result = logResult,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    ActorUserId = actorUserId,
+                    ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                    CreatedAt = loggedAt
+                });
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
 
-        var method = (request.Method ?? "manual").Trim().ToLowerInvariant();
-        if (method is not ("manual" or "qr"))
-        {
-            method = "manual";
-        }
+                return Results.BadRequest(new
+                {
+                    message = "Provide either participantId or code.",
+                    direction = direction.ToString(),
+                    loggedAt,
+                    result = logResult
+                });
+            }
 
-        var alreadyCheckedIn = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
+            if (participant is null)
+            {
+                logResult = CheckInLogResults.NotFound;
+                db.EventParticipantLogs.Add(new EventParticipantLogEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = orgId,
+                    EventId = id,
+                    ParticipantId = null,
+                    Direction = direction,
+                    Method = logMethod,
+                    Result = logResult,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    ActorUserId = actorUserId,
+                    ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                    CreatedAt = loggedAt
+                });
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
 
-        if (!alreadyCheckedIn)
-        {
-            db.CheckIns.Add(new CheckInEntity
+                return Results.NotFound(new
+                {
+                    message = "Participant not found.",
+                    direction = direction.ToString(),
+                    loggedAt,
+                    result = logResult
+                });
+            }
+
+            alreadyCheckedIn = await db.CheckIns.AsNoTracking()
+                .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
+
+            if (direction == EventParticipantLogDirection.Entry)
+            {
+                if (alreadyCheckedIn)
+                {
+                    logResult = CheckInLogResults.AlreadyArrived;
+                }
+                else
+                {
+                    db.CheckIns.Add(new CheckInEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = id,
+                        ParticipantId = participant.Id,
+                        OrganizationId = orgId,
+                        CheckedInAt = loggedAt,
+                        Method = checkInMethod
+                    });
+                }
+            }
+
+            db.EventParticipantLogs.Add(new EventParticipantLogEntity
             {
                 Id = Guid.NewGuid(),
+                OrganizationId = orgId,
                 EventId = id,
                 ParticipantId = participant.Id,
-                OrganizationId = orgId,
-                CheckedInAt = DateTime.UtcNow,
-                Method = method
+                Direction = direction,
+                Method = logMethod,
+                Result = logResult,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                ActorUserId = actorUserId,
+                ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                CreatedAt = loggedAt
             });
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException ex) when (direction == EventParticipantLogDirection.Entry && IsUniqueViolation(ex))
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+
+            alreadyCheckedIn = true;
+            logResult = CheckInLogResults.AlreadyArrived;
+
+            await using var fallbackTransaction = await db.Database.BeginTransactionAsync(ct);
+            db.EventParticipantLogs.Add(new EventParticipantLogEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = orgId,
+                EventId = id,
+                ParticipantId = participant?.Id,
+                Direction = direction,
+                Method = logMethod,
+                Result = logResult,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                ActorUserId = actorUserId,
+                ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                CreatedAt = loggedAt
+            });
+            await db.SaveChangesAsync(ct);
+            await fallbackTransaction.CommitAsync(ct);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
 
             try
             {
+                await using var failureTransaction = await db.Database.BeginTransactionAsync(ct);
+                db.EventParticipantLogs.Add(new EventParticipantLogEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = orgId,
+                    EventId = id,
+                    ParticipantId = participant?.Id,
+                    Direction = direction,
+                    Method = logMethod,
+                    Result = CheckInLogResults.Failed,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    ActorUserId = actorUserId,
+                    ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                    CreatedAt = loggedAt
+                });
                 await db.SaveChangesAsync(ct);
+                await failureTransaction.CommitAsync(ct);
             }
-            catch (DbUpdateException)
+            catch
             { }
+
+            return Results.Json(new
+            {
+                message = "Request failed.",
+                direction = direction.ToString(),
+                loggedAt,
+                result = CheckInLogResults.Failed
+            }, statusCode: StatusCodes.Status500InternalServerError);
         }
 
         var arrivedCount = await db.CheckIns.AsNoTracking()
@@ -1869,7 +2056,15 @@ internal static class EventsHandlers
         var totalCount = await db.Participants.AsNoTracking()
             .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
-        return Results.Ok(new CheckInResponse(participant.Id, participant.FullName, alreadyCheckedIn, arrivedCount, totalCount));
+        return Results.Ok(new CheckInResponse(
+            participant!.Id,
+            participant.FullName,
+            alreadyCheckedIn,
+            arrivedCount,
+            totalCount,
+            direction.ToString(),
+            loggedAt,
+            logResult));
     }
 
     internal static async Task<IResult> UndoCheckIn(
@@ -2018,13 +2213,27 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        return await CheckInByCodeForOrg(orgId, eventId, request, db, ct);
+        var actorUserId = TryGetActorUserId(httpContext.User);
+        var actorRole = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
+
+        var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            userAgent = null;
+        }
+
+        return await CheckInByCodeForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, db, ct);
     }
 
     internal static async Task<IResult> CheckInByCodeForOrg(
         Guid orgId,
         string eventId,
         CheckInCodeRequest request,
+        Guid? actorUserId,
+        string? actorRole,
+        string? ipAddress,
+        string? userAgent,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -2033,18 +2242,133 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Request body is required.");
         }
 
-        var code = request.CheckInCode?.Trim().ToUpperInvariant();
-        if (string.IsNullOrWhiteSpace(code))
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
-            return EventsHelpers.BadRequest("Check-in code is required.");
+            return error!;
         }
 
-        if (code.Length != 8)
+        var direction = NormalizeLogDirection(request.Direction);
+
+        var rawMethod = request.Method;
+        if (string.IsNullOrWhiteSpace(rawMethod))
         {
-            return EventsHelpers.BadRequest("Check-in code must be 8 characters.");
+            // Preserve legacy behavior: /checkins defaulted to qr when method is not provided.
+            rawMethod = "QrScan";
+        }
+        var logMethod = NormalizeLogMethod(rawMethod);
+
+        var code = NormalizeCheckInCode(request.CheckInCode ?? request.Code);
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 8)
+        {
+            var eventExists = await db.Events.AsNoTracking()
+                .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+            if (!eventExists)
+            {
+                return Results.NotFound(new { message = "Event not found." });
+            }
+
+            var message = string.IsNullOrWhiteSpace(code)
+                ? "Check-in code is required."
+                : "Check-in code must be 8 characters.";
+            var loggedAt = DateTime.UtcNow;
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            db.EventParticipantLogs.Add(new EventParticipantLogEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = orgId,
+                EventId = id,
+                ParticipantId = null,
+                Direction = direction,
+                Method = logMethod,
+                Result = CheckInLogResults.InvalidRequest,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                ActorUserId = actorUserId,
+                ActorRole = string.IsNullOrWhiteSpace(actorRole) ? null : actorRole.Trim(),
+                CreatedAt = loggedAt
+            });
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return Results.BadRequest(new
+            {
+                message,
+                direction = direction.ToString(),
+                loggedAt,
+                result = CheckInLogResults.InvalidRequest
+            });
         }
 
-        return await CheckInForOrg(orgId, eventId, new CheckInRequest(code, null, "qr"), db, ct);
+        return await CheckInForOrg(
+            orgId,
+            eventId,
+            new CheckInRequest(code, null, rawMethod, request.Direction),
+            actorUserId,
+            actorRole,
+            ipAddress,
+            userAgent,
+            db,
+            ct);
+    }
+
+    private static Guid? TryGetActorUserId(ClaimsPrincipal user)
+    {
+        var raw = user.FindFirstValue("sub");
+        return Guid.TryParse(raw, out var id) ? id : null;
+    }
+
+    private static EventParticipantLogDirection NormalizeLogDirection(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return EventParticipantLogDirection.Entry;
+        }
+
+        var normalized = new string(raw.Trim().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return normalized == "exit" ? EventParticipantLogDirection.Exit : EventParticipantLogDirection.Entry;
+    }
+
+    private static EventParticipantLogMethod NormalizeLogMethod(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return EventParticipantLogMethod.Manual;
+        }
+
+        var normalized = new string(raw.Trim().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return normalized switch
+        {
+            "qr" => EventParticipantLogMethod.QrScan,
+            "qrscan" => EventParticipantLogMethod.QrScan,
+            "scan" => EventParticipantLogMethod.QrScan,
+            "manual" => EventParticipantLogMethod.Manual,
+            _ => EventParticipantLogMethod.Manual
+        };
+    }
+
+    private static string NormalizeCheckInCode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        var cleaned = raw.Trim().ToUpperInvariant();
+        return new string(cleaned.Where(char.IsLetterOrDigit).ToArray());
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+    }
+
+    private static class CheckInLogResults
+    {
+        internal const string Success = "Success";
+        internal const string AlreadyArrived = "AlreadyArrived";
+        internal const string NotFound = "NotFound";
+        internal const string InvalidRequest = "InvalidRequest";
+        internal const string Failed = "Failed";
     }
 
     internal static async Task<IResult> GetCheckInSummary(
@@ -2076,6 +2400,226 @@ internal static class EventsHandlers
             .CountAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
 
         return Results.Ok(new CheckInSummary(arrivedCount, totalCount));
+    }
+
+    internal static async Task<IResult> GetEventParticipantLogs(
+        string eventId,
+        string? direction,
+        string? method,
+        string? result,
+        string? from,
+        string? to,
+        string? query,
+        int? page,
+        int? pageSize,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var resolvedPage = page.GetValueOrDefault(1);
+        if (resolvedPage < 1)
+        {
+            resolvedPage = 1;
+        }
+
+        var resolvedPageSize = pageSize.GetValueOrDefault(50);
+        if (resolvedPageSize < 1)
+        {
+            resolvedPageSize = 50;
+        }
+        resolvedPageSize = Math.Min(resolvedPageSize, 200);
+
+        DateTime? fromUtc = null;
+        if (!string.IsNullOrWhiteSpace(from))
+        {
+            if (!TryParseLogFilterDate(from, out var parsedFrom, out var isDateOnly))
+            {
+                return EventsHelpers.BadRequest("Invalid from date.");
+            }
+            fromUtc = isDateOnly
+                ? DateTime.SpecifyKind(parsedFrom.Date, DateTimeKind.Utc)
+                : parsedFrom;
+        }
+
+        DateTime? toUtcExclusive = null;
+        if (!string.IsNullOrWhiteSpace(to))
+        {
+            if (!TryParseLogFilterDate(to, out var parsedTo, out var isDateOnly))
+            {
+                return EventsHelpers.BadRequest("Invalid to date.");
+            }
+            toUtcExclusive = isDateOnly
+                ? DateTime.SpecifyKind(parsedTo.Date, DateTimeKind.Utc).AddDays(1)
+                : parsedTo;
+        }
+
+        var baseQuery =
+            from log in db.EventParticipantLogs.AsNoTracking()
+            where log.OrganizationId == orgId && log.EventId == id
+            join participant in db.Participants.AsNoTracking()
+                on log.ParticipantId equals participant.Id into participantJoin
+            from participant in participantJoin.DefaultIfEmpty()
+            join actor in db.Users.AsNoTracking()
+                on log.ActorUserId equals actor.Id into actorJoin
+            from actor in actorJoin.DefaultIfEmpty()
+            select new { log, participant, actor };
+
+        var directionValue = (direction ?? "all").Trim().ToLowerInvariant();
+        if (directionValue == "entry")
+        {
+            baseQuery = baseQuery.Where(x => x.log.Direction == EventParticipantLogDirection.Entry);
+        }
+        else if (directionValue == "exit")
+        {
+            baseQuery = baseQuery.Where(x => x.log.Direction == EventParticipantLogDirection.Exit);
+        }
+
+        var methodValue = (method ?? "all").Trim();
+        if (!string.Equals(methodValue, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var parsedMethod = TryParseLogMethodFilter(methodValue);
+            if (!parsedMethod.HasValue)
+            {
+                return EventsHelpers.BadRequest("Invalid method filter.");
+            }
+
+            baseQuery = baseQuery.Where(x => x.log.Method == parsedMethod.Value);
+        }
+
+        var resultValue = (result ?? "all").Trim();
+        if (!string.IsNullOrWhiteSpace(resultValue) && !string.Equals(resultValue, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var normalizedResult = NormalizeLogResult(resultValue);
+            if (normalizedResult is not null)
+            {
+                baseQuery = baseQuery.Where(x => x.log.Result == normalizedResult);
+            }
+        }
+
+        if (fromUtc.HasValue)
+        {
+            baseQuery = baseQuery.Where(x => x.log.CreatedAt >= fromUtc.Value);
+        }
+
+        if (toUtcExclusive.HasValue)
+        {
+            baseQuery = baseQuery.Where(x => x.log.CreatedAt < toUtcExclusive.Value);
+        }
+
+        var search = query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            baseQuery = baseQuery.Where(x =>
+                (x.participant != null && (
+                    EF.Functions.ILike(x.participant.FullName, pattern)
+                    || EF.Functions.ILike(x.participant.TcNo, pattern)
+                    || (x.participant.Phone != null && EF.Functions.ILike(x.participant.Phone, pattern))
+                    || (x.participant.Email != null && EF.Functions.ILike(x.participant.Email, pattern))
+                    || EF.Functions.ILike(x.participant.CheckInCode, pattern)
+                ))
+                || (x.actor != null && EF.Functions.ILike(x.actor.Email, pattern))
+                || (x.log.ActorRole != null && EF.Functions.ILike(x.log.ActorRole, pattern))
+            );
+        }
+
+        var total = await baseQuery.CountAsync(ct);
+
+        var pageItems = await baseQuery
+            .OrderByDescending(x => x.log.CreatedAt)
+            .Skip((resolvedPage - 1) * resolvedPageSize)
+            .Take(resolvedPageSize)
+            .ToListAsync(ct);
+
+        var items = pageItems.Select(row => new EventParticipantLogItemDto(
+            row.log.Id,
+            row.log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            row.log.Direction.ToString(),
+            row.log.Method.ToString(),
+            row.log.Result,
+            row.log.ParticipantId,
+            row.participant?.FullName,
+            row.participant?.TcNo,
+            row.participant?.Phone,
+            row.participant?.CheckInCode,
+            row.log.ActorUserId,
+            row.actor?.Email,
+            row.log.ActorRole,
+            row.log.IpAddress,
+            row.log.UserAgent))
+            .ToArray();
+
+        return Results.Ok(new EventParticipantLogListResponseDto(resolvedPage, resolvedPageSize, total, items));
+    }
+
+    private static bool TryParseLogFilterDate(string raw, out DateTime valueUtc, out bool isDateOnly)
+    {
+        var trimmed = raw.Trim();
+        if (DateOnly.TryParseExact(trimmed, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            isDateOnly = true;
+            valueUtc = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            return true;
+        }
+
+        isDateOnly = false;
+        if (DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
+        {
+            valueUtc = dt;
+            return true;
+        }
+
+        valueUtc = default;
+        return false;
+    }
+
+    private static string? NormalizeLogResult(string raw)
+    {
+        var normalized = new string(raw.Trim().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return normalized switch
+        {
+            "success" => CheckInLogResults.Success,
+            "alreadyarrived" => CheckInLogResults.AlreadyArrived,
+            "notfound" => CheckInLogResults.NotFound,
+            "invalidrequest" => CheckInLogResults.InvalidRequest,
+            "failed" => CheckInLogResults.Failed,
+            _ => null
+        };
+    }
+
+    private static EventParticipantLogMethod? TryParseLogMethodFilter(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var normalized = new string(raw.Trim().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return normalized switch
+        {
+            "manual" => EventParticipantLogMethod.Manual,
+            "qr" => EventParticipantLogMethod.QrScan,
+            "qrscan" => EventParticipantLogMethod.QrScan,
+            "scan" => EventParticipantLogMethod.QrScan,
+            _ => null
+        };
     }
 
     private static ParticipantDetailsDto? MapDetails(ParticipantDetailsEntity? details)

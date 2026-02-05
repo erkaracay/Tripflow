@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tripflow.Api.Data;
@@ -11,9 +12,11 @@ using Tripflow.Api.Data;
 namespace Tripflow.Api.Data.Migrations
 {
     [DbContext(typeof(TripflowDbContext))]
-    partial class TripflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260205041211_AddEventParticipantLogResult")]
+    partial class AddEventParticipantLogResult
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -258,9 +261,6 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("IpAddress")
-                        .HasColumnType("text");
-
                     b.Property<string>("Method")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -278,9 +278,6 @@ namespace Tripflow.Api.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasDefaultValue("Success");
-
-                    b.Property<string>("UserAgent")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

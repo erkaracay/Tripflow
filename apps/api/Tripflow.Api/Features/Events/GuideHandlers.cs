@@ -89,24 +89,53 @@ internal static class GuideHandlers
         var checkinsQuery = db.CheckIns.AsNoTracking()
             .Where(x => x.EventId == id && x.OrganizationId == orgId);
 
-        var participants = await participantsQuery
+        var logsQuery = db.EventParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId && x.EventId == id && x.ParticipantId != null);
+
+        var rows = await participantsQuery
             .OrderBy(x => x.FullName)
             .GroupJoin(
                 checkinsQuery,
                 participant => participant.Id,
                 checkIn => checkIn.ParticipantId,
-                (participant, checkIns) => new ParticipantDto(
+                (participant, checkIns) => new
+                {
                     participant.Id,
                     participant.FullName,
                     participant.Phone,
                     participant.Email,
                     participant.TcNo,
-                    participant.BirthDate.ToString("yyyy-MM-dd"),
-                    participant.Gender.ToString(),
+                    participant.BirthDate,
+                    participant.Gender,
                     participant.CheckInCode,
-                    checkIns.Any(),
-                    null))
-            .ToArrayAsync(ct);
+                    Arrived = checkIns.Any(),
+                    LastLog = logsQuery
+                        .Where(log => log.ParticipantId == participant.Id)
+                        .OrderByDescending(log => log.CreatedAt)
+                        .Select(log => new { log.Direction, log.Method, log.Result, log.CreatedAt })
+                        .FirstOrDefault()
+                })
+            .ToListAsync(ct);
+
+        var participants = rows.Select(row => new ParticipantDto(
+                row.Id,
+                row.FullName,
+                row.Phone,
+                row.Email,
+                row.TcNo,
+                row.BirthDate.ToString("yyyy-MM-dd"),
+                row.Gender.ToString(),
+                row.CheckInCode,
+                row.Arrived,
+                null,
+                row.LastLog is null
+                    ? null
+                    : new ParticipantLastLogDto(
+                        row.LastLog.Direction.ToString(),
+                        row.LastLog.Method.ToString(),
+                        row.LastLog.Result,
+                        row.LastLog.CreatedAt)))
+            .ToArray();
 
         return Results.Ok(participants);
     }
@@ -264,7 +293,15 @@ internal static class GuideHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        return await EventsHandlers.CheckInByCodeForOrg(orgId, eventId, request, db, ct);
+        var actorRole = user.FindFirstValue("role") ?? user.FindFirstValue(ClaimTypes.Role);
+        var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            userAgent = null;
+        }
+
+        return await EventsHandlers.CheckInByCodeForOrg(orgId, eventId, request, userId, actorRole, ipAddress, userAgent, db, ct);
     }
 
     internal static async Task<IResult> UndoCheckIn(

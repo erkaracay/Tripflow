@@ -189,7 +189,14 @@ public sealed record ParticipantDto(
     string Gender,
     string CheckInCode,
     bool Arrived,
-    ParticipantDetailsDto? Details);
+    ParticipantDetailsDto? Details,
+    ParticipantLastLogDto? LastLog = null);
+
+public sealed record ParticipantLastLogDto(
+    string Direction,
+    string Method,
+    string Result,
+    DateTime CreatedAt);
 
 public sealed record ParticipantProfileDto(
     Guid Id,
@@ -225,13 +232,45 @@ public sealed record ParticipantTableResponseDto(
     ParticipantTableItemDto[] Items);
 public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
 
-public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method);
-public sealed record CheckInCodeRequest(string? CheckInCode);
+public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method, string? Direction = null);
+public sealed record CheckInCodeRequest(string? CheckInCode, string? Code = null, string? Direction = null, string? Method = null);
 public sealed record CheckInUndoRequest(Guid? ParticipantId, string? CheckInCode);
 public sealed record CheckInSummary(int ArrivedCount, int TotalCount);
 public sealed record ResetAllCheckInsResponse(int RemovedCount, int ArrivedCount, int TotalCount);
-public sealed record CheckInResponse(Guid ParticipantId, string ParticipantName, bool AlreadyArrived, int ArrivedCount, int TotalCount);
+public sealed record CheckInResponse(
+    Guid ParticipantId,
+    string ParticipantName,
+    bool AlreadyArrived,
+    int ArrivedCount,
+    int TotalCount,
+    string? Direction = null,
+    DateTime? LoggedAt = null,
+    string? Result = null);
 public sealed record CheckInUndoResponse(Guid ParticipantId, bool AlreadyUndone, int ArrivedCount, int TotalCount);
+
+public sealed record EventParticipantLogItemDto(
+    Guid Id,
+    string CreatedAt,
+    string Direction,
+    string Method,
+    string Result,
+    Guid? ParticipantId,
+    string? ParticipantName,
+    string? ParticipantTcNo,
+    string? ParticipantPhone,
+    string? CheckInCode,
+    Guid? ActorUserId,
+    string? ActorEmail,
+    string? ActorRole,
+    string? IpAddress = null,
+    string? UserAgent = null);
+
+public sealed record EventParticipantLogListResponseDto(
+    int Page,
+    int PageSize,
+    int Total,
+    EventParticipantLogItemDto[] Items);
+
 public sealed record VerifyCheckInCodeRequest(string? CheckInCode);
 public sealed record VerifyCheckInCodeResponse(bool IsValid, string? NormalizedCode);
 public sealed record AssignGuideRequest(Guid? GuideUserId);
