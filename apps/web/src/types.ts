@@ -48,6 +48,14 @@ export type Participant = {
   checkInCode: string
   arrived: boolean
   details?: ParticipantDetails | null
+  lastLog?: ParticipantLastLog | null
+}
+
+export type ParticipantLastLog = {
+  direction: 'Entry' | 'Exit'
+  method: 'Manual' | 'QrScan'
+  result: string
+  createdAt: string
 }
 
 export type ParticipantResolve = {
@@ -205,6 +213,9 @@ export type CheckInResponse = {
   alreadyArrived: boolean
   arrivedCount: number
   totalCount: number
+  direction?: 'Entry' | 'Exit' | null
+  loggedAt?: string | null
+  result?: string | null
 }
 
 export type CheckInUndoResponse = {
@@ -212,6 +223,31 @@ export type CheckInUndoResponse = {
   alreadyUndone: boolean
   arrivedCount: number
   totalCount: number
+}
+
+export type EventParticipantLogItem = {
+  id: string
+  createdAt: string
+  direction: string
+  method: string
+  result: string
+  participantId?: string | null
+  participantName?: string | null
+  participantTcNo?: string | null
+  participantPhone?: string | null
+  checkInCode?: string | null
+  actorUserId?: string | null
+  actorEmail?: string | null
+  actorRole?: string | null
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export type EventParticipantLogListResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: EventParticipantLogItem[]
 }
 
 export type ResetAllCheckInsResponse = {

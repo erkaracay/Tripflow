@@ -57,6 +57,9 @@ const startScanner = async () => {
     return
   }
 
+  // Always restart from a clean state to avoid parallel decode sessions / leaked tracks.
+  stopScanner()
+
   errorKey.value = null
   isStarting.value = true
   isScanning.value = false

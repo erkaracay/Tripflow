@@ -3,6 +3,7 @@ import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } 
 import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
 import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
+import AdminEventLogs from './pages/admin/AdminEventLogs.vue'
 import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
 import AdminParticipantProfile from './pages/admin/AdminParticipantProfile.vue'
 import AdminParticipantsTable from './pages/admin/AdminParticipantsTable.vue'
@@ -39,6 +40,12 @@ const router = createRouter({
     {
       path: '/admin/events/:eventId/checkin',
       component: AdminEventCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/logs',
+      component: AdminEventLogs,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },

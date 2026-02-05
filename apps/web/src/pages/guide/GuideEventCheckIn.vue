@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiGet, apiPost } from '../../lib/api'
+import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
+import { normalizeQrCode } from '../../lib/qr'
+import { formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -18,6 +20,9 @@ import type {
   ParticipantResolve,
   Event as EventDto,
 } from '../../types'
+
+type CheckInDirection = 'Entry' | 'Exit'
+type CheckInMethod = 'Manual' | 'QrScan'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,9 +47,12 @@ const isCheckingIn = ref(false)
 const dataLoaded = ref(false)
 const lastAutoCode = ref('')
 const lastResult = ref<CheckInResponse | null>(null)
+const lastErrorResult = ref<string | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckInAfterScan = ref(false)
 const autoCheckInStorageKey = 'tripflow:guide:autoCheckInAfterScan'
+const checkInDirection = ref<CheckInDirection>('Entry')
+const checkInDirectionStorageKey = computed(() => `tripflow:guide:checkInDirection:${eventId.value}`)
 const scannerOpen = ref(false)
 const scanErrorKey = ref<string | null>(null)
 const scanErrorText = ref<string | null>(null)
@@ -60,8 +68,10 @@ const lastAction = ref<{ participantId: string; participantName: string } | null
 let highlightTimer: number | undefined
 let lastActionTimer: number | undefined
 let searchDebounceTimer: number | undefined
+let lastScannedCode: string | null = null
+let lastScannedAt = 0
 
-const { pushToast } = useToast()
+const { pushToast, removeToast } = useToast()
 
 const filteredParticipants = computed(() => {
   const query = debouncedSearchTerm.value.trim().toLowerCase()
@@ -79,6 +89,16 @@ const filteredParticipants = computed(() => {
 })
 
 const hasData = computed(() => Boolean(event.value))
+
+const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
+  if (!log) {
+    return '—'
+  }
+  const directionLabel = log.direction === 'Exit' ? t('common.exit') : t('common.entry')
+  const methodLabel = log.method === 'QrScan' ? 'QR' : t('common.manual')
+  const time = formatTime(log.createdAt)
+  return `${directionLabel} (${methodLabel}) • ${time}`
+}
 
 const loadData = async () => {
   loading.value = true
@@ -106,17 +126,29 @@ const loadData = async () => {
   }
 }
 
-const updateFromCheckIn = (response: CheckInResponse) => {
+const updateFromCheckIn = (response: CheckInResponse, method: CheckInMethod) => {
   summary.value = {
     arrivedCount: response.arrivedCount,
     totalCount: response.totalCount,
   }
 
-  participants.value = participants.value.map((participant) =>
-    participant.id === response.participantId
-      ? { ...participant, arrived: true }
-      : participant
-  )
+  const direction = (response.direction ?? 'Entry') as CheckInDirection
+  const result = response.result ?? (response.alreadyArrived ? 'AlreadyArrived' : 'Success')
+  const createdAt = response.loggedAt ?? null
+
+  participants.value = participants.value.map((participant) => {
+    if (participant.id !== response.participantId) {
+      return participant
+    }
+
+    return {
+      ...participant,
+      arrived: direction === 'Entry' ? true : participant.arrived,
+      lastLog: createdAt
+        ? { direction, method, result, createdAt }
+        : participant.lastLog ?? null,
+    }
+  })
 }
 
 const setLastAction = (response: CheckInResponse) => {
@@ -209,55 +241,78 @@ const handleConfirm = async () => {
   await resetAllCheckIns()
 }
 
-const submitCheckIn = async (code: string) => {
+const submitCheckIn = async (
+  code: string,
+  options?: { suppressToast?: boolean; method?: CheckInMethod; direction?: CheckInDirection }
+) => {
   actionMessageKey.value = null
   actionMessageText.value = null
   actionErrorKey.value = null
   actionErrorText.value = null
   lastResult.value = null
+  lastErrorResult.value = null
 
   const normalized = normalizeCheckInCode(code).slice(0, 8)
   if (!normalized) {
     actionErrorKey.value = 'validation.checkInCodeRequired'
-    pushToast({ key: 'toast.invalidCode', tone: 'error' })
+    if (!options?.suppressToast) {
+      pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
+    }
     return false
   }
 
+  const direction = options?.direction ?? checkInDirection.value
   isCheckingIn.value = true
   try {
-    const response = await apiPost<CheckInResponse>(`/api/guide/events/${eventId.value}/checkins`, {
+    const response = await apiPostWithPayload<CheckInResponse>(`/api/guide/events/${eventId.value}/checkins`, {
       checkInCode: normalized,
+      direction,
+      method: options?.method ?? 'Manual',
     })
 
-    updateFromCheckIn(response)
-    actionMessageKey.value = response.alreadyArrived
-      ? 'guide.checkIn.alreadyCheckedIn'
-      : 'guide.checkIn.success'
-    if (response.alreadyArrived) {
-      pushToast({ key: 'toast.alreadyArrived', tone: 'info' })
+    updateFromCheckIn(response, options?.method ?? 'Manual')
+
+    const responseDirection = (response.direction ?? direction) as CheckInDirection
+    const result = response.result ?? (response.alreadyArrived ? 'AlreadyArrived' : 'Success')
+    if (responseDirection === 'Exit') {
+      actionMessageText.value = t('common.exitLogged', { name: response.participantName })
     } else {
-      pushToast({
-        key: 'toast.checkedIn',
-        tone: 'success',
-        timeout: 10000,
-        action: {
-          labelKey: 'common.undo',
-          onClick: () => {
-            void undoCheckIn(response.participantId)
+      actionMessageKey.value = response.alreadyArrived
+        ? 'guide.checkIn.alreadyCheckedIn'
+        : 'guide.checkIn.success'
+    }
+
+    if (!options?.suppressToast) {
+      if (responseDirection === 'Exit') {
+        pushToast({ key: 'common.exitLogged', params: { name: response.participantName }, tone: 'success' })
+      } else if (result === 'AlreadyArrived') {
+        pushToast({ key: 'toast.alreadyCheckedIn', tone: 'info' })
+      } else {
+        pushToast({
+          key: 'toast.checkedIn',
+          tone: 'success',
+          timeout: 10000,
+          action: {
+            labelKey: 'common.undo',
+            onClick: () => {
+              void undoCheckIn(response.participantId)
+            },
           },
-        },
-      })
+        })
+      }
     }
     checkInCode.value = ''
     lastResult.value = response
-    setLastAction(response)
-    highlightParticipantId.value = response.participantId
-    if (highlightTimer) {
-      globalThis.clearTimeout(highlightTimer)
+    if (responseDirection === 'Entry') {
+      setLastAction(response)
+      highlightParticipantId.value = response.participantId
+      if (highlightTimer) {
+        globalThis.clearTimeout(highlightTimer)
+      }
+      highlightTimer = globalThis.setTimeout(() => {
+        highlightParticipantId.value = null
+      }, 2000)
     }
-    highlightTimer = globalThis.setTimeout(() => {
-      highlightParticipantId.value = null
-    }, 2000)
     await nextTick()
     codeInput.value?.focus()
     return true
@@ -266,7 +321,25 @@ const submitCheckIn = async (code: string) => {
     if (!actionErrorText.value) {
       actionErrorKey.value = 'errors.checkIn.failed'
     }
-    pushToast({ key: 'toast.invalidCode', tone: 'error' })
+    if (!options?.suppressToast) {
+      const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+      const result =
+        payload && typeof payload === 'object' && payload !== null && 'result' in payload
+          ? String((payload as { result?: string }).result ?? '')
+          : ''
+
+      if (result === 'NotFound') {
+        pushToast({ key: 'toast.codeNotFound', tone: 'error' })
+      } else if (result === 'InvalidRequest') {
+        pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
+      } else {
+        pushToast({ key: direction === 'Entry' ? 'common.checkInFailed' : 'common.exitFailed', tone: 'error' })
+      }
+    }
+    const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+    if (payload && typeof payload === 'object' && payload !== null && 'result' in payload) {
+      lastErrorResult.value = String((payload as { result?: string }).result ?? null)
+    }
     return false
   } finally {
     isCheckingIn.value = false
@@ -275,49 +348,6 @@ const submitCheckIn = async (code: string) => {
 
 const clearSearch = () => {
   searchTerm.value = ''
-}
-
-const normalizeQrCode = (raw: string) => {
-  const trimmed = raw.trim()
-  if (!trimmed) {
-    return ''
-  }
-
-  let candidate = trimmed
-  const queryMatch = trimmed.match(/[?&](?:code|checkInCode)=([^&#]+)/i)
-  if (queryMatch?.[1]) {
-    try {
-      candidate = decodeURIComponent(queryMatch[1])
-    } catch {
-      candidate = queryMatch[1]
-    }
-  } else {
-    try {
-      const url = new URL(trimmed)
-      candidate = url.searchParams.get('code') ?? url.searchParams.get('checkInCode') ?? trimmed
-    } catch {
-      // Not a URL; keep raw string.
-    }
-  }
-
-  const normalized = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  return normalized.length === 8 ? normalized : ''
-}
-
-const resolveParticipantByCode = async (code: string) => {
-  scanResolving.value = true
-  try {
-    const participant = await apiGet<ParticipantResolve>(
-      `/api/guide/events/${eventId.value}/participants/resolve?code=${encodeURIComponent(code)}`
-    )
-    scanFoundParticipant.value = participant
-    return true
-  } catch (err) {
-    scanFoundParticipant.value = null
-    return false
-  } finally {
-    scanResolving.value = false
-  }
 }
 
 const resetScanState = () => {
@@ -332,7 +362,7 @@ const handleScanCheckIn = async () => {
     return
   }
 
-  const success = await submitCheckIn(scanFoundCode.value)
+  const success = await submitCheckIn(scanFoundCode.value, { method: 'QrScan' })
   if (success) {
     resetScanState()
   }
@@ -348,18 +378,49 @@ const handleScanResult = async (raw: string) => {
     return
   }
 
-  scanFoundCode.value = code
-  const resolved = await resolveParticipantByCode(code)
-  if (!resolved) {
-    scanFoundCode.value = null
-    scanErrorKey.value = 'guide.checkIn.invalidCode'
+  const now = Date.now()
+  if (lastScannedCode === code && now - lastScannedAt < 2500) {
+    return
+  }
+  lastScannedCode = code
+  lastScannedAt = now
+
+  checkInCode.value = code
+  await nextTick()
+  codeInput.value?.focus()
+
+  if (!autoCheckInAfterScan.value) {
+    const action = checkInDirection.value === 'Entry' ? t('common.checkIn') : t('common.exit')
+    pushToast(`${t('common.codeCaptured', { code })} ${t('common.pressToContinue', { action })}`, 'info', 4500)
     return
   }
 
-  if (autoCheckInAfterScan.value) {
-    const success = await submitCheckIn(code)
-    if (success) {
-      resetScanState()
+  if (isCheckingIn.value) {
+    return
+  }
+
+  const progressLabel = checkInDirection.value === 'Entry' ? t('common.checkingIn') : t('common.loggingExit')
+  const loadingToastId = pushToast(`${t('common.codeCaptured', { code })} ${progressLabel}`, 'info', { timeout: 0 })
+  const success = await submitCheckIn(code, { suppressToast: true, method: 'QrScan' })
+  removeToast(loadingToastId)
+
+  if (success) {
+    const name = lastResult.value?.participantName ?? code
+    if (checkInDirection.value === 'Entry' && lastResult.value?.result === 'AlreadyArrived') {
+      pushToast({ key: 'toast.alreadyCheckedIn', tone: 'info' })
+    } else {
+      const key = checkInDirection.value === 'Entry' ? 'common.entryLogged' : 'common.exitLogged'
+      pushToast({ key, params: { name }, tone: 'success' })
+    }
+    resetScanState()
+  } else {
+    if (lastErrorResult.value === 'NotFound') {
+      pushToast({ key: 'toast.codeNotFound', tone: 'error' })
+    } else if (lastErrorResult.value === 'InvalidRequest') {
+      pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
+    } else {
+      const key = checkInDirection.value === 'Entry' ? 'common.checkInFailed' : 'common.exitFailed'
+      pushToast({ key, tone: 'error' })
     }
   }
 }
@@ -380,7 +441,7 @@ const focusManualCode = async () => {
 }
 
 const handleCheckInSubmit = async () => {
-  await submitCheckIn(checkInCode.value)
+  await submitCheckIn(checkInCode.value, { method: 'Manual' })
 }
 
 const handleCodeInput = (event: Event) => {
@@ -393,7 +454,7 @@ const markArrived = async (participant: Participant) => {
     return
   }
 
-  await submitCheckIn(participant.checkInCode)
+  await submitCheckIn(participant.checkInCode, { direction: 'Entry', method: 'Manual' })
 }
 
 const copyCode = async (code: string) => {
@@ -442,7 +503,7 @@ const resolveQueryCode = async () => {
 
   lastAutoCode.value = queryCode
   if (autoCheckInAfterScan.value) {
-    const success = await submitCheckIn(queryCode)
+    const success = await submitCheckIn(queryCode, { method: 'QrScan' })
     if (success) {
       await clearCheckInQuery()
     }
@@ -465,6 +526,11 @@ const loadAutoCheckInPreference = () => {
   }
 }
 
+const loadCheckInDirectionPreference = () => {
+  const stored = globalThis.localStorage?.getItem(checkInDirectionStorageKey.value)
+  checkInDirection.value = stored === 'Exit' ? 'Exit' : 'Entry'
+}
+
 watch(searchTerm, (value) => {
   if (searchDebounceTimer) {
     globalThis.clearTimeout(searchDebounceTimer)
@@ -485,8 +551,13 @@ watch(autoCheckInAfterScan, (value) => {
   globalThis.localStorage?.setItem(autoCheckInStorageKey, value ? '1' : '0')
 })
 
+watch(checkInDirection, (value) => {
+  globalThis.localStorage?.setItem(checkInDirectionStorageKey.value, value)
+})
+
 onMounted(() => {
   loadAutoCheckInPreference()
+  loadCheckInDirectionPreference()
   void initialize()
 })
 
@@ -544,6 +615,37 @@ onUnmounted(() => {
       <template v-else>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold">{{ t('common.checkIn') }}</h2>
+        <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
+          <span class="font-medium text-slate-500">{{ t('common.mode') }}</span>
+          <div class="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              class="rounded-lg px-3 py-1.5 font-semibold"
+              :class="
+                checkInDirection === 'Entry'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              "
+              :aria-pressed="checkInDirection === 'Entry'"
+              @click="checkInDirection = 'Entry'"
+            >
+              {{ t('common.entry') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg px-3 py-1.5 font-semibold"
+              :class="
+                checkInDirection === 'Exit'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              "
+              :aria-pressed="checkInDirection === 'Exit'"
+              @click="checkInDirection = 'Exit'"
+            >
+              {{ t('common.exit') }}
+            </button>
+          </div>
+        </div>
         <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
           <input
             v-model.trim="checkInCode"
@@ -560,7 +662,13 @@ onUnmounted(() => {
             :disabled="isCheckingIn"
             type="submit"
           >
-            {{ isCheckingIn ? t('guide.checkIn.submitting') : t('common.checkIn') }}
+            {{
+              isCheckingIn
+                ? t('guide.checkIn.submitting')
+                : checkInDirection === 'Entry'
+                  ? t('common.checkIn')
+                  : t('common.exit')
+            }}
           </button>
         </form>
         <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -569,7 +677,7 @@ onUnmounted(() => {
             type="button"
             @click="openScanner"
           >
-            {{ t('guide.checkIn.scanQr') }}
+            {{ t('common.scanQr') }}
           </button>
         </div>
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
@@ -638,7 +746,13 @@ onUnmounted(() => {
               :disabled="isCheckingIn"
               @click="handleScanCheckIn"
             >
-              {{ isCheckingIn ? t('guide.checkIn.submitting') : t('guide.checkIn.checkInNow') }}
+              {{
+                isCheckingIn
+                  ? t('guide.checkIn.submitting')
+                  : checkInDirection === 'Entry'
+                    ? t('guide.checkIn.checkInNow')
+                    : t('common.exit')
+              }}
             </button>
             <button
               class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
@@ -658,13 +772,21 @@ onUnmounted(() => {
         </div>
         <label class="mt-4 inline-flex items-center gap-2 text-xs text-slate-600">
           <input v-model="autoCheckInAfterScan" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-          {{ t('guide.checkIn.autoCheckInToggle') }}
+          {{ t('common.autoCheckInAfterScan') }}
         </label>
         <div v-if="lastResult" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
           <div class="font-semibold text-emerald-800">
-            {{ lastResult.alreadyArrived ? t('common.arrivedAlready') : t('common.checkedIn') }}
+            {{
+              (lastResult.direction ?? 'Entry') === 'Exit'
+                ? t('common.exitLogged', { name: lastResult.participantName })
+                : lastResult.alreadyArrived
+                  ? t('common.arrivedAlready')
+                  : t('common.checkedIn')
+            }}
           </div>
-          <div class="mt-1 text-emerald-700">{{ lastResult.participantName }}</div>
+          <div v-if="(lastResult.direction ?? 'Entry') !== 'Exit'" class="mt-1 text-emerald-700">
+            {{ lastResult.participantName }}
+          </div>
         </div>
       </section>
 
@@ -739,6 +861,10 @@ onUnmounted(() => {
                   <span v-if="participant.email">{{ participant.email }}</span>
                   <span v-if="participant.email && participant.phone"> | </span>
                   <span v-if="participant.phone">{{ formatPhoneDisplay(participant.phone) }}</span>
+                </div>
+                <div class="mt-1 text-xs text-slate-500">
+                  {{ t('common.lastActionLabel') }}:
+                  <span class="font-medium text-slate-700">{{ formatLastLog(participant.lastLog) }}</span>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                   <span
