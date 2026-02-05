@@ -2,11 +2,12 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
+import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
 import { normalizeQrCode } from '../../lib/qr'
 import { formatTime } from '../../lib/formatters'
-import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
+import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
+import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import QrScannerModal from '../../components/QrScannerModal.vue'
@@ -17,7 +18,9 @@ import type {
   CheckInUndoResponse,
   ResetAllCheckInsResponse,
   Participant,
+  ParticipantWillNotAttendResponse,
   ParticipantResolve,
+  EventPortalInfo,
   Event as EventDto,
 } from '../../types'
 
@@ -31,6 +34,7 @@ const eventId = computed(() => route.params.eventId as string)
 
 const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
+const portalInfo = ref<EventPortalInfo | null>(null)
 const summary = ref<CheckInSummary>({ arrivedCount: 0, totalCount: 0 })
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
@@ -38,6 +42,7 @@ const errorMessage = ref<string | null>(null)
 
 const searchTerm = ref('')
 const debouncedSearchTerm = ref('')
+const participantFilter = ref<'all' | 'arrived' | 'not_arrived' | 'will_not_attend'>('all')
 const checkInCode = ref('')
 const actionMessageKey = ref<string | null>(null)
 const actionMessageText = ref<string | null>(null)
@@ -48,6 +53,7 @@ const dataLoaded = ref(false)
 const lastAutoCode = ref('')
 const lastResult = ref<CheckInResponse | null>(null)
 const lastErrorResult = ref<string | null>(null)
+const lastErrorCode = ref<string | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckInAfterScan = ref(false)
 const autoCheckInStorageKey = 'tripflow:guide:autoCheckInAfterScan'
@@ -61,10 +67,12 @@ const scanFoundParticipant = ref<ParticipantResolve | null>(null)
 const scanResolving = ref(false)
 const highlightParticipantId = ref<string | null>(null)
 const undoingParticipantId = ref<string | null>(null)
+const updatingWillNotAttendId = ref<string | null>(null)
 const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
+const openMenuParticipantId = ref<string | null>(null)
 let highlightTimer: number | undefined
 let lastActionTimer: number | undefined
 let searchDebounceTimer: number | undefined
@@ -75,20 +83,52 @@ const { pushToast, removeToast } = useToast()
 
 const filteredParticipants = computed(() => {
   const query = debouncedSearchTerm.value.trim().toLowerCase()
-  if (!query) {
-    return participants.value
+  const filter = participantFilter.value
+
+  let filtered = participants.value
+  if (filter === 'will_not_attend') {
+    filtered = filtered.filter((participant) => participant.willNotAttend)
+  } else {
+    filtered = filtered.filter((participant) => !participant.willNotAttend)
+    if (filter === 'arrived') {
+      filtered = filtered.filter((participant) => participant.arrived)
+    } else if (filter === 'not_arrived') {
+      filtered = filtered.filter((participant) => !participant.arrived)
+    }
   }
 
-  return participants.value.filter((participant) => {
-    const haystack = [participant.fullName, participant.email, participant.phone]
+  if (!query) {
+    return filtered
+  }
+
+  return filtered.filter((participant) => {
+    const haystack = [
+      participant.fullName,
+      participant.email,
+      participant.phone,
+      participant.tcNo,
+      participant.checkInCode,
+      participant.details?.roomNo,
+      participant.details?.agencyName,
+    ]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
+
     return haystack.includes(query)
   })
 })
 
 const hasData = computed(() => Boolean(event.value))
+const effectiveTotal = computed(() => Math.max(summary.value.totalCount - willNotAttendCount.value, 0))
+const notArrivedCount = computed(() => Math.max(effectiveTotal.value - summary.value.arrivedCount, 0))
+const willNotAttendCount = computed(
+  () => participants.value.filter((participant) => participant.willNotAttend).length
+)
+
+const setParticipantFilter = (value: typeof participantFilter.value) => {
+  participantFilter.value = value
+}
 
 const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   if (!log) {
@@ -98,6 +138,14 @@ const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   const methodLabel = log.method === 'QrScan' ? 'QR' : t('common.manual')
   const time = formatTime(log.createdAt)
   return `${directionLabel} (${methodLabel}) • ${time}`
+}
+
+const closeRowMenu = () => {
+  openMenuParticipantId.value = null
+}
+
+const toggleRowMenu = (participantId: string) => {
+  openMenuParticipantId.value = openMenuParticipantId.value === participantId ? null : participantId
 }
 
 const loadData = async () => {
@@ -115,6 +163,12 @@ const loadData = async () => {
     event.value = eventData
     participants.value = participantsData
     summary.value = summaryData
+
+    try {
+      portalInfo.value = await apiGet<EventPortalInfo>(`/api/events/${eventId.value}/portal`)
+    } catch {
+      portalInfo.value = null
+    }
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : null
     if (!errorMessage.value) {
@@ -251,6 +305,7 @@ const submitCheckIn = async (
   actionErrorText.value = null
   lastResult.value = null
   lastErrorResult.value = null
+  lastErrorCode.value = null
 
   const normalized = normalizeCheckInCode(code).slice(0, 8)
   if (!normalized) {
@@ -323,12 +378,18 @@ const submitCheckIn = async (
     }
     if (!options?.suppressToast) {
       const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+      const code =
+        payload && typeof payload === 'object' && payload !== null && 'code' in payload
+          ? String((payload as { code?: string }).code ?? '')
+          : ''
       const result =
         payload && typeof payload === 'object' && payload !== null && 'result' in payload
           ? String((payload as { result?: string }).result ?? '')
           : ''
 
-      if (result === 'NotFound') {
+      if (code === 'will_not_attend') {
+        pushToast({ key: 'toast.willNotAttendBlocked', tone: 'error' })
+      } else if (result === 'NotFound') {
         pushToast({ key: 'toast.codeNotFound', tone: 'error' })
       } else if (result === 'InvalidRequest') {
         pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
@@ -337,6 +398,9 @@ const submitCheckIn = async (
       }
     }
     const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+    if (payload && typeof payload === 'object' && payload !== null && 'code' in payload) {
+      lastErrorCode.value = String((payload as { code?: string }).code ?? null)
+    }
     if (payload && typeof payload === 'object' && payload !== null && 'result' in payload) {
       lastErrorResult.value = String((payload as { result?: string }).result ?? null)
     }
@@ -413,16 +477,18 @@ const handleScanResult = async (raw: string) => {
       pushToast({ key, params: { name }, tone: 'success' })
     }
     resetScanState()
-  } else {
-    if (lastErrorResult.value === 'NotFound') {
-      pushToast({ key: 'toast.codeNotFound', tone: 'error' })
-    } else if (lastErrorResult.value === 'InvalidRequest') {
-      pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
-    } else {
-      const key = checkInDirection.value === 'Entry' ? 'common.checkInFailed' : 'common.exitFailed'
-      pushToast({ key, tone: 'error' })
-    }
-  }
+	  } else {
+	    if (lastErrorCode.value === 'will_not_attend') {
+	      pushToast({ key: 'toast.willNotAttendBlocked', tone: 'error' })
+	    } else if (lastErrorResult.value === 'NotFound') {
+	      pushToast({ key: 'toast.codeNotFound', tone: 'error' })
+	    } else if (lastErrorResult.value === 'InvalidRequest') {
+	      pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
+	    } else {
+	      const key = checkInDirection.value === 'Entry' ? 'common.checkInFailed' : 'common.exitFailed'
+	      pushToast({ key, tone: 'error' })
+	    }
+	  }
 }
 
 const openScanner = () => {
@@ -455,6 +521,119 @@ const markArrived = async (participant: Participant) => {
   }
 
   await submitCheckIn(participant.checkInCode, { direction: 'Entry', method: 'Manual' })
+}
+
+const setWillNotAttend = async (participant: Participant, willNotAttend: boolean) => {
+  if (updatingWillNotAttendId.value === participant.id) {
+    return
+  }
+
+  updatingWillNotAttendId.value = participant.id
+  try {
+    const response = await apiPatchWithPayload<ParticipantWillNotAttendResponse>(
+      `/api/guide/events/${eventId.value}/participants/${participant.id}/will-not-attend`,
+      { willNotAttend }
+    )
+
+    participants.value = participants.value.map((item) =>
+      item.id === participant.id
+        ? {
+            ...item,
+            willNotAttend: response.willNotAttend,
+            arrived: response.arrived,
+            lastLog: response.lastLog ?? item.lastLog ?? null,
+          }
+        : item
+    )
+
+    pushToast({
+      key: willNotAttend ? 'toast.willNotAttendEnabled' : 'toast.willNotAttendDisabled',
+      tone: 'success',
+    })
+  } catch {
+    pushToast({ key: 'toast.willNotAttendFailed', tone: 'error' })
+  } finally {
+    updatingWillNotAttendId.value = null
+    closeRowMenu()
+  }
+}
+
+const openWhatsApp = (participant: Participant) => {
+  const phone = participant.phone?.trim()
+  if (!phone) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  const eventName = event.value?.name?.trim() || t('common.event')
+  const meetingPoint = portalInfo.value?.meeting?.place?.trim() || ''
+  const locationPart = meetingPoint ? t('guide.checkIn.whatsappLocation', { location: meetingPoint }) : ''
+  const message = t('guide.checkIn.whatsappMessage', {
+    name: participant.fullName,
+    event: eventName,
+    locationPart,
+  })
+
+  const normalizedPhone = normalizePhone(phone).normalized || phone
+  const url = buildWhatsAppUrl(normalizedPhone, message)
+  if (!url) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  globalThis.open(url, '_blank', 'noopener,noreferrer')
+  closeRowMenu()
+}
+
+const buildTelLink = (phone: string) => {
+  const normalized = normalizePhone(phone).normalized || phone
+  const digits = normalized.replace(/\D/g, '')
+  if (!digits) {
+    return ''
+  }
+  if (normalized.startsWith('+')) {
+    return `tel:${normalized}`
+  }
+  return `tel:+${digits}`
+}
+
+const openCall = (participant: Participant) => {
+  const phone = participant.phone?.trim()
+  if (!phone) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  const telLink = buildTelLink(phone)
+  if (!telLink) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  globalThis.location.href = telLink
+  closeRowMenu()
+}
+
+const copyPhone = async (phone?: string | null) => {
+  const trimmed = phone?.trim() ?? ''
+  if (!trimmed) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  const clipboard = globalThis.navigator?.clipboard
+  if (!clipboard?.writeText) {
+    pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+    return
+  }
+
+  try {
+    await clipboard.writeText(trimmed)
+    pushToast({ key: 'toast.copied', tone: 'success' })
+  } catch {
+    pushToast({ key: 'errors.copyFailed', tone: 'error' })
+  }
+  closeRowMenu()
 }
 
 const copyCode = async (code: string) => {
@@ -537,7 +716,7 @@ watch(searchTerm, (value) => {
   }
   searchDebounceTimer = globalThis.setTimeout(() => {
     debouncedSearchTerm.value = value
-  }, 250)
+  }, 200)
 }, { immediate: true })
 
 watch(
@@ -555,13 +734,32 @@ watch(checkInDirection, (value) => {
   globalThis.localStorage?.setItem(checkInDirectionStorageKey.value, value)
 })
 
+const handleDocumentClick = (event: MouseEvent) => {
+  if (!openMenuParticipantId.value) {
+    return
+  }
+
+  const target = event.target as HTMLElement | null
+  if (!target) {
+    openMenuParticipantId.value = null
+    return
+  }
+
+  const root = target.closest(`[data-row-menu="${openMenuParticipantId.value}"]`)
+  if (!root) {
+    openMenuParticipantId.value = null
+  }
+}
+
 onMounted(() => {
   loadAutoCheckInPreference()
   loadCheckInDirectionPreference()
   void initialize()
+  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
   if (highlightTimer) {
     globalThis.clearTimeout(highlightTimer)
   }
@@ -590,8 +788,22 @@ onUnmounted(() => {
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
           <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.arrivedLabel') }}</div>
           <div class="mt-1 text-xl font-semibold text-slate-800">
-            {{ summary.arrivedCount }} / {{ summary.totalCount }}
+            {{ summary.arrivedCount }} / {{ effectiveTotal }}
           </div>
+          <button
+            class="mt-2 text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+            type="button"
+            @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
+          >
+            {{ t('common.notArrived') }}: {{ notArrivedCount }}
+          </button>
+          <button
+            class="mt-1 text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+            type="button"
+            @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
+          >
+            {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
+          </button>
         </div>
       </div>
     </div>
@@ -808,6 +1020,57 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'all'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('all')"
+          >
+            {{ t('common.all') }} ({{ effectiveTotal }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'arrived'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('arrived')"
+          >
+            {{ t('common.arrivedLabel') }} ({{ summary.arrivedCount }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'not_arrived'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('not_arrived')"
+          >
+            {{ t('common.notArrived') }} ({{ notArrivedCount }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'will_not_attend'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('will_not_attend')"
+          >
+            {{ t('common.willNotAttendPlural') }} ({{ willNotAttendCount }})
+          </button>
+        </div>
+
         <div
           v-if="lastAction"
           class="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between"
@@ -823,21 +1086,23 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div class="relative mt-4">
-          <input
-            v-model.trim="searchTerm"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pr-16 text-sm focus:border-slate-400 focus:outline-none"
-            :placeholder="t('common.searchPlaceholder')"
-            type="text"
-          />
-          <button
-            v-if="searchTerm"
-            class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-            type="button"
-            @click="clearSearch"
-          >
-            {{ t('common.clearSearch') }}
-          </button>
+        <div class="sticky top-16 z-10 -mx-4 mt-4 bg-white/95 px-4 pb-3 pt-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
+          <div class="relative">
+            <input
+              v-model.trim="searchTerm"
+              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pr-16 text-sm focus:border-slate-400 focus:outline-none"
+              :placeholder="t('common.searchPlaceholder')"
+              type="text"
+            />
+            <button
+              v-if="searchTerm"
+              class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+              type="button"
+              @click="clearSearch"
+            >
+              {{ t('common.clearSearch') }}
+            </button>
+          </div>
         </div>
 
         <div
@@ -851,8 +1116,9 @@ onUnmounted(() => {
           <li
             v-for="participant in filteredParticipants"
             :key="participant.id"
-            class="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition"
+            class="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 transition"
             :class="highlightParticipantId === participant.id ? 'ring-2 ring-emerald-300' : ''"
+            :data-row-menu="participant.id"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -879,7 +1145,8 @@ onUnmounted(() => {
                   </span>
                   <button
                     v-if="!participant.arrived"
-                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="participant.willNotAttend"
                     type="button"
                     @click="markArrived(participant)"
                   >
@@ -887,24 +1154,65 @@ onUnmounted(() => {
                   </button>
                   <button
                     v-else
-                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="undoingParticipantId === participant.id"
                     type="button"
                     @click="undoCheckIn(participant.id)"
                   >
                     {{ undoingParticipantId === participant.id ? t('common.undoing') : t('common.undo') }}
                   </button>
+                  <div class="hidden flex-wrap items-center gap-2 sm:flex">
+                    <button
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="updatingWillNotAttendId === participant.id"
+                      type="button"
+                      @click="setWillNotAttend(participant, !participant.willNotAttend)"
+                    >
+                      {{
+                        updatingWillNotAttendId === participant.id
+                          ? t('common.saving')
+                          : participant.willNotAttend
+                            ? t('common.willAttend')
+                            : t('common.willNotAttend')
+                      }}
+                    </button>
+                    <button
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                      type="button"
+                      @click="openCall(participant)"
+                    >
+                      {{ t('actions.call') }}
+                    </button>
+                    <button
+                      class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      type="button"
+                      :aria-label="t('actions.whatsappAria')"
+                      @click="openWhatsApp(participant)"
+                    >
+                      {{ t('actions.whatsapp') }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
+                <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                  <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
+                  <button
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 hover:border-slate-300 sm:hidden"
+                    type="button"
+                    :aria-label="t('common.open')"
+                    @click="toggleRowMenu(participant.id)"
+                  >
+                    ⋯
+                  </button>
+                </div>
                 <div class="flex w-full items-center gap-2 sm:w-auto">
                   <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-700">
                     {{ participant.checkInCode }}
                   </span>
                   <button
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300 sm:inline-flex"
                     type="button"
                     @click="copyCode(participant.checkInCode)"
                   >
@@ -912,6 +1220,50 @@ onUnmounted(() => {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div
+              v-if="openMenuParticipantId === participant.id"
+              class="absolute right-4 top-12 z-10 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg sm:hidden"
+            >
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                :disabled="updatingWillNotAttendId === participant.id"
+                @click="setWillNotAttend(participant, !participant.willNotAttend)"
+              >
+                <span>
+                  {{ participant.willNotAttend ? t('common.willAttend') : t('common.willNotAttend') }}
+                </span>
+              </button>
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
+                type="button"
+                @click="openCall(participant)"
+              >
+                <span>{{ t('actions.call') }}</span>
+              </button>
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
+                type="button"
+                @click="openWhatsApp(participant)"
+              >
+                <span>{{ t('actions.whatsapp') }}</span>
+              </button>
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
+                type="button"
+                @click="copyPhone(participant.phone)"
+              >
+                <span>{{ t('actions.copyPhone') }}</span>
+              </button>
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
+                type="button"
+                @click="copyCode(participant.checkInCode); closeRowMenu()"
+              >
+                <span>{{ t('common.copy') }}</span>
+              </button>
             </div>
           </li>
         </ul>

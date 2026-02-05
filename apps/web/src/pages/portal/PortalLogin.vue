@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { portalLogin } from '../../lib/api'
+import { portalGetMe, portalLogin, portalResolveEvent } from '../../lib/api'
+import LoadingState from '../../components/ui/LoadingState.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,7 @@ const tcNo = ref('')
 const accessCodeInput = ref<HTMLInputElement | null>(null)
 const tcNoInput = ref<HTMLInputElement | null>(null)
 const submitting = ref(false)
+const checkingSession = ref(false)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const retryAfterSeconds = ref<number | null>(null)
@@ -72,6 +74,45 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
 
   globalThis.localStorage?.setItem(sessionTokenKey(eventId), token)
   globalThis.localStorage?.setItem(sessionExpiryKey(eventId), expiresAt)
+}
+
+const clearSession = (eventId: string) => {
+  globalThis.localStorage?.removeItem(sessionTokenKey(eventId))
+  globalThis.localStorage?.removeItem(sessionExpiryKey(eventId))
+}
+
+const tryReuseExistingSession = async (eventAccessCode: string) => {
+  if (checkingSession.value) {
+    return
+  }
+
+  checkingSession.value = true
+  try {
+    const resolved = await portalResolveEvent(eventAccessCode)
+    const token = globalThis.localStorage?.getItem(sessionTokenKey(resolved.eventId)) ?? ''
+    const expiry = globalThis.localStorage?.getItem(sessionExpiryKey(resolved.eventId)) ?? ''
+    if (!token || !expiry) {
+      return
+    }
+
+    const expiresAt = new Date(expiry)
+    if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+      clearSession(resolved.eventId)
+      return
+    }
+
+    try {
+      await portalGetMe(token)
+      await router.replace(`/e/${resolved.eventId}`)
+    } catch (err) {
+      const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: number }).status : null
+      if (status === 401 || status === 403) {
+        clearSession(resolved.eventId)
+      }
+    }
+  } finally {
+    checkingSession.value = false
+  }
 }
 
 const submitLogin = async () => {
@@ -196,13 +237,18 @@ onUnmounted(() => {
 onMounted(() => {
   const rawCode = route.query.code ?? route.query.eventAccessCode
   if (typeof rawCode === 'string') {
-    accessCode.value = sanitizeAccessCode(rawCode)
+    const normalized = sanitizeAccessCode(rawCode)
+    accessCode.value = normalized
+    if (normalized.length === 8) {
+      void tryReuseExistingSession(normalized)
+    }
   }
 })
 </script>
 
 <template>
   <div class="space-y-6">
+    <LoadingState v-if="checkingSession" message-key="portal.login.checkingSession" />
     <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <div class="space-y-2">
         <h1 class="text-2xl font-semibold">{{ t('portal.login.title') }}</h1>
@@ -223,7 +269,7 @@ onMounted(() => {
             autocapitalize="characters"
             spellcheck="false"
             autofocus
-            :disabled="submitting"
+            :disabled="submitting || checkingSession"
             :aria-invalid="isAccessCodeError"
             :aria-describedby="isAccessCodeError && (errorKey || errorMessage) ? errorId : undefined"
             @input="handleAccessCodeInput"
@@ -244,7 +290,7 @@ onMounted(() => {
             pattern="[0-9]*"
             autocomplete="off"
             spellcheck="false"
-            :disabled="submitting"
+            :disabled="submitting || checkingSession"
             :aria-invalid="isTcError"
             :aria-describedby="isTcError && (errorKey || errorMessage) ? errorId : undefined"
             @input="handleTcNoInput"
@@ -253,7 +299,7 @@ onMounted(() => {
         </label>
         <button
           class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-          :disabled="submitting || (retryAfterSeconds ?? 0) > 0"
+          :disabled="submitting || checkingSession || (retryAfterSeconds ?? 0) > 0"
           type="submit"
         >
           <span v-if="submitting" class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>

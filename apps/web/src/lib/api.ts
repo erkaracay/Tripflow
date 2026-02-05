@@ -1,6 +1,6 @@
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './auth'
 import { pushToast } from './toast'
-import type { PortalLoginResponse, PortalMeResponse } from '../types'
+import type { PortalLoginResponse, PortalMeResponse, PortalResolveEventResponse } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
@@ -197,6 +197,26 @@ export const apiPutWithHeaders = async <T>(
   return { data, headers: response.headers }
 }
 
+export const apiPatch = async <T>(path: string, body: unknown): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'PATCH',
+    headers: buildHeaders('application/json'),
+    body: JSON.stringify(body),
+  })
+
+  return handleResponse<T>(response)
+}
+
+export const apiPatchWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'PATCH',
+    headers: buildHeaders('application/json'),
+    body: JSON.stringify(body),
+  })
+
+  return handleResponseWithPayload<T>(response)
+}
+
 export const apiDelete = async <T>(path: string): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'DELETE',
@@ -256,4 +276,10 @@ export const portalLogin = async (
 
 export const portalGetMe = async (sessionToken: string): Promise<PortalMeResponse> => {
   return portalGet<PortalMeResponse>('/api/portal/me', { 'X-Portal-Session': sessionToken })
+}
+
+export const portalResolveEvent = async (eventAccessCode: string): Promise<PortalResolveEventResponse> => {
+  return portalGet<PortalResolveEventResponse>(
+    `/api/portal/resolve?eventAccessCode=${encodeURIComponent(eventAccessCode)}`
+  )
 }

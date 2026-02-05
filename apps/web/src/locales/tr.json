@@ -54,6 +54,11 @@
     "arrivedSummary": "Yoklama {arrived} / {total}",
     "arrivedLabel": "Yoklama alındı",
     "pendingLabel": "Bekliyor",
+    "all": "Tümü",
+    "notArrived": "Gelmeyen",
+    "willNotAttend": "Katılmayacak",
+    "willNotAttendPlural": "Katılmayacaklar",
+    "willAttend": "Katılacak",
     "arrivedAlready": "Zaten yoklama alınmış",
     "checkedIn": "Yoklama alındı",
     "lastActionLabel": "Son hareket",
@@ -66,15 +71,18 @@
     "genderMale": "Erkek",
     "genderOther": "Diğer",
     "noData": "Veri yok.",
-    "searchPlaceholder": "İsim, e-posta veya telefon ara",
+    "searchPlaceholder": "Ad, TC, telefon, kod, oda, acente ara",
     "clearSearch": "Temizle"
   },
   "actions": {
     "whatsapp": "WhatsApp",
-    "whatsappAria": "WhatsApp mesajını aç"
+    "whatsappAria": "WhatsApp mesajını aç",
+    "call": "Ara",
+    "copyPhone": "Telefonu kopyala"
   },
   "warnings": {
     "phoneRequiredForWhatsapp": "WhatsApp için telefon gerekli.",
+    "phoneRequired": "Telefon gerekli.",
     "tcNoDuplicate": "Bu etkinlikte aynı TC kimlik numarası başka bir katılımcıda da var."
   },
   "nav": {
@@ -203,6 +211,10 @@
     "alreadyArrived": "Zaten geldi.",
     "alreadyCheckedIn": "Zaten yoklama alınmış.",
     "checkedIn": "Yoklama alındı.",
+    "willNotAttendEnabled": "Katılmayacak olarak işaretlendi.",
+    "willNotAttendDisabled": "Katılacak olarak işaretlendi.",
+    "willNotAttendFailed": "Katılma durumu güncellenemedi.",
+    "willNotAttendBlocked": "Bu katılımcı Katılmayacak olarak işaretli. Önce geri alın.",
     "eventUpdated": "Etkinlik güncellendi.",
     "eventUpdateFailed": "Etkinlik güncellenemedi.",
     "participantAdded": "Katılımcı eklendi.",
@@ -429,7 +441,9 @@
       "empty": "Katılımcı bulunamadı.",
       "markArrived": "Geldi olarak işaretle",
       "success": "Yoklama alındı.",
-      "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş."
+      "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş.",
+      "whatsappMessage": "Merhaba {name}, {event} için program başladı. {locationPart}Bir sorun varsa bu numaradan ulaşabilirsiniz.",
+      "whatsappLocation": "Şu an {location} noktasındayız, sizi bekliyoruz. "
     },
     "participants": {
       "title": "Katılımcılar",
@@ -918,6 +932,7 @@
       "tcPlaceholder": "11 hane",
       "submit": "Devam et",
       "submitting": "Doğrulanıyor...",
+      "checkingSession": "Oturum kontrol ediliyor...",
       "accessCodeRequired": "Erişim kodu gerekli.",
       "tcRequired": "TC kimlik numarası 11 hane olmalı.",
       "invalidEventCode": "Etkinlik erişim kodu geçersiz.",

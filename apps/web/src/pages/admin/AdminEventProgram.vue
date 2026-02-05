@@ -300,19 +300,6 @@ const handleKeydown = (event: KeyboardEvent) => {
     }
     return
   }
-
-  if (event.key !== 'Escape') return
-  if (dayModalOpen.value) {
-    if (!savingDay.value) {
-      dayModalOpen.value = false
-    }
-    return
-  }
-  if (activityModalOpen.value) {
-    if (!savingActivity.value) {
-      activityModalOpen.value = false
-    }
-  }
 }
 
 watch(dayModalOpen, async (open) => {
@@ -639,11 +626,10 @@ onMounted(loadAll)
     <div
       v-if="dayModalOpen"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-      @click.self="!savingDay && (dayModalOpen = false)"
     >
       <form
         ref="dayModalRef"
-        class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+        class="flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="dayModalTitleId"
@@ -652,7 +638,7 @@ onMounted(loadAll)
         <h3 :id="dayModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingDayId ? t('admin.program.days.edit') : t('admin.program.days.add') }}
         </h3>
-        <div class="mt-4 grid gap-3">
+        <div class="mt-4 grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.date') }}</span>
             <input
@@ -727,11 +713,10 @@ onMounted(loadAll)
     <div
       v-if="activityModalOpen"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-      @click.self="!savingActivity && (activityModalOpen = false)"
     >
       <form
         ref="activityModalRef"
-        class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
+        class="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="activityModalTitleId"
@@ -740,7 +725,7 @@ onMounted(loadAll)
         <h3 :id="activityModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingActivityId ? t('admin.program.activities.edit') : t('admin.program.activities.add') }}
         </h3>
-        <div class="mt-4 grid gap-3 md:grid-cols-2">
+        <div class="mt-4 grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.title') }}</span>
             <input

@@ -8,6 +8,7 @@ import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { useToast } from '../../lib/toast'
+import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
@@ -79,6 +80,25 @@ const resolvePublicBase = () => {
   return globalThis.location?.origin ?? ''
 }
 
+const formatPortalDate = (value?: string | null) => {
+  if (!value) {
+    return '-'
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return '-'
+  }
+
+  const datePart = (trimmed.includes('T') ? trimmed.split('T')[0] : trimmed.split(' ')[0]) ?? ''
+  const [year, month, day] = datePart.split('-')
+  if (year && month && day) {
+    return `${day}.${month}.${year}`
+  }
+
+  return trimmed
+}
+
 const buildGuideLink = (code: string) => {
   const base = resolvePublicBase()
   if (!base) {
@@ -86,15 +106,6 @@ const buildGuideLink = (code: string) => {
   }
 
   return `${base}/guide/events/${eventId.value}/checkin?code=${encodeURIComponent(code)}`
-}
-
-const buildLoginLink = () => {
-  const base = resolvePublicBase()
-  if (!base) {
-    return ''
-  }
-
-  return `${base}/e/login`
 }
 
 const formatActivityType = (type?: string | null) => {
@@ -137,16 +148,6 @@ const copyToClipboard = async (value: string, successKey: string, errorKeyValue:
   } catch {
     pushToast({ key: errorKeyValue, tone: 'error' })
   }
-}
-
-const copyLoginLink = async () => {
-  const url = buildLoginLink()
-  if (!url) {
-    pushToast({ key: 'portal.actions.copyLinkFailed', tone: 'error' })
-    return
-  }
-
-  await copyToClipboard(url, 'portal.actions.linkCopied', 'portal.actions.copyLinkFailed')
 }
 
 const copyCheckInCode = async () => {
@@ -311,6 +312,12 @@ const loadPortal = async () => {
   try {
     const response = await portalGetMe(sessionToken.value)
     event.value = response.event
+    setPortalHeader(
+      response.event.name,
+      (response.event as { logoUrl?: string | null }).logoUrl ?? null,
+      response.event.startDate,
+      response.event.endDate
+    )
     participant.value = response.participant
     portal.value = response.portal
     schedule.value = response.schedule
@@ -395,11 +402,12 @@ onUnmounted(() => {
   if (welcomeTimer.value) {
     globalThis.clearTimeout(welcomeTimer.value)
   }
+  clearPortalHeader()
 })
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div :class="requiresLogin ? 'space-y-6' : 'space-y-6 pb-24'">
     <div
       v-if="welcomeVisible && event"
       class="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
@@ -450,32 +458,6 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="space-y-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('portal.header.kicker') }}</div>
-              <h1 class="mt-3 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
-              <p class="mt-1 text-sm text-slate-500" v-if="event">
-                {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
-              </p>
-            </div>
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
-                @click="copyLoginLink"
-              >
-                {{ t('portal.actions.copyLoginLink') }}
-              </button>
-              <button
-                class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
-                @click="logoutPortal"
-              >
-                {{ t('portal.actions.logout') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
         <div class="hidden md:flex gap-4 border-b border-slate-200 text-sm">
           <button
             v-for="tab in tabs"
@@ -512,14 +494,11 @@ onUnmounted(() => {
                     "
                     @click="selectDay(index)"
                   >
-                    <div class="text-[10px] uppercase tracking-[0.15em] text-slate-400" :class="index === selectedDayIndex ? 'text-white/70' : ''">
-                      {{ t('portal.schedule.dayLabel', { day: index + 1 }) }}
-                    </div>
                     <div class="mt-1 text-sm font-semibold">
                       {{ day.title || t('portal.schedule.dayFallback', { day: index + 1 }) }}
                     </div>
                     <div class="mt-1 text-[11px] text-slate-400" :class="index === selectedDayIndex ? 'text-white/70' : ''">
-                      {{ day.date }}
+                      {{ formatPortalDate(day.date) }}
                     </div>
                   </button>
                 </div>
@@ -529,7 +508,7 @@ onUnmounted(() => {
                     <div class="text-sm font-semibold text-slate-900">
                       {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
                     </div>
-                    <div class="text-xs text-slate-500">{{ selectedDay.date }}</div>
+                    <div class="text-xs text-slate-500">{{ formatPortalDate(selectedDay.date) }}</div>
                     <div v-if="selectedDay.notes" class="mt-2 text-sm text-slate-600">
                       {{ selectedDay.notes }}
                     </div>
@@ -716,5 +695,20 @@ onUnmounted(() => {
     </section>
 
     <PortalTabBar class="md:hidden" :tabs="tabs" :active="activeTab" @select="setActiveTab" />
+  </div>
+
+  <div
+    v-if="!requiresLogin"
+    class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur"
+  >
+    <div class="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
+      <button
+        class="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+        type="button"
+        @click="logoutPortal"
+      >
+        {{ t('portal.actions.logout') }}
+      </button>
+    </div>
   </div>
 </template>

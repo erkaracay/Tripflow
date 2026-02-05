@@ -3,6 +3,7 @@ export type Event = {
   name: string
   startDate: string
   endDate: string
+  logoUrl?: string | null
   guideUserId?: string | null
   eventAccessCode?: string | null
   isDeleted: boolean
@@ -47,6 +48,7 @@ export type Participant = {
   gender: ParticipantGender
   checkInCode: string
   arrived: boolean
+  willNotAttend: boolean
   details?: ParticipantDetails | null
   lastLog?: ParticipantLastLog | null
 }
@@ -56,6 +58,13 @@ export type ParticipantLastLog = {
   method: 'Manual' | 'QrScan'
   result: string
   createdAt: string
+}
+
+export type ParticipantWillNotAttendResponse = {
+  id: string
+  willNotAttend: boolean
+  arrived: boolean
+  lastLog?: ParticipantLastLog | null
 }
 
 export type ParticipantResolve = {
@@ -272,12 +281,18 @@ export type PortalLoginResponse = {
   participantId: string
 }
 
+export type PortalResolveEventResponse = {
+  eventId: string
+  eventTitle: string
+}
+
 export type PortalMeResponse = {
   event: {
     id: string
     name: string
     startDate: string
     endDate: string
+    logoUrl?: string | null
   }
   participant: {
     id: string

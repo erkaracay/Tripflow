@@ -54,6 +54,11 @@
     "arrivedSummary": "Checked in {arrived} / {total}",
     "arrivedLabel": "Checked in",
     "pendingLabel": "Pending",
+    "all": "All",
+    "notArrived": "Not arrived",
+    "willNotAttend": "Will not attend",
+    "willNotAttendPlural": "Will not attend",
+    "willAttend": "Will attend",
     "arrivedAlready": "Already checked in",
     "checkedIn": "Checked in",
     "lastActionLabel": "Last action",
@@ -66,15 +71,18 @@
     "genderMale": "Male",
     "genderOther": "Other",
     "noData": "No data available.",
-    "searchPlaceholder": "Search by name, email, or phone",
+    "searchPlaceholder": "Search name, TC, phone, code, room, agency",
     "clearSearch": "Clear"
   },
   "actions": {
     "whatsapp": "WhatsApp",
-    "whatsappAria": "Open WhatsApp message"
+    "whatsappAria": "Open WhatsApp message",
+    "call": "Call",
+    "copyPhone": "Copy phone"
   },
   "warnings": {
     "phoneRequiredForWhatsapp": "Phone number required for WhatsApp.",
+    "phoneRequired": "Phone number required.",
     "tcNoDuplicate": "Another participant in this event uses the same identity number."
   },
   "nav": {
@@ -203,6 +211,10 @@
     "alreadyArrived": "Already arrived.",
     "alreadyCheckedIn": "Already checked in.",
     "checkedIn": "Checked in.",
+    "willNotAttendEnabled": "Marked as will not attend.",
+    "willNotAttendDisabled": "Marked as attending.",
+    "willNotAttendFailed": "Could not update attendance status.",
+    "willNotAttendBlocked": "This participant is marked as will not attend. Undo it first.",
     "eventUpdated": "Event updated.",
     "eventUpdateFailed": "Failed to update event.",
     "participantAdded": "Participant added.",
@@ -444,7 +456,9 @@
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
       "success": "Check-in successful.",
-      "alreadyCheckedIn": "Already checked in."
+      "alreadyCheckedIn": "Already checked in.",
+      "whatsappMessage": "Hi {name}, {event} has started. {locationPart}If you have any issues, you can reach us on this number.",
+      "whatsappLocation": "We are at {location} and waiting for you. "
     },
     "participants": {
       "title": "Participants",
@@ -933,6 +947,7 @@
       "tcPlaceholder": "11 digits",
       "submit": "Continue",
       "submitting": "Verifying...",
+      "checkingSession": "Checking your session...",
       "accessCodeRequired": "Access code is required.",
       "tcRequired": "Identity number must be 11 digits.",
       "invalidEventCode": "Event access code is not valid.",

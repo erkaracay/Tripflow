@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
+import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import { normalizeQrCode } from '../../lib/qr'
 import { formatTime } from '../../lib/formatters'
@@ -17,6 +17,7 @@ import type {
   CheckInSummary,
   CheckInUndoResponse,
   Participant,
+  ParticipantWillNotAttendResponse,
   Event as EventDto,
   ResetAllCheckInsResponse,
 } from '../../types'
@@ -37,6 +38,7 @@ const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
 const searchTerm = ref('')
+const participantFilter = ref<'all' | 'arrived' | 'not_arrived' | 'will_not_attend'>('all')
 const checkInCode = ref('')
 const actionMessageKey = ref<string | null>(null)
 const actionMessageText = ref<string | null>(null)
@@ -47,8 +49,10 @@ const dataLoaded = ref(false)
 const lastAutoCode = ref('')
 const lastResult = ref<CheckInResponse | null>(null)
 const lastErrorResult = ref<string | null>(null)
+const lastErrorCode = ref<string | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
 const undoingParticipantId = ref<string | null>(null)
+const updatingWillNotAttendId = ref<string | null>(null)
 const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
@@ -57,6 +61,7 @@ const autoCheckInAfterScan = ref(false)
 const autoCheckInStorageKey = 'tripflow:admin:autoCheckInAfterScan'
 const checkInDirection = ref<CheckInDirection>('Entry')
 const checkInDirectionStorageKey = computed(() => `tripflow:admin:checkInDirection:${eventId.value}`)
+const openMenuParticipantId = ref<string | null>(null)
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
 
@@ -72,20 +77,53 @@ const isSuperAdmin = computed(() => {
 
 const filteredParticipants = computed(() => {
   const query = searchTerm.value.trim().toLowerCase()
-  if (!query) {
-    return participants.value
+  const filter = participantFilter.value
+
+  let filtered = participants.value
+
+  if (filter === 'will_not_attend') {
+    filtered = filtered.filter((participant) => participant.willNotAttend)
+  } else {
+    filtered = filtered.filter((participant) => !participant.willNotAttend)
+    if (filter === 'arrived') {
+      filtered = filtered.filter((participant) => participant.arrived)
+    } else if (filter === 'not_arrived') {
+      filtered = filtered.filter((participant) => !participant.arrived)
+    }
   }
 
-  return participants.value.filter((participant) => {
-    const haystack = [participant.fullName, participant.email, participant.phone]
+  if (!query) {
+    return filtered
+  }
+
+  return filtered.filter((participant) => {
+    const haystack = [
+      participant.fullName,
+      participant.email,
+      participant.phone,
+      participant.tcNo,
+      participant.checkInCode,
+      participant.details?.roomNo,
+      participant.details?.agencyName,
+    ]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
+
     return haystack.includes(query)
   })
 })
 
 const hasData = computed(() => Boolean(event.value))
+const effectiveTotal = computed(() => Math.max(summary.value.totalCount - willNotAttendCount.value, 0))
+const notArrivedCount = computed(() => Math.max(effectiveTotal.value - summary.value.arrivedCount, 0))
+const willNotAttendCount = computed(
+  () => participants.value.filter((participant) => participant.willNotAttend).length
+)
+
+const setParticipantFilter = (value: typeof participantFilter.value) => {
+  participantFilter.value = value
+}
 
 const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   if (!log) {
@@ -95,6 +133,14 @@ const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   const methodLabel = log.method === 'QrScan' ? 'QR' : t('common.manual')
   const time = formatTime(log.createdAt)
   return `${directionLabel} (${methodLabel}) • ${time}`
+}
+
+const closeRowMenu = () => {
+  openMenuParticipantId.value = null
+}
+
+const toggleRowMenu = (participantId: string) => {
+  openMenuParticipantId.value = openMenuParticipantId.value === participantId ? null : participantId
 }
 
 const loadData = async () => {
@@ -224,6 +270,7 @@ const submitCheckIn = async (
   actionErrorText.value = null
   lastResult.value = null
   lastErrorResult.value = null
+  lastErrorCode.value = null
 
   const normalized = code.trim().toUpperCase()
   if (!normalized) {
@@ -284,12 +331,18 @@ const submitCheckIn = async (
     }
     if (!options?.suppressToast) {
       const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+      const code =
+        payload && typeof payload === 'object' && payload !== null && 'code' in payload
+          ? String((payload as { code?: string }).code ?? '')
+          : ''
       const result =
         payload && typeof payload === 'object' && payload !== null && 'result' in payload
           ? String((payload as { result?: string }).result ?? '')
           : ''
 
-      if (result === 'NotFound') {
+      if (code === 'will_not_attend') {
+        pushToast({ key: 'toast.willNotAttendBlocked', tone: 'error' })
+      } else if (result === 'NotFound') {
         pushToast({ key: 'toast.codeNotFound', tone: 'error' })
       } else if (result === 'InvalidRequest') {
         pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
@@ -298,6 +351,9 @@ const submitCheckIn = async (
       }
     }
     const payload = err && typeof err === 'object' ? (err as { payload?: unknown }).payload : undefined
+    if (payload && typeof payload === 'object' && payload !== null && 'code' in payload) {
+      lastErrorCode.value = String((payload as { code?: string }).code ?? null)
+    }
     if (payload && typeof payload === 'object' && payload !== null && 'result' in payload) {
       lastErrorResult.value = String((payload as { result?: string }).result ?? null)
     }
@@ -369,7 +425,9 @@ const handleScanResult = async (raw: string) => {
       pushToast({ key, params: { name }, tone: 'success' })
     }
   } else {
-    if (lastErrorResult.value === 'NotFound') {
+    if (lastErrorCode.value === 'will_not_attend') {
+      pushToast({ key: 'toast.willNotAttendBlocked', tone: 'error' })
+    } else if (lastErrorResult.value === 'NotFound') {
       pushToast({ key: 'toast.codeNotFound', tone: 'error' })
     } else if (lastErrorResult.value === 'InvalidRequest') {
       pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
@@ -377,6 +435,41 @@ const handleScanResult = async (raw: string) => {
       const key = checkInDirection.value === 'Entry' ? 'common.checkInFailed' : 'common.exitFailed'
       pushToast({ key, tone: 'error' })
     }
+  }
+}
+
+const setWillNotAttend = async (participant: Participant, willNotAttend: boolean) => {
+  if (updatingWillNotAttendId.value === participant.id) {
+    return
+  }
+
+  updatingWillNotAttendId.value = participant.id
+  try {
+    const response = await apiPatchWithPayload<ParticipantWillNotAttendResponse>(
+      `/api/events/${eventId.value}/participants/${participant.id}/will-not-attend`,
+      { willNotAttend }
+    )
+
+    participants.value = participants.value.map((item) =>
+      item.id === participant.id
+        ? {
+            ...item,
+            willNotAttend: response.willNotAttend,
+            arrived: response.arrived,
+            lastLog: response.lastLog ?? item.lastLog ?? null,
+          }
+        : item
+    )
+
+    pushToast({
+      key: willNotAttend ? 'toast.willNotAttendEnabled' : 'toast.willNotAttendDisabled',
+      tone: 'success',
+    })
+  } catch {
+    pushToast({ key: 'toast.willNotAttendFailed', tone: 'error' })
+  } finally {
+    updatingWillNotAttendId.value = null
+    closeRowMenu()
   }
 }
 
@@ -471,10 +564,32 @@ watch(checkInDirection, (value) => {
   globalThis.localStorage?.setItem(checkInDirectionStorageKey.value, value)
 })
 
+const handleDocumentClick = (event: MouseEvent) => {
+  if (!openMenuParticipantId.value) {
+    return
+  }
+
+  const target = event.target as HTMLElement | null
+  if (!target) {
+    openMenuParticipantId.value = null
+    return
+  }
+
+  const root = target.closest(`[data-row-menu="${openMenuParticipantId.value}"]`)
+  if (!root) {
+    openMenuParticipantId.value = null
+  }
+}
+
 onMounted(() => {
   loadAutoCheckInPreference()
   loadCheckInDirectionPreference()
   void initialize()
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
 
@@ -518,8 +633,22 @@ onMounted(() => {
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
           <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.arrivedLabel') }}</div>
           <div class="mt-1 text-xl font-semibold text-slate-800">
-            {{ summary.arrivedCount }} / {{ summary.totalCount }}
+            {{ summary.arrivedCount }} / {{ effectiveTotal }}
           </div>
+          <button
+            class="mt-2 text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+            type="button"
+            @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
+          >
+            {{ t('common.notArrived') }}: {{ notArrivedCount }}
+          </button>
+          <button
+            class="mt-1 text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+            type="button"
+            @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
+          >
+            {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
+          </button>
         </div>
       </div>
     </div>
@@ -654,6 +783,57 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'all'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('all')"
+          >
+            {{ t('common.all') }} ({{ effectiveTotal }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'arrived'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('arrived')"
+          >
+            {{ t('common.arrivedLabel') }} ({{ summary.arrivedCount }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'not_arrived'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('not_arrived')"
+          >
+            {{ t('common.notArrived') }} ({{ notArrivedCount }})
+          </button>
+          <button
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              participantFilter === 'will_not_attend'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            type="button"
+            @click="setParticipantFilter('will_not_attend')"
+          >
+            {{ t('common.willNotAttendPlural') }} ({{ willNotAttendCount }})
+          </button>
+        </div>
+
         <div class="mt-4">
           <input
             v-model.trim="searchTerm"
@@ -674,7 +854,8 @@ onMounted(() => {
           <li
             v-for="participant in filteredParticipants"
             :key="participant.id"
-            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            class="relative rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            :data-row-menu="participant.id"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -701,7 +882,8 @@ onMounted(() => {
                   </span>
                   <button
                     v-if="!participant.arrived"
-                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="participant.willNotAttend"
                     type="button"
                     @click="markArrived(participant)"
                   >
@@ -709,24 +891,50 @@ onMounted(() => {
                   </button>
                   <button
                     v-else
-                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="undoingParticipantId === participant.id"
                     type="button"
                     @click="undoCheckIn(participant.id)"
                   >
                     {{ undoingParticipantId === participant.id ? t('common.undoing') : t('common.undo') }}
                   </button>
+                  <div class="hidden flex-wrap items-center gap-2 sm:flex">
+                    <button
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="updatingWillNotAttendId === participant.id"
+                      type="button"
+                      @click="setWillNotAttend(participant, !participant.willNotAttend)"
+                    >
+                      {{
+                        updatingWillNotAttendId === participant.id
+                          ? t('common.saving')
+                          : participant.willNotAttend
+                            ? t('common.willAttend')
+                            : t('common.willNotAttend')
+                      }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
+                <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                  <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
+                  <button
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 hover:border-slate-300 sm:hidden"
+                    type="button"
+                    :aria-label="t('common.open')"
+                    @click="toggleRowMenu(participant.id)"
+                  >
+                    ⋯
+                  </button>
+                </div>
                 <div class="flex w-full items-center gap-2 sm:w-auto">
                   <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-700">
                     {{ participant.checkInCode }}
                   </span>
                   <button
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    class="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300 sm:inline-flex"
                     type="button"
                     @click="copyCode(participant.checkInCode)"
                   >
@@ -734,6 +942,29 @@ onMounted(() => {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div
+              v-if="openMenuParticipantId === participant.id"
+              class="absolute right-4 top-12 z-10 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg sm:hidden"
+            >
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                :disabled="updatingWillNotAttendId === participant.id"
+                @click="setWillNotAttend(participant, !participant.willNotAttend)"
+              >
+                <span>
+                  {{ participant.willNotAttend ? t('common.willAttend') : t('common.willNotAttend') }}
+                </span>
+              </button>
+              <button
+                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
+                type="button"
+                @click="copyCode(participant.checkInCode); closeRowMenu()"
+              >
+                <span>{{ t('common.copy') }}</span>
+              </button>
             </div>
           </li>
         </ul>

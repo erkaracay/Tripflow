@@ -5,6 +5,12 @@ import ToastHost from './components/ui/ToastHost.vue'
 import { clearToken, getTokenRole, isTokenExpired, orgState, tokenState } from './lib/auth'
 import { setLocale, type Locale } from './i18n'
 import { useI18n } from 'vue-i18n'
+import {
+    portalHeaderEndDate,
+    portalHeaderLogoUrl,
+    portalHeaderName,
+    portalHeaderStartDate,
+} from './lib/portalHeader'
 
 const router = useRouter()
 const route = useRoute()
@@ -38,6 +44,33 @@ const eventsPath = computed(() => {
   return ''
 })
 
+const isPortalRoute = computed(() => route.path.startsWith('/e'))
+
+const formatPortalDate = (value?: string) => {
+    if (!value) {
+        return ''
+    }
+    const trimmed = value.trim()
+    if (!trimmed) {
+        return ''
+    }
+    const datePart = (trimmed.includes('T') ? trimmed.split('T')[0] : trimmed.split(' ')[0]) ?? ''
+    const [year, month, day] = datePart.split('-')
+    if (year && month && day) {
+        return `${day}.${month}.${year}`
+    }
+    return trimmed
+}
+
+const portalDateRange = computed(() => {
+    const start = formatPortalDate(portalHeaderStartDate.value)
+    const end = formatPortalDate(portalHeaderEndDate.value)
+    if (!start || !end) {
+        return ''
+    }
+    return t('common.dateRange', { start, end })
+})
+
 const handleLogout = async () => {
   clearToken()
   mobileMenuOpen.value = false
@@ -67,14 +100,31 @@ watch(
             <div class="mx-auto max-w-3xl px-4 py-3 sm:px-6">
                 <div class="flex items-center justify-between gap-3">
                     <div class="leading-tight">
-                        <div class="text-base font-semibold">{{ t('common.appName') }}</div>
-                        <div class="text-[11px] uppercase tracking-wide text-slate-500">
-                            {{ t('common.sprintLabel') }}
+                        <div v-if="isPortalRoute" class="flex items-center gap-3">
+                            <img
+                                v-if="portalHeaderLogoUrl"
+                                :src="portalHeaderLogoUrl"
+                                alt=""
+                                class="h-10 w-10 rounded-full border border-slate-200 object-cover"
+                            />
+                            <div>
+                                <div class="text-base font-semibold text-slate-900">
+                                    {{ portalHeaderName || t('common.event') }}
+                                </div>
+                                <div v-if="portalDateRange" class="text-[11px] text-slate-500">
+                                    {{ portalDateRange }}
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else>
+                            <div class="text-base font-semibold">{{ t('common.appName') }}</div>
+                            <div class="text-[11px] uppercase tracking-wide text-slate-500">
+                                {{ t('common.sprintLabel') }}
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Desktop nav -->
-                    <nav class="hidden items-center gap-3 text-sm text-slate-600 md:flex">
+                    <nav v-if="!isPortalRoute" class="hidden items-center gap-3 text-sm text-slate-600 md:flex">
                         <div class="flex items-center rounded-full border border-slate-200 bg-white p-0.5 text-[11px] font-semibold text-slate-600">
                             <button
                                 class="rounded-full px-2.5 py-1 transition"
@@ -115,8 +165,7 @@ watch(
                         </button>
                     </nav>
 
-                    <!-- Mobile actions -->
-                    <div class="flex items-center gap-2 md:hidden">
+                    <div v-if="!isPortalRoute" class="flex items-center gap-2 md:hidden">
                         <div class="flex items-center rounded-full border border-slate-200 bg-white p-0.5 text-[11px] font-semibold text-slate-600">
                             <button
                                 class="rounded-full px-2 py-0.5 transition"
@@ -150,7 +199,7 @@ watch(
                     </div>
                 </div>
 
-                <div v-if="mobileMenuOpen" class="pt-3 md:hidden">
+                <div v-if="mobileMenuOpen && !isPortalRoute" class="pt-3 md:hidden">
                     <nav class="space-y-1 rounded-xl border border-slate-200 bg-white p-2 text-sm text-slate-700 shadow-sm">
                         <RouterLink
                             v-if="showOrgLink"
