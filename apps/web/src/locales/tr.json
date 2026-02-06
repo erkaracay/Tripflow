@@ -905,6 +905,7 @@
       "typeOther": "Diğer",
       "menuLabel": "Menü",
       "openSurvey": "Anketi aç",
+      "scrollHint": "Kaydırarak geçiş yapabilirsiniz",
       "openMap": "Haritada aç"
     },
     "qr": {
@@ -957,7 +958,10 @@
       "openMaps": "Haritada aç",
       "note": "Not",
       "notesTitle": "Notlar",
-      "notesEmpty": "Henüz not yok."
+      "notesEmpty": "Henüz not yok.",
+      "languageTitle": "Dil",
+      "languageTr": "Türkçe",
+      "languageEn": "İngilizce"
     }
   },
   "helloWorld": {

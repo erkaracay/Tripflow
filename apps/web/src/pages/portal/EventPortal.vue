@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
+import { setLocale, type Locale } from '../../i18n'
 import { portalGetMe } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -19,7 +20,7 @@ type RetryState = 'idle' | 'retrying'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { pushToast } = useToast()
 const eventId = computed(() => route.params.eventId as string)
 
@@ -44,6 +45,8 @@ const qrError = ref(false)
 const welcomeVisible = ref(false)
 const welcomeTimer = ref<number | null>(null)
 const hasLoadedOnce = ref(false)
+const showDayScrollHint = ref(false)
+let scrollHintTimer: number | null = null
 
 const sessionToken = ref('')
 const sessionExpiresAt = ref<Date | null>(null)
@@ -222,6 +225,13 @@ const setActiveTab = (value: string) => {
   activeTab.value = value as TabKey
 }
 
+const switchLocale = (value: Locale) => {
+  if (locale.value === value) {
+    return
+  }
+  setLocale(value)
+}
+
 const welcomeStorageKey = (participantId: string) =>
   `tf_welcome_shown:${eventId.value}:${participantId}`
 
@@ -394,6 +404,26 @@ watch(
   }
 )
 
+watch(
+  () => scheduleDays.value.length,
+  (count) => {
+    if (scrollHintTimer) {
+      globalThis.clearTimeout(scrollHintTimer)
+      scrollHintTimer = null
+    }
+
+    if (count > 2) {
+      showDayScrollHint.value = true
+      scrollHintTimer = globalThis.setTimeout(() => {
+        showDayScrollHint.value = false
+        scrollHintTimer = null
+      }, 15000)
+    } else {
+      showDayScrollHint.value = false
+    }
+  }
+)
+
 onMounted(() => {
   void loadPortal()
 })
@@ -402,12 +432,15 @@ onUnmounted(() => {
   if (welcomeTimer.value) {
     globalThis.clearTimeout(welcomeTimer.value)
   }
+  if (scrollHintTimer) {
+    globalThis.clearTimeout(scrollHintTimer)
+  }
   clearPortalHeader()
 })
 </script>
 
 <template>
-  <div :class="requiresLogin ? 'space-y-6' : 'space-y-6 pb-24'">
+  <div :class="requiresLogin ? 'space-y-6' : 'space-y-6 pb-32'">
     <div
       v-if="welcomeVisible && event"
       class="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
@@ -481,11 +514,11 @@ onUnmounted(() => {
               <p class="mt-1 text-sm text-slate-500" v-if="scheduleDays.length === 0">
                 {{ t('portal.schedule.empty') }}
               </p>
-              <div v-else class="mt-4 space-y-4">
-                <div class="flex gap-2 overflow-x-auto">
-                  <button
-                    v-for="(day, index) in scheduleDays"
-                    :key="day.id"
+                <div v-else class="mt-4 space-y-4">
+                  <div class="flex gap-2 overflow-x-auto">
+                    <button
+                      v-for="(day, index) in scheduleDays"
+                      :key="day.id"
                     class="min-w-[120px] rounded-2xl border px-3 py-2 text-left text-xs"
                     :class="
                       index === selectedDayIndex
@@ -502,12 +535,12 @@ onUnmounted(() => {
                     </div>
                   </button>
                 </div>
+                <div v-if="showDayScrollHint" class="text-center text-xs text-slate-500">
+                  {{ t('portal.schedule.scrollHint') }}
+                </div>
 
                 <div v-if="selectedDay" class="space-y-4">
                   <div>
-                    <div class="text-sm font-semibold text-slate-900">
-                      {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
-                    </div>
                     <div class="text-xs text-slate-500">{{ formatPortalDate(selectedDay.date) }}</div>
                     <div v-if="selectedDay.notes" class="mt-2 text-sm text-slate-600">
                       {{ selectedDay.notes }}
@@ -630,20 +663,6 @@ onUnmounted(() => {
                 />
                 <div v-else class="text-sm text-slate-500">{{ t('portal.qr.empty') }}</div>
 
-                <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
-                  <button
-                    class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
-                    @click="copyCheckInCode"
-                  >
-                    {{ t('portal.qr.copyCode') }}
-                  </button>
-                  <button
-                    class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 sm:w-auto"
-                    @click="copyGuideLink"
-                  >
-                    {{ t('portal.qr.copyGuideLink') }}
-                  </button>
-                </div>
               </div>
             </div>
           </section>
@@ -689,26 +708,56 @@ onUnmounted(() => {
                 <li v-for="note in portal?.notes" :key="note">{{ note }}</li>
               </ul>
             </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 class="text-lg font-semibold">{{ t('portal.info.languageTitle') }}</h2>
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  class="w-full rounded-full border px-3 py-2 text-sm font-semibold"
+                  :class="
+                    locale === 'tr'
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  "
+                  type="button"
+                  @click="switchLocale('tr')"
+                >
+                  {{ t('portal.info.languageTr') }}
+                </button>
+                <button
+                  class="w-full rounded-full border px-3 py-2 text-sm font-semibold"
+                  :class="
+                    locale === 'en'
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  "
+                  type="button"
+                  @click="switchLocale('en')"
+                >
+                  {{ t('portal.info.languageEn') }}
+                </button>
+              </div>
+
+              <button
+                class="mt-5 inline-flex w-full items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:border-rose-300"
+                type="button"
+                @click="logoutPortal"
+              >
+                {{ t('portal.actions.logout') }}
+              </button>
+            </div>
           </section>
         </div>
       </div>
     </section>
 
-    <PortalTabBar class="md:hidden" :tabs="tabs" :active="activeTab" @select="setActiveTab" />
   </div>
 
   <div
     v-if="!requiresLogin"
-    class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur"
+    class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
+    style="padding-bottom: env(safe-area-inset-bottom)"
   >
-    <div class="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
-      <button
-        class="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
-        type="button"
-        @click="logoutPortal"
-      >
-        {{ t('portal.actions.logout') }}
-      </button>
-    </div>
+    <PortalTabBar :tabs="tabs" :active="activeTab" @select="setActiveTab" />
   </div>
 </template>

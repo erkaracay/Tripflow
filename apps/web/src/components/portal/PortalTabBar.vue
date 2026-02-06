@@ -10,13 +10,11 @@ const emit = defineEmits<{ (event: 'select', id: string): void }>()
 const onSelect = (id: string) => {
   emit('select', id)
 }
+
 </script>
 
 <template>
-  <nav
-    class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
-    style="padding-bottom: env(safe-area-inset-bottom)"
-  >
+  <nav class="w-full border-t border-slate-200 bg-white/95 backdrop-blur md:hidden">
     <div class="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
       <button
         v-for="tab in props.tabs"

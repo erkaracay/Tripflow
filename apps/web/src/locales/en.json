@@ -920,6 +920,7 @@
       "typeOther": "Other",
       "menuLabel": "Menu",
       "openSurvey": "Open survey",
+      "scrollHint": "Swipe to see more days",
       "openMap": "Open in maps"
     },
     "qr": {
@@ -972,7 +973,10 @@
       "openMaps": "Open in Maps",
       "note": "Note",
       "notesTitle": "Notes",
-      "notesEmpty": "No notes yet."
+      "notesEmpty": "No notes yet.",
+      "languageTitle": "Language",
+      "languageTr": "Turkish",
+      "languageEn": "English"
     }
   },
   "helloWorld": {
