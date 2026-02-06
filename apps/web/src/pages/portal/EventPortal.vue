@@ -494,7 +494,7 @@ onUnmounted(() => {
                     </div>
                   </button>
                 </div>
-                <div v-if="showDayScrollHint" class="text-center text-xs text-slate-500">
+                <div v-if="showDayScrollHint" class="text-center text-xs font-semibold text-rose-600 animate-pulse">
                   {{ t('portal.schedule.scrollHint') }}
                 </div>
 
