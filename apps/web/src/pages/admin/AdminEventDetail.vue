@@ -1351,12 +1351,20 @@ onMounted(loadEvent)
             <h2 class="text-lg font-semibold">{{ t('admin.portal.title') }}</h2>
             <span class="text-xs text-slate-500">{{ t('admin.portal.subtitle') }}</span>
           </div>
-          <RouterLink
-            class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
-            :to="`/admin/events/${eventId}/program`"
-          >
-            {{ t('admin.eventDetail.openProgram') }}
-          </RouterLink>
+          <div class="flex flex-wrap items-center gap-2">
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              :to="`/admin/events/${eventId}/program`"
+            >
+              {{ t('admin.eventDetail.openProgram') }}
+            </RouterLink>
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              :to="`/admin/events/${eventId}/docs/tabs`"
+            >
+              {{ t('admin.portal.docsTabs') }}
+            </RouterLink>
+          </div>
         </div>
 
         <form class="mt-4 space-y-6" @submit.prevent="savePortal">

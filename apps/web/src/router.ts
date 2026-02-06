@@ -8,6 +8,7 @@ import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
 import AdminParticipantProfile from './pages/admin/AdminParticipantProfile.vue'
 import AdminParticipantsTable from './pages/admin/AdminParticipantsTable.vue'
 import AdminEventProgram from './pages/admin/AdminEventProgram.vue'
+import AdminEventDocsTabs from './pages/admin/AdminEventDocsTabs.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
 import AdminUsers from './pages/admin/AdminUsers.vue'
 import AdminGuides from './pages/admin/AdminGuides.vue'
@@ -17,6 +18,7 @@ import GuideEventProgram from './pages/guide/GuideEventProgram.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
 import EventPortal from './pages/portal/EventPortal.vue'
+import PortalDocsPrint from './pages/portal/PortalDocsPrint.vue'
 import PortalLogin from './pages/portal/PortalLogin.vue'
 import type { UserRole } from './types'
 
@@ -52,6 +54,12 @@ const router = createRouter({
     {
       path: '/admin/events/:eventId/program',
       component: AdminEventProgram,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/docs/tabs',
+      component: AdminEventDocsTabs,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
@@ -106,6 +114,7 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     { path: '/e/login', component: PortalLogin },
+    { path: '/e/:eventId/docs/print', component: PortalDocsPrint, props: true },
     { path: '/e/:eventId', component: EventPortal, props: true },
   ],
 })

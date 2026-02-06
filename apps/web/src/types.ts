@@ -286,6 +286,59 @@ export type PortalResolveEventResponse = {
   eventTitle: string
 }
 
+export type PortalDocTabDto = {
+  id: string
+  title: string
+  type: string
+  sortOrder: number
+  content: unknown
+}
+
+export type PortalFlightInfo = {
+  airline?: string | null
+  departureAirport?: string | null
+  arrivalAirport?: string | null
+  flightCode?: string | null
+  departureTime?: string | null
+  arrivalTime?: string | null
+  pnr?: string | null
+  baggagePieces?: number | null
+  baggageTotalKg?: number | null
+}
+
+export type PortalInsuranceInfo = {
+  companyName?: string | null
+  policyNo?: string | null
+  startDate?: string | null
+  endDate?: string | null
+}
+
+export type PortalParticipantTravel = {
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  hotelCheckInDate?: string | null
+  hotelCheckOutDate?: string | null
+  arrival?: PortalFlightInfo | null
+  return?: PortalFlightInfo | null
+  insurance?: PortalInsuranceInfo | null
+}
+
+export type PortalDocsResponse = {
+  tabs: PortalDocTabDto[]
+  participantTravel: PortalParticipantTravel
+}
+
+export type EventDocTabDto = {
+  id: string
+  eventId: string
+  title: string
+  type: string
+  sortOrder: number
+  isActive: boolean
+  content: unknown
+}
+
 export type PortalMeResponse = {
   event: {
     id: string
@@ -306,6 +359,7 @@ export type PortalMeResponse = {
   }
   portal: EventPortalInfo
   schedule: EventSchedule
+  docs: PortalDocsResponse
 }
 
 export type EventAccessCodeResponse = {

@@ -578,6 +578,7 @@
     "logs": {
       "title": "Recent Logs",
       "link": "Logs",
+      "backToEvent": "Back to event",
       "exportCsv": "Export CSV",
       "exportNote": "Exports current page only.",
       "all": "All",
@@ -615,6 +616,51 @@
         "notFound": "Not found",
         "invalidRequest": "Invalid request",
         "failed": "Failed"
+      }
+    },
+    "docs": {
+      "title": "Documents",
+      "newTab": "New Tab",
+      "editTab": "Edit tab",
+      "tabTitle": "Title",
+      "tabType": "Type",
+      "sortOrder": "Order",
+      "active": "Active",
+      "actions": "Actions",
+      "empty": "No tabs yet.",
+      "types": {
+        "hotel": "Hotel",
+        "insurance": "Insurance",
+        "custom": "Custom"
+      },
+      "customType": "Custom type",
+      "hotelSection": "Hotel information",
+      "hotelName": "Hotel name",
+      "hotelAddress": "Address",
+      "hotelPhone": "Phone",
+      "checkInNote": "Check-in note",
+      "checkOutNote": "Check-out note",
+      "insuranceSection": "Insurance information",
+      "insurancePersonalNote": "Insurance details are stored per participant and are not edited here.",
+      "customText": "Text",
+      "customTextPlaceholder": "Add a short paragraph...",
+      "customFields": "Fields",
+      "addField": "Add field",
+      "fieldLabel": "Label",
+      "fieldValue": "Value",
+      "removeField": "Remove",
+      "advancedJson": "Advanced JSON",
+      "advancedHint": "Optional: edit the raw JSON object. Use with care.",
+      "applyJson": "Apply JSON",
+      "customSection": "JSON content",
+      "customHint": "Enter a JSON object.",
+      "defaultTab": "Default tab",
+      "deleteConfirm": "Delete this tab?",
+      "validation": {
+        "titleRequired": "Title is required.",
+        "typeRequired": "Type is required.",
+        "sortOrder": "Order must be 1 or greater.",
+        "jsonInvalid": "JSON is invalid or not an object."
       }
     },
     "participantProfile": {
@@ -764,6 +810,7 @@
     "portal": {
       "title": "Portal Content",
       "subtitle": "Participant view",
+      "docsTabs": "Document tabs",
       "meeting": {
         "title": "Meeting",
         "time": "Time",
@@ -908,7 +955,47 @@
     },
     "docs": {
       "title": "Documents",
-      "empty": "No documents yet."
+      "subtitle": "Event information and documents",
+      "pdf": "Download PDF",
+      "linksTitle": "Documents and Links",
+      "linksEmpty": "No documents yet.",
+      "travelTitle": "Travel Details",
+      "hotelCardTitle": "Hotel / Room",
+      "flightOutboundTitle": "Flight (Outbound)",
+      "flightReturnTitle": "Flight (Return)",
+      "insuranceTitle": "Travel Insurance",
+      "documentsTitle": "Documents",
+      "roomNo": "Room no",
+      "roomType": "Room type",
+      "boardType": "Board",
+      "checkIn": "Check-in",
+      "checkOut": "Check-out",
+      "airline": "Airline",
+      "departureAirport": "Departure",
+      "arrivalAirport": "Arrival",
+      "flightCode": "Flight code",
+      "departureTime": "Departure time",
+      "arrivalTime": "Arrival time",
+      "pnr": "PNR",
+      "baggage": "Baggage",
+      "companyName": "Company",
+      "policyNo": "Policy no",
+      "startDate": "Start",
+      "endDate": "End",
+      "hotelName": "Hotel name",
+      "hotelAddress": "Address",
+      "hotelPhone": "Phone",
+      "checkInNote": "Check-in note",
+      "checkOutNote": "Check-out note",
+      "empty": "No documents yet.",
+      "board": {
+        "roomOnly": "Room only",
+        "bb": "Bed & Breakfast",
+        "hb": "Half board",
+        "fb": "Full board",
+        "ai": "All inclusive",
+        "uai": "Ultra all inclusive"
+      }
     },
     "schedule": {
       "empty": "Program not published yet.",
@@ -977,6 +1064,12 @@
       "languageTitle": "Language",
       "languageTr": "Turkish",
       "languageEn": "English"
+    },
+    "infoTabs": {
+      "flight": "Flight",
+      "hotel": "Hotel",
+      "insurance": "Insurance",
+      "empty": "No information."
     }
   },
   "helloWorld": {

@@ -563,6 +563,7 @@
     "logs": {
       "title": "Giriş/Çıkış Kayıtları",
       "link": "Kayıtlar",
+      "backToEvent": "Etkinliğe dön",
       "exportCsv": "CSV dışa aktar",
       "exportNote": "Yalnızca mevcut sayfayı dışa aktarır.",
       "all": "Tümü",
@@ -600,6 +601,51 @@
         "notFound": "Bulunamadı",
         "invalidRequest": "Geçersiz istek",
         "failed": "Hata"
+      }
+    },
+    "docs": {
+      "title": "Belgeler",
+      "newTab": "Yeni Sekme",
+      "editTab": "Sekmeyi düzenle",
+      "tabTitle": "Başlık",
+      "tabType": "Tip",
+      "sortOrder": "Sıra",
+      "active": "Aktif",
+      "actions": "İşlemler",
+      "empty": "Henüz sekme yok.",
+      "types": {
+        "hotel": "Otel",
+        "insurance": "Sigorta",
+        "custom": "Özel"
+      },
+      "customType": "Özel tip",
+      "hotelSection": "Otel bilgileri",
+      "hotelName": "Otel adı",
+      "hotelAddress": "Adres",
+      "hotelPhone": "Telefon",
+      "checkInNote": "Giriş notu",
+      "checkOutNote": "Çıkış notu",
+      "insuranceSection": "Sigorta bilgileri",
+      "insurancePersonalNote": "Sigorta bilgileri katılımcı bazında tutulur. Buradan düzenlenmez.",
+      "customText": "Metin",
+      "customTextPlaceholder": "Kısa bir açıklama yazın...",
+      "customFields": "Alanlar",
+      "addField": "Alan ekle",
+      "fieldLabel": "Etiket",
+      "fieldValue": "Değer",
+      "removeField": "Kaldır",
+      "advancedJson": "Gelişmiş JSON",
+      "advancedHint": "İsteğe bağlı: ham JSON nesnesini düzenleyin. Dikkatli kullanın.",
+      "applyJson": "JSON uygula",
+      "customSection": "JSON içerik",
+      "customHint": "JSON nesnesi girin.",
+      "defaultTab": "Varsayılan sekme",
+      "deleteConfirm": "Bu sekme silinsin mi?",
+      "validation": {
+        "titleRequired": "Başlık gerekli.",
+        "typeRequired": "Tip gerekli.",
+        "sortOrder": "Sıra 1 veya daha büyük olmalı.",
+        "jsonInvalid": "JSON geçersiz veya nesne değil."
       }
     },
     "participantProfile": {
@@ -749,6 +795,7 @@
     "portal": {
       "title": "Portal İçeriği",
       "subtitle": "Katılımcı görünümü",
+      "docsTabs": "Belge sekmeleri",
       "meeting": {
         "title": "Buluşma",
         "time": "Saat",
@@ -893,7 +940,47 @@
     },
     "docs": {
       "title": "Belgeler",
-      "empty": "Henüz belge yok."
+      "subtitle": "Etkinlik bilgileri ve dökümanlar",
+      "pdf": "PDF indir",
+      "linksTitle": "Dokümanlar ve Linkler",
+      "linksEmpty": "Henüz doküman yok.",
+      "travelTitle": "Seyahat Bilgileri",
+      "hotelCardTitle": "Otel / Oda",
+      "flightOutboundTitle": "Uçuş (Gidiş)",
+      "flightReturnTitle": "Uçuş (Dönüş)",
+      "insuranceTitle": "Seyahat Sigortası",
+      "documentsTitle": "Belgeler",
+      "roomNo": "Oda no",
+      "roomType": "Oda tipi",
+      "boardType": "Pansiyon",
+      "checkIn": "Giriş",
+      "checkOut": "Çıkış",
+      "airline": "Havayolu",
+      "departureAirport": "Kalkış",
+      "arrivalAirport": "Varış",
+      "flightCode": "Uçuş kodu",
+      "departureTime": "Kalkış saati",
+      "arrivalTime": "Varış saati",
+      "pnr": "PNR",
+      "baggage": "Bagaj",
+      "companyName": "Şirket",
+      "policyNo": "Poliçe no",
+      "startDate": "Başlangıç",
+      "endDate": "Bitiş",
+      "hotelName": "Otel adı",
+      "hotelAddress": "Adres",
+      "hotelPhone": "Telefon",
+      "checkInNote": "Giriş notu",
+      "checkOutNote": "Çıkış notu",
+      "empty": "Henüz belge yok.",
+      "board": {
+        "roomOnly": "Sadece oda",
+        "bb": "Oda + Kahvaltı",
+        "hb": "Yarım pansiyon",
+        "fb": "Tam pansiyon",
+        "ai": "Her şey dahil",
+        "uai": "Ultra her şey dahil"
+      }
     },
     "schedule": {
       "empty": "Program henüz yayınlanmadı.",
@@ -962,6 +1049,12 @@
       "languageTitle": "Dil",
       "languageTr": "Türkçe",
       "languageEn": "İngilizce"
+    },
+    "infoTabs": {
+      "flight": "Uçuş",
+      "hotel": "Otel",
+      "insurance": "Sigorta",
+      "empty": "Bilgi yok."
     }
   },
   "helloWorld": {
