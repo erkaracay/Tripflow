@@ -8,7 +8,6 @@ import { portalGetMe } from '../../lib/api'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import { useToast } from '../../lib/toast'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
@@ -21,7 +20,6 @@ type RetryState = 'idle' | 'retrying'
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
-const { pushToast } = useToast()
 const eventId = computed(() => route.params.eventId as string)
 
 const event = ref<PortalMeResponse['event'] | null>(null)
