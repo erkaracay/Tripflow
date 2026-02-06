@@ -28,6 +28,70 @@ const onSelect = (id: string) => {
         type="button"
         @click="onSelect(tab.id)"
       >
+        <span class="flex h-5 w-5 items-center justify-center">
+          <svg
+            v-if="tab.id === 'days'"
+            viewBox="0 0 24 24"
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 2v3M17 2v3M3 9h18" />
+            <path d="M5 6h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+          </svg>
+          <svg
+            v-else-if="tab.id === 'docs'"
+            viewBox="0 0 24 24"
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+            <path d="M14 2v6h6" />
+            <path d="M9 13h6M9 17h6" />
+          </svg>
+          <svg
+            v-else-if="tab.id === 'qr'"
+            viewBox="0 0 24 24"
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="6" height="6" rx="1" />
+            <rect x="15" y="3" width="6" height="6" rx="1" />
+            <rect x="3" y="15" width="6" height="6" rx="1" />
+            <rect x="13" y="13" width="2" height="2" rx="0.5" />
+            <rect x="19" y="19" width="2" height="2" rx="0.5" />
+            <rect x="15" y="17" width="2" height="2" rx="0.5" />
+          </svg>
+          <svg
+            v-else
+            viewBox="0 0 24 24"
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 10v6" />
+            <path d="M12 7h.01" />
+          </svg>
+        </span>
         <span>{{ tab.label }}</span>
       </button>
     </div>

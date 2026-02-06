@@ -8,6 +8,7 @@ import { formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
+import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import QrScannerModal from '../../components/QrScannerModal.vue'
@@ -58,7 +59,6 @@ const codeInput = ref<HTMLInputElement | null>(null)
 const autoCheckInAfterScan = ref(false)
 const autoCheckInStorageKey = 'tripflow:guide:autoCheckInAfterScan'
 const checkInDirection = ref<CheckInDirection>('Entry')
-const checkInDirectionStorageKey = computed(() => `tripflow:guide:checkInDirection:${eventId.value}`)
 const scannerOpen = ref(false)
 const scanErrorKey = ref<string | null>(null)
 const scanErrorText = ref<string | null>(null)
@@ -72,7 +72,6 @@ const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
-const openMenuParticipantId = ref<string | null>(null)
 let highlightTimer: number | undefined
 let lastActionTimer: number | undefined
 let searchDebounceTimer: number | undefined
@@ -140,13 +139,6 @@ const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   return `${directionLabel} (${methodLabel}) • ${time}`
 }
 
-const closeRowMenu = () => {
-  openMenuParticipantId.value = null
-}
-
-const toggleRowMenu = (participantId: string) => {
-  openMenuParticipantId.value = openMenuParticipantId.value === participantId ? null : participantId
-}
 
 const loadData = async () => {
   loading.value = true
@@ -554,7 +546,6 @@ const setWillNotAttend = async (participant: Participant, willNotAttend: boolean
     pushToast({ key: 'toast.willNotAttendFailed', tone: 'error' })
   } finally {
     updatingWillNotAttendId.value = null
-    closeRowMenu()
   }
 }
 
@@ -582,7 +573,6 @@ const openWhatsApp = (participant: Participant) => {
   }
 
   globalThis.open(url, '_blank', 'noopener,noreferrer')
-  closeRowMenu()
 }
 
 const buildTelLink = (phone: string) => {
@@ -611,49 +601,6 @@ const openCall = (participant: Participant) => {
   }
 
   globalThis.location.href = telLink
-  closeRowMenu()
-}
-
-const copyPhone = async (phone?: string | null) => {
-  const trimmed = phone?.trim() ?? ''
-  if (!trimmed) {
-    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
-    return
-  }
-
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
-    return
-  }
-
-  try {
-    await clipboard.writeText(trimmed)
-    pushToast({ key: 'toast.copied', tone: 'success' })
-  } catch {
-    pushToast({ key: 'errors.copyFailed', tone: 'error' })
-  }
-  closeRowMenu()
-}
-
-const copyCode = async (code: string) => {
-  actionMessageKey.value = null
-  actionMessageText.value = null
-  actionErrorKey.value = null
-  actionErrorText.value = null
-
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    actionErrorKey.value = 'errors.copyNotSupported'
-    return
-  }
-
-  try {
-    await clipboard.writeText(code)
-    actionMessageKey.value = 'common.copySuccess'
-  } catch {
-    actionErrorKey.value = 'errors.copyFailed'
-  }
 }
 
 const clearCheckInQuery = async () => {
@@ -705,10 +652,6 @@ const loadAutoCheckInPreference = () => {
   }
 }
 
-const loadCheckInDirectionPreference = () => {
-  const stored = globalThis.localStorage?.getItem(checkInDirectionStorageKey.value)
-  checkInDirection.value = stored === 'Exit' ? 'Exit' : 'Entry'
-}
 
 watch(searchTerm, (value) => {
   if (searchDebounceTimer) {
@@ -730,36 +673,12 @@ watch(autoCheckInAfterScan, (value) => {
   globalThis.localStorage?.setItem(autoCheckInStorageKey, value ? '1' : '0')
 })
 
-watch(checkInDirection, (value) => {
-  globalThis.localStorage?.setItem(checkInDirectionStorageKey.value, value)
-})
-
-const handleDocumentClick = (event: MouseEvent) => {
-  if (!openMenuParticipantId.value) {
-    return
-  }
-
-  const target = event.target as HTMLElement | null
-  if (!target) {
-    openMenuParticipantId.value = null
-    return
-  }
-
-  const root = target.closest(`[data-row-menu="${openMenuParticipantId.value}"]`)
-  if (!root) {
-    openMenuParticipantId.value = null
-  }
-}
-
 onMounted(() => {
   loadAutoCheckInPreference()
-  loadCheckInDirectionPreference()
   void initialize()
-  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick)
   if (highlightTimer) {
     globalThis.clearTimeout(highlightTimer)
   }
@@ -790,20 +709,22 @@ onUnmounted(() => {
           <div class="mt-1 text-xl font-semibold text-slate-800">
             {{ summary.arrivedCount }} / {{ effectiveTotal }}
           </div>
-          <button
-            class="mt-2 text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-            type="button"
-            @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
-          >
-            {{ t('common.notArrived') }}: {{ notArrivedCount }}
-          </button>
-          <button
-            class="mt-1 text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
-            type="button"
-            @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
-          >
-            {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
-          </button>
+          <div class="mt-2 flex flex-col gap-1">
+            <button
+              class="block text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
+            >
+              {{ t('common.notArrived') }}: {{ notArrivedCount }}
+            </button>
+            <button
+              class="block text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
+            >
+              {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -858,7 +779,16 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
+        <div class="mt-4">
+          <button
+            class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            type="button"
+            @click="openScanner"
+          >
+            {{ t('common.scanQr') }}
+          </button>
+        </div>
+        <form class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
           <input
             v-model.trim="checkInCode"
             ref="codeInput"
@@ -870,7 +800,7 @@ onUnmounted(() => {
             @input="handleCodeInput"
           />
           <button
-            class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
             :disabled="isCheckingIn"
             type="submit"
           >
@@ -883,15 +813,6 @@ onUnmounted(() => {
             }}
           </button>
         </form>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
-            type="button"
-            @click="openScanner"
-          >
-            {{ t('common.scanQr') }}
-          </button>
-        </div>
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
           <span v-if="actionMessageKey || actionMessageText" class="text-emerald-600">
             {{ actionMessageKey ? t(actionMessageKey) : actionMessageText }}
@@ -1003,11 +924,11 @@ onUnmounted(() => {
       </section>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-lg font-semibold">{{ t('guide.checkIn.participantsTitle') }}</h2>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <button
-              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              class="max-w-[150px] whitespace-normal rounded border border-slate-200 bg-white px-3 py-1.5 text-center text-xs font-medium leading-snug text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 sm:max-w-none sm:whitespace-nowrap"
               type="button"
               :disabled="participants.length === 0 || resettingAllCheckIns"
               @click="requestResetAllCheckIns"
@@ -1118,7 +1039,6 @@ onUnmounted(() => {
             :key="participant.id"
             class="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 transition"
             :class="highlightParticipantId === participant.id ? 'ring-2 ring-emerald-300' : ''"
-            :data-row-menu="participant.id"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1161,7 +1081,7 @@ onUnmounted(() => {
                   >
                     {{ undoingParticipantId === participant.id ? t('common.undoing') : t('common.undo') }}
                   </button>
-                  <div class="hidden flex-wrap items-center gap-2 sm:flex">
+                  <div class="flex flex-wrap items-center gap-2">
                     <button
                       class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                       :disabled="updatingWillNotAttendId === participant.id"
@@ -1179,91 +1099,24 @@ onUnmounted(() => {
                     <button
                       class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
                       type="button"
+                      :disabled="!participant.phone"
                       @click="openCall(participant)"
                     >
                       {{ t('actions.call') }}
                     </button>
                     <button
-                      class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
                       type="button"
                       :aria-label="t('actions.whatsappAria')"
+                      :disabled="!participant.phone"
                       @click="openWhatsApp(participant)"
                     >
+                      <WhatsAppIcon class="text-emerald-700" :size="14" />
                       {{ t('actions.whatsapp') }}
                     </button>
                   </div>
                 </div>
               </div>
-
-              <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                  <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
-                  <button
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 hover:border-slate-300 sm:hidden"
-                    type="button"
-                    :aria-label="t('common.open')"
-                    @click="toggleRowMenu(participant.id)"
-                  >
-                    ⋯
-                  </button>
-                </div>
-                <div class="flex w-full items-center gap-2 sm:w-auto">
-                  <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-700">
-                    {{ participant.checkInCode }}
-                  </span>
-                  <button
-                    class="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300 sm:inline-flex"
-                    type="button"
-                    @click="copyCode(participant.checkInCode)"
-                  >
-                    {{ t('common.copy') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div
-              v-if="openMenuParticipantId === participant.id"
-              class="absolute right-4 top-12 z-10 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg sm:hidden"
-            >
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                type="button"
-                :disabled="updatingWillNotAttendId === participant.id"
-                @click="setWillNotAttend(participant, !participant.willNotAttend)"
-              >
-                <span>
-                  {{ participant.willNotAttend ? t('common.willAttend') : t('common.willNotAttend') }}
-                </span>
-              </button>
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
-                type="button"
-                @click="openCall(participant)"
-              >
-                <span>{{ t('actions.call') }}</span>
-              </button>
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-emerald-800 hover:bg-slate-50"
-                type="button"
-                @click="openWhatsApp(participant)"
-              >
-                <span>{{ t('actions.whatsapp') }}</span>
-              </button>
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
-                type="button"
-                @click="copyPhone(participant.phone)"
-              >
-                <span>{{ t('actions.copyPhone') }}</span>
-              </button>
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
-                type="button"
-                @click="copyCode(participant.checkInCode); closeRowMenu()"
-              >
-                <span>{{ t('common.copy') }}</span>
-              </button>
             </div>
           </li>
         </ul>

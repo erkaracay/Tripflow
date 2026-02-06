@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import { normalizeQrCode } from '../../lib/qr'
 import { formatTime } from '../../lib/formatters'
-import { formatPhoneDisplay, normalizeCheckInCode } from '../../lib/normalize'
+import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
+import { buildWhatsAppUrl } from '../../lib/whatsapp'
+import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import QrScannerModal from '../../components/QrScannerModal.vue'
@@ -60,8 +62,6 @@ const scannerOpen = ref(false)
 const autoCheckInAfterScan = ref(false)
 const autoCheckInStorageKey = 'tripflow:admin:autoCheckInAfterScan'
 const checkInDirection = ref<CheckInDirection>('Entry')
-const checkInDirectionStorageKey = computed(() => `tripflow:admin:checkInDirection:${eventId.value}`)
-const openMenuParticipantId = ref<string | null>(null)
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
 
@@ -135,12 +135,56 @@ const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   return `${directionLabel} (${methodLabel}) • ${time}`
 }
 
-const closeRowMenu = () => {
-  openMenuParticipantId.value = null
+const buildTelLink = (phone: string) => {
+  const normalized = normalizePhone(phone).normalized || phone
+  const digits = normalized.replace(/\D/g, '')
+  if (!digits) {
+    return ''
+  }
+  if (normalized.startsWith('+')) {
+    return `tel:${normalized}`
+  }
+  return `tel:+${digits}`
 }
 
-const toggleRowMenu = (participantId: string) => {
-  openMenuParticipantId.value = openMenuParticipantId.value === participantId ? null : participantId
+const openCall = (participant: Participant) => {
+  const phone = participant.phone?.trim()
+  if (!phone) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  const telLink = buildTelLink(phone)
+  if (!telLink) {
+    pushToast({ key: 'warnings.phoneRequired', tone: 'error' })
+    return
+  }
+
+  globalThis.location.href = telLink
+}
+
+const openWhatsApp = (participant: Participant) => {
+  const phone = participant.phone?.trim()
+  if (!phone) {
+    pushToast({ key: 'warnings.phoneRequiredForWhatsapp', tone: 'error' })
+    return
+  }
+
+  const eventName = event.value?.name?.trim() || t('common.event')
+  const message = t('guide.checkIn.whatsappMessage', {
+    name: participant.fullName,
+    event: eventName,
+    locationPart: '',
+  })
+
+  const normalizedPhone = normalizePhone(phone).normalized || phone
+  const url = buildWhatsAppUrl(normalizedPhone, message)
+  if (!url) {
+    pushToast({ key: 'warnings.phoneRequiredForWhatsapp', tone: 'error' })
+    return
+  }
+
+  globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
 const loadData = async () => {
@@ -469,7 +513,6 @@ const setWillNotAttend = async (participant: Participant, willNotAttend: boolean
     pushToast({ key: 'toast.willNotAttendFailed', tone: 'error' })
   } finally {
     updatingWillNotAttendId.value = null
-    closeRowMenu()
   }
 }
 
@@ -479,26 +522,6 @@ const markArrived = async (participant: Participant) => {
   }
 
   await submitCheckIn(participant.checkInCode, { direction: 'Entry', method: 'Manual' })
-}
-
-const copyCode = async (code: string) => {
-  actionMessageKey.value = null
-  actionMessageText.value = null
-  actionErrorKey.value = null
-  actionErrorText.value = null
-
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    actionErrorKey.value = 'errors.copyNotSupported'
-    return
-  }
-
-  try {
-    await clipboard.writeText(code)
-    actionMessageKey.value = 'common.copySuccess'
-  } catch {
-    actionErrorKey.value = 'errors.copyFailed'
-  }
 }
 
 const clearCheckInQuery = async () => {
@@ -551,46 +574,15 @@ const loadAutoCheckInPreference = () => {
   autoCheckInAfterScan.value = stored === '1'
 }
 
-const loadCheckInDirectionPreference = () => {
-  const stored = globalThis.localStorage?.getItem(checkInDirectionStorageKey.value)
-  checkInDirection.value = stored === 'Exit' ? 'Exit' : 'Entry'
-}
-
 watch(autoCheckInAfterScan, (value) => {
   globalThis.localStorage?.setItem(autoCheckInStorageKey, value ? '1' : '0')
 })
 
-watch(checkInDirection, (value) => {
-  globalThis.localStorage?.setItem(checkInDirectionStorageKey.value, value)
-})
-
-const handleDocumentClick = (event: MouseEvent) => {
-  if (!openMenuParticipantId.value) {
-    return
-  }
-
-  const target = event.target as HTMLElement | null
-  if (!target) {
-    openMenuParticipantId.value = null
-    return
-  }
-
-  const root = target.closest(`[data-row-menu="${openMenuParticipantId.value}"]`)
-  if (!root) {
-    openMenuParticipantId.value = null
-  }
-}
-
 onMounted(() => {
   loadAutoCheckInPreference()
-  loadCheckInDirectionPreference()
   void initialize()
-  document.addEventListener('click', handleDocumentClick)
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick)
-})
 </script>
 
 <template>
@@ -635,20 +627,22 @@ onUnmounted(() => {
           <div class="mt-1 text-xl font-semibold text-slate-800">
             {{ summary.arrivedCount }} / {{ effectiveTotal }}
           </div>
-          <button
-            class="mt-2 text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-            type="button"
-            @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
-          >
-            {{ t('common.notArrived') }}: {{ notArrivedCount }}
-          </button>
-          <button
-            class="mt-1 text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
-            type="button"
-            @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
-          >
-            {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
-          </button>
+          <div class="mt-2 flex flex-col gap-1">
+            <button
+              class="block text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setParticipantFilter(participantFilter === 'not_arrived' ? 'all' : 'not_arrived')"
+            >
+              {{ t('common.notArrived') }}: {{ notArrivedCount }}
+            </button>
+            <button
+              class="block text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setParticipantFilter(participantFilter === 'will_not_attend' ? 'all' : 'will_not_attend')"
+            >
+              {{ t('common.willNotAttend') }}: {{ willNotAttendCount }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -703,7 +697,16 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
+        <div class="mt-4">
+          <button
+            class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            type="button"
+            @click="openScanner"
+          >
+            {{ t('common.scanQr') }}
+          </button>
+        </div>
+        <form class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">
           <input
             v-model.trim="checkInCode"
             ref="codeInput"
@@ -715,7 +718,7 @@ onUnmounted(() => {
             @input="handleCodeInput"
           />
           <button
-            class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
             :disabled="isCheckingIn"
             type="submit"
           >
@@ -728,15 +731,6 @@ onUnmounted(() => {
             }}
           </button>
         </form>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
-            type="button"
-            @click="openScanner"
-          >
-            {{ t('common.scanQr') }}
-          </button>
-        </div>
         <label class="mt-3 inline-flex items-center gap-2 text-xs text-slate-600">
           <input v-model="autoCheckInAfterScan" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
           {{ t('common.autoCheckInAfterScan') }}
@@ -854,8 +848,7 @@ onUnmounted(() => {
           <li
             v-for="participant in filteredParticipants"
             :key="participant.id"
-            class="relative rounded-2xl border border-slate-200 bg-slate-50 p-4"
-            :data-row-menu="participant.id"
+            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -898,7 +891,25 @@ onUnmounted(() => {
                   >
                     {{ undoingParticipantId === participant.id ? t('common.undoing') : t('common.undo') }}
                   </button>
-                  <div class="hidden flex-wrap items-center gap-2 sm:flex">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="!participant.phone"
+                      type="button"
+                      @click="openCall(participant)"
+                    >
+                      {{ t('actions.call') }}
+                    </button>
+                    <button
+                      class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      type="button"
+                      :disabled="!participant.phone"
+                      :aria-label="t('actions.whatsappAria')"
+                      @click="openWhatsApp(participant)"
+                    >
+                      <WhatsAppIcon class="text-emerald-700" :size="14" />
+                      {{ t('actions.whatsapp') }}
+                    </button>
                     <button
                       class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                       :disabled="updatingWillNotAttendId === participant.id"
@@ -916,55 +927,6 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-
-              <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                  <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.checkInCode') }}</div>
-                  <button
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 hover:border-slate-300 sm:hidden"
-                    type="button"
-                    :aria-label="t('common.open')"
-                    @click="toggleRowMenu(participant.id)"
-                  >
-                    ⋯
-                  </button>
-                </div>
-                <div class="flex w-full items-center gap-2 sm:w-auto">
-                  <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-700">
-                    {{ participant.checkInCode }}
-                  </span>
-                  <button
-                    class="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300 sm:inline-flex"
-                    type="button"
-                    @click="copyCode(participant.checkInCode)"
-                  >
-                    {{ t('common.copy') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div
-              v-if="openMenuParticipantId === participant.id"
-              class="absolute right-4 top-12 z-10 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg sm:hidden"
-            >
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                type="button"
-                :disabled="updatingWillNotAttendId === participant.id"
-                @click="setWillNotAttend(participant, !participant.willNotAttend)"
-              >
-                <span>
-                  {{ participant.willNotAttend ? t('common.willAttend') : t('common.willNotAttend') }}
-                </span>
-              </button>
-              <button
-                class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
-                type="button"
-                @click="copyCode(participant.checkInCode); closeRowMenu()"
-              >
-                <span>{{ t('common.copy') }}</span>
-              </button>
             </div>
           </li>
         </ul>

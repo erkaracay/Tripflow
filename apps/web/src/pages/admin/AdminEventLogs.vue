@@ -209,7 +209,7 @@ onMounted(loadEvent)
 
 <template>
   <div class="mx-auto max-w-7xl space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <RouterLink
           class="text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
@@ -227,15 +227,15 @@ onMounted(loadEvent)
           {{ eventError }}
         </p>
       </div>
-      <div class="flex flex-col items-end gap-1">
+      <div class="flex w-full flex-col items-start gap-1 sm:w-auto sm:items-end">
         <button
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+          class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300 sm:w-auto"
           type="button"
           @click="exportCsv"
         >
           {{ t('admin.logs.exportCsv') }}
         </button>
-        <span class="text-xs text-slate-400">{{ t('admin.logs.exportNote') }}</span>
+        <span class="text-xs text-slate-400 sm:text-right">{{ t('admin.logs.exportNote') }}</span>
       </div>
     </div>
 
