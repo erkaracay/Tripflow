@@ -138,45 +138,6 @@ const buildMapsLink = (activity: { locationName?: string | null; address?: strin
   return `https://maps.google.com/?q=${encodeURIComponent(query)}`
 }
 
-const copyToClipboard = async (value: string, successKey: string, errorKeyValue: string) => {
-  const clipboard = globalThis.navigator?.clipboard
-  if (!clipboard?.writeText) {
-    pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
-    return
-  }
-
-  try {
-    await clipboard.writeText(value)
-    pushToast({ key: successKey, tone: 'success' })
-  } catch {
-    pushToast({ key: errorKeyValue, tone: 'error' })
-  }
-}
-
-const copyCheckInCode = async () => {
-  if (!checkInCode.value) {
-    pushToast({ key: 'portal.qr.enterCode', tone: 'error' })
-    return
-  }
-
-  await copyToClipboard(checkInCode.value, 'portal.qr.codeCopied', 'portal.actions.copyLinkFailed')
-}
-
-const copyGuideLink = async () => {
-  if (!checkInCode.value) {
-    pushToast({ key: 'portal.qr.linkNeedsCode', tone: 'error' })
-    return
-  }
-
-  const link = buildGuideLink(checkInCode.value)
-  if (!link) {
-    pushToast({ key: 'portal.actions.copyLinkFailed', tone: 'error' })
-    return
-  }
-
-  await copyToClipboard(link, 'portal.actions.linkCopied', 'portal.actions.copyLinkFailed')
-}
-
 const parseDate = (value?: string | null) => {
   if (!value) {
     return null
