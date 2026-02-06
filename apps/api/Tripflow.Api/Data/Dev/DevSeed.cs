@@ -140,6 +140,11 @@ public static class DevSeed
         await EnsurePortalAsync(db, eventB1, orgB.Id, now, ct, state);
         await EnsurePortalAsync(db, eventB2, orgB.Id, now, ct, state);
 
+        await EnsureDocTabsAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsureDocTabsAsync(db, eventA2, orgA.Id, now, ct, state);
+        await EnsureDocTabsAsync(db, eventB1, orgB.Id, now, ct, state);
+        await EnsureDocTabsAsync(db, eventB2, orgB.Id, now, ct, state);
+
         await EnsureScheduleAsync(db, eventA1, orgA.Id, now, ct, state);
         await EnsureScheduleAsync(db, eventA2, orgA.Id, now, ct, state);
         await EnsureScheduleAsync(db, eventB1, orgB.Id, now, ct, state);
@@ -405,6 +410,7 @@ public static class DevSeed
                 state.Seeded = true;
             }
 
+            await EnsureParticipantDetailsAsync(db, eventEntity, organizationId, existingParticipants, now, ct, state);
             return;
         }
 
@@ -439,6 +445,302 @@ public static class DevSeed
         }
 
         db.Participants.AddRange(participants);
+        state.Seeded = true;
+
+        await EnsureParticipantDetailsAsync(db, eventEntity, organizationId, participants, now, ct, state);
+    }
+
+    private static async Task EnsureParticipantDetailsAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        IReadOnlyList<ParticipantEntity> participants,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        var participantIds = participants.Select(x => x.Id).ToArray();
+        var existingDetails = await db.ParticipantDetails
+            .Where(x => participantIds.Contains(x.ParticipantId))
+            .ToListAsync(ct);
+
+        var detailsById = existingDetails.ToDictionary(x => x.ParticipantId, x => x);
+
+        var airlines = new[] { "THY", "Pegasus", "AJet" };
+        var airports = new[] { "IST", "SAW", "ESB", "ADB" };
+        var cities = new[] { "İstanbul", "Ankara", "İzmir", "Antalya" };
+        var boardTypes = new[] { "BB", "HB", "AI", "RO" };
+        var roomTypes = new[] { "Single", "Double", "Triple" };
+
+        for (var i = 0; i < participants.Count; i++)
+        {
+            var participant = participants[i];
+            var index = i + 1;
+            var detail = detailsById.TryGetValue(participant.Id, out var existing)
+                ? existing
+                : new ParticipantDetailsEntity { ParticipantId = participant.Id };
+
+            var updated = false;
+
+            if (string.IsNullOrWhiteSpace(detail.RoomNo))
+            {
+                detail.RoomNo = $"{100 + (index % 20)}";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.RoomType))
+            {
+                detail.RoomType = roomTypes[index % roomTypes.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.BoardType))
+            {
+                detail.BoardType = boardTypes[index % boardTypes.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.PersonNo))
+            {
+                detail.PersonNo = ((index % 3) + 1).ToString();
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.AgencyName))
+            {
+                detail.AgencyName = "Tripflow Travel";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.City))
+            {
+                detail.City = cities[index % cities.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.FlightCity))
+            {
+                detail.FlightCity = cities[(index + 1) % cities.Length];
+                updated = true;
+            }
+            if (detail.HotelCheckInDate is null)
+            {
+                detail.HotelCheckInDate = eventEntity.StartDate;
+                updated = true;
+            }
+            if (detail.HotelCheckOutDate is null)
+            {
+                detail.HotelCheckOutDate = eventEntity.EndDate;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.TicketNo))
+            {
+                var prefix = string.IsNullOrWhiteSpace(eventEntity.Name)
+                    ? "E"
+                    : eventEntity.Name.Trim()[0].ToString().ToUpperInvariant();
+                detail.TicketNo = $"{prefix}{index:0000}";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.AttendanceStatus))
+            {
+                detail.AttendanceStatus = "Confirmed";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.InsuranceCompanyName))
+            {
+                detail.InsuranceCompanyName = "AXA";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.InsurancePolicyNo))
+            {
+                detail.InsurancePolicyNo = $"POL-{index:0000}";
+                updated = true;
+            }
+            if (detail.InsuranceStartDate is null)
+            {
+                detail.InsuranceStartDate = eventEntity.StartDate;
+                updated = true;
+            }
+            if (detail.InsuranceEndDate is null)
+            {
+                detail.InsuranceEndDate = eventEntity.EndDate;
+                updated = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(detail.ArrivalAirline))
+            {
+                detail.ArrivalAirline = airlines[index % airlines.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalDepartureAirport))
+            {
+                detail.ArrivalDepartureAirport = airports[index % airports.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalArrivalAirport))
+            {
+                detail.ArrivalArrivalAirport = airports[(index + 1) % airports.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalFlightCode))
+            {
+                detail.ArrivalFlightCode = $"TF{100 + index}";
+                updated = true;
+            }
+            if (detail.ArrivalDepartureTime is null)
+            {
+                detail.ArrivalDepartureTime = new TimeOnly(8 + (index % 6), 30);
+                updated = true;
+            }
+            if (detail.ArrivalArrivalTime is null)
+            {
+                detail.ArrivalArrivalTime = new TimeOnly(10 + (index % 6), 5);
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalPnr))
+            {
+                detail.ArrivalPnr = $"PNR{index:0000}";
+                updated = true;
+            }
+            if (detail.ArrivalBaggagePieces is null)
+            {
+                detail.ArrivalBaggagePieces = (index % 2) + 1;
+                updated = true;
+            }
+            if (detail.ArrivalBaggageTotalKg is null)
+            {
+                detail.ArrivalBaggageTotalKg = (index % 2 == 0) ? 23 : 30;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalBaggageAllowance))
+            {
+                detail.ArrivalBaggageAllowance = $"{detail.ArrivalBaggagePieces} pc {detail.ArrivalBaggageTotalKg} kg";
+                updated = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(detail.ReturnAirline))
+            {
+                detail.ReturnAirline = airlines[(index + 1) % airlines.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnDepartureAirport))
+            {
+                detail.ReturnDepartureAirport = airports[(index + 1) % airports.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnArrivalAirport))
+            {
+                detail.ReturnArrivalAirport = airports[index % airports.Length];
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnFlightCode))
+            {
+                detail.ReturnFlightCode = $"TF{200 + index}";
+                updated = true;
+            }
+            if (detail.ReturnDepartureTime is null)
+            {
+                detail.ReturnDepartureTime = new TimeOnly(17 + (index % 4), 0);
+                updated = true;
+            }
+            if (detail.ReturnArrivalTime is null)
+            {
+                detail.ReturnArrivalTime = new TimeOnly(19 + (index % 4), 20);
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnPnr))
+            {
+                detail.ReturnPnr = $"RPNR{index:0000}";
+                updated = true;
+            }
+            if (detail.ReturnBaggagePieces is null)
+            {
+                detail.ReturnBaggagePieces = (index % 2) + 1;
+                updated = true;
+            }
+            if (detail.ReturnBaggageTotalKg is null)
+            {
+                detail.ReturnBaggageTotalKg = (index % 2 == 0) ? 23 : 30;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnBaggageAllowance))
+            {
+                detail.ReturnBaggageAllowance = $"{detail.ReturnBaggagePieces} pc {detail.ReturnBaggageTotalKg} kg";
+                updated = true;
+            }
+
+            if (existing is null)
+            {
+                db.ParticipantDetails.Add(detail);
+                updated = true;
+            }
+
+            if (updated)
+            {
+                state.Seeded = true;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task EnsureDocTabsAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var hasTabs = await db.EventDocTabs
+            .AnyAsync(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId, ct);
+        if (hasTabs)
+        {
+            return;
+        }
+
+        var hotelContent = JsonSerializer.Serialize(new
+        {
+            hotelName = $"{eventEntity.Name} Otel",
+            address = "Merkez Mah. 10. Sokak No:5",
+            phone = "+90 212 555 0000",
+            checkInNote = "Giriş 14:00 itibarıyla",
+            checkOutNote = "Çıkış 12:00"
+        });
+
+        var insuranceContent = JsonSerializer.Serialize(new
+        {
+            companyName = string.Empty,
+            policyNo = string.Empty,
+            startDate = string.Empty,
+            endDate = string.Empty
+        });
+
+        db.EventDocTabs.AddRange(
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                Title = "Hotel",
+                Type = "Hotel",
+                SortOrder = 1,
+                IsActive = true,
+                ContentJson = hotelContent,
+                CreatedAt = now
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                Title = "Insurance",
+                Type = "Insurance",
+                SortOrder = 2,
+                IsActive = false,
+                ContentJson = insuranceContent,
+                CreatedAt = now
+            });
+
         state.Seeded = true;
     }
 

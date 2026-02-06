@@ -7,6 +7,7 @@ public sealed class ParticipantDetailsEntity
 
     public string? RoomNo { get; set; }
     public string? RoomType { get; set; }
+    public string? BoardType { get; set; }
     public string? PersonNo { get; set; }
     public string? AgencyName { get; set; }
     public string? City { get; set; }
@@ -17,6 +18,11 @@ public sealed class ParticipantDetailsEntity
 
     public string? TicketNo { get; set; }
     public string? AttendanceStatus { get; set; }
+
+    public string? InsuranceCompanyName { get; set; }
+    public string? InsurancePolicyNo { get; set; }
+    public DateOnly? InsuranceStartDate { get; set; }
+    public DateOnly? InsuranceEndDate { get; set; }
 
     public string? ArrivalAirline { get; set; }
     public string? ArrivalDepartureAirport { get; set; }

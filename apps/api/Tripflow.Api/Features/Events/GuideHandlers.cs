@@ -488,6 +488,7 @@ internal static class GuideHandlers
         return new ParticipantDetailsDto(
             details.RoomNo,
             details.RoomType,
+            details.BoardType,
             details.PersonNo,
             details.AgencyName,
             details.City,
@@ -496,6 +497,10 @@ internal static class GuideHandlers
             details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
             details.TicketNo,
             details.AttendanceStatus,
+            details.InsuranceCompanyName,
+            details.InsurancePolicyNo,
+            details.InsuranceStartDate?.ToString("yyyy-MM-dd"),
+            details.InsuranceEndDate?.ToString("yyyy-MM-dd"),
             details.ArrivalAirline,
             details.ArrivalDepartureAirport,
             details.ArrivalArrivalAirport,

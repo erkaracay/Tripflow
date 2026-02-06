@@ -23,6 +23,7 @@ internal static class ParticipantImportHandlers
     [
         "room_no",
         "room_type",
+        "board_type",
         "person_no",
         "agency_name",
         "city",
@@ -36,6 +37,10 @@ internal static class ParticipantImportHandlers
         "hotel_check_in_date",
         "hotel_check_out_date",
         "ticket_no",
+        "insurance_company_name",
+        "insurance_policy_no",
+        "insurance_start_date",
+        "insurance_end_date",
         "arrival_airline",
         "arrival_departure_airport",
         "arrival_arrival_airport",
@@ -60,6 +65,7 @@ internal static class ParticipantImportHandlers
     [
         "101",
         "Double",
+        "HB",
         "2",
         "Sky Travel",
         "Istanbul",
@@ -73,6 +79,10 @@ internal static class ParticipantImportHandlers
         "2026-03-10",
         "2026-03-12",
         "TK-123",
+        "Acme Insurance",
+        "POL-123",
+        "2026-03-10",
+        "2026-03-12",
         "Turkish Airlines",
         "IST",
         "ASR",
@@ -100,7 +110,9 @@ internal static class ParticipantImportHandlers
     {
         "birth_date",
         "hotel_check_in_date",
-        "hotel_check_out_date"
+        "hotel_check_out_date",
+        "insurance_start_date",
+        "insurance_end_date"
     };
 
     private static readonly HashSet<string> TimeColumns = new(StringComparer.OrdinalIgnoreCase)
@@ -381,6 +393,30 @@ internal static class ParticipantImportHandlers
                         "invalid_date")
                     {
                         Field = "hotel_check_out_date"
+                    });
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("insurance_start_date"), out var insuranceStart))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "insurance_start_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "insurance_start_date"
+                    });
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("insurance_end_date"), out var insuranceEnd))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "insurance_end_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "insurance_end_date"
                     });
                 }
 
@@ -727,8 +763,9 @@ internal static class ParticipantImportHandlers
                         if (hasDetails)
                         {
                             participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
-                            ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
+                            ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, insuranceStart,
+                                insuranceEnd, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime,
+                                returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
                         }
                         else if (participant.Details is not null)
@@ -763,8 +800,8 @@ internal static class ParticipantImportHandlers
                             {
                                 ParticipantId = newParticipant.Id
                             };
-                            ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, arrivalDepartureTime,
-                                arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
+                            ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, insuranceStart, insuranceEnd,
+                                arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
                             newParticipant.Details = details;
                         }
@@ -1074,6 +1111,8 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("oda no")] = "room_no";
         map[NormalizeHeader("oda no.")] = "room_no";
         map[NormalizeHeader("oda tipi")] = "room_type";
+        map[NormalizeHeader("pansiyon")] = "board_type";
+        map[NormalizeHeader("board type")] = "board_type";
         map[NormalizeHeader("kisi no")] = "person_no";
         map[NormalizeHeader("bayi adi")] = "agency_name";
         map[NormalizeHeader("acente adi")] = "agency_name";
@@ -1091,6 +1130,14 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("bilet no")] = "ticket_no";
         map[NormalizeHeader("attendance_status")] = "attendance_status";
         map[NormalizeHeader("katilim durumu")] = "attendance_status";
+        map[NormalizeHeader("sigorta sirketi")] = "insurance_company_name";
+        map[NormalizeHeader("sigorta şirketi")] = "insurance_company_name";
+        map[NormalizeHeader("sigorta polisi")] = "insurance_policy_no";
+        map[NormalizeHeader("sigorta police no")] = "insurance_policy_no";
+        map[NormalizeHeader("sigorta baslangic")] = "insurance_start_date";
+        map[NormalizeHeader("sigorta başlangic")] = "insurance_start_date";
+        map[NormalizeHeader("sigorta bitis")] = "insurance_end_date";
+        map[NormalizeHeader("sigorta bitiş")] = "insurance_end_date";
 
         map[NormalizeHeader("gelis havayolu")] = "arrival_airline";
         map[NormalizeHeader("gelis kalkis havalimani")] = "arrival_departure_airport";
@@ -1464,6 +1511,8 @@ internal static class ParticipantImportHandlers
         ImportRow row,
         DateOnly? hotelCheckIn,
         DateOnly? hotelCheckOut,
+        DateOnly? insuranceStart,
+        DateOnly? insuranceEnd,
         TimeOnly? arrivalDeparture,
         TimeOnly? arrivalArrival,
         TimeOnly? returnDeparture,
@@ -1475,6 +1524,7 @@ internal static class ParticipantImportHandlers
     {
         details.RoomNo = row.GetValue("room_no");
         details.RoomType = row.GetValue("room_type");
+        details.BoardType = row.GetValue("board_type");
         details.PersonNo = row.GetValue("person_no");
         details.AgencyName = row.GetValue("agency_name");
         details.City = row.GetValue("city");
@@ -1483,6 +1533,10 @@ internal static class ParticipantImportHandlers
         details.HotelCheckOutDate = hotelCheckOut;
         details.TicketNo = row.GetValue("ticket_no");
         details.AttendanceStatus = row.GetValue("attendance_status");
+        details.InsuranceCompanyName = row.GetValue("insurance_company_name");
+        details.InsurancePolicyNo = row.GetValue("insurance_policy_no");
+        details.InsuranceStartDate = insuranceStart;
+        details.InsuranceEndDate = insuranceEnd;
         details.ArrivalAirline = row.GetValue("arrival_airline");
         details.ArrivalDepartureAirport = row.GetValue("arrival_departure_airport");
         details.ArrivalArrivalAirport = row.GetValue("arrival_arrival_airport");

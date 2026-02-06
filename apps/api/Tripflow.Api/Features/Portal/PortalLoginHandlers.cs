@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
@@ -152,6 +153,7 @@ internal static class PortalLoginHandlers
         }
 
         var schedule = await EventsHandlers.BuildScheduleAsync(eventEntity.Id, eventEntity.OrganizationId, db, ct);
+        var docs = await BuildDocsAsync(db, eventEntity, participant, ct);
 
         var response = new PortalMeResponse(
             new PortalEventSummary(
@@ -170,7 +172,8 @@ internal static class PortalLoginHandlers
                 participant.Gender.ToString(),
                 participant.CheckInCode),
             portal,
-            schedule);
+            schedule,
+            docs);
 
         return Results.Ok(response);
     }
@@ -205,6 +208,130 @@ internal static class PortalLoginHandlers
 
     private static string GetClientIp(HttpContext httpContext)
         => httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private static async Task<PortalDocsResponse> BuildDocsAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        ParticipantEntity participant,
+        CancellationToken ct)
+    {
+        var details = await db.ParticipantDetails.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ParticipantId == participant.Id, ct);
+
+        var allTabs = await db.EventDocTabs.AsNoTracking()
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+
+        var insuranceDefaults = allTabs.FirstOrDefault(x => x.Type == "Insurance");
+        var insuranceInfo = BuildInsuranceInfo(insuranceDefaults?.ContentJson, details);
+
+        var travel = new PortalParticipantTravel(
+            details?.RoomNo,
+            details?.RoomType,
+            details?.BoardType,
+            details?.HotelCheckInDate?.ToString("yyyy-MM-dd"),
+            details?.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
+            details is null
+                ? null
+                : new PortalFlightInfo(
+                    details.ArrivalAirline,
+                    details.ArrivalDepartureAirport,
+                    details.ArrivalArrivalAirport,
+                    details.ArrivalFlightCode,
+                    details.ArrivalDepartureTime?.ToString("HH:mm"),
+                    details.ArrivalArrivalTime?.ToString("HH:mm"),
+                    details.ArrivalPnr,
+                    details.ArrivalBaggagePieces,
+                    details.ArrivalBaggageTotalKg),
+            details is null
+                ? null
+                : new PortalFlightInfo(
+                    details.ReturnAirline,
+                    details.ReturnDepartureAirport,
+                    details.ReturnArrivalAirport,
+                    details.ReturnFlightCode,
+                    details.ReturnDepartureTime?.ToString("HH:mm"),
+                    details.ReturnArrivalTime?.ToString("HH:mm"),
+                    details.ReturnPnr,
+                    details.ReturnBaggagePieces,
+                    details.ReturnBaggageTotalKg),
+            insuranceInfo);
+
+        var tabDtos = allTabs
+            .Where(tab => tab.IsActive)
+            .Select(tab => new PortalDocTabDto(
+            tab.Id,
+            tab.Title,
+            tab.Type,
+            tab.SortOrder,
+            ParseContentJson(tab.ContentJson)))
+            .ToArray();
+
+        return new PortalDocsResponse(tabDtos, travel);
+    }
+
+    private static PortalInsuranceInfo? BuildInsuranceInfo(string? contentJson, ParticipantDetailsEntity? details)
+    {
+        var defaults = ParseContentJson(contentJson);
+
+        var defaultCompany = ReadStringProperty(defaults, "companyName");
+        var defaultPolicy = ReadStringProperty(defaults, "policyNo");
+        var defaultStart = ReadStringProperty(defaults, "startDate");
+        var defaultEnd = ReadStringProperty(defaults, "endDate");
+
+        var company = string.IsNullOrWhiteSpace(details?.InsuranceCompanyName) ? defaultCompany : details!.InsuranceCompanyName;
+        var policyNo = string.IsNullOrWhiteSpace(details?.InsurancePolicyNo) ? defaultPolicy : details!.InsurancePolicyNo;
+        var start = details?.InsuranceStartDate?.ToString("yyyy-MM-dd") ?? defaultStart;
+        var end = details?.InsuranceEndDate?.ToString("yyyy-MM-dd") ?? defaultEnd;
+
+        if (string.IsNullOrWhiteSpace(company)
+            && string.IsNullOrWhiteSpace(policyNo)
+            && string.IsNullOrWhiteSpace(start)
+            && string.IsNullOrWhiteSpace(end))
+        {
+            return null;
+        }
+
+        return new PortalInsuranceInfo(company, policyNo, start, end);
+    }
+
+    private static JsonElement ParseContentJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return JsonSerializer.Deserialize<JsonElement>("{}");
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<JsonElement>(json);
+        }
+        catch
+        {
+            return JsonSerializer.Deserialize<JsonElement>("{}");
+        }
+    }
+
+    private static string? ReadStringProperty(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (!element.TryGetProperty(name, out var prop))
+        {
+            return null;
+        }
+
+        if (prop.ValueKind == JsonValueKind.String)
+        {
+            return prop.GetString();
+        }
+
+        return prop.ToString();
+    }
 
     private static bool IsRateLimited(string key, out int retryAfterSeconds)
     {

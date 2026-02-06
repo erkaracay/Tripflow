@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,7 @@ internal static class EventsHandlers
             PortalJson = portalJson,
             UpdatedAt = DateTime.UtcNow
         });
+        db.EventDocTabs.AddRange(CreateDefaultDocTabs(entity));
         db.EventDays.AddRange(EventsHelpers.CreateDefaultDays(entity));
         await db.SaveChangesAsync(ct);
 
@@ -939,6 +941,7 @@ internal static class EventsHandlers
         db.EventActivities.RemoveRange(db.EventActivities.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventDays.RemoveRange(db.EventDays.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.EventDocTabs.RemoveRange(db.EventDocTabs.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Participants.RemoveRange(db.Participants.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Events.RemoveRange(db.Events.Where(x => x.Id == id && x.OrganizationId == orgId));
 
@@ -1124,6 +1127,197 @@ internal static class EventsHandlers
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(request);
+    }
+
+    internal static async Task<IResult> GetDocTabs(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var tabs = await db.EventDocTabs.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(ct);
+
+        var response = tabs.Select(MapDocTab).ToArray();
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> CreateDocTab(
+        string eventId,
+        CreateEventDocTabRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var validation = ValidateDocTabRequest(
+            request.Title,
+            request.Type,
+            request.SortOrder,
+            request.IsActive,
+            request.Content,
+            null,
+            out var title,
+            out var type,
+            out var sortOrder,
+            out var isActive,
+            out var contentJson);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        var entity = new EventDocTabEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            EventId = id,
+            Title = title!,
+            Type = type!,
+            SortOrder = sortOrder,
+            IsActive = isActive,
+            ContentJson = contentJson!,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.EventDocTabs.Add(entity);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Created($"/api/events/{id}/docs/tabs/{entity.Id}", MapDocTab(entity));
+    }
+
+    internal static async Task<IResult> UpdateDocTab(
+        string eventId,
+        string tabId,
+        UpdateEventDocTabRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(tabId, out var docTabId))
+        {
+            return EventsHelpers.BadRequest("Doc tab id is invalid.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.EventDocTabs
+            .FirstOrDefaultAsync(x => x.Id == docTabId && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Doc tab not found." });
+        }
+
+        var validation = ValidateDocTabRequest(
+            request.Title,
+            request.Type,
+            request.SortOrder,
+            request.IsActive,
+            request.Content,
+            entity,
+            out var title,
+            out var type,
+            out var sortOrder,
+            out var isActive,
+            out var contentJson);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        entity.Title = title!;
+        entity.Type = type!;
+        entity.SortOrder = sortOrder;
+        entity.IsActive = isActive;
+        entity.ContentJson = contentJson!;
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(MapDocTab(entity));
+    }
+
+    internal static async Task<IResult> DeleteDocTab(
+        string eventId,
+        string tabId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(tabId, out var docTabId))
+        {
+            return EventsHelpers.BadRequest("Doc tab id is invalid.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.EventDocTabs
+            .FirstOrDefaultAsync(x => x.Id == docTabId && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Doc tab not found." });
+        }
+
+        db.EventDocTabs.Remove(entity);
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
     }
 
     internal static async Task<IResult> AssignGuide(
@@ -1397,6 +1591,7 @@ internal static class EventsHandlers
             row.details is null ? null : new ParticipantDetailsDto(
                 row.details.RoomNo,
                 row.details.RoomType,
+                row.details.BoardType,
                 row.details.PersonNo,
                 row.details.AgencyName,
                 row.details.City,
@@ -1405,6 +1600,10 @@ internal static class EventsHandlers
                 row.details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
                 row.details.TicketNo,
                 row.details.AttendanceStatus,
+                row.details.InsuranceCompanyName,
+                row.details.InsurancePolicyNo,
+                row.details.InsuranceStartDate?.ToString("yyyy-MM-dd"),
+                row.details.InsuranceEndDate?.ToString("yyyy-MM-dd"),
                 row.details.ArrivalAirline,
                 row.details.ArrivalDepartureAirport,
                 row.details.ArrivalArrivalAirport,
@@ -2749,6 +2948,195 @@ internal static class EventsHandlers
         };
     }
 
+    private static EventDocTabDto MapDocTab(EventDocTabEntity entity)
+    {
+        return new EventDocTabDto(
+            entity.Id,
+            entity.EventId,
+            entity.Title,
+            entity.Type,
+            entity.SortOrder,
+            entity.IsActive,
+            ParseContentJson(entity.ContentJson));
+    }
+
+    private static IResult? ValidateDocTabRequest(
+        string? titleInput,
+        string? typeInput,
+        int? sortOrderInput,
+        bool? isActiveInput,
+        JsonElement? contentInput,
+        EventDocTabEntity? existing,
+        out string? title,
+        out string? type,
+        out int sortOrder,
+        out bool isActive,
+        out string? contentJson)
+    {
+        title = titleInput?.Trim();
+        type = typeInput?.Trim();
+
+        if (titleInput is null)
+        {
+            if (existing is null)
+            {
+                sortOrder = 0;
+                isActive = false;
+                contentJson = null;
+                return EventsHelpers.BadRequest("Title is required.");
+            }
+            title = existing.Title;
+        }
+        else if (string.IsNullOrWhiteSpace(title))
+        {
+            sortOrder = 0;
+            isActive = false;
+            contentJson = null;
+            return EventsHelpers.BadRequest("Title is required.");
+        }
+        else if (title!.Length > 200)
+        {
+            sortOrder = 0;
+            isActive = false;
+            contentJson = null;
+            return EventsHelpers.BadRequest("Title must be at most 200 characters.");
+        }
+
+        if (typeInput is null)
+        {
+            if (existing is null)
+            {
+                sortOrder = 0;
+                isActive = false;
+                contentJson = null;
+                return EventsHelpers.BadRequest("Type is required.");
+            }
+            type = existing.Type;
+        }
+        else if (string.IsNullOrWhiteSpace(type))
+        {
+            sortOrder = 0;
+            isActive = false;
+            contentJson = null;
+            return EventsHelpers.BadRequest("Type is required.");
+        }
+        else if (type!.Length > 50)
+        {
+            sortOrder = 0;
+            isActive = false;
+            contentJson = null;
+            return EventsHelpers.BadRequest("Type must be at most 50 characters.");
+        }
+
+        if (sortOrderInput.HasValue)
+        {
+            sortOrder = sortOrderInput.Value;
+            if (sortOrder < 1)
+            {
+                isActive = false;
+                contentJson = null;
+                return EventsHelpers.BadRequest("Sort order must be >= 1.");
+            }
+        }
+        else
+        {
+            sortOrder = existing?.SortOrder ?? 1;
+        }
+
+        isActive = isActiveInput ?? existing?.IsActive ?? true;
+
+        if (contentInput.HasValue)
+        {
+            var value = contentInput.Value;
+            if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
+            {
+                contentJson = existing?.ContentJson ?? "{}";
+            }
+            else if (value.ValueKind != JsonValueKind.Object)
+            {
+                contentJson = null;
+                return EventsHelpers.BadRequest("contentJson must be a JSON object.");
+            }
+            else
+            {
+                contentJson = JsonSerializer.Serialize(value);
+            }
+        }
+        else
+        {
+            contentJson = existing?.ContentJson ?? "{}";
+        }
+
+        return null;
+    }
+
+    private static JsonElement ParseContentJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return JsonSerializer.Deserialize<JsonElement>("{}");
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<JsonElement>(json);
+        }
+        catch
+        {
+            return JsonSerializer.Deserialize<JsonElement>("{}");
+        }
+    }
+
+    private static IEnumerable<EventDocTabEntity> CreateDefaultDocTabs(EventEntity entity)
+    {
+        var hotelContent = JsonSerializer.Serialize(new
+        {
+            hotelName = string.Empty,
+            address = string.Empty,
+            phone = string.Empty,
+            checkInNote = string.Empty,
+            checkOutNote = string.Empty
+        });
+
+        var insuranceContent = JsonSerializer.Serialize(new
+        {
+            companyName = string.Empty,
+            policyNo = string.Empty,
+            startDate = string.Empty,
+            endDate = string.Empty
+        });
+
+        var now = DateTime.UtcNow;
+
+        return new[]
+        {
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Hotel",
+                Type = "Hotel",
+                SortOrder = 1,
+                IsActive = true,
+                ContentJson = hotelContent,
+                CreatedAt = now
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Insurance",
+                Type = "Insurance",
+                SortOrder = 2,
+                IsActive = false,
+                ContentJson = insuranceContent,
+                CreatedAt = now
+            }
+        };
+    }
+
     private static ParticipantDetailsDto? MapDetails(ParticipantDetailsEntity? details)
     {
         if (details is null)
@@ -2759,6 +3147,7 @@ internal static class EventsHandlers
         return new ParticipantDetailsDto(
             details.RoomNo,
             details.RoomType,
+            details.BoardType,
             details.PersonNo,
             details.AgencyName,
             details.City,
@@ -2767,6 +3156,10 @@ internal static class EventsHandlers
             details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
             details.TicketNo,
             details.AttendanceStatus,
+            details.InsuranceCompanyName,
+            details.InsurancePolicyNo,
+            details.InsuranceStartDate?.ToString("yyyy-MM-dd"),
+            details.InsuranceEndDate?.ToString("yyyy-MM-dd"),
             details.ArrivalAirline,
             details.ArrivalDepartureAirport,
             details.ArrivalArrivalAirport,
@@ -2796,6 +3189,7 @@ internal static class EventsHandlers
     {
         details.RoomNo = request.RoomNo;
         details.RoomType = request.RoomType;
+        details.BoardType = request.BoardType;
         details.PersonNo = request.PersonNo;
         details.AgencyName = request.AgencyName;
         details.City = request.City;
@@ -2814,6 +3208,20 @@ internal static class EventsHandlers
         details.HotelCheckOutDate = checkOut;
         details.TicketNo = request.TicketNo;
         details.AttendanceStatus = request.AttendanceStatus;
+        if (!TryParseDateOnly(request.InsuranceStartDate, out var insuranceStart))
+        {
+            error = "Insurance start date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        if (!TryParseDateOnly(request.InsuranceEndDate, out var insuranceEnd))
+        {
+            error = "Insurance end date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        details.InsuranceCompanyName = request.InsuranceCompanyName;
+        details.InsurancePolicyNo = request.InsurancePolicyNo;
+        details.InsuranceStartDate = insuranceStart;
+        details.InsuranceEndDate = insuranceEnd;
         details.ArrivalAirline = request.ArrivalAirline;
         details.ArrivalDepartureAirport = request.ArrivalDepartureAirport;
         details.ArrivalArrivalAirport = request.ArrivalArrivalAirport;

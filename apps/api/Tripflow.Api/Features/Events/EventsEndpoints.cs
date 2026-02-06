@@ -372,6 +372,33 @@ public static class EventsEndpoints
                 return op;
             });
 
+        admin.MapGet("/{eventId}/docs/tabs", EventsHandlers.GetDocTabs)
+            .WithSummary("List doc tabs")
+            .WithDescription("Returns all document tabs for the event.")
+            .Produces<EventDocTabDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/docs/tabs", EventsHandlers.CreateDocTab)
+            .WithSummary("Create doc tab")
+            .WithDescription("Creates a document tab for the event.")
+            .Produces<EventDocTabDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/docs/tabs/{tabId}", EventsHandlers.UpdateDocTab)
+            .WithSummary("Update doc tab")
+            .WithDescription("Updates a document tab for the event.")
+            .Produces<EventDocTabDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/docs/tabs/{tabId}", EventsHandlers.DeleteDocTab)
+            .WithSummary("Delete doc tab")
+            .WithDescription("Deletes a document tab for the event.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

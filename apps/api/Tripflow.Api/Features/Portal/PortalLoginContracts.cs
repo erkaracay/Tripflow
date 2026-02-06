@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Tripflow.Api.Features.Events;
 
 namespace Tripflow.Api.Features.Portal;
@@ -16,7 +17,8 @@ public sealed record PortalMeResponse(
     PortalEventSummary Event,
     PortalParticipantSummaryFull Participant,
     EventPortalInfo Portal,
-    EventScheduleDto Schedule);
+    EventScheduleDto Schedule,
+    PortalDocsResponse Docs);
 
 public sealed record PortalEventSummary(
     Guid Id,
@@ -34,3 +36,41 @@ public sealed record PortalParticipantSummaryFull(
     string BirthDate,
     string Gender,
     string CheckInCode);
+
+public sealed record PortalDocsResponse(
+    PortalDocTabDto[] Tabs,
+    PortalParticipantTravel ParticipantTravel);
+
+public sealed record PortalDocTabDto(
+    Guid Id,
+    string Title,
+    string Type,
+    int SortOrder,
+    JsonElement Content);
+
+public sealed record PortalParticipantTravel(
+    string? RoomNo,
+    string? RoomType,
+    string? BoardType,
+    string? HotelCheckInDate,
+    string? HotelCheckOutDate,
+    PortalFlightInfo? Arrival,
+    PortalFlightInfo? Return,
+    PortalInsuranceInfo? Insurance);
+
+public sealed record PortalFlightInfo(
+    string? Airline,
+    string? DepartureAirport,
+    string? ArrivalAirport,
+    string? FlightCode,
+    string? DepartureTime,
+    string? ArrivalTime,
+    string? Pnr,
+    int? BaggagePieces,
+    int? BaggageTotalKg);
+
+public sealed record PortalInsuranceInfo(
+    string? CompanyName,
+    string? PolicyNo,
+    string? StartDate,
+    string? EndDate);

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Tripflow.Api.Features.Events;
 
 public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate);
@@ -118,6 +120,7 @@ public sealed record UpdateParticipantRequest(
 public sealed record ParticipantDetailsRequest(
     string? RoomNo,
     string? RoomType,
+    string? BoardType,
     string? PersonNo,
     string? AgencyName,
     string? City,
@@ -126,6 +129,10 @@ public sealed record ParticipantDetailsRequest(
     string? HotelCheckOutDate,
     string? TicketNo,
     string? AttendanceStatus,
+    string? InsuranceCompanyName,
+    string? InsurancePolicyNo,
+    string? InsuranceStartDate,
+    string? InsuranceEndDate,
     string? ArrivalAirline,
     string? ArrivalDepartureAirport,
     string? ArrivalArrivalAirport,
@@ -150,6 +157,7 @@ public sealed record ParticipantDetailsRequest(
 public sealed record ParticipantDetailsDto(
     string? RoomNo,
     string? RoomType,
+    string? BoardType,
     string? PersonNo,
     string? AgencyName,
     string? City,
@@ -158,6 +166,10 @@ public sealed record ParticipantDetailsDto(
     string? HotelCheckOutDate,
     string? TicketNo,
     string? AttendanceStatus,
+    string? InsuranceCompanyName,
+    string? InsurancePolicyNo,
+    string? InsuranceStartDate,
+    string? InsuranceEndDate,
     string? ArrivalAirline,
     string? ArrivalDepartureAirport,
     string? ArrivalArrivalAirport,
@@ -198,6 +210,29 @@ public sealed record ParticipantLastLogDto(
     string Method,
     string Result,
     DateTime CreatedAt);
+
+public sealed record EventDocTabDto(
+    Guid Id,
+    Guid EventId,
+    string Title,
+    string Type,
+    int SortOrder,
+    bool IsActive,
+    JsonElement Content);
+
+public sealed record CreateEventDocTabRequest(
+    string? Title,
+    string? Type,
+    int? SortOrder,
+    bool? IsActive,
+    JsonElement? Content);
+
+public sealed record UpdateEventDocTabRequest(
+    string? Title,
+    string? Type,
+    int? SortOrder,
+    bool? IsActive,
+    JsonElement? Content);
 
 public sealed record ParticipantWillNotAttendRequest(bool? WillNotAttend);
 public sealed record ParticipantWillNotAttendResponseDto(

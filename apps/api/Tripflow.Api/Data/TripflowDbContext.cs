@@ -12,6 +12,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventActivityEntity> EventActivities => Set<EventActivityEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
+    public DbSet<EventDocTabEntity> EventDocTabs => Set<EventDocTabEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
     public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
@@ -227,6 +228,7 @@ public sealed class TripflowDbContext : DbContext
 
             b.Property(x => x.RoomNo).HasMaxLength(50);
             b.Property(x => x.RoomType).HasMaxLength(50);
+            b.Property(x => x.BoardType).HasMaxLength(50);
             b.Property(x => x.PersonNo).HasMaxLength(50);
             b.Property(x => x.AgencyName).HasMaxLength(200);
             b.Property(x => x.City).HasMaxLength(100);
@@ -237,6 +239,11 @@ public sealed class TripflowDbContext : DbContext
 
             b.Property(x => x.TicketNo).HasMaxLength(100);
             b.Property(x => x.AttendanceStatus).HasMaxLength(100);
+
+            b.Property(x => x.InsuranceCompanyName).HasMaxLength(200);
+            b.Property(x => x.InsurancePolicyNo).HasMaxLength(100);
+            b.Property(x => x.InsuranceStartDate).HasColumnType("date");
+            b.Property(x => x.InsuranceEndDate).HasColumnType("date");
 
             b.Property(x => x.ArrivalAirline).HasMaxLength(100);
             b.Property(x => x.ArrivalDepartureAirport).HasMaxLength(100);
@@ -260,6 +267,33 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnBaggagePieces);
             b.Property(x => x.ReturnBaggageTotalKg);
 
+        });
+
+        modelBuilder.Entity<EventDocTabEntity>(b =>
+        {
+            b.ToTable("event_doc_tabs");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Type).HasMaxLength(50).IsRequired();
+            b.Property(x => x.SortOrder).HasDefaultValue(1);
+            b.Property(x => x.IsActive).HasDefaultValue(true);
+            b.Property(x => x.ContentJson).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.SortOrder });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.DocTabs)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.DocTabs)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PortalSessionEntity>(b =>

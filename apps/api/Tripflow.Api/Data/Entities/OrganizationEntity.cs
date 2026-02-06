@@ -18,4 +18,5 @@ public sealed class OrganizationEntity
     public List<PortalSessionEntity> PortalSessions { get; set; } = new();
     public List<CheckInEntity> CheckIns { get; set; } = new();
     public List<EventPortalEntity> Portals { get; set; } = new();
+    public List<EventDocTabEntity> DocTabs { get; set; } = new();
 }
