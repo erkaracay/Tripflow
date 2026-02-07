@@ -157,6 +157,20 @@ const editDetails = reactive({
   returnArrivalTime: '',
   returnPnr: '',
   returnBaggageAllowance: '',
+  arrivalTransferPickupTime: '',
+  arrivalTransferPickupPlace: '',
+  arrivalTransferDropoffPlace: '',
+  arrivalTransferVehicle: '',
+  arrivalTransferPlate: '',
+  arrivalTransferDriverInfo: '',
+  arrivalTransferNote: '',
+  returnTransferPickupTime: '',
+  returnTransferPickupPlace: '',
+  returnTransferDropoffPlace: '',
+  returnTransferVehicle: '',
+  returnTransferPlate: '',
+  returnTransferDriverInfo: '',
+  returnTransferNote: '',
 })
 
 const genderOptions = [
@@ -556,6 +570,20 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
   editDetails.returnPnr = participant.details?.returnPnr ?? ''
   editDetails.returnBaggageAllowance = participant.details?.returnBaggageAllowance ?? ''
+  editDetails.arrivalTransferPickupTime = participant.details?.arrivalTransferPickupTime ?? ''
+  editDetails.arrivalTransferPickupPlace = participant.details?.arrivalTransferPickupPlace ?? ''
+  editDetails.arrivalTransferDropoffPlace = participant.details?.arrivalTransferDropoffPlace ?? ''
+  editDetails.arrivalTransferVehicle = participant.details?.arrivalTransferVehicle ?? ''
+  editDetails.arrivalTransferPlate = participant.details?.arrivalTransferPlate ?? ''
+  editDetails.arrivalTransferDriverInfo = participant.details?.arrivalTransferDriverInfo ?? ''
+  editDetails.arrivalTransferNote = participant.details?.arrivalTransferNote ?? ''
+  editDetails.returnTransferPickupTime = participant.details?.returnTransferPickupTime ?? ''
+  editDetails.returnTransferPickupPlace = participant.details?.returnTransferPickupPlace ?? ''
+  editDetails.returnTransferDropoffPlace = participant.details?.returnTransferDropoffPlace ?? ''
+  editDetails.returnTransferVehicle = participant.details?.returnTransferVehicle ?? ''
+  editDetails.returnTransferPlate = participant.details?.returnTransferPlate ?? ''
+  editDetails.returnTransferDriverInfo = participant.details?.returnTransferDriverInfo ?? ''
+  editDetails.returnTransferNote = participant.details?.returnTransferNote ?? ''
 }
 
 const cancelEditParticipant = () => {
@@ -660,6 +688,20 @@ const saveParticipant = async (participant: Participant) => {
           returnArrivalTime: editDetails.returnArrivalTime || undefined,
           returnPnr: editDetails.returnPnr || undefined,
           returnBaggageAllowance: editDetails.returnBaggageAllowance || undefined,
+          arrivalTransferPickupTime: editDetails.arrivalTransferPickupTime || undefined,
+          arrivalTransferPickupPlace: editDetails.arrivalTransferPickupPlace || undefined,
+          arrivalTransferDropoffPlace: editDetails.arrivalTransferDropoffPlace || undefined,
+          arrivalTransferVehicle: editDetails.arrivalTransferVehicle || undefined,
+          arrivalTransferPlate: editDetails.arrivalTransferPlate || undefined,
+          arrivalTransferDriverInfo: editDetails.arrivalTransferDriverInfo || undefined,
+          arrivalTransferNote: editDetails.arrivalTransferNote || undefined,
+          returnTransferPickupTime: editDetails.returnTransferPickupTime || undefined,
+          returnTransferPickupPlace: editDetails.returnTransferPickupPlace || undefined,
+          returnTransferDropoffPlace: editDetails.returnTransferDropoffPlace || undefined,
+          returnTransferVehicle: editDetails.returnTransferVehicle || undefined,
+          returnTransferPlate: editDetails.returnTransferPlate || undefined,
+          returnTransferDriverInfo: editDetails.returnTransferDriverInfo || undefined,
+          returnTransferNote: editDetails.returnTransferNote || undefined,
         },
       }
     )
@@ -1732,6 +1774,69 @@ onMounted(loadEvent)
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnBaggageAllowance') }}</span>
                     <input v-model.trim="editDetails.returnBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
+                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.transferTitle') }}</div>
+                <div class="text-sm font-semibold text-slate-600">{{ t('admin.participants.details.arrivalTransferTitle') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferPickupTime') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferPickupPlace') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferPickupPlace" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferDropoffPlace') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferDropoffPlace" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferVehicle') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferVehicle" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferPlate') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferPlate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferDriverInfo') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferDriverInfo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm md:col-span-3">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferNote') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferNote" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
+                <div class="text-sm font-semibold text-slate-600">{{ t('admin.participants.details.returnTransferTitle') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferPickupTime') }}</span>
+                    <input v-model.trim="editDetails.returnTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferPickupPlace') }}</span>
+                    <input v-model.trim="editDetails.returnTransferPickupPlace" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferDropoffPlace') }}</span>
+                    <input v-model.trim="editDetails.returnTransferDropoffPlace" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferVehicle') }}</span>
+                    <input v-model.trim="editDetails.returnTransferVehicle" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferPlate') }}</span>
+                    <input v-model.trim="editDetails.returnTransferPlate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferDriverInfo') }}</span>
+                    <input v-model.trim="editDetails.returnTransferDriverInfo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm md:col-span-3">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferNote') }}</span>
+                    <input v-model.trim="editDetails.returnTransferNote" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                 </div>
               </div>

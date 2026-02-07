@@ -60,6 +60,7 @@ const formatType = (type: string) => {
   const normalized = type.toLowerCase()
   if (normalized === 'hotel') return t('admin.docs.types.hotel')
   if (normalized === 'insurance') return t('admin.docs.types.insurance')
+  if (normalized === 'transfer') return t('admin.docs.types.transfer')
   return type
 }
 

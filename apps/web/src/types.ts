@@ -107,6 +107,20 @@ export type ParticipantDetails = {
   returnBaggageAllowance?: string | null
   returnBaggagePieces?: number | null
   returnBaggageTotalKg?: number | null
+  arrivalTransferPickupTime?: string | null
+  arrivalTransferPickupPlace?: string | null
+  arrivalTransferDropoffPlace?: string | null
+  arrivalTransferVehicle?: string | null
+  arrivalTransferPlate?: string | null
+  arrivalTransferDriverInfo?: string | null
+  arrivalTransferNote?: string | null
+  returnTransferPickupTime?: string | null
+  returnTransferPickupPlace?: string | null
+  returnTransferDropoffPlace?: string | null
+  returnTransferVehicle?: string | null
+  returnTransferPlate?: string | null
+  returnTransferDriverInfo?: string | null
+  returnTransferNote?: string | null
 }
 
 export type ParticipantTableItem = {
@@ -313,14 +327,27 @@ export type PortalInsuranceInfo = {
   endDate?: string | null
 }
 
+export type PortalTransferInfo = {
+  pickupTime?: string | null
+  pickupPlace?: string | null
+  dropoffPlace?: string | null
+  vehicle?: string | null
+  plate?: string | null
+  driverInfo?: string | null
+  note?: string | null
+}
+
 export type PortalParticipantTravel = {
   roomNo?: string | null
   roomType?: string | null
   boardType?: string | null
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
+  ticketNo?: string | null
   arrival?: PortalFlightInfo | null
   return?: PortalFlightInfo | null
+  transferOutbound?: PortalTransferInfo | null
+  transferReturn?: PortalTransferInfo | null
   insurance?: PortalInsuranceInfo | null
 }
 
