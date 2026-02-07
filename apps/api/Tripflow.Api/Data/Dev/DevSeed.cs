@@ -668,6 +668,78 @@ public static class DevSeed
                 updated = true;
             }
 
+            if (detail.ArrivalTransferPickupTime is null)
+            {
+                detail.ArrivalTransferPickupTime = new TimeOnly(7 + (index % 4), 15);
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferPickupPlace))
+            {
+                detail.ArrivalTransferPickupPlace = "Havalimanı Terminal 1";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferDropoffPlace))
+            {
+                detail.ArrivalTransferDropoffPlace = "Otel giriş kapısı";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferVehicle))
+            {
+                detail.ArrivalTransferVehicle = "Mercedes Sprinter";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferPlate))
+            {
+                detail.ArrivalTransferPlate = $"34 TF {200 + index:000}";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferDriverInfo))
+            {
+                detail.ArrivalTransferDriverInfo = $"Sürücü {index % 5 + 1} · +90 5{index % 9}0 123 45 67";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTransferNote))
+            {
+                detail.ArrivalTransferNote = "Karşılama tabelası Tripflow";
+                updated = true;
+            }
+
+            if (detail.ReturnTransferPickupTime is null)
+            {
+                detail.ReturnTransferPickupTime = new TimeOnly(18 + (index % 3), 0);
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferPickupPlace))
+            {
+                detail.ReturnTransferPickupPlace = "Otel lobisi";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferDropoffPlace))
+            {
+                detail.ReturnTransferDropoffPlace = "Havalimanı Terminal 2";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferVehicle))
+            {
+                detail.ReturnTransferVehicle = "Mercedes Vito";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferPlate))
+            {
+                detail.ReturnTransferPlate = $"34 TF {500 + index:000}";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferDriverInfo))
+            {
+                detail.ReturnTransferDriverInfo = $"Sürücü {index % 4 + 1} · +90 5{index % 9}0 765 43 21";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTransferNote))
+            {
+                detail.ReturnTransferNote = "Lobide 15 dk önce buluşma";
+                updated = true;
+            }
+
             if (existing is null)
             {
                 db.ParticipantDetails.Add(detail);
@@ -715,6 +787,8 @@ public static class DevSeed
             endDate = string.Empty
         });
 
+        var transferContent = JsonSerializer.Serialize(new { });
+
         db.EventDocTabs.AddRange(
             new EventDocTabEntity
             {
@@ -738,6 +812,18 @@ public static class DevSeed
                 SortOrder = 2,
                 IsActive = false,
                 ContentJson = insuranceContent,
+                CreatedAt = now
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                Title = "Transfer",
+                Type = "Transfer",
+                SortOrder = 3,
+                IsActive = true,
+                ContentJson = transferContent,
                 CreatedAt = now
             });
 

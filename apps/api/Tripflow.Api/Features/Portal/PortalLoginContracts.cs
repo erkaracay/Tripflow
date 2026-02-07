@@ -54,8 +54,11 @@ public sealed record PortalParticipantTravel(
     string? BoardType,
     string? HotelCheckInDate,
     string? HotelCheckOutDate,
+    string? TicketNo,
     PortalFlightInfo? Arrival,
     PortalFlightInfo? Return,
+    PortalTransferInfo? TransferOutbound,
+    PortalTransferInfo? TransferReturn,
     PortalInsuranceInfo? Insurance);
 
 public sealed record PortalFlightInfo(
@@ -74,3 +77,12 @@ public sealed record PortalInsuranceInfo(
     string? PolicyNo,
     string? StartDate,
     string? EndDate);
+
+public sealed record PortalTransferInfo(
+    string? PickupTime,
+    string? PickupPlace,
+    string? DropoffPlace,
+    string? Vehicle,
+    string? Plate,
+    string? DriverInfo,
+    string? Note);

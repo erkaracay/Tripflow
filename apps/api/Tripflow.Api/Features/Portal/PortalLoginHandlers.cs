@@ -226,12 +226,31 @@ internal static class PortalLoginHandlers
         var insuranceDefaults = allTabs.FirstOrDefault(x => x.Type == "Insurance");
         var insuranceInfo = BuildInsuranceInfo(insuranceDefaults?.ContentJson, details);
 
+        var transferOutbound = BuildTransferInfo(
+            details?.ArrivalTransferPickupTime,
+            details?.ArrivalTransferPickupPlace,
+            details?.ArrivalTransferDropoffPlace,
+            details?.ArrivalTransferVehicle,
+            details?.ArrivalTransferPlate,
+            details?.ArrivalTransferDriverInfo,
+            details?.ArrivalTransferNote);
+
+        var transferReturn = BuildTransferInfo(
+            details?.ReturnTransferPickupTime,
+            details?.ReturnTransferPickupPlace,
+            details?.ReturnTransferDropoffPlace,
+            details?.ReturnTransferVehicle,
+            details?.ReturnTransferPlate,
+            details?.ReturnTransferDriverInfo,
+            details?.ReturnTransferNote);
+
         var travel = new PortalParticipantTravel(
             details?.RoomNo,
             details?.RoomType,
             details?.BoardType,
             details?.HotelCheckInDate?.ToString("yyyy-MM-dd"),
             details?.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
+            details?.TicketNo,
             details is null
                 ? null
                 : new PortalFlightInfo(
@@ -256,6 +275,8 @@ internal static class PortalLoginHandlers
                     details.ReturnPnr,
                     details.ReturnBaggagePieces,
                     details.ReturnBaggageTotalKg),
+            transferOutbound,
+            transferReturn,
             insuranceInfo);
 
         var tabDtos = allTabs
@@ -294,6 +315,36 @@ internal static class PortalLoginHandlers
         }
 
         return new PortalInsuranceInfo(company, policyNo, start, end);
+    }
+
+    private static PortalTransferInfo? BuildTransferInfo(
+        TimeOnly? pickupTime,
+        string? pickupPlace,
+        string? dropoffPlace,
+        string? vehicle,
+        string? plate,
+        string? driverInfo,
+        string? note)
+    {
+        if (pickupTime is null
+            && string.IsNullOrWhiteSpace(pickupPlace)
+            && string.IsNullOrWhiteSpace(dropoffPlace)
+            && string.IsNullOrWhiteSpace(vehicle)
+            && string.IsNullOrWhiteSpace(plate)
+            && string.IsNullOrWhiteSpace(driverInfo)
+            && string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        return new PortalTransferInfo(
+            pickupTime?.ToString("HH:mm"),
+            pickupPlace,
+            dropoffPlace,
+            vehicle,
+            plate,
+            driverInfo,
+            note);
     }
 
     private static JsonElement ParseContentJson(string? json)

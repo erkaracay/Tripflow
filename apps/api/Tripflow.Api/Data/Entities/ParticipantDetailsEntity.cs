@@ -45,4 +45,20 @@ public sealed class ParticipantDetailsEntity
     public string? ReturnBaggageAllowance { get; set; }
     public int? ReturnBaggagePieces { get; set; }
     public int? ReturnBaggageTotalKg { get; set; }
+
+    public TimeOnly? ArrivalTransferPickupTime { get; set; }
+    public string? ArrivalTransferPickupPlace { get; set; }
+    public string? ArrivalTransferDropoffPlace { get; set; }
+    public string? ArrivalTransferVehicle { get; set; }
+    public string? ArrivalTransferPlate { get; set; }
+    public string? ArrivalTransferDriverInfo { get; set; }
+    public string? ArrivalTransferNote { get; set; }
+
+    public TimeOnly? ReturnTransferPickupTime { get; set; }
+    public string? ReturnTransferPickupPlace { get; set; }
+    public string? ReturnTransferDropoffPlace { get; set; }
+    public string? ReturnTransferVehicle { get; set; }
+    public string? ReturnTransferPlate { get; set; }
+    public string? ReturnTransferDriverInfo { get; set; }
+    public string? ReturnTransferNote { get; set; }
 }

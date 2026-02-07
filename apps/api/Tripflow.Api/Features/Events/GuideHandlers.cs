@@ -520,6 +520,20 @@ internal static class GuideHandlers
             details.ReturnPnr,
             details.ReturnBaggageAllowance,
             details.ReturnBaggagePieces,
-            details.ReturnBaggageTotalKg);
+            details.ReturnBaggageTotalKg,
+            details.ArrivalTransferPickupTime?.ToString("HH:mm"),
+            details.ArrivalTransferPickupPlace,
+            details.ArrivalTransferDropoffPlace,
+            details.ArrivalTransferVehicle,
+            details.ArrivalTransferPlate,
+            details.ArrivalTransferDriverInfo,
+            details.ArrivalTransferNote,
+            details.ReturnTransferPickupTime?.ToString("HH:mm"),
+            details.ReturnTransferPickupPlace,
+            details.ReturnTransferDropoffPlace,
+            details.ReturnTransferVehicle,
+            details.ReturnTransferPlate,
+            details.ReturnTransferDriverInfo,
+            details.ReturnTransferNote);
     }
 }

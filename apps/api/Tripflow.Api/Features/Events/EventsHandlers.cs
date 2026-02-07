@@ -1623,7 +1623,21 @@ internal static class EventsHandlers
                 row.details.ReturnPnr,
                 row.details.ReturnBaggageAllowance,
                 row.details.ReturnBaggagePieces,
-                row.details.ReturnBaggageTotalKg)))
+                row.details.ReturnBaggageTotalKg,
+                row.details.ArrivalTransferPickupTime?.ToString("HH:mm"),
+                row.details.ArrivalTransferPickupPlace,
+                row.details.ArrivalTransferDropoffPlace,
+                row.details.ArrivalTransferVehicle,
+                row.details.ArrivalTransferPlate,
+                row.details.ArrivalTransferDriverInfo,
+                row.details.ArrivalTransferNote,
+                row.details.ReturnTransferPickupTime?.ToString("HH:mm"),
+                row.details.ReturnTransferPickupPlace,
+                row.details.ReturnTransferDropoffPlace,
+                row.details.ReturnTransferVehicle,
+                row.details.ReturnTransferPlate,
+                row.details.ReturnTransferDriverInfo,
+                row.details.ReturnTransferNote)))
             .ToArray();
 
         return Results.Ok(new ParticipantTableResponseDto(
@@ -3106,6 +3120,8 @@ internal static class EventsHandlers
             endDate = string.Empty
         });
 
+        var transferContent = JsonSerializer.Serialize(new { });
+
         var now = DateTime.UtcNow;
 
         return new[]
@@ -3132,6 +3148,18 @@ internal static class EventsHandlers
                 SortOrder = 2,
                 IsActive = false,
                 ContentJson = insuranceContent,
+                CreatedAt = now
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Transfer",
+                Type = "Transfer",
+                SortOrder = 3,
+                IsActive = true,
+                ContentJson = transferContent,
                 CreatedAt = now
             }
         };
@@ -3179,7 +3207,21 @@ internal static class EventsHandlers
             details.ReturnPnr,
             details.ReturnBaggageAllowance,
             details.ReturnBaggagePieces,
-            details.ReturnBaggageTotalKg);
+            details.ReturnBaggageTotalKg,
+            details.ArrivalTransferPickupTime?.ToString("HH:mm"),
+            details.ArrivalTransferPickupPlace,
+            details.ArrivalTransferDropoffPlace,
+            details.ArrivalTransferVehicle,
+            details.ArrivalTransferPlate,
+            details.ArrivalTransferDriverInfo,
+            details.ArrivalTransferNote,
+            details.ReturnTransferPickupTime?.ToString("HH:mm"),
+            details.ReturnTransferPickupPlace,
+            details.ReturnTransferDropoffPlace,
+            details.ReturnTransferVehicle,
+            details.ReturnTransferPlate,
+            details.ReturnTransferDriverInfo,
+            details.ReturnTransferNote);
     }
 
     private static bool TryApplyDetails(
@@ -3262,6 +3304,30 @@ internal static class EventsHandlers
         details.ReturnBaggageAllowance = request.ReturnBaggageAllowance;
         details.ReturnBaggagePieces = request.ReturnBaggagePieces;
         details.ReturnBaggageTotalKg = request.ReturnBaggageTotalKg;
+        if (!TryParseTimeOnly(request.ArrivalTransferPickupTime, out var arrivalTransferPickupTime))
+        {
+            error = "Arrival transfer pickup time must be in HH:mm format.";
+            return false;
+        }
+        if (!TryParseTimeOnly(request.ReturnTransferPickupTime, out var returnTransferPickupTime))
+        {
+            error = "Return transfer pickup time must be in HH:mm format.";
+            return false;
+        }
+        details.ArrivalTransferPickupTime = arrivalTransferPickupTime;
+        details.ArrivalTransferPickupPlace = request.ArrivalTransferPickupPlace;
+        details.ArrivalTransferDropoffPlace = request.ArrivalTransferDropoffPlace;
+        details.ArrivalTransferVehicle = request.ArrivalTransferVehicle;
+        details.ArrivalTransferPlate = request.ArrivalTransferPlate;
+        details.ArrivalTransferDriverInfo = request.ArrivalTransferDriverInfo;
+        details.ArrivalTransferNote = request.ArrivalTransferNote;
+        details.ReturnTransferPickupTime = returnTransferPickupTime;
+        details.ReturnTransferPickupPlace = request.ReturnTransferPickupPlace;
+        details.ReturnTransferDropoffPlace = request.ReturnTransferDropoffPlace;
+        details.ReturnTransferVehicle = request.ReturnTransferVehicle;
+        details.ReturnTransferPlate = request.ReturnTransferPlate;
+        details.ReturnTransferDriverInfo = request.ReturnTransferDriverInfo;
+        details.ReturnTransferNote = request.ReturnTransferNote;
         error = string.Empty;
         return true;
     }

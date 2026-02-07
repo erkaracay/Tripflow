@@ -152,7 +152,21 @@ public sealed record ParticipantDetailsRequest(
     string? ReturnPnr,
     string? ReturnBaggageAllowance,
     int? ReturnBaggagePieces,
-    int? ReturnBaggageTotalKg);
+    int? ReturnBaggageTotalKg,
+    string? ArrivalTransferPickupTime,
+    string? ArrivalTransferPickupPlace,
+    string? ArrivalTransferDropoffPlace,
+    string? ArrivalTransferVehicle,
+    string? ArrivalTransferPlate,
+    string? ArrivalTransferDriverInfo,
+    string? ArrivalTransferNote,
+    string? ReturnTransferPickupTime,
+    string? ReturnTransferPickupPlace,
+    string? ReturnTransferDropoffPlace,
+    string? ReturnTransferVehicle,
+    string? ReturnTransferPlate,
+    string? ReturnTransferDriverInfo,
+    string? ReturnTransferNote);
 
 public sealed record ParticipantDetailsDto(
     string? RoomNo,
@@ -189,7 +203,21 @@ public sealed record ParticipantDetailsDto(
     string? ReturnPnr,
     string? ReturnBaggageAllowance,
     int? ReturnBaggagePieces,
-    int? ReturnBaggageTotalKg);
+    int? ReturnBaggageTotalKg,
+    string? ArrivalTransferPickupTime,
+    string? ArrivalTransferPickupPlace,
+    string? ArrivalTransferDropoffPlace,
+    string? ArrivalTransferVehicle,
+    string? ArrivalTransferPlate,
+    string? ArrivalTransferDriverInfo,
+    string? ArrivalTransferNote,
+    string? ReturnTransferPickupTime,
+    string? ReturnTransferPickupPlace,
+    string? ReturnTransferDropoffPlace,
+    string? ReturnTransferVehicle,
+    string? ReturnTransferPlate,
+    string? ReturnTransferDriverInfo,
+    string? ReturnTransferNote);
 
 public sealed record ParticipantDto(
     Guid Id,

@@ -58,7 +58,21 @@ internal static class ParticipantImportHandlers
         "return_arrival_time",
         "return_pnr",
         "return_baggage_pieces",
-        "return_baggage_total_kg"
+        "return_baggage_total_kg",
+        "arrival_transfer_pickup_time",
+        "arrival_transfer_pickup_place",
+        "arrival_transfer_dropoff_place",
+        "arrival_transfer_vehicle",
+        "arrival_transfer_plate",
+        "arrival_transfer_driver_info",
+        "arrival_transfer_note",
+        "return_transfer_pickup_time",
+        "return_transfer_pickup_place",
+        "return_transfer_dropoff_place",
+        "return_transfer_vehicle",
+        "return_transfer_plate",
+        "return_transfer_driver_info",
+        "return_transfer_note"
     ];
 
     private static readonly string[] ExampleRow =
@@ -100,7 +114,21 @@ internal static class ParticipantImportHandlers
         "20:10",
         "PNR456",
         "1",
-        "23"
+        "23",
+        "07:30",
+        "Istanbul Airport",
+        "Hotel Lobby",
+        "Sprinter",
+        "34 TF 123",
+        "Driver Ali +90 555 222 33 44",
+        "Meeting at gate 5",
+        "18:00",
+        "Hotel Lobby",
+        "Istanbul Airport",
+        "Vito",
+        "34 TF 987",
+        "Driver Ayse +90 555 666 77 88",
+        "Pickup 15 min earlier"
     ];
 
     private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd.MM.yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yy"];
@@ -120,7 +148,9 @@ internal static class ParticipantImportHandlers
         "arrival_departure_time",
         "arrival_arrival_time",
         "return_departure_time",
-        "return_arrival_time"
+        "return_arrival_time",
+        "arrival_transfer_pickup_time",
+        "return_transfer_pickup_time"
     };
 
     private static readonly Regex BaggagePiecesRegex =
@@ -468,6 +498,30 @@ internal static class ParticipantImportHandlers
                     });
                 }
 
+                if (!TryParseOptionalTime(row.GetValue("arrival_transfer_pickup_time"), out var arrivalTransferPickupTime))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_transfer_pickup_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "arrival_transfer_pickup_time"
+                    });
+                }
+
+                if (!TryParseOptionalTime(row.GetValue("return_transfer_pickup_time"), out var returnTransferPickupTime))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_transfer_pickup_time invalid",
+                        "invalid_time")
+                    {
+                        Field = "return_transfer_pickup_time"
+                    });
+                }
+
                 if (!TryParseOptionalBaggagePieces(
                         row.GetValue("arrival_baggage_pieces"),
                         out var arrivalBaggagePieces,
@@ -736,7 +790,8 @@ internal static class ParticipantImportHandlers
 
                 var hasDetails = row.HasAnyDetails || hotelCheckIn is not null || hotelCheckOut is not null
                     || arrivalDepartureTime is not null || arrivalArrivalTime is not null
-                    || returnDepartureTime is not null || returnArrivalTime is not null;
+                    || returnDepartureTime is not null || returnArrivalTime is not null
+                    || arrivalTransferPickupTime is not null || returnTransferPickupTime is not null;
 
                 if (existingByTc.TryGetValue(tcNo, out var matches) && matches.Count == 1)
                 {
@@ -766,7 +821,8 @@ internal static class ParticipantImportHandlers
                             ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, insuranceStart,
                                 insuranceEnd, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime,
                                 returnArrivalTime,
-                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
+                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
+                                arrivalTransferPickupTime, returnTransferPickupTime);
                         }
                         else if (participant.Details is not null)
                         {
@@ -802,7 +858,8 @@ internal static class ParticipantImportHandlers
                             };
                             ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, insuranceStart, insuranceEnd,
                                 arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
-                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg);
+                                arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
+                                arrivalTransferPickupTime, returnTransferPickupTime);
                             newParticipant.Details = details;
                         }
 
@@ -1159,6 +1216,28 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("donus pnr")] = "return_pnr";
         map[NormalizeHeader("return_baggage_allowance")] = "return_baggage_allowance";
         map[NormalizeHeader("donus bagajhakki")] = "return_baggage_allowance";
+
+        map[NormalizeHeader("gelis transfer alinis saati")] = "arrival_transfer_pickup_time";
+        map[NormalizeHeader("gelis transfer alinis yeri")] = "arrival_transfer_pickup_place";
+        map[NormalizeHeader("gelis transfer birakilis yeri")] = "arrival_transfer_dropoff_place";
+        map[NormalizeHeader("gelis transfer bırakılış yeri")] = "arrival_transfer_dropoff_place";
+        map[NormalizeHeader("gelis transfer arac")] = "arrival_transfer_vehicle";
+        map[NormalizeHeader("gelis transfer araç")] = "arrival_transfer_vehicle";
+        map[NormalizeHeader("gelis transfer plaka")] = "arrival_transfer_plate";
+        map[NormalizeHeader("gelis transfer surucu bilgileri")] = "arrival_transfer_driver_info";
+        map[NormalizeHeader("gelis transfer sürücü bilgileri")] = "arrival_transfer_driver_info";
+        map[NormalizeHeader("gelis transfer not")] = "arrival_transfer_note";
+
+        map[NormalizeHeader("donus transfer alinis saati")] = "return_transfer_pickup_time";
+        map[NormalizeHeader("donus transfer alinis yeri")] = "return_transfer_pickup_place";
+        map[NormalizeHeader("donus transfer birakilis yeri")] = "return_transfer_dropoff_place";
+        map[NormalizeHeader("donus transfer bırakılış yeri")] = "return_transfer_dropoff_place";
+        map[NormalizeHeader("donus transfer arac")] = "return_transfer_vehicle";
+        map[NormalizeHeader("donus transfer araç")] = "return_transfer_vehicle";
+        map[NormalizeHeader("donus transfer plaka")] = "return_transfer_plate";
+        map[NormalizeHeader("donus transfer surucu bilgileri")] = "return_transfer_driver_info";
+        map[NormalizeHeader("donus transfer sürücü bilgileri")] = "return_transfer_driver_info";
+        map[NormalizeHeader("donus transfer not")] = "return_transfer_note";
 
         return map;
     }
@@ -1520,7 +1599,9 @@ internal static class ParticipantImportHandlers
         int? arrivalBaggagePieces,
         int? arrivalBaggageTotalKg,
         int? returnBaggagePieces,
-        int? returnBaggageTotalKg)
+        int? returnBaggageTotalKg,
+        TimeOnly? arrivalTransferPickupTime,
+        TimeOnly? returnTransferPickupTime)
     {
         details.RoomNo = row.GetValue("room_no");
         details.RoomType = row.GetValue("room_type");
@@ -1557,6 +1638,20 @@ internal static class ParticipantImportHandlers
         details.ReturnBaggageAllowance = row.GetValue("return_baggage_allowance");
         details.ReturnBaggagePieces = returnBaggagePieces;
         details.ReturnBaggageTotalKg = returnBaggageTotalKg;
+        details.ArrivalTransferPickupTime = arrivalTransferPickupTime;
+        details.ArrivalTransferPickupPlace = row.GetValue("arrival_transfer_pickup_place");
+        details.ArrivalTransferDropoffPlace = row.GetValue("arrival_transfer_dropoff_place");
+        details.ArrivalTransferVehicle = row.GetValue("arrival_transfer_vehicle");
+        details.ArrivalTransferPlate = row.GetValue("arrival_transfer_plate");
+        details.ArrivalTransferDriverInfo = row.GetValue("arrival_transfer_driver_info");
+        details.ArrivalTransferNote = row.GetValue("arrival_transfer_note");
+        details.ReturnTransferPickupTime = returnTransferPickupTime;
+        details.ReturnTransferPickupPlace = row.GetValue("return_transfer_pickup_place");
+        details.ReturnTransferDropoffPlace = row.GetValue("return_transfer_dropoff_place");
+        details.ReturnTransferVehicle = row.GetValue("return_transfer_vehicle");
+        details.ReturnTransferPlate = row.GetValue("return_transfer_plate");
+        details.ReturnTransferDriverInfo = row.GetValue("return_transfer_driver_info");
+        details.ReturnTransferNote = row.GetValue("return_transfer_note");
     }
 
     private static Dictionary<string, List<int>> BuildFileTcRowMap(List<ImportRow> rows)
