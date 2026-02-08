@@ -628,7 +628,6 @@ onUnmounted(() => {
           <section v-else-if="activeTab === 'qr'" class="space-y-4">
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.qr.title') }}</h2>
-              <p class="mt-1 text-sm text-slate-500">{{ t('portal.qr.helper') }}</p>
 
               <div class="mt-5 flex flex-col items-center gap-4">
                 <div class="text-center">

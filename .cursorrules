@@ -1,11 +1,12 @@
-# Tripflow Cursor Rules
+# Infora Cursor Rules
 
-You are acting as a senior full-stack engineer for the Tripflow monorepo.
-Your goal is to implement requested changes safely, in small steps, without breaking existing behavior.
+You are acting as a senior full-stack engineer for the Infora monorepo.
+Goal: implement requested changes safely, in small steps, without breaking existing behavior.
+Secondary goal: maximize user experience (QoL) — reduce friction, avoid surprising UI behavior, and keep flows fast and clear.
 
 ## Repo structure
 
-- Backend: apps/api (NET 8 minimal API, EF Core 8, PostgreSQL)
+- Backend: apps/api (.NET 8 minimal API, EF Core 8, PostgreSQL)
 - Frontend: apps/web (Vue 3 + Vite + TypeScript + Tailwind v4)
 - Patterns:
   - API code tends to be separated by Endpoints / Contracts / Handlers / Helpers.
@@ -15,44 +16,86 @@ Your goal is to implement requested changes safely, in small steps, without brea
 ## Non-negotiables (safety)
 
 - Do not break existing API contracts unless explicitly requested.
-- If a contract changes, keep backwards compatibility (additive fields, fallback mapping, accept legacy request shapes).
-- Avoid destructive migrations. Prefer additive columns/tables and fallback logic.
-- No secrets in source control. Do not touch env/user-secrets approach.
+- If a contract changes, keep backwards compatibility:
+  - additive fields
+  - accept legacy request shapes
+  - fallback mapping (legacy -> new)
+- Avoid destructive migrations:
+  - prefer additive columns/tables
+  - backfill when safe
+  - keep legacy columns during transition
+- No secrets in source control. Do not change the env/user-secrets approach.
+- Do not introduce new heavy dependencies unless absolutely necessary (call it out first in plan).
+
+## UX / QoL bar (must)
+
+- Prevent data loss: modals/forms that can lose edits must not close by outside click; warn on navigation if needed.
+- Preserve state on errors: if a fetch fails, keep previous data visible + show a clear error banner/toast.
+- Avoid double actions: debounce scans/clicks, disable buttons while loading, idempotent server behavior where possible.
+- Make the “right thing” the default: safe defaults, reversible toggles, and clear confirmations.
+- Mobile-first: no button overflow, primary action always visible, secondary actions go to ⋯ menu.
+- Clear feedback: toasts must be specific (NotFound vs InvalidRequest, etc.), no vague “failed” unless unavoidable.
 
 ## Web UI rules
 
 - All user-visible text must be i18n (en.json + tr.json). Never ship raw i18n keys.
 - Hide empty fields/rows in UI (do not render placeholders like “—”).
-- Dates shown in UI must be dd.MM.yyyy and times HH:mm. Use shared formatters (formatDate/formatTime/formatBaggage).
+- Dates shown in UI: dd.MM.yyyy
+- Times shown in UI: HH:mm
+- Use shared formatters (formatDate/formatTime/formatBaggage) and reuse them everywhere.
+- Links:
+  - phone-like values should use tel:
+  - address/meeting point should open maps (Google/Apple) via a maps link helper
+  - WhatsApp uses wa.me with prefilled message
 - Forms:
   - Enter-to-submit where appropriate.
   - Prevent double submit (loading guard).
   - Focus first invalid input on error.
   - Disable inputs/buttons during submit.
-- Mobile:
-  - Keep primary action visible.
-  - Move secondary actions into ⋯ menu to avoid button overflow.
+  - Keep inputs readable on mobile (no cramped multi-button rows).
+- Lists:
+  - Search should be debounced.
+  - Pagination should not jump scroll unexpectedly; keep the user context.
+  - Empty state should be helpful (what filters are active, how to clear).
 - Print/PDF pages:
   - Improve page breaks (avoid cutting cards mid-content).
-  - Do not print raw URLs; print-friendly styling.
+  - Do not print raw URLs; use print-friendly styling.
+  - Ensure long text wraps correctly and headings start on clean breaks where needed.
 
 ## API rules
 
 - Always enforce org-scope + role permissions consistent with existing behavior.
 - Prefer single-query paging endpoints and avoid N+1.
+- For large lists:
+  - server-side filtering/sorting/paging
+  - count query for totals (standard)
 - When an operation has “effect + log”, keep it atomic with a DB transaction.
-- For logging, store client info (ip/userAgent) only if already part of the design; do not show it in UI tables unless explicitly requested (CSV export is okay when specified).
+- Logging:
+  - store client info (ip/userAgent) only if part of the design
+  - do not show it in UI tables unless explicitly requested (CSV export can include it when specified)
 
 ## Import / parsing
 
 - Accept typed XLSX cells where possible.
 - CSV/XLSX date/time parsing should be tolerant and downgrade non-critical parse failures to warnings when safe.
 - Keep import templates in sync with parsing logic; warn on legacy headers.
+- When ambiguity exists (day/month):
+  - prefer strict parsing + warning message that points to expected format(s)
+  - never silently swap values without warning
 
-## Workflow
+## Workflow (how to work)
 
-- Start by proposing: plan + files to change + API/UI impact + manual test checklist.
+- Start every task by proposing:
+  - plan (small steps)
+  - files to change
+  - API/UI impact
+  - edge cases
+  - manual test checklist
 - Make minimal changes that compile.
 - Ensure builds pass:
   - dotnet build (api)
   - npm --workspace apps/web run build
+- If a change touches UX-critical flows (login, check-in, portal docs):
+  - do a quick mobile sanity check
+  - verify no raw i18n keys
+  - verify error states keep previous data

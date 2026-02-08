@@ -1242,7 +1242,7 @@ onMounted(loadEvent)
         </button>
         <a
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-          href="/e/login"
+          :href="buildPortalLoginLink(event?.eventAccessCode ?? undefined) || '/e/login'"
           rel="noreferrer"
           target="_blank"
         >

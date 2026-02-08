@@ -1,6 +1,6 @@
-# Tripflow AI Playbook (for Cursor / contributors)
+# Infora AI Playbook (for Cursor / contributors)
 
-This document explains how we implement features in Tripflow, what patterns we follow, and what “done” means.
+This document explains how we implement features in Infora, what patterns we follow, and what “done” means.
 
 ## 1) Product surfaces
 
@@ -14,7 +14,15 @@ This document explains how we implement features in Tripflow, what patterns we f
 - Admin: event-level management inside org scope.
 - Guide: scoped to assigned events (and org), mostly read/operate flows (check-in, program view).
 
-## 3) UI conventions (apps/web)
+## 3) UX principles (non-negotiable)
+
+- QoL is a feature: reduce friction, remove confusion, keep screens calm.
+- Prevent data loss: editing modals/forms must not close by outside click; preserve inputs on errors.
+- Clear feedback: result-aware toasts; no vague “failed” if we can classify (NotFound vs InvalidRequest).
+- Mobile-first ergonomics: primary action visible, secondary actions in ⋯ menu, no button overflow.
+- Consistency: formatting + i18n + layouts must feel the same across Admin/Guide/Portal.
+
+## 4) UI conventions (apps/web)
 
 ### i18n
 
@@ -25,18 +33,32 @@ This document explains how we implement features in Tripflow, what patterns we f
 
 - UI dates: dd.MM.yyyy
 - UI times: HH:mm
-- Baggage: “{pieces} pc • {kg} kg” style (use formatBaggage)
-- Use shared helpers in a single place (formatters.ts or similar) and reuse them everywhere.
+- Baggage: “{pieces} pc • {kg} kg” (use formatBaggage)
+- Keep helpers in one place and reuse everywhere.
 
 ### Hide empty fields
 
 - If a field is null/empty, do not render the row (e.g., PNR missing => row not shown).
+
+### Clickable semantics (tel / maps / whatsapp)
+
+- Phone-like values should open dialer (tel:).
+- Address/meeting-point style values should open a maps link (Google/Apple) via a helper.
+- WhatsApp actions should use wa.me with an encoded message.
 
 ### Forms
 
 - Enter-to-submit where it makes sense (login/create/modals).
 - Disable controls while saving; guard against double submit.
 - Focus the first invalid field on error.
+- On fetch failure, keep old data rendered + show error banner/toast.
+
+### Lists / tables
+
+- Debounced search.
+- Paging does not unexpectedly scroll/jump.
+- Filters should be obvious and easy to clear.
+- Empty state explains what happened (filters, query) and how to recover.
 
 ### Mobile ergonomics
 
@@ -52,8 +74,9 @@ This document explains how we implement features in Tripflow, what patterns we f
   - page-break-before on major headings when helpful
   - hide link URLs in print (avoid showing long hrefs)
   - ensure readable typography on A4
+  - long text wraps nicely; avoid cutting headings from their content
 
-## 4) API conventions (apps/api)
+## 5) API conventions (apps/api)
 
 ### Folder patterns
 
@@ -71,7 +94,7 @@ This document explains how we implement features in Tripflow, what patterns we f
 ### Performance
 
 - Avoid N+1: prefer joins / projections.
-- Paging endpoints should return { page, pageSize, total, items } style response.
+- Paging endpoints should return { page, pageSize, total, items } response.
 - Sorting and filtering should be server-side for large lists.
 
 ### Migrations
@@ -80,15 +103,15 @@ This document explains how we implement features in Tripflow, what patterns we f
   - add columns/tables, keep old columns during transition
   - backfill when safe
   - introduce fallback mapping (legacy -> new)
-- Only remove legacy columns after we’re confident in production and have a follow-up migration plan.
+- Only remove legacy columns after production confidence + explicit follow-up migration plan.
 
 ### Logging semantics
 
 - When writing a log plus applying an effect (like check-in), do it in a single transaction.
-- If client info (ip/userAgent) exists, store it in DB; do not display in UI tables unless requested.
+- Client info (ip/userAgent) may be stored in DB when needed; do not display in UI tables unless requested.
 - CSV exports can include extra columns at the end when needed.
 
-## 5) Docs tabs model (portal docs)
+## 6) Docs tabs model (portal docs)
 
 - Built-in tabs exist (e.g., Flight/Hotel/Insurance).
 - Custom tabs support two editing modes:
@@ -97,39 +120,38 @@ This document explains how we implement features in Tripflow, what patterns we f
 - Portal rendering should support:
   - { text, fields[] } (preferred)
   - legacy flat JSON object (read-only display)
+- Rendering rules:
+  - hide empty rows (no placeholders)
+  - phone/address-like fields become clickable (tel/maps)
 
-## 6) Import templates
+## 7) Import templates
 
 - Templates must match parser headers exactly.
 - Keep parsing tolerant:
   - XLSX typed cells (date/time)
   - CSV strings with common TR formats
 - Warnings vs errors:
-  - Prefer warnings for optional fields that fail parsing
-  - Errors for required fields (tc, fullName, etc.)
+  - warnings for optional fields that fail parsing
+  - errors for required fields (tc, fullName, etc.)
 
-## 7) Definition of done (DoD)
-
-For a change to be “done”:
+## 8) Definition of done (DoD)
 
 - Builds pass:
   - dotnet build (api)
   - npm --workspace apps/web run build
 - No raw i18n keys in UI
-- Mobile layout does not break (basic manual check)
-- Manual test checklist is updated and performed for the changed flows
+- Mobile layout sanity check (no overflow, primary action visible)
+- Manual test checklist updated and performed for changed flows
 - Contract changes are backward compatible (unless explicitly breaking)
 
-## 8) Suggested “work loop” for Cursor
-
-When starting any task:
+## 9) Suggested work loop for Cursor
 
 1) Summarize the ask in 3–6 bullets.
 2) Propose a minimal plan and list the files to edit.
 3) Implement in small diffs.
 4) Provide a short manual test checklist and call out edge cases.
 
-## 9) Commit style
+## 10) Commit style
 
 Prefer at most 2–3 commits per feature:
 

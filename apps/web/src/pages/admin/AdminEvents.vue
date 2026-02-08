@@ -129,8 +129,15 @@ const copyEventAccessCode = async (code: string) => {
   }
 }
 
-const copyPortalLoginLink = async () => {
-  const loginUrl = `${globalThis.location.origin}/e/login`
+const buildPortalLoginLink = (code?: string) => {
+  const base = globalThis.location?.origin ?? ''
+  if (!base) return ''
+  if (code) return `${base}/e/login?code=${encodeURIComponent(code)}`
+  return `${base}/e/login`
+}
+
+const copyPortalLoginLink = async (code?: string) => {
+  const loginUrl = buildPortalLoginLink(code)
   try {
     const ok = await copyText(loginUrl)
     if (!ok) {
@@ -283,7 +290,7 @@ onMounted(loadEvents)
               <button
                 class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:border-slate-300"
                 type="button"
-                @click="copyPortalLoginLink"
+                @click="copyPortalLoginLink(event.eventAccessCode)"
               >
                 {{ t('admin.events.list.copyLoginLink') }}
               </button>
@@ -298,7 +305,7 @@ onMounted(loadEvents)
             </RouterLink>
             <a
               class="text-slate-700 underline hover:text-slate-900"
-              href="/e/login"
+              :href="buildPortalLoginLink(event.eventAccessCode)"
               rel="noreferrer"
               target="_blank"
             >
