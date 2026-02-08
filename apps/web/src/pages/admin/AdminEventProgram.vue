@@ -261,15 +261,6 @@ const duplicateActivity = (activity: EventActivity, event?: MouseEvent) => {
   activityModalOpen.value = true
 }
 
-const parseTimeToMinutes = (value?: string | null) => {
-  if (!value) return null
-  const [h, m] = value.split(':')
-  const hours = Number(h)
-  const minutes = Number(m)
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
-  return hours * 60 + minutes
-}
-
 const buildMapsLink = (activity: { locationName?: string | null; address?: string | null }) => {
   const query = activity.address?.trim() || activity.locationName?.trim()
   if (!query) {
