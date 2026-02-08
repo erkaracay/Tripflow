@@ -79,6 +79,7 @@ export type ParticipantGender = 'Female' | 'Male' | 'Other'
 export type ParticipantDetails = {
   roomNo?: string | null
   roomType?: string | null
+  boardType?: string | null
   personNo?: string | null
   agencyName?: string | null
   city?: string | null
@@ -86,7 +87,13 @@ export type ParticipantDetails = {
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
   ticketNo?: string | null
+  arrivalTicketNo?: string | null
+  returnTicketNo?: string | null
   attendanceStatus?: string | null
+  insuranceCompanyName?: string | null
+  insurancePolicyNo?: string | null
+  insuranceStartDate?: string | null
+  insuranceEndDate?: string | null
   arrivalAirline?: string | null
   arrivalDepartureAirport?: string | null
   arrivalArrivalAirport?: string | null
@@ -313,6 +320,7 @@ export type PortalFlightInfo = {
   departureAirport?: string | null
   arrivalAirport?: string | null
   flightCode?: string | null
+  ticketNo?: string | null
   departureTime?: string | null
   arrivalTime?: string | null
   pnr?: string | null

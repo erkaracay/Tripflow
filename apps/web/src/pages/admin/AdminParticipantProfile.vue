@@ -239,6 +239,12 @@ onMounted(loadProfile)
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalFlightCode') }}</span>
                 <span class="text-slate-900">{{ displayValue(details?.arrivalFlightCode ?? undefined) }}</span>
               </div>
+              <div v-if="details?.arrivalTicketNo || details?.ticketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalTicketNo') }}</span>
+                <span class="text-slate-900">
+                  {{ displayValue(details?.arrivalTicketNo ?? details?.ticketNo ?? undefined) }}
+                </span>
+              </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalDepartureTime') }}</span>
                 <span class="text-slate-900">{{ formatTime(details?.arrivalDepartureTime) }}</span>
@@ -287,6 +293,10 @@ onMounted(loadProfile)
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnFlightCode') }}</span>
                 <span class="text-slate-900">{{ displayValue(details?.returnFlightCode ?? undefined) }}</span>
               </div>
+              <div v-if="details?.returnTicketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnTicketNo') }}</span>
+                <span class="text-slate-900">{{ displayValue(details?.returnTicketNo ?? undefined) }}</span>
+              </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnDepartureTime') }}</span>
                 <span class="text-slate-900">{{ formatTime(details?.returnDepartureTime) }}</span>
@@ -330,10 +340,6 @@ onMounted(loadProfile)
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.flightCity') }}</span>
             <span class="text-slate-900">{{ displayValue(details?.flightCity ?? undefined) }}</span>
-          </div>
-          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-            <span class="text-slate-500">{{ t('admin.participantProfile.fields.ticketNo') }}</span>
-            <span class="text-slate-900">{{ displayValue(details?.ticketNo ?? undefined) }}</span>
           </div>
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.attendanceStatus') }}</span>

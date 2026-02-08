@@ -126,6 +126,8 @@ const exportCsv = () => {
     'flightCity',
     'hotelCheckInDate',
     'hotelCheckOutDate',
+    'arrivalTicketNo',
+    'returnTicketNo',
     'ticketNo',
     'attendanceStatus',
     'arrivalAirline',
@@ -170,6 +172,8 @@ const exportCsv = () => {
       details.flightCity ?? '',
       details.hotelCheckInDate ?? '',
       details.hotelCheckOutDate ?? '',
+      details.arrivalTicketNo ?? details.ticketNo ?? '',
+      details.returnTicketNo ?? '',
       details.ticketNo ?? '',
       details.attendanceStatus ?? '',
       details.arrivalAirline ?? '',
@@ -383,7 +387,19 @@ onMounted(loadEvent)
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.flightCity ?? '—' }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.details?.hotelCheckInDate) }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.details?.hotelCheckOutDate) }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.ticketNo ?? '—' }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">
+                <div v-if="row.details?.arrivalTicketNo || row.details?.ticketNo || row.details?.returnTicketNo" class="flex flex-col gap-1">
+                  <div v-if="row.details?.arrivalTicketNo || row.details?.ticketNo" class="flex items-baseline gap-1">
+                    <span class="text-[10px] font-semibold text-slate-400">{{ t('admin.participantsTable.ticketOutboundShort') }}</span>
+                    <span>{{ row.details?.arrivalTicketNo ?? row.details?.ticketNo }}</span>
+                  </div>
+                  <div v-if="row.details?.returnTicketNo" class="flex items-baseline gap-1">
+                    <span class="text-[10px] font-semibold text-slate-400">{{ t('admin.participantsTable.ticketReturnShort') }}</span>
+                    <span>{{ row.details?.returnTicketNo }}</span>
+                  </div>
+                </div>
+                <span v-else>—</span>
+              </td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.attendanceStatus ?? '—' }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalAirline ?? '—' }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalDepartureAirport ?? '—' }}</td>

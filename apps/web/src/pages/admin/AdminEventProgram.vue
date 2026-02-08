@@ -77,12 +77,22 @@ const resetDayForm = (day?: EventDay) => {
   }
 }
 
+const normalizeTimeValue = (value?: string | null) => {
+  if (!value) return ''
+  const trimmed = value.trim()
+  const match = trimmed.match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?$/)
+  if (match) {
+    return `${match[1]!.padStart(2, '0')}:${match[2]!}`
+  }
+  return trimmed
+}
+
 const resetActivityForm = (activity?: EventActivity) => {
   activityForm.value = {
     title: activity?.title ?? '',
     type: activity?.type ?? 'Other',
-    startTime: activity?.startTime ?? '',
-    endTime: activity?.endTime ?? '',
+    startTime: normalizeTimeValue(activity?.startTime),
+    endTime: normalizeTimeValue(activity?.endTime),
     locationName: activity?.locationName ?? '',
     address: activity?.address ?? '',
     directions: activity?.directions ?? '',

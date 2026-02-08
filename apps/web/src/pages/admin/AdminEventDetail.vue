@@ -139,7 +139,8 @@ const editDetails = reactive({
   flightCity: '',
   hotelCheckInDate: '',
   hotelCheckOutDate: '',
-  ticketNo: '',
+  arrivalTicketNo: '',
+  returnTicketNo: '',
   attendanceStatus: '',
   arrivalAirline: '',
   arrivalDepartureAirport: '',
@@ -552,7 +553,8 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.flightCity = participant.details?.flightCity ?? ''
   editDetails.hotelCheckInDate = participant.details?.hotelCheckInDate ?? ''
   editDetails.hotelCheckOutDate = participant.details?.hotelCheckOutDate ?? ''
-  editDetails.ticketNo = participant.details?.ticketNo ?? ''
+  editDetails.arrivalTicketNo = participant.details?.arrivalTicketNo ?? participant.details?.ticketNo ?? ''
+  editDetails.returnTicketNo = participant.details?.returnTicketNo ?? ''
   editDetails.attendanceStatus = participant.details?.attendanceStatus ?? ''
   editDetails.arrivalAirline = participant.details?.arrivalAirline ?? ''
   editDetails.arrivalDepartureAirport = participant.details?.arrivalDepartureAirport ?? ''
@@ -670,7 +672,8 @@ const saveParticipant = async (participant: Participant) => {
           flightCity: editDetails.flightCity || undefined,
           hotelCheckInDate: editDetails.hotelCheckInDate || undefined,
           hotelCheckOutDate: editDetails.hotelCheckOutDate || undefined,
-          ticketNo: editDetails.ticketNo || undefined,
+          arrivalTicketNo: editDetails.arrivalTicketNo || undefined,
+          returnTicketNo: editDetails.returnTicketNo || undefined,
           attendanceStatus: editDetails.attendanceStatus || undefined,
           arrivalAirline: editDetails.arrivalAirline || undefined,
           arrivalDepartureAirport: editDetails.arrivalDepartureAirport || undefined,
@@ -913,48 +916,138 @@ const openWhatsApp = async (participant: Participant) => {
   }
 }
 
-const downloadParticipantsCsv = () => {
+const buildParticipantsExport = () => {
+  const headers = [
+    'room_no',
+    'room_type',
+    'board_type',
+    'person_no',
+    'agency_name',
+    'city',
+    'full_name',
+    'birth_date',
+    'tc_no',
+    'gender',
+    'phone',
+    'email',
+    'flight_city',
+    'hotel_check_in_date',
+    'hotel_check_out_date',
+    'arrival_ticket_no',
+    'return_ticket_no',
+    'insurance_company_name',
+    'insurance_policy_no',
+    'insurance_start_date',
+    'insurance_end_date',
+    'arrival_airline',
+    'arrival_departure_airport',
+    'arrival_arrival_airport',
+    'arrival_flight_code',
+    'arrival_departure_time',
+    'arrival_arrival_time',
+    'arrival_pnr',
+    'arrival_baggage_pieces',
+    'arrival_baggage_total_kg',
+    'return_airline',
+    'return_departure_airport',
+    'return_arrival_airport',
+    'return_flight_code',
+    'return_departure_time',
+    'return_arrival_time',
+    'return_pnr',
+    'return_baggage_pieces',
+    'return_baggage_total_kg',
+    'arrival_transfer_pickup_time',
+    'arrival_transfer_pickup_place',
+    'arrival_transfer_dropoff_place',
+    'arrival_transfer_vehicle',
+    'arrival_transfer_plate',
+    'arrival_transfer_driver_info',
+    'arrival_transfer_note',
+    'return_transfer_pickup_time',
+    'return_transfer_pickup_place',
+    'return_transfer_dropoff_place',
+    'return_transfer_vehicle',
+    'return_transfer_plate',
+    'return_transfer_driver_info',
+    'return_transfer_note',
+  ]
+
+  const rows = participants.value.map((participant) => {
+    const details = participant.details ?? {}
+    return [
+      details.roomNo ?? '',
+      details.roomType ?? '',
+      details.boardType ?? '',
+      details.personNo ?? '',
+      details.agencyName ?? '',
+      details.city ?? '',
+      participant.fullName,
+      participant.birthDate,
+      participant.tcNo,
+      participant.gender,
+      participant.phone ?? '',
+      participant.email ?? '',
+      details.flightCity ?? '',
+      details.hotelCheckInDate ?? '',
+      details.hotelCheckOutDate ?? '',
+      details.arrivalTicketNo ?? details.ticketNo ?? '',
+      details.returnTicketNo ?? '',
+      details.insuranceCompanyName ?? '',
+      details.insurancePolicyNo ?? '',
+      details.insuranceStartDate ?? '',
+      details.insuranceEndDate ?? '',
+      details.arrivalAirline ?? '',
+      details.arrivalDepartureAirport ?? '',
+      details.arrivalArrivalAirport ?? '',
+      details.arrivalFlightCode ?? '',
+      details.arrivalDepartureTime ?? '',
+      details.arrivalArrivalTime ?? '',
+      details.arrivalPnr ?? '',
+      details.arrivalBaggagePieces ?? '',
+      details.arrivalBaggageTotalKg ?? '',
+      details.returnAirline ?? '',
+      details.returnDepartureAirport ?? '',
+      details.returnArrivalAirport ?? '',
+      details.returnFlightCode ?? '',
+      details.returnDepartureTime ?? '',
+      details.returnArrivalTime ?? '',
+      details.returnPnr ?? '',
+      details.returnBaggagePieces ?? '',
+      details.returnBaggageTotalKg ?? '',
+      details.arrivalTransferPickupTime ?? '',
+      details.arrivalTransferPickupPlace ?? '',
+      details.arrivalTransferDropoffPlace ?? '',
+      details.arrivalTransferVehicle ?? '',
+      details.arrivalTransferPlate ?? '',
+      details.arrivalTransferDriverInfo ?? '',
+      details.arrivalTransferNote ?? '',
+      details.returnTransferPickupTime ?? '',
+      details.returnTransferPickupPlace ?? '',
+      details.returnTransferDropoffPlace ?? '',
+      details.returnTransferVehicle ?? '',
+      details.returnTransferPlate ?? '',
+      details.returnTransferDriverInfo ?? '',
+      details.returnTransferNote ?? '',
+    ]
+  })
+
+  return { headers, rows }
+}
+
+const downloadParticipantsExcel = async () => {
   if (participants.value.length === 0) {
     return
   }
 
-  const headers = [
-    'id',
-    'fullName',
-    'tcNo',
-    'birthDate',
-    'gender',
-    'email',
-    'phone',
-    'checkInCode',
-    'arrived',
-  ]
-  const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`
-  const rows = participants.value.map((participant) => [
-    participant.id,
-    participant.fullName,
-    participant.tcNo,
-    participant.birthDate,
-    participant.gender,
-    participant.email ?? '',
-    participant.phone ?? '',
-    participant.checkInCode,
-    participant.arrived ? 'true' : 'false',
-  ])
+  const { headers, rows } = buildParticipantsExport()
+  const { utils, writeFile } = await import('xlsx')
+  const worksheet = utils.aoa_to_sheet([headers, ...rows])
+  const workbook = utils.book_new()
+  utils.book_append_sheet(workbook, worksheet, 'Participants')
 
-  const csv = [headers, ...rows]
-    .map((row) => row.map((value) => escapeValue(String(value ?? ''))).join(','))
-    .join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
   const name = event.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
-  link.href = URL.createObjectURL(blob)
-  link.download = `${name}-participants.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(link.href)
+  writeFile(workbook, `${name}-participants.xlsx`)
 }
 
 const savePortal = async () => {
@@ -1567,9 +1660,9 @@ onMounted(loadEvent)
               class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
               type="button"
               :disabled="participants.length === 0"
-              @click="downloadParticipantsCsv"
+              @click="downloadParticipantsExcel"
             >
-              {{ t('admin.participants.exportCsv') }}
+              {{ t('admin.participants.exportExcel') }}
             </button>
           </div>
         </div>
@@ -1698,8 +1791,12 @@ onMounted(loadEvent)
                     <input v-model.trim="editDetails.hotelCheckOutDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                   <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.ticketNo') }}</span>
-                    <input v-model.trim="editDetails.ticketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTicketNo') }}</span>
+                    <input v-model.trim="editDetails.arrivalTicketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTicketNo') }}</span>
+                    <input v-model.trim="editDetails.returnTicketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.attendanceStatus') }}</span>

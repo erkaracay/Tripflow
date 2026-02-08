@@ -385,9 +385,9 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
           </div>
-          <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
+          <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
           </div>
           <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -427,9 +427,9 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
           </div>
-          <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
+          <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
           </div>
           <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -687,9 +687,9 @@ const formatCustomValue = (value: unknown): string => {
           <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
           <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
         </div>
-        <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
+        <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
         </div>
         <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -730,10 +730,10 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
           </div>
-          <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
-          </div>
+        <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
+        </div>
           <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
             <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
