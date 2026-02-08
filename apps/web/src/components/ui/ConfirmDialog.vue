@@ -10,11 +10,13 @@ const props = withDefaults(
     message: string
     confirmLabel?: string
     cancelLabel?: string
+    confirmDisabled?: boolean
     tone?: Tone
   }>(),
   {
     confirmLabel: 'Confirm',
     cancelLabel: 'Cancel',
+    confirmDisabled: false,
     tone: 'default',
   }
 )
@@ -70,9 +72,10 @@ onUnmounted(() => {
             {{ cancelLabel }}
           </button>
           <button
-            class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+            class="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             :class="tone === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-slate-900 hover:bg-slate-800'"
             type="button"
+            :disabled="confirmDisabled"
             @click="confirm"
           >
             {{ confirmLabel }}

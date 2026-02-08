@@ -145,7 +145,27 @@ public static class GuideEndpoints
 
         group.MapGet("/events/{eventId}/items", GuideHandlers.GetEventItems)
             .WithSummary("Guide event items")
+            .WithDescription("Returns equipment items. Use includeInactive=true to list all (for management).")
             .Produces<EventItemDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPut("/events/{eventId}/items/{itemId}", GuideHandlers.UpdateEventItem)
+            .WithSummary("Guide update equipment item")
+            .Produces<EventItemDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/events/{eventId}/items/{itemId}", GuideHandlers.DeleteEventItem)
+            .WithSummary("Guide delete equipment item")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/items/create", GuideHandlers.CreateEventItem)
+            .WithSummary("Guide create equipment item")
+            .WithDescription("Adds a new equipment item to the event.")
+            .Produces<EventItemDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/events/{eventId}/items/{itemId}/actions", GuideHandlers.PostItemAction)

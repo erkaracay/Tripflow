@@ -2,11 +2,13 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiGet, apiPostWithPayload } from '../../lib/api'
+import { apiDelete, apiGet, apiPostWithPayload, apiPut } from '../../lib/api'
 import { normalizeQrCode } from '../../lib/qr'
 import { normalizeCheckInCode } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import QrScannerModal from '../../components/QrScannerModal.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
+import CopyIcon from '../../components/icons/CopyIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type {
@@ -41,7 +43,119 @@ const codeInput = ref<HTMLInputElement | null>(null)
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
 
+const EQUIPMENT_TYPES = ['Headset', 'Badge', 'Kit', 'Other'] as const
+const activeItems = computed(() => items.value.filter((i) => i.isActive))
+const showAddForm = ref(false)
+const addForm = ref({ type: 'Headset' as string, name: '' })
+const addSaving = ref(false)
+const editingId = ref<string | null>(null)
+const editForm = ref({ type: 'Headset', name: '', isActive: true })
+const editSaving = ref(false)
+const deleteConfirmOpen = ref(false)
+const itemToDelete = ref<EventItem | null>(null)
+const deleteSaving = ref(false)
+
+const typeLabel = (type: string) => {
+  return EQUIPMENT_TYPES.includes(type as (typeof EQUIPMENT_TYPES)[number])
+    ? t('equipment.types.' + type)
+    : type
+}
+
 const { pushToast, removeToast } = useToast()
+
+const openAdd = () => {
+  showAddForm.value = true
+  addForm.value = { type: 'Headset', name: '' }
+}
+const cancelAdd = () => {
+  showAddForm.value = false
+}
+const submitAdd = async () => {
+  const name = addForm.value.name?.trim()
+  if (!name) {
+    pushToast({ key: 'equipment.validation.nameRequired', tone: 'error' })
+    return
+  }
+  addSaving.value = true
+  try {
+    const created = await apiPostWithPayload<EventItem>(`${API}/${eventId.value}/items/create`, {
+      type: addForm.value.type || 'Headset',
+      title: addForm.value.type || 'Headset',
+      name,
+    })
+    pushToast({ key: 'equipment.createSuccess', tone: 'success' })
+    showAddForm.value = false
+    await loadEventAndItems()
+    if (created?.id) selectedItemId.value = created.id
+  } catch {
+    pushToast({ key: 'common.saveFailed', tone: 'error' })
+  } finally {
+    addSaving.value = false
+  }
+}
+
+const openEdit = (item: EventItem) => {
+  editingId.value = item.id
+  editForm.value = {
+    type: EQUIPMENT_TYPES.includes(item.type as (typeof EQUIPMENT_TYPES)[number]) ? item.type : 'Other',
+    name: item.name,
+    isActive: item.isActive,
+  }
+}
+const cancelEdit = () => {
+  editingId.value = null
+}
+const submitEdit = async () => {
+  const id = editingId.value
+  if (!id) return
+  const name = editForm.value.name?.trim()
+  if (!name) {
+    pushToast({ key: 'equipment.validation.nameRequired', tone: 'error' })
+    return
+  }
+  editSaving.value = true
+  try {
+    await apiPut<EventItem>(`${API}/${eventId.value}/items/${id}`, {
+      type: editForm.value.type,
+      title: editForm.value.type,
+      name,
+      isActive: editForm.value.isActive,
+    })
+    pushToast({ key: 'equipment.updateSuccess', tone: 'success' })
+    editingId.value = null
+    await loadEventAndItems()
+  } catch {
+    pushToast({ key: 'common.saveFailed', tone: 'error' })
+  } finally {
+    editSaving.value = false
+  }
+}
+
+const openDeleteConfirm = (item: EventItem) => {
+  itemToDelete.value = item
+  deleteConfirmOpen.value = true
+}
+const cancelDelete = () => {
+  deleteConfirmOpen.value = false
+  itemToDelete.value = null
+}
+const confirmDelete = async () => {
+  const item = itemToDelete.value
+  if (!item) return
+  deleteSaving.value = true
+  try {
+    await apiDelete(`${API}/${eventId.value}/items/${item.id}`)
+    pushToast({ key: 'equipment.deleteSuccess', tone: 'success' })
+    deleteConfirmOpen.value = false
+    itemToDelete.value = null
+    await loadEventAndItems()
+    if (selectedItemId.value === item.id) selectedItemId.value = activeItems.value[0]?.id ?? null
+  } catch {
+    pushToast({ key: 'common.saveFailed', tone: 'error' })
+  } finally {
+    deleteSaving.value = false
+  }
+}
 
 const loadEventAndItems = async () => {
   loading.value = true
@@ -49,13 +163,14 @@ const loadEventAndItems = async () => {
   try {
     const [eventData, itemsData] = await Promise.all([
       apiGet<EventDto>(`/api/events/${eventId.value}`),
-      apiGet<EventItem[]>(`${API}/${eventId.value}/items`),
+      apiGet<EventItem[]>(`${API}/${eventId.value}/items?includeInactive=true`),
     ])
     event.value = eventData
     items.value = itemsData
-    if (itemsData.length > 0 && !selectedItemId.value) {
-      const headset = itemsData.find((i) => i.type === 'Headset' || i.name === 'Headset')
-      const first = headset ?? itemsData[0]
+    const active = itemsData.filter((i) => i.isActive)
+    if (active.length > 0 && !selectedItemId.value) {
+      const headset = active.find((i) => i.type === 'Headset' || i.name === 'Headset')
+      const first = headset ?? active[0]
       if (first) selectedItemId.value = first.id
     }
   } catch {
@@ -175,6 +290,20 @@ const formatLastAction = (item: ItemParticipantTableResponse['items'][0]) => {
   return `${act} · ${method} · ${log.createdAt} · ${log.result}`
 }
 
+const copyCode = async (value: string) => {
+  if (!value) return
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(value)
+      pushToast({ key: 'common.copySuccess', tone: 'success' })
+    } else {
+      pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+    }
+  } catch {
+    pushToast({ key: 'errors.copyFailed', tone: 'error' })
+  }
+}
+
 onMounted(() => {
   const stored = globalThis.localStorage?.getItem(storageKeyMode.value)
   if (stored === 'Return' || stored === 'Give') action.value = stored
@@ -240,16 +369,171 @@ watch(selectedItemId, () => {
 
     <template v-else>
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <h2 class="mb-3 text-lg font-medium text-slate-800">{{ t('equipment.listTitle') }}</h2>
+        <div class="mb-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-left text-slate-600">
+                <th class="p-2">{{ t('equipment.name') }}</th>
+                <th class="p-2">{{ t('equipment.type') }}</th>
+                <th class="p-2">{{ t('equipment.active') }}</th>
+                <th class="p-2 w-0"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="i in items" :key="i.id">
+                <tr v-if="editingId !== i.id" class="border-b border-slate-100">
+                  <td class="p-2 font-medium">{{ i.name }}</td>
+                  <td class="p-2 text-slate-600">{{ typeLabel(i.type) }}</td>
+                  <td class="p-2">
+                    <span v-if="i.isActive" class="text-emerald-600">{{ t('common.yes') }}</span>
+                    <span v-else class="text-slate-400">{{ t('common.no') }}</span>
+                  </td>
+                  <td class="p-2">
+                    <button
+                      type="button"
+                      class="rounded px-2 py-1 text-slate-600 hover:bg-slate-100"
+                      @click="openEdit(i)"
+                    >
+                      {{ t('equipment.edit') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded px-2 py-1 text-red-600 hover:bg-red-50"
+                      @click="openDeleteConfirm(i)"
+                    >
+                      {{ t('equipment.delete') }}
+                    </button>
+                  </td>
+                </tr>
+                <tr v-else class="border-b border-slate-100 bg-slate-50">
+                  <td class="p-2" colspan="4">
+                    <form class="flex w-full" @submit.prevent="submitEdit">
+                      <table class="w-full text-sm" style="table-layout: fixed">
+                        <tbody>
+                          <tr>
+                            <td class="w-[40%] p-2 align-middle">
+                              <label class="block">
+                                <span class="sr-only">{{ t('equipment.name') }}</span>
+                                <input
+                                  v-model.trim="editForm.name"
+                                  type="text"
+                                  class="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm"
+                                  :placeholder="t('equipment.namePlaceholder')"
+                                />
+                              </label>
+                            </td>
+                            <td class="w-[25%] p-2 align-middle">
+                              <label class="block">
+                                <span class="sr-only">{{ t('equipment.type') }}</span>
+                                <select
+                                  v-model="editForm.type"
+                                  class="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm"
+                                >
+                                  <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
+                                    {{ t('equipment.types.' + opt) }}
+                                  </option>
+                                </select>
+                              </label>
+                            </td>
+                            <td class="w-[20%] p-2 align-middle">
+                              <label class="inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+                                <input v-model="editForm.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                                <span>{{ t('equipment.active') }}</span>
+                              </label>
+                            </td>
+                            <td class="w-[15%] p-2 align-middle text-right">
+                              <button
+                                type="submit"
+                                class="rounded bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
+                                :disabled="editSaving"
+                              >
+                                {{ editSaving ? t('common.saving') : t('equipment.save') }}
+                              </button>
+                              <button
+                                type="button"
+                                class="ml-1 rounded border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-100"
+                                @click="cancelEdit"
+                              >
+                                {{ t('equipment.cancel') }}
+                              </button>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </form>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="items.length === 0 && !showAddForm">
+                <td colspan="4" class="p-4 text-center text-slate-500">{{ t('equipment.noItemsYet') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="!showAddForm" class="mb-6">
+          <button
+            type="button"
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:border-slate-300"
+            @click="openAdd"
+          >
+            {{ t('equipment.addItem') }}
+          </button>
+        </div>
+        <form
+          v-else
+          class="mb-6 flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-slate-50 p-3"
+          @submit.prevent="submitAdd"
+        >
+          <label class="min-w-0">
+            <span class="block text-xs text-slate-500">{{ t('equipment.name') }}</span>
+            <input
+              v-model.trim="addForm.name"
+              type="text"
+              class="mt-0.5 w-40 rounded border border-slate-200 px-2 py-1.5 text-sm"
+              :placeholder="t('equipment.namePlaceholder')"
+            />
+          </label>
+          <label class="min-w-0">
+            <span class="block text-xs text-slate-500">{{ t('equipment.type') }}</span>
+            <select
+              v-model="addForm.type"
+              class="mt-0.5 w-28 rounded border border-slate-200 px-2 py-1.5 text-sm"
+            >
+              <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
+                {{ t('equipment.types.' + opt) }}
+              </option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            class="rounded bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
+            :disabled="addSaving"
+          >
+            {{ addSaving ? t('common.saving') : t('equipment.addItem') }}
+          </button>
+          <button
+            type="button"
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-100"
+            @click="cancelAdd"
+          >
+            {{ t('equipment.cancel') }}
+          </button>
+        </form>
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <h2 class="mb-3 text-lg font-medium text-slate-800">{{ t('equipment.giveReturnTitle') }}</h2>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-            <label class="min-w-0 flex-1">
+            <label class="min-w-0 flex-1 sm:max-w-xs">
               <span class="block text-sm text-slate-600">{{ t('equipment.item') }}</span>
               <select
                 v-model="selectedItemId"
                 class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm"
               >
-                <option v-for="i in items" :key="i.id" :value="i.id">{{ i.name }}</option>
-                <option v-if="items.length === 0" value="" disabled>{{ t('equipment.noItems') }}</option>
+                <option v-for="i in activeItems" :key="i.id" :value="i.id">{{ i.name }}</option>
+                <option v-if="activeItems.length === 0" value="" disabled>{{ t('equipment.noItems') }}</option>
               </select>
             </label>
             <div class="flex items-center gap-2">
@@ -343,24 +627,34 @@ watch(selectedItemId, () => {
               <tr class="border-b border-slate-200 text-left text-slate-600">
                 <th class="p-2">{{ t('common.name') }}</th>
                 <th class="p-2">{{ t('equipment.code') }}</th>
-                <th class="p-2">{{ t('equipment.status') }}</th>
-                <th class="p-2">{{ t('equipment.lastAction') }}</th>
+                <th class="min-w-[120px] p-2">{{ t('equipment.status') }}</th>
+                <th class="min-w-[220px] p-2">{{ t('equipment.lastAction') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in table?.items" :key="row.id" class="border-b border-slate-100">
                 <td class="p-2 font-medium">{{ row.fullName }}</td>
-                <td class="p-2">{{ row.checkInCode }}</td>
                 <td class="p-2">
-                  <span v-if="row.itemState?.given" class="rounded bg-amber-100 px-2 py-0.5 text-amber-800">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded font-mono text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    :title="t('common.copy')"
+                    @click="copyCode(row.checkInCode)"
+                  >
+                    <span>{{ row.checkInCode }}</span>
+                    <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                  </button>
+                </td>
+                <td class="min-w-[120px] whitespace-nowrap p-2">
+                  <span v-if="row.itemState?.given" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-amber-800">
                     {{ t('equipment.given') }}
                   </span>
-                  <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                  <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="inline-block rounded bg-slate-100 px-2 py-0.5 text-slate-700">
                     {{ t('equipment.returned') }}
                   </span>
                   <span v-else class="text-slate-500">—</span>
                 </td>
-                <td class="p-2 text-slate-600">{{ formatLastAction(row) }}</td>
+                <td class="min-w-[220px] whitespace-nowrap p-2 text-slate-600">{{ formatLastAction(row) }}</td>
               </tr>
               <tr v-if="table && table.items.length === 0">
                 <td colspan="4" class="p-4 text-center text-slate-500">{{ t('equipment.noParticipants') }}</td>
@@ -391,5 +685,16 @@ watch(selectedItemId, () => {
     </template>
 
     <QrScannerModal :open="scannerOpen" @close="scannerOpen = false" @result="onScanResult" />
+    <ConfirmDialog
+      :open="deleteConfirmOpen"
+      :title="t('equipment.deleteConfirmTitle')"
+      :message="itemToDelete ? t('equipment.deleteConfirmMessage', { name: itemToDelete.name }) : ''"
+      :confirm-label="deleteSaving ? t('common.saving') : t('equipment.delete')"
+      :confirm-disabled="deleteSaving"
+      tone="danger"
+      @update:open="deleteConfirmOpen = $event"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>

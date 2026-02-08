@@ -28,10 +28,11 @@ import type {
 type CheckInDirection = 'Entry' | 'Exit'
 type CheckInMethod = 'Manual' | 'QrScan'
 
+const props = defineProps<{ eventId?: string }>()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const eventId = computed(() => route.params.eventId as string)
+const eventId = computed(() => (props.eventId ?? route.params.eventId) as string)
 
 const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])

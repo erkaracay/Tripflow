@@ -10,6 +10,7 @@ import QrScannerModal from '../../components/QrScannerModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
+import CopyIcon from '../../components/icons/CopyIcon.vue'
 import type {
   Event as EventDto,
   EventItem,
@@ -285,6 +286,20 @@ const formatLastAction = (item: ItemParticipantTableResponse['items'][0]) => {
   const act = log.action === 'Return' ? t('equipment.return') : t('equipment.give')
   const method = log.method === 'QrScan' ? 'QR' : t('common.manual')
   return `${act} · ${method} · ${log.createdAt} · ${log.result}`
+}
+
+const copyCode = async (value: string) => {
+  if (!value) return
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(value)
+      pushToast({ key: 'common.copySuccess', tone: 'success' })
+    } else {
+      pushToast({ key: 'errors.copyNotSupported', tone: 'error' })
+    }
+  } catch {
+    pushToast({ key: 'errors.copyFailed', tone: 'error' })
+  }
 }
 
 onMounted(() => {
@@ -582,24 +597,34 @@ watch(selectedItemId, () => {
               <tr class="border-b border-slate-200 text-left text-slate-600">
                 <th class="p-2">{{ t('common.name') }}</th>
                 <th class="p-2">{{ t('equipment.code') }}</th>
-                <th class="p-2">{{ t('equipment.status') }}</th>
-                <th class="p-2">{{ t('equipment.lastAction') }}</th>
+                <th class="min-w-[120px] p-2">{{ t('equipment.status') }}</th>
+                <th class="min-w-[220px] p-2">{{ t('equipment.lastAction') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in table?.items" :key="row.id" class="border-b border-slate-100">
                 <td class="p-2 font-medium">{{ row.fullName }}</td>
-                <td class="p-2">{{ row.checkInCode }}</td>
                 <td class="p-2">
-                  <span v-if="row.itemState?.given" class="rounded bg-amber-100 px-2 py-0.5 text-amber-800">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded font-mono text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    :title="t('common.copy')"
+                    @click="copyCode(row.checkInCode)"
+                  >
+                    <span>{{ row.checkInCode }}</span>
+                    <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                  </button>
+                </td>
+                <td class="min-w-[120px] whitespace-nowrap p-2">
+                  <span v-if="row.itemState?.given" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-amber-800">
                     {{ t('equipment.given') }}
                   </span>
-                  <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                  <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="inline-block rounded bg-slate-100 px-2 py-0.5 text-slate-700">
                     {{ t('equipment.returned') }}
                   </span>
                   <span v-else class="text-slate-500">—</span>
                 </td>
-                <td class="p-2 text-slate-600">{{ formatLastAction(row) }}</td>
+                <td class="min-w-[220px] whitespace-nowrap p-2 text-slate-600">{{ formatLastAction(row) }}</td>
               </tr>
               <tr v-if="table && table.items.length === 0">
                 <td colspan="4" class="p-4 text-center text-slate-500">{{ t('equipment.noParticipants') }}</td>
