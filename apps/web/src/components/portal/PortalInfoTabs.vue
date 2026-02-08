@@ -43,7 +43,6 @@ const isFlightLikeTab = (tab: { title: string; type: string }) => {
   return normalizedType === 'flight' || normalizedType === 'ucus' || normalizedType === 'uçuş' || titleMatches
 }
 
-const printFlightTabs = computed(() => customTabs.value.filter(isFlightLikeTab))
 const printCustomTabs = computed(() => customTabs.value.filter((tab) => !isFlightLikeTab(tab)))
 
 const tabs = computed<TabItem[]>(() => [
@@ -366,52 +365,7 @@ const formatCustomValue = (value: unknown): string => {
     </div>
 
     <div v-if="printMode" class="space-y-4">
-      <template v-if="printFlightTabs.length > 0">
-        <div
-          v-for="tab in printFlightTabs"
-          :key="tab.id"
-          class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card"
-        >
-          <div class="print-title text-sm font-semibold text-slate-900">{{ tab.title }}</div>
-          <div class="mt-3 space-y-3 text-sm text-slate-600">
-            <div v-if="getCustomText(tab.content)" class="whitespace-pre-line">
-              {{ getCustomText(tab.content) }}
-            </div>
-            <div v-if="getCustomFields(tab.content).length > 0" class="grid gap-2">
-              <div
-                v-for="field in getCustomFields(tab.content)"
-                :key="field.label"
-                class="flex items-start justify-between gap-3 print-row"
-              >
-                <span class="text-slate-500">{{ field.label }}</span>
-                <span class="text-right font-medium text-slate-800">
-                  <a
-                    v-if="isPhoneField(field.label, field.value) && buildTelLink(field.value)"
-                    :href="buildTelLink(field.value)"
-                    class="underline"
-                  >
-                    {{ formatPhoneDisplay(field.value) || field.value }}
-                  </a>
-                  <a
-                    v-else-if="isAddressField(field.label) && buildMapsLink(field.value)"
-                    :href="buildMapsLink(field.value)"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="underline"
-                  >
-                    {{ field.value }}
-                  </a>
-                  <span v-else>{{ field.value }}</span>
-                </span>
-              </div>
-            </div>
-            <div v-if="!getCustomText(tab.content) && getCustomFields(tab.content).length === 0" class="text-sm text-slate-500">
-              {{ t('portal.infoTabs.empty') }}
-            </div>
-          </div>
-        </div>
-      </template>
-      <div v-else class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.infoTabs.flight') }}</div>
         <div class="mt-3 space-y-2 text-sm">
           <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.flightOutboundTitle') }}</div>
@@ -567,6 +521,7 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.hotelCheckOutDate) }}</span>
           </div>
         </div>
+      </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.infoTabs.insurance') }}</div>
@@ -712,6 +667,7 @@ const formatCustomValue = (value: unknown): string => {
       </div>
     </div>
 
+    <template v-else>
     <div v-if="activeTab?.kind === 'flight'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.flightOutboundTitle') }}</div>
       <div class="mt-3 space-y-2 text-sm">
@@ -770,18 +726,18 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.arrivalAirport) }}</span>
           </div>
-        <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
-        </div>
-        <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
-        </div>
-        <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
-        </div>
+          <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
+          </div>
+          <div v-if="hasText(travel?.ticketNo)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.ticketNo) }}</span>
+          </div>
+          <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
+          </div>
           <div v-if="formatTime(travel?.return?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
             <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.arrivalTime) }}</span>
@@ -806,46 +762,45 @@ const formatCustomValue = (value: unknown): string => {
     <div v-else-if="activeTab?.kind === 'hotel'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.hotelCardTitle') }}</div>
       <div class="mt-3 space-y-2 text-sm">
-          <div v-if="hasText(readContentString(hotelTab?.content, 'hotelName'))" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'hotelName') }}</span>
-          </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'address'))" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              <a
-                v-if="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-                :href="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-                target="_blank"
-                rel="noreferrer"
-                class="underline"
-              >
-                {{ readContentString(hotelTab?.content, 'address') }}
-              </a>
-              <span v-else>{{ contentValue(hotelTab?.content, 'address') }}</span>
-            </span>
-          </div>
-          <div v-if="hasText(contentPhone(hotelTab?.content).raw)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              <a
-                v-if="contentPhone(hotelTab?.content).link"
-                :href="contentPhone(hotelTab?.content).link"
-                class="underline"
-              >
-                {{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}
-              </a>
-              <span v-else>{{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}</span>
-            </span>
-          </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkInNote') }}</span>
-          </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkOutNote') }}</span>
-          </div>
+        <div v-if="hasText(readContentString(hotelTab?.content, 'hotelName'))" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'hotelName') }}</span>
+        </div>
+        <div v-if="hasText(readContentString(hotelTab?.content, 'address'))" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+          <span class="text-right font-medium text-slate-800">
+            <a
+              v-if="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
+              :href="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
+              target="_blank"
+              rel="noreferrer"
+              class="underline"
+            >
+              {{ readContentString(hotelTab?.content, 'address') }}
+            </a>
+            <span v-else>{{ contentValue(hotelTab?.content, 'address') }}</span>
+          </span>
+        </div>
+        <div v-if="hasText(contentPhone(hotelTab?.content).raw)" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+          <span class="text-right font-medium text-slate-800">
+            <a
+              v-if="contentPhone(hotelTab?.content).link"
+              :href="contentPhone(hotelTab?.content).link"
+              class="underline"
+            >
+              {{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}
+            </a>
+            <span v-else>{{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}</span>
+          </span>
+        </div>
+        <div v-if="hasText(readContentString(hotelTab?.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkInNote') }}</span>
+        </div>
+        <div v-if="hasText(readContentString(hotelTab?.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkOutNote') }}</span>
         </div>
       </div>
 
@@ -1014,5 +969,6 @@ const formatCustomValue = (value: unknown): string => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
