@@ -174,6 +174,13 @@ const toObject = (content: unknown): Record<string, unknown> | null => {
   return content as Record<string, unknown>
 }
 
+const readString = (content: Record<string, unknown> | null, key: string) => {
+  if (!content) return ''
+  const value = content[key]
+  if (typeof value !== 'string') return ''
+  return value.trim()
+}
+
 const readContentString = (content: unknown, key: string) => {
   const obj = toObject(content)
   if (!obj) return ''
@@ -198,6 +205,54 @@ const contentPhone = (content: unknown) => {
     display: display || raw,
     link: buildTelLink(raw),
   }
+}
+
+const parseTransferContent = (content: unknown) => {
+  const obj = toObject(content)
+  if (!obj) {
+    return { arrival: null as PortalTransferInfo | null, return: null as PortalTransferInfo | null }
+  }
+
+  const arrivalObj = toObject(obj.arrival)
+  const returnObj = toObject(obj.return)
+
+  const build = (section: Record<string, unknown> | null, prefix: string) => {
+    const pickupTime = readString(section, 'pickupTime') || readString(obj, `${prefix}PickupTime`)
+    const pickupPlace = readString(section, 'pickupPlace') || readString(obj, `${prefix}PickupPlace`)
+    const dropoffPlace = readString(section, 'dropoffPlace') || readString(obj, `${prefix}DropoffPlace`)
+    const vehicle = readString(section, 'vehicle') || readString(obj, `${prefix}Vehicle`)
+    const plate = readString(section, 'plate') || readString(obj, `${prefix}Plate`)
+    const driverInfo = readString(section, 'driverInfo') || readString(obj, `${prefix}DriverInfo`)
+    const note = readString(section, 'note') || readString(obj, `${prefix}Note`)
+
+    const info: PortalTransferInfo = {
+      pickupTime,
+      pickupPlace,
+      dropoffPlace,
+      vehicle,
+      plate,
+      driverInfo,
+      note,
+    }
+
+    return hasTransferValue(info) ? info : null
+  }
+
+  return {
+    arrival: build(arrivalObj, 'arrival'),
+    return: build(returnObj, 'return'),
+  }
+}
+
+const resolveTransferData = (content?: unknown) => {
+  const parsed = parseTransferContent(content)
+  const outbound = hasTransferValue(travel.value?.transferOutbound)
+    ? travel.value?.transferOutbound
+    : parsed.arrival
+  const ret = hasTransferValue(travel.value?.transferReturn)
+    ? travel.value?.transferReturn
+    : parsed.return
+  return { outbound, return: ret, hasAny: hasTransferValue(outbound) || hasTransferValue(ret) }
 }
 
 const getCustomText = (content: unknown) => {
@@ -553,71 +608,73 @@ const formatCustomValue = (value: unknown): string => {
         :key="tab.id"
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card"
       >
+        <template v-if="resolveTransferData(tab.content).hasAny">
         <div class="print-title text-sm font-semibold text-slate-900">{{ tab.title }}</div>
         <div class="mt-3 space-y-2 text-sm">
           <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferOutboundTitle') }}</div>
-          <div v-if="formatTime(travel?.transferOutbound?.pickupTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="formatTime(resolveTransferData(tab.content).outbound?.pickupTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.transferOutbound?.pickupTime) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(resolveTransferData(tab.content).outbound?.pickupTime) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.pickupPlace)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.pickupPlace)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.pickupPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.pickupPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.dropoffPlace)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.dropoffPlace)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.dropoffPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.dropoffPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.vehicle)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.vehicle)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.vehicle) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.vehicle) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.plate)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.plate)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.plate) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.plate) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.driverInfo)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.driverInfo)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.driverInfo) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.driverInfo) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferOutbound?.note)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).outbound?.note)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.note) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).outbound?.note) }}</span>
           </div>
         </div>
 
         <div class="mt-4 space-y-2 text-sm">
           <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferReturnTitle') }}</div>
-          <div v-if="formatTime(travel?.transferReturn?.pickupTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="formatTime(resolveTransferData(tab.content).return?.pickupTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.transferReturn?.pickupTime) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(resolveTransferData(tab.content).return?.pickupTime) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.pickupPlace)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.pickupPlace)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.pickupPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.pickupPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.dropoffPlace)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.dropoffPlace)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.dropoffPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.dropoffPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.vehicle)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.vehicle)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.vehicle) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.vehicle) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.plate)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.plate)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.plate) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.plate) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.driverInfo)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.driverInfo)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.driverInfo) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.driverInfo) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.note)" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="hasText(resolveTransferData(tab.content).return?.note)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.note) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(tab.content).return?.note) }}</span>
           </div>
         </div>
-        <p v-if="!hasTransferValue(travel?.transferOutbound) && !hasTransferValue(travel?.transferReturn)" class="mt-3 text-xs text-slate-500">
+        </template>
+        <p v-else class="mt-3 text-xs text-slate-500">
           {{ t('portal.infoTabs.empty') }}
         </p>
       </div>
@@ -859,70 +916,70 @@ const formatCustomValue = (value: unknown): string => {
       <div class="text-sm font-semibold text-slate-900">{{ activeTab?.label ?? t('portal.docs.transferTitle') }}</div>
       <div class="mt-3 space-y-2 text-sm">
         <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferOutboundTitle') }}</div>
-        <div v-if="formatTime(travel?.transferOutbound?.pickupTime) !== '—'" class="flex items-start justify-between gap-3">
+        <div v-if="formatTime(resolveTransferData(activeTab?.content).outbound?.pickupTime) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.transferOutbound?.pickupTime) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ formatTime(resolveTransferData(activeTab?.content).outbound?.pickupTime) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.pickupPlace)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.pickupPlace)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.pickupPlace) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.pickupPlace) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.dropoffPlace)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.dropoffPlace)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.dropoffPlace) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.dropoffPlace) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.vehicle)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.vehicle)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.vehicle) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.vehicle) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.plate)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.plate)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.plate) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.plate) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.driverInfo)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.driverInfo)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.driverInfo) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.driverInfo) }}</span>
         </div>
-        <div v-if="hasText(travel?.transferOutbound?.note)" class="flex items-start justify-between gap-3">
+        <div v-if="hasText(resolveTransferData(activeTab?.content).outbound?.note)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferOutbound?.note) }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).outbound?.note) }}</span>
         </div>
       </div>
 
       <div class="mt-5 border-t border-slate-100 pt-4">
         <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferReturnTitle') }}</div>
         <div class="mt-3 space-y-2 text-sm">
-          <div v-if="formatTime(travel?.transferReturn?.pickupTime) !== '—'" class="flex items-start justify-between gap-3">
+          <div v-if="formatTime(resolveTransferData(activeTab?.content).return?.pickupTime) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.transferReturn?.pickupTime) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(resolveTransferData(activeTab?.content).return?.pickupTime) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.pickupPlace)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.pickupPlace)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.pickupPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.pickupPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.dropoffPlace)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.dropoffPlace)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.dropoffPlace) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.dropoffPlace) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.vehicle)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.vehicle)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.vehicle) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.vehicle) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.plate)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.plate)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.plate) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.plate) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.driverInfo)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.driverInfo)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.driverInfo) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.driverInfo) }}</span>
           </div>
-          <div v-if="hasText(travel?.transferReturn?.note)" class="flex items-start justify-between gap-3">
+          <div v-if="hasText(resolveTransferData(activeTab?.content).return?.note)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.transferReturn?.note) }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(resolveTransferData(activeTab?.content).return?.note) }}</span>
           </div>
         </div>
       </div>
-      <p v-if="!hasTransferValue(travel?.transferOutbound) && !hasTransferValue(travel?.transferReturn)" class="mt-3 text-xs text-slate-500">
+      <p v-if="!resolveTransferData(activeTab?.content).hasAny" class="mt-3 text-xs text-slate-500">
         {{ t('portal.infoTabs.empty') }}
       </p>
     </div>

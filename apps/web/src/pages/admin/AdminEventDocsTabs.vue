@@ -28,7 +28,7 @@ const updatingId = ref<string | null>(null)
 
 const form = reactive({
   title: '',
-  type: 'Hotel' as 'Hotel' | 'Insurance' | 'Custom',
+  type: 'Hotel' as 'Hotel' | 'Insurance' | 'Transfer' | 'Custom',
   customType: '',
   sortOrder: 1,
   isActive: true,
@@ -37,6 +37,20 @@ const form = reactive({
   hotelPhone: '',
   hotelCheckInNote: '',
   hotelCheckOutNote: '',
+  transferArrivalPickupTime: '',
+  transferArrivalPickupPlace: '',
+  transferArrivalDropoffPlace: '',
+  transferArrivalVehicle: '',
+  transferArrivalPlate: '',
+  transferArrivalDriverInfo: '',
+  transferArrivalNote: '',
+  transferReturnPickupTime: '',
+  transferReturnPickupPlace: '',
+  transferReturnDropoffPlace: '',
+  transferReturnVehicle: '',
+  transferReturnPlate: '',
+  transferReturnDriverInfo: '',
+  transferReturnNote: '',
   customText: '',
   customFields: [] as { id: string; label: string; value: string }[],
 })
@@ -66,7 +80,7 @@ const formatType = (type: string) => {
 
 const isSystemType = (type: string) => {
   const normalized = type.toLowerCase()
-  return normalized === 'hotel' || normalized === 'insurance'
+  return normalized === 'hotel' || normalized === 'insurance' || normalized === 'transfer'
 }
 
 const toObject = (content: unknown): Record<string, unknown> => {
@@ -80,6 +94,32 @@ const readContent = (content: Record<string, unknown>, key: string) => {
   const value = content[key]
   if (typeof value !== 'string') return ''
   return value
+}
+
+const normalizeTransferContent = (content: unknown) => {
+  const obj = toObject(content)
+  const arrival = toObject(obj.arrival)
+  const ret = toObject(obj.return)
+
+  const read = (section: Record<string, unknown>, key: string, fallbackKey: string) =>
+    readContent(section, key) || readContent(obj, fallbackKey)
+
+  return {
+    arrivalPickupTime: read(arrival, 'pickupTime', 'arrivalPickupTime'),
+    arrivalPickupPlace: read(arrival, 'pickupPlace', 'arrivalPickupPlace'),
+    arrivalDropoffPlace: read(arrival, 'dropoffPlace', 'arrivalDropoffPlace'),
+    arrivalVehicle: read(arrival, 'vehicle', 'arrivalVehicle'),
+    arrivalPlate: read(arrival, 'plate', 'arrivalPlate'),
+    arrivalDriverInfo: read(arrival, 'driverInfo', 'arrivalDriverInfo'),
+    arrivalNote: read(arrival, 'note', 'arrivalNote'),
+    returnPickupTime: read(ret, 'pickupTime', 'returnPickupTime'),
+    returnPickupPlace: read(ret, 'pickupPlace', 'returnPickupPlace'),
+    returnDropoffPlace: read(ret, 'dropoffPlace', 'returnDropoffPlace'),
+    returnVehicle: read(ret, 'vehicle', 'returnVehicle'),
+    returnPlate: read(ret, 'plate', 'returnPlate'),
+    returnDriverInfo: read(ret, 'driverInfo', 'returnDriverInfo'),
+    returnNote: read(ret, 'note', 'returnNote'),
+  }
 }
 
 const normalizeCustomContent = (content: unknown) => {
@@ -132,6 +172,20 @@ const resetForm = () => {
   form.hotelPhone = ''
   form.hotelCheckInNote = ''
   form.hotelCheckOutNote = ''
+  form.transferArrivalPickupTime = ''
+  form.transferArrivalPickupPlace = ''
+  form.transferArrivalDropoffPlace = ''
+  form.transferArrivalVehicle = ''
+  form.transferArrivalPlate = ''
+  form.transferArrivalDriverInfo = ''
+  form.transferArrivalNote = ''
+  form.transferReturnPickupTime = ''
+  form.transferReturnPickupPlace = ''
+  form.transferReturnDropoffPlace = ''
+  form.transferReturnVehicle = ''
+  form.transferReturnPlate = ''
+  form.transferReturnDriverInfo = ''
+  form.transferReturnNote = ''
   form.customText = ''
   form.customFields = []
   rawJson.value = ''
@@ -159,6 +213,8 @@ const openEdit = (tab: EventDocTabDto) => {
     form.type = 'Hotel'
   } else if (normalized === 'insurance') {
     form.type = 'Insurance'
+  } else if (normalized === 'transfer') {
+    form.type = 'Transfer'
   } else {
     form.type = 'Custom'
     form.customType = tab.type
@@ -170,6 +226,22 @@ const openEdit = (tab: EventDocTabDto) => {
     form.hotelPhone = readContent(content, 'phone')
     form.hotelCheckInNote = readContent(content, 'checkInNote')
     form.hotelCheckOutNote = readContent(content, 'checkOutNote')
+  } else if (form.type === 'Transfer') {
+    const normalized = normalizeTransferContent(tab.content)
+    form.transferArrivalPickupTime = normalized.arrivalPickupTime
+    form.transferArrivalPickupPlace = normalized.arrivalPickupPlace
+    form.transferArrivalDropoffPlace = normalized.arrivalDropoffPlace
+    form.transferArrivalVehicle = normalized.arrivalVehicle
+    form.transferArrivalPlate = normalized.arrivalPlate
+    form.transferArrivalDriverInfo = normalized.arrivalDriverInfo
+    form.transferArrivalNote = normalized.arrivalNote
+    form.transferReturnPickupTime = normalized.returnPickupTime
+    form.transferReturnPickupPlace = normalized.returnPickupPlace
+    form.transferReturnDropoffPlace = normalized.returnDropoffPlace
+    form.transferReturnVehicle = normalized.returnVehicle
+    form.transferReturnPlate = normalized.returnPlate
+    form.transferReturnDriverInfo = normalized.returnDriverInfo
+    form.transferReturnNote = normalized.returnNote
   } else {
     const normalized = normalizeCustomContent(tab.content)
     form.customText = normalized.text
@@ -258,6 +330,28 @@ const buildContent = () => {
   }
   if (form.type === 'Insurance') {
     return {}
+  }
+  if (form.type === 'Transfer') {
+    return {
+      arrival: {
+        pickupTime: form.transferArrivalPickupTime.trim(),
+        pickupPlace: form.transferArrivalPickupPlace.trim(),
+        dropoffPlace: form.transferArrivalDropoffPlace.trim(),
+        vehicle: form.transferArrivalVehicle.trim(),
+        plate: form.transferArrivalPlate.trim(),
+        driverInfo: form.transferArrivalDriverInfo.trim(),
+        note: form.transferArrivalNote.trim(),
+      },
+      return: {
+        pickupTime: form.transferReturnPickupTime.trim(),
+        pickupPlace: form.transferReturnPickupPlace.trim(),
+        dropoffPlace: form.transferReturnDropoffPlace.trim(),
+        vehicle: form.transferReturnVehicle.trim(),
+        plate: form.transferReturnPlate.trim(),
+        driverInfo: form.transferReturnDriverInfo.trim(),
+        note: form.transferReturnNote.trim(),
+      },
+    }
   }
 
   try {
@@ -502,6 +596,7 @@ onMounted(() => {
             <select v-model="form.type" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving">
               <option value="Hotel">{{ t('admin.docs.types.hotel') }}</option>
               <option value="Insurance">{{ t('admin.docs.types.insurance') }}</option>
+              <option value="Transfer">{{ t('admin.docs.types.transfer') }}</option>
               <option value="Custom">{{ t('admin.docs.types.custom') }}</option>
             </select>
           </label>
@@ -569,6 +664,75 @@ onMounted(() => {
             <p class="text-sm text-slate-600">
               {{ t('admin.docs.insurancePersonalNote') }}
             </p>
+          </div>
+
+          <div v-if="form.type === 'Transfer'" class="md:col-span-2 grid gap-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {{ t('admin.docs.transferSection') }}
+            </div>
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div class="text-xs font-semibold text-slate-600">{{ t('admin.docs.transferArrivalSection') }}</div>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPickupTime') }}</span>
+                <input v-model.trim="form.transferArrivalPickupTime" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPickupPlace') }}</span>
+                <input v-model.trim="form.transferArrivalPickupPlace" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferDropoffPlace') }}</span>
+                <input v-model.trim="form.transferArrivalDropoffPlace" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferVehicle') }}</span>
+                <input v-model.trim="form.transferArrivalVehicle" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPlate') }}</span>
+                <input v-model.trim="form.transferArrivalPlate" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferDriver') }}</span>
+                <input v-model.trim="form.transferArrivalDriverInfo" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferNote') }}</span>
+                <textarea v-model.trim="form.transferArrivalNote" rows="2" class="rounded border border-slate-200 px-3 py-2 text-sm"></textarea>
+              </label>
+            </div>
+
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div class="text-xs font-semibold text-slate-600">{{ t('admin.docs.transferReturnSection') }}</div>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPickupTime') }}</span>
+                <input v-model.trim="form.transferReturnPickupTime" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPickupPlace') }}</span>
+                <input v-model.trim="form.transferReturnPickupPlace" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferDropoffPlace') }}</span>
+                <input v-model.trim="form.transferReturnDropoffPlace" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferVehicle') }}</span>
+                <input v-model.trim="form.transferReturnVehicle" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferPlate') }}</span>
+                <input v-model.trim="form.transferReturnPlate" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferDriver') }}</span>
+                <input v-model.trim="form.transferReturnDriverInfo" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.docs.transferNote') }}</span>
+                <textarea v-model.trim="form.transferReturnNote" rows="2" class="rounded border border-slate-200 px-3 py-2 text-sm"></textarea>
+              </label>
+            </div>
           </div>
 
           <div v-if="form.type === 'Custom'" class="md:col-span-2 grid gap-4">

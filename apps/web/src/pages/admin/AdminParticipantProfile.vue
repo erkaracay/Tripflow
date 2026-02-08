@@ -8,7 +8,7 @@ import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay } from '../../lib/normalize'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { ParticipantProfile } from '../../types'
+import type { EventDocTabDto, ParticipantProfile } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -20,16 +20,32 @@ const participantId = computed(() => String(route.params.participantId ?? ''))
 const loading = ref(true)
 const errorMessage = ref<string | null>(null)
 const profile = ref<ParticipantProfile | null>(null)
+const hotelName = ref<string | null>(null)
 
 const details = computed(() => profile.value?.details ?? null)
+
+const resolveHotelName = (tabs: EventDocTabDto[]) => {
+  const hotelTab =
+    tabs.find((tab) => tab.type?.toLowerCase() === 'hotel' && tab.isActive) ??
+    tabs.find((tab) => tab.type?.toLowerCase() === 'hotel')
+  if (!hotelTab || typeof hotelTab.content !== 'object' || hotelTab.content === null) {
+    return null
+  }
+  const content = hotelTab.content as Record<string, unknown>
+  const nameValue = content.hotelName
+  return typeof nameValue === 'string' ? nameValue : null
+}
 
 const loadProfile = async () => {
   loading.value = true
   errorMessage.value = null
   try {
-    profile.value = await apiGet<ParticipantProfile>(
-      `/api/events/${eventId.value}/participants/${participantId.value}`
-    )
+    const [profileData, tabs] = await Promise.all([
+      apiGet<ParticipantProfile>(`/api/events/${eventId.value}/participants/${participantId.value}`),
+      apiGet<EventDocTabDto[]>(`/api/events/${eventId.value}/docs/tabs`).catch(() => []),
+    ])
+    profile.value = profileData
+    hotelName.value = resolveHotelName(tabs)
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : t('errors.generic')
   } finally {
@@ -192,6 +208,10 @@ onMounted(loadProfile)
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold text-slate-900">{{ t('admin.participantProfile.sections.hotel') }}</h2>
         <div class="mt-4 space-y-3 text-sm">
+          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.hotelName') }}</span>
+            <span class="text-slate-900">{{ displayValue(hotelName ?? undefined) }}</span>
+          </div>
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.roomNo') }}</span>
             <span class="text-slate-900">{{ displayValue(details?.roomNo ?? undefined) }}</span>
