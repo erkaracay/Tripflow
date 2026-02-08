@@ -36,7 +36,8 @@ internal static class ParticipantImportHandlers
         "flight_city",
         "hotel_check_in_date",
         "hotel_check_out_date",
-        "ticket_no",
+        "arrival_ticket_no",
+        "return_ticket_no",
         "insurance_company_name",
         "insurance_policy_no",
         "insurance_start_date",
@@ -92,7 +93,8 @@ internal static class ParticipantImportHandlers
         "Istanbul",
         "2026-03-10",
         "2026-03-12",
-        "TK-123",
+        "TK-123-OUT",
+        "TK-456-RET",
         "Acme Insurance",
         "POL-123",
         "2026-03-10",
@@ -936,10 +938,49 @@ internal static class ParticipantImportHandlers
         using var workbook = new XLWorkbook();
         var worksheet = workbook.AddWorksheet("Participants");
 
+        var dateHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "birth_date",
+            "hotel_check_in_date",
+            "hotel_check_out_date",
+            "insurance_start_date",
+            "insurance_end_date"
+        };
+        var timeHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "arrival_departure_time",
+            "arrival_arrival_time",
+            "return_departure_time",
+            "return_arrival_time",
+            "arrival_transfer_pickup_time",
+            "return_transfer_pickup_time"
+        };
+
         for (var i = 0; i < CanonicalHeaders.Length; i++)
         {
-            worksheet.Cell(1, i + 1).Value = CanonicalHeaders[i];
-            worksheet.Cell(2, i + 1).Value = ExampleRow[i];
+            var header = CanonicalHeaders[i];
+            var example = ExampleRow[i];
+            var headerCell = worksheet.Cell(1, i + 1);
+            var valueCell = worksheet.Cell(2, i + 1);
+
+            headerCell.Value = header;
+
+            if (dateHeaders.Contains(header)
+                && DateTime.TryParseExact(example, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateValue))
+            {
+                valueCell.Value = dateValue;
+                valueCell.Style.DateFormat.Format = "yyyy-MM-dd";
+            }
+            else if (timeHeaders.Contains(header)
+                && TimeSpan.TryParseExact(example, "hh\\:mm", CultureInfo.InvariantCulture, out var timeValue))
+            {
+                valueCell.Value = timeValue;
+                valueCell.Style.DateFormat.Format = "HH:mm";
+            }
+            else
+            {
+                valueCell.Value = example;
+            }
         }
 
         worksheet.Row(1).Style.Font.Bold = true;
@@ -1184,7 +1225,18 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("e-mail")] = "email";
         map[NormalizeHeader("checkin")] = "hotel_check_in_date";
         map[NormalizeHeader("checkout")] = "hotel_check_out_date";
-        map[NormalizeHeader("bilet no")] = "ticket_no";
+        map[NormalizeHeader("bilet no")] = "arrival_ticket_no";
+        map[NormalizeHeader("bilet no gidis")] = "arrival_ticket_no";
+        map[NormalizeHeader("bilet no gidiş")] = "arrival_ticket_no";
+        map[NormalizeHeader("gidis bilet no")] = "arrival_ticket_no";
+        map[NormalizeHeader("gidiş bilet no")] = "arrival_ticket_no";
+        map[NormalizeHeader("bilet no donus")] = "return_ticket_no";
+        map[NormalizeHeader("bilet no dönüş")] = "return_ticket_no";
+        map[NormalizeHeader("donus bilet no")] = "return_ticket_no";
+        map[NormalizeHeader("dönüş bilet no")] = "return_ticket_no";
+        map[NormalizeHeader("ticket_no")] = "arrival_ticket_no";
+        map[NormalizeHeader("arrival ticket no")] = "arrival_ticket_no";
+        map[NormalizeHeader("return ticket no")] = "return_ticket_no";
         map[NormalizeHeader("attendance_status")] = "attendance_status";
         map[NormalizeHeader("katilim durumu")] = "attendance_status";
         map[NormalizeHeader("sigorta sirketi")] = "insurance_company_name";
@@ -1612,7 +1664,14 @@ internal static class ParticipantImportHandlers
         details.FlightCity = row.GetValue("flight_city");
         details.HotelCheckInDate = hotelCheckIn;
         details.HotelCheckOutDate = hotelCheckOut;
-        details.TicketNo = row.GetValue("ticket_no");
+        var arrivalTicketNo = row.GetValue("arrival_ticket_no");
+        var returnTicketNo = row.GetValue("return_ticket_no");
+        details.ArrivalTicketNo = arrivalTicketNo;
+        details.ReturnTicketNo = returnTicketNo;
+        if (string.IsNullOrWhiteSpace(details.TicketNo) && !string.IsNullOrWhiteSpace(arrivalTicketNo))
+        {
+            details.TicketNo = arrivalTicketNo;
+        }
         details.AttendanceStatus = row.GetValue("attendance_status");
         details.InsuranceCompanyName = row.GetValue("insurance_company_name");
         details.InsurancePolicyNo = row.GetValue("insurance_policy_no");

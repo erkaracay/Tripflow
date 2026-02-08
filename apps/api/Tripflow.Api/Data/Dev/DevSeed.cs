@@ -532,12 +532,22 @@ public static class DevSeed
                 detail.HotelCheckOutDate = eventEntity.EndDate;
                 updated = true;
             }
-            if (string.IsNullOrWhiteSpace(detail.TicketNo))
+            var ticketPrefix = string.IsNullOrWhiteSpace(eventEntity.Name)
+                ? "E"
+                : eventEntity.Name.Trim()[0].ToString().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(detail.ArrivalTicketNo))
             {
-                var prefix = string.IsNullOrWhiteSpace(eventEntity.Name)
-                    ? "E"
-                    : eventEntity.Name.Trim()[0].ToString().ToUpperInvariant();
-                detail.TicketNo = $"{prefix}{index:0000}";
+                detail.ArrivalTicketNo = $"{ticketPrefix}{index:0000}-OUT";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.ReturnTicketNo))
+            {
+                detail.ReturnTicketNo = $"{ticketPrefix}{index:0000}-RET";
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(detail.TicketNo) && !string.IsNullOrWhiteSpace(detail.ArrivalTicketNo))
+            {
+                detail.TicketNo = detail.ArrivalTicketNo;
                 updated = true;
             }
             if (string.IsNullOrWhiteSpace(detail.AttendanceStatus))

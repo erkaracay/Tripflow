@@ -250,7 +250,7 @@ internal static class PortalLoginHandlers
             details?.BoardType,
             details?.HotelCheckInDate?.ToString("yyyy-MM-dd"),
             details?.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
-            details?.TicketNo,
+            details?.ArrivalTicketNo ?? details?.TicketNo,
             details is null
                 ? null
                 : new PortalFlightInfo(
@@ -258,6 +258,7 @@ internal static class PortalLoginHandlers
                     details.ArrivalDepartureAirport,
                     details.ArrivalArrivalAirport,
                     details.ArrivalFlightCode,
+                    details.ArrivalTicketNo ?? details.TicketNo,
                     details.ArrivalDepartureTime?.ToString("HH:mm"),
                     details.ArrivalArrivalTime?.ToString("HH:mm"),
                     details.ArrivalPnr,
@@ -270,6 +271,7 @@ internal static class PortalLoginHandlers
                     details.ReturnDepartureAirport,
                     details.ReturnArrivalAirport,
                     details.ReturnFlightCode,
+                    details.ReturnTicketNo,
                     details.ReturnDepartureTime?.ToString("HH:mm"),
                     details.ReturnArrivalTime?.ToString("HH:mm"),
                     details.ReturnPnr,

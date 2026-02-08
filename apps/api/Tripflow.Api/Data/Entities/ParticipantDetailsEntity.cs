@@ -17,6 +17,8 @@ public sealed class ParticipantDetailsEntity
     public DateOnly? HotelCheckOutDate { get; set; }
 
     public string? TicketNo { get; set; }
+    public string? ArrivalTicketNo { get; set; }
+    public string? ReturnTicketNo { get; set; }
     public string? AttendanceStatus { get; set; }
 
     public string? InsuranceCompanyName { get; set; }

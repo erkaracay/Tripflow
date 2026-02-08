@@ -66,6 +66,7 @@ public sealed record PortalFlightInfo(
     string? DepartureAirport,
     string? ArrivalAirport,
     string? FlightCode,
+    string? TicketNo,
     string? DepartureTime,
     string? ArrivalTime,
     string? Pnr,

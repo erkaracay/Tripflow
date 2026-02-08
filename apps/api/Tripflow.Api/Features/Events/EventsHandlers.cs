@@ -1524,6 +1524,8 @@ internal static class EventsHandlers
                 || (x.Details != null && (
                     (x.Details.RoomNo != null && EF.Functions.ILike(x.Details.RoomNo, pattern))
                     || (x.Details.TicketNo != null && EF.Functions.ILike(x.Details.TicketNo, pattern))
+                    || (x.Details.ArrivalTicketNo != null && EF.Functions.ILike(x.Details.ArrivalTicketNo, pattern))
+                    || (x.Details.ReturnTicketNo != null && EF.Functions.ILike(x.Details.ReturnTicketNo, pattern))
                     || (x.Details.ArrivalPnr != null && EF.Functions.ILike(x.Details.ArrivalPnr, pattern))
                     || (x.Details.ReturnPnr != null && EF.Functions.ILike(x.Details.ReturnPnr, pattern))
                     || (x.Details.AgencyName != null && EF.Functions.ILike(x.Details.AgencyName, pattern))
@@ -1598,7 +1600,9 @@ internal static class EventsHandlers
                 row.details.FlightCity,
                 row.details.HotelCheckInDate?.ToString("yyyy-MM-dd"),
                 row.details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
-                row.details.TicketNo,
+                row.details.ArrivalTicketNo ?? row.details.TicketNo,
+                row.details.ArrivalTicketNo ?? row.details.TicketNo,
+                row.details.ReturnTicketNo,
                 row.details.AttendanceStatus,
                 row.details.InsuranceCompanyName,
                 row.details.InsurancePolicyNo,
@@ -2685,6 +2689,17 @@ internal static class EventsHandlers
         return new string(cleaned.Where(char.IsLetterOrDigit).ToArray());
     }
 
+    private static string? NormalizeOptionalText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
     private static bool IsUniqueViolation(DbUpdateException exception)
     {
         return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
@@ -3182,7 +3197,9 @@ internal static class EventsHandlers
             details.FlightCity,
             details.HotelCheckInDate?.ToString("yyyy-MM-dd"),
             details.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
-            details.TicketNo,
+            details.ArrivalTicketNo ?? details.TicketNo,
+            details.ArrivalTicketNo ?? details.TicketNo,
+            details.ReturnTicketNo,
             details.AttendanceStatus,
             details.InsuranceCompanyName,
             details.InsurancePolicyNo,
@@ -3248,7 +3265,23 @@ internal static class EventsHandlers
         }
         details.HotelCheckInDate = checkIn;
         details.HotelCheckOutDate = checkOut;
-        details.TicketNo = request.TicketNo;
+        var legacyTicketNo = NormalizeOptionalText(request.TicketNo);
+        var arrivalTicketNo = NormalizeOptionalText(request.ArrivalTicketNo);
+        var returnTicketNo = NormalizeOptionalText(request.ReturnTicketNo);
+        if (string.IsNullOrWhiteSpace(arrivalTicketNo) && !string.IsNullOrWhiteSpace(legacyTicketNo))
+        {
+            arrivalTicketNo = legacyTicketNo;
+        }
+        details.ArrivalTicketNo = arrivalTicketNo;
+        details.ReturnTicketNo = returnTicketNo;
+        if (string.IsNullOrWhiteSpace(details.TicketNo) && !string.IsNullOrWhiteSpace(arrivalTicketNo))
+        {
+            details.TicketNo = arrivalTicketNo;
+        }
+        else if (string.IsNullOrWhiteSpace(details.TicketNo) && !string.IsNullOrWhiteSpace(legacyTicketNo))
+        {
+            details.TicketNo = legacyTicketNo;
+        }
         details.AttendanceStatus = request.AttendanceStatus;
         if (!TryParseDateOnly(request.InsuranceStartDate, out var insuranceStart))
         {
