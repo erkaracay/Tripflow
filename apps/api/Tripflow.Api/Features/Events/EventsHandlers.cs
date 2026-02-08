@@ -2890,6 +2890,8 @@ internal static class EventsHandlers
         string? query,
         int? page,
         int? pageSize,
+        string? sort,
+        string? dir,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
@@ -3020,8 +3022,31 @@ internal static class EventsHandlers
 
         var total = await baseQuery.CountAsync(ct);
 
-        var pageItems = await baseQuery
-            .OrderByDescending(x => x.log.CreatedAt)
+        var sortVal = (sort ?? "createdAt").Trim().ToLowerInvariant();
+        var desc = (dir ?? "desc").Trim().ToLowerInvariant() == "desc";
+        var ordered = sortVal switch
+        {
+            "participantname" => desc
+                ? baseQuery.OrderByDescending(x => x.participant != null ? x.participant.FullName ?? "" : "").ThenByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.participant != null ? x.participant.FullName ?? "" : "").ThenBy(x => x.log.CreatedAt),
+            "actoremail" => desc
+                ? baseQuery.OrderByDescending(x => x.actor != null ? x.actor.Email ?? "" : "").ThenByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.actor != null ? x.actor.Email ?? "" : "").ThenBy(x => x.log.CreatedAt),
+            "direction" => desc
+                ? baseQuery.OrderByDescending(x => x.log.Direction.ToString()).ThenByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.log.Direction.ToString()).ThenBy(x => x.log.CreatedAt),
+            "method" => desc
+                ? baseQuery.OrderByDescending(x => x.log.Method.ToString()).ThenByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.log.Method.ToString()).ThenBy(x => x.log.CreatedAt),
+            "result" => desc
+                ? baseQuery.OrderByDescending(x => x.log.Result ?? "").ThenByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.log.Result ?? "").ThenBy(x => x.log.CreatedAt),
+            _ => desc
+                ? baseQuery.OrderByDescending(x => x.log.CreatedAt)
+                : baseQuery.OrderBy(x => x.log.CreatedAt)
+        };
+
+        var pageItems = await ordered
             .Skip((resolvedPage - 1) * resolvedPageSize)
             .Take(resolvedPageSize)
             .ToListAsync(ct);

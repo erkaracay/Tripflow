@@ -102,6 +102,24 @@ const goNext = () => {
   void fetchTable()
 }
 
+const setSort = (col: string) => {
+  const apiKey = col === 'roomNo' ? 'roomno' : col === 'agencyName' ? 'agencyname' : col === 'arrivedAt' ? 'arrivedAt' : 'fullName'
+  if (sort.value === apiKey) {
+    dir.value = dir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sort.value = apiKey
+    dir.value = 'asc'
+  }
+  page.value = 1
+  void fetchTable()
+}
+
+const sortIndicator = (col: string) => {
+  const apiKey = col === 'roomNo' ? 'roomno' : col === 'agencyName' ? 'agencyname' : col === 'arrivedAt' ? 'arrivedAt' : 'fullName'
+  if (sort.value !== apiKey) return ''
+  return dir.value === 'asc' ? ' ↑' : ' ↓'
+}
+
 const buildCsvValue = (value: string | number | null | undefined) =>
   `"${String(value ?? '').replace(/"/g, '""')}"`
 
@@ -323,19 +341,51 @@ onMounted(loadEvent)
         <table class="min-w-full text-sm">
           <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.fullName') }}</th>
+              <th class="px-3 py-2">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-200/80"
+                  @click="setSort('fullName')"
+                >
+                  {{ t('admin.participantsTable.columns.fullName') }}{{ sortIndicator('fullName') }}
+                </button>
+              </th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.tcNo') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.phone') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.email') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.gender') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.birthDate') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrived') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivedAt') }}</th>
+              <th class="px-3 py-2">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-200/80"
+                  @click="setSort('arrivedAt')"
+                >
+                  {{ t('admin.participantsTable.columns.arrivedAt') }}{{ sortIndicator('arrivedAt') }}
+                </button>
+              </th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.checkInCode') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.roomNo') }}</th>
+              <th class="px-3 py-2">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-200/80"
+                  @click="setSort('roomNo')"
+                >
+                  {{ t('admin.participantsTable.columns.roomNo') }}{{ sortIndicator('roomNo') }}
+                </button>
+              </th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.roomType') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.personNo') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.agencyName') }}</th>
+              <th class="px-3 py-2">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-200/80"
+                  @click="setSort('agencyName')"
+                >
+                  {{ t('admin.participantsTable.columns.agencyName') }}{{ sortIndicator('agencyName') }}
+                </button>
+              </th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.city') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.flightCity') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.hotelCheckInDate') }}</th>

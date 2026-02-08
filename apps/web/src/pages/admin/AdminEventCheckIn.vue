@@ -694,11 +694,17 @@ onMounted(() => {
         </div>
         <div class="mt-4">
           <button
-            class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-opacity duration-200 hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-70"
             type="button"
+            :disabled="isCheckingIn"
             @click="openScanner"
           >
-            {{ t('common.scanQr') }}
+            <span
+              v-if="isCheckingIn"
+              class="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border border-white/60 border-t-transparent"
+              aria-hidden="true"
+            />
+            <span>{{ isCheckingIn ? t('admin.checkIn.submitting') : t('common.scanQr') }}</span>
           </button>
         </div>
         <form class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="handleCheckInSubmit">

@@ -1224,37 +1224,35 @@ onMounted(loadEvent)
 
 <template>
   <div class="space-y-8">
-    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-2">
-          <RouterLink
-            class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
-            to="/admin/events"
-          >
-            {{ t('nav.backToEvents') }}
-          </RouterLink>
-          <RouterLink
-            v-if="isSuperAdmin"
-            class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
-            to="/admin/orgs"
-          >
-            {{ t('nav.backToOrganizations') }}
-          </RouterLink>
-        </div>
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <h1 class="text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
-          <span
-            v-if="event?.isDeleted"
-            class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
-          >
-            {{ t('common.archived') }}
-          </span>
-        </div>
-        <p class="text-sm text-slate-500" v-if="event">
-          {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
-        </p>
+    <div class="flex flex-col gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <RouterLink
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+          to="/admin/events"
+        >
+          {{ t('nav.backToEvents') }}
+        </RouterLink>
+        <RouterLink
+          v-if="isSuperAdmin"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+          to="/admin/orgs"
+        >
+          {{ t('nav.backToOrganizations') }}
+        </RouterLink>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <h1 class="text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
+        <span
+          v-if="event?.isDeleted"
+          class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
+        >
+          {{ t('common.archived') }}
+        </span>
+      </div>
+      <p v-if="event" class="whitespace-nowrap text-sm text-slate-500">
+        {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+      </p>
+      <nav class="flex flex-wrap items-center gap-2" aria-label="Event sections">
         <RouterLink
           class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           :to="`/admin/events/${eventId}/checkin`"
@@ -1305,7 +1303,7 @@ onMounted(loadEvent)
         >
           {{ t('admin.eventDetail.openPortal') }}
         </a>
-      </div>
+      </nav>
     </div>
 
     <LoadingState v-if="loading" message-key="admin.eventDetail.loading" />

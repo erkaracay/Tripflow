@@ -35,6 +35,8 @@ const table = ref<ItemParticipantTableResponse | null>(null)
 const tablePage = ref(1)
 const tableQuery = ref('')
 const tableStatus = ref<'all' | 'given' | 'not_returned'>('all')
+const tableSort = ref('fullName')
+const tableDir = ref<'asc' | 'desc'>('asc')
 const loading = ref(true)
 const loadErrorKey = ref<string | null>(null)
 const submitting = ref(false)
@@ -45,6 +47,30 @@ let lastScannedCode: string | null = null
 let lastScannedAt = 0
 
 const EQUIPMENT_TYPES = ['Headset', 'Badge', 'Kit', 'Other'] as const
+
+const itemsSortKey = ref<'name' | 'type'>('name')
+const itemsSortDir = ref<'asc' | 'desc'>('asc')
+
+const sortedItems = computed(() => {
+  const list = [...items.value]
+  const dir = itemsSortDir.value === 'asc' ? 1 : -1
+  list.sort((a, b) => {
+    const cmp = itemsSortKey.value === 'name'
+      ? (a.name ?? '').localeCompare(b.name ?? '')
+      : (a.type ?? '').localeCompare(b.type ?? '')
+    return cmp * dir
+  })
+  return list
+})
+
+const setItemsSort = (key: 'name' | 'type') => {
+  if (itemsSortKey.value === key) {
+    itemsSortDir.value = itemsSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    itemsSortKey.value = key
+    itemsSortDir.value = 'asc'
+  }
+}
 
 const typeLabel = (type: string) => {
   return EQUIPMENT_TYPES.includes(type as (typeof EQUIPMENT_TYPES)[number])
@@ -190,6 +216,8 @@ const loadTable = async () => {
     params.set('status', tableStatus.value === 'not_returned' ? 'not_returned' : tableStatus.value)
     params.set('page', String(tablePage.value))
     params.set('pageSize', '50')
+    params.set('sort', tableSort.value)
+    params.set('dir', tableDir.value)
     const res = await apiGet<ItemParticipantTableResponse>(
       `/api/events/${eventId.value}/items/${selectedItemId.value}/participants/table?${params}`
     )
@@ -199,9 +227,20 @@ const loadTable = async () => {
   }
 }
 
-watch([selectedItemId, tablePage, tableQuery, tableStatus], () => {
+watch([selectedItemId, tablePage, tableQuery, tableStatus, tableSort, tableDir], () => {
   void loadTable()
 })
+
+const setTableSort = (col: string) => {
+  if (tableSort.value === col) {
+    tableDir.value = tableDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    tableSort.value = col
+    tableDir.value = 'asc'
+  }
+  tablePage.value = 1
+  void loadTable()
+}
 
 const persistMode = () => {
   try {
@@ -272,6 +311,10 @@ const onScanResult = async (raw: string) => {
   code.value = extracted
   await nextTick()
   codeInput.value?.focus()
+  if (submitting.value) {
+    pushToast({ key: 'common.checkingIn', tone: 'info' })
+    return
+  }
   if (!autoSubmitAfterScan.value) {
     pushToast({ key: 'equipment.codeFilled', tone: 'info' })
     return
@@ -345,14 +388,30 @@ watch(selectedItemId, () => {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 text-left text-slate-600">
-                <th class="p-2">{{ t('equipment.name') }}</th>
-                <th class="p-2">{{ t('equipment.type') }}</th>
+                <th class="p-2">
+                  <button
+                    type="button"
+                    class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                    @click="setItemsSort('name')"
+                  >
+                    {{ t('equipment.name') }}{{ itemsSortKey === 'name' ? (itemsSortDir === 'asc' ? ' ↑' : ' ↓') : '' }}
+                  </button>
+                </th>
+                <th class="p-2">
+                  <button
+                    type="button"
+                    class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                    @click="setItemsSort('type')"
+                  >
+                    {{ t('equipment.type') }}{{ itemsSortKey === 'type' ? (itemsSortDir === 'asc' ? ' ↑' : ' ↓') : '' }}
+                  </button>
+                </th>
                 <th class="p-2">{{ t('equipment.active') }}</th>
                 <th class="p-2 w-0"></th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="i in items" :key="i.id">
+              <template v-for="i in sortedItems" :key="i.id">
                 <tr v-if="editingId !== i.id" class="border-b border-slate-100">
                   <td class="p-2 font-medium">{{ i.name }}</td>
                   <td class="p-2 text-slate-600">{{ typeLabel(i.type) }}</td>
@@ -529,10 +588,16 @@ watch(selectedItemId, () => {
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:border-slate-300"
+              class="inline-flex items-center justify-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition-opacity duration-200 hover:border-slate-300 disabled:pointer-events-none disabled:opacity-70"
+              :disabled="submitting"
               @click="openScanner"
             >
-              {{ t('equipment.scanQr') }}
+              <span
+                v-if="submitting"
+                class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+                aria-hidden="true"
+              />
+              <span>{{ submitting ? t('common.checkingIn') : t('equipment.scanQr') }}</span>
             </button>
             <label class="flex items-center gap-2 text-sm">
               <input v-model="autoSubmitAfterScan" type="checkbox" />
@@ -596,7 +661,15 @@ watch(selectedItemId, () => {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 text-left text-slate-600">
-                <th class="p-2">{{ t('common.name') }}</th>
+                <th class="p-2">
+                  <button
+                    type="button"
+                    class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                    @click="setTableSort('fullName')"
+                  >
+                    {{ t('common.name') }}{{ tableSort === 'fullName' ? (tableDir === 'asc' ? ' ↑' : ' ↓') : '' }}
+                  </button>
+                </th>
                 <th class="p-2">{{ t('equipment.code') }}</th>
                 <th class="min-w-[120px] p-2">{{ t('equipment.status') }}</th>
                 <th class="min-w-[220px] p-2">{{ t('equipment.lastAction') }}</th>

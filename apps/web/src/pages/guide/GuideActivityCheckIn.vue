@@ -36,6 +36,8 @@ const table = ref<ActivityParticipantTableResponse | null>(null)
 const tablePage = ref(1)
 const tableQuery = ref('')
 const tableStatus = ref<'all' | 'checked_in' | 'not_checked_in'>('all')
+const tableSort = ref('fullName')
+const tableDir = ref<'asc' | 'desc'>('asc')
 const loading = ref(true)
 const loadErrorKey = ref<string | null>(null)
 const submitting = ref(false)
@@ -80,6 +82,8 @@ const loadTable = async () => {
     params.set('status', tableStatus.value)
     params.set('page', String(tablePage.value))
     params.set('pageSize', '50')
+    params.set('sort', tableSort.value)
+    params.set('dir', tableDir.value)
     const res = await apiGet<ActivityParticipantTableResponse>(
       `${API}/${eventId.value}/activities/${selectedActivityId.value}/participants/table?${params}`
     )
@@ -89,9 +93,20 @@ const loadTable = async () => {
   }
 }
 
-watch([selectedActivityId, tablePage, tableQuery, tableStatus], () => {
+watch([selectedActivityId, tablePage, tableQuery, tableStatus, tableSort, tableDir], () => {
   void loadTable()
 })
+
+const setTableSort = (col: string) => {
+  if (tableSort.value === col) {
+    tableDir.value = tableDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    tableSort.value = col
+    tableDir.value = 'asc'
+  }
+  tablePage.value = 1
+  void loadTable()
+}
 
 const persistMode = () => {
   try {
@@ -176,6 +191,10 @@ const onScanResult = async (raw: string) => {
   code.value = extracted
   await nextTick()
   codeInput.value?.focus()
+  if (submitting.value) {
+    pushToast({ key: 'common.checkingIn', tone: 'info' })
+    return
+  }
   if (!autoSubmitAfterScan.value) {
     pushToast({ key: 'activityCheckIn.codeFilled', tone: 'info' })
     return
@@ -298,10 +317,16 @@ watch(selectedActivityId, () => {
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm hover:border-slate-300"
+              class="inline-flex items-center justify-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition-opacity duration-200 hover:border-slate-300 disabled:pointer-events-none disabled:opacity-70"
+              :disabled="submitting"
               @click="openScanner"
             >
-              {{ t('activityCheckIn.scanQr') }}
+              <span
+                v-if="submitting"
+                class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+                aria-hidden="true"
+              />
+              <span>{{ submitting ? t('common.checkingIn') : t('activityCheckIn.scanQr') }}</span>
             </button>
             <label class="flex items-center gap-2 text-sm">
               <input v-model="autoSubmitAfterScan" type="checkbox" />
@@ -373,7 +398,15 @@ watch(selectedActivityId, () => {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 text-left text-slate-600">
-                <th class="p-2">{{ t('common.name') }}</th>
+                <th class="p-2">
+                  <button
+                    type="button"
+                    class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                    @click="setTableSort('fullName')"
+                  >
+                    {{ t('common.name') }}{{ tableSort === 'fullName' ? (tableDir === 'asc' ? ' ↑' : ' ↓') : '' }}
+                  </button>
+                </th>
                 <th class="p-2">{{ t('activityCheckIn.code') }}</th>
                 <th class="p-2">{{ t('activityCheckIn.status') }}</th>
                 <th class="p-2">{{ t('activityCheckIn.lastAction') }}</th>

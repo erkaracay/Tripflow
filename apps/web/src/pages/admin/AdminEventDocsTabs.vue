@@ -20,6 +20,8 @@ const eventError = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const tabs = ref<EventDocTabDto[]>([])
+const sortKey = ref<'sortOrder' | 'title' | 'type'>('sortOrder')
+const sortDir = ref<'asc' | 'desc'>('asc')
 
 const modalOpen = ref(false)
 const saving = ref(false)
@@ -69,6 +71,37 @@ const resolvedType = computed(() => {
 })
 
 const isSystemFormType = computed(() => form.type !== 'Custom')
+
+const sortedTabs = computed(() => {
+  const list = [...tabs.value]
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  list.sort((a, b) => {
+    let cmp = 0
+    if (sortKey.value === 'sortOrder') {
+      cmp = (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+    } else if (sortKey.value === 'title') {
+      cmp = (a.title ?? '').localeCompare(b.title ?? '')
+    } else {
+      cmp = (a.type ?? '').localeCompare(b.type ?? '')
+    }
+    return cmp * dir
+  })
+  return list
+})
+
+const setSort = (key: 'sortOrder' | 'title' | 'type') => {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+const sortIndicator = (key: 'sortOrder' | 'title' | 'type') => {
+  if (sortKey.value !== key) return ''
+  return sortDir.value === 'asc' ? ' ↑' : ' ↓'
+}
 
 const formatType = (type: string) => {
   const normalized = type.toLowerCase()
@@ -522,15 +555,39 @@ onMounted(() => {
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
-              <th class="px-4 py-3 text-left">{{ t('admin.docs.sortOrder') }}</th>
-              <th class="px-4 py-3 text-left">{{ t('admin.docs.tabTitle') }}</th>
-              <th class="px-4 py-3 text-left">{{ t('admin.docs.tabType') }}</th>
+              <th class="px-4 py-3 text-left">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('sortOrder')"
+                >
+                  {{ t('admin.docs.sortOrder') }}{{ sortIndicator('sortOrder') }}
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('title')"
+                >
+                  {{ t('admin.docs.tabTitle') }}{{ sortIndicator('title') }}
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('type')"
+                >
+                  {{ t('admin.docs.tabType') }}{{ sortIndicator('type') }}
+                </button>
+              </th>
               <th class="px-4 py-3 text-left">{{ t('admin.docs.active') }}</th>
               <th class="px-4 py-3 text-right">{{ t('admin.docs.actions') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
-            <tr v-for="tab in tabs" :key="tab.id" class="text-slate-700">
+            <tr v-for="tab in sortedTabs" :key="tab.id" class="text-slate-700">
               <td class="px-4 py-3">{{ tab.sortOrder }}</td>
               <td class="px-4 py-3 font-medium text-slate-900">{{ tab.title }}</td>
               <td class="px-4 py-3">{{ formatType(tab.type) }}</td>

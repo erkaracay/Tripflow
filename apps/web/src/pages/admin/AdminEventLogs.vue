@@ -31,6 +31,8 @@ const to = ref('')
 
 const searchInput = ref('')
 const searchQuery = ref('')
+const sort = ref('createdAt')
+const dir = ref<'asc' | 'desc'>('desc')
 const debounceHandle = ref<number | ReturnType<typeof setTimeout> | null>(null)
 
 const totalPages = computed(() => Math.max(Math.ceil(total.value / pageSize.value), 1))
@@ -51,7 +53,7 @@ const fetchLogs = async () => {
   errorMessage.value = null
   try {
     const response = await apiGet<EventParticipantLogListResponse>(
-      `/api/events/${eventId.value}/logs?direction=${encodeURIComponent(direction.value)}&method=${encodeURIComponent(method.value)}&result=${encodeURIComponent(result.value)}&from=${encodeURIComponent(from.value)}&to=${encodeURIComponent(to.value)}&query=${encodeURIComponent(searchQuery.value)}&page=${page.value}&pageSize=${pageSize.value}`
+      `/api/events/${eventId.value}/logs?direction=${encodeURIComponent(direction.value)}&method=${encodeURIComponent(method.value)}&result=${encodeURIComponent(result.value)}&from=${encodeURIComponent(from.value)}&to=${encodeURIComponent(to.value)}&query=${encodeURIComponent(searchQuery.value)}&page=${page.value}&pageSize=${pageSize.value}&sort=${encodeURIComponent(sort.value)}&dir=${dir.value}`
     )
     items.value = response.items
     total.value = response.total
@@ -114,6 +116,22 @@ const goNext = () => {
   if (!canNext.value) return
   page.value += 1
   void fetchLogs()
+}
+
+const setSort = (col: string) => {
+  if (sort.value === col) {
+    dir.value = dir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sort.value = col
+    dir.value = col === 'createdAt' ? 'desc' : 'asc'
+  }
+  page.value = 1
+  void fetchLogs()
+}
+
+const sortIndicator = (col: string) => {
+  if (sort.value !== col) return ''
+  return dir.value === 'asc' ? ' ↑' : ' ↓'
 }
 
 const buildCsvValue = (value: string | number | null | undefined) =>
@@ -392,13 +410,61 @@ onMounted(loadEvent)
         <table class="min-w-[900px] w-full border-separate border-spacing-0 text-left text-sm">
           <thead class="sticky top-0 bg-white">
             <tr class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.createdAt') }}</th>
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.direction') }}</th>
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.method') }}</th>
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.result') }}</th>
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.participant') }}</th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('createdAt')"
+                >
+                  {{ t('admin.logs.columns.createdAt') }}{{ sortIndicator('createdAt') }}
+                </button>
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('direction')"
+                >
+                  {{ t('admin.logs.columns.direction') }}{{ sortIndicator('direction') }}
+                </button>
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('method')"
+                >
+                  {{ t('admin.logs.columns.method') }}{{ sortIndicator('method') }}
+                </button>
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('result')"
+                >
+                  {{ t('admin.logs.columns.result') }}{{ sortIndicator('result') }}
+                </button>
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('participantName')"
+                >
+                  {{ t('admin.logs.columns.participant') }}{{ sortIndicator('participantName') }}
+                </button>
+              </th>
               <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.code') }}</th>
-              <th class="border-b border-slate-200 px-4 py-3">{{ t('admin.logs.columns.actor') }}</th>
+              <th class="border-b border-slate-200 px-4 py-3">
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
+                  @click="setSort('actorEmail')"
+                >
+                  {{ t('admin.logs.columns.actor') }}{{ sortIndicator('actorEmail') }}
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
