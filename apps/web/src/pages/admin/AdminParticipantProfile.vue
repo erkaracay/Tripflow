@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
-import { formatPhoneDisplay } from '../../lib/normalize'
+import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
+import CopyIcon from '../../components/icons/CopyIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { EventDocTabDto, ParticipantProfile } from '../../types'
@@ -21,19 +22,41 @@ const loading = ref(true)
 const errorMessage = ref<string | null>(null)
 const profile = ref<ParticipantProfile | null>(null)
 const hotelName = ref<string | null>(null)
+const hotelAddress = ref<string | null>(null)
+const hotelPhone = ref<string | null>(null)
 
 const details = computed(() => profile.value?.details ?? null)
 
-const resolveHotelName = (tabs: EventDocTabDto[]) => {
+const readString = (content: Record<string, unknown>, key: string): string | null => {
+  const v = content[key]
+  return typeof v === 'string' ? v : null
+}
+
+const resolveHotelFromTabs = (tabs: EventDocTabDto[]) => {
   const hotelTab =
     tabs.find((tab) => tab.type?.toLowerCase() === 'hotel' && tab.isActive) ??
     tabs.find((tab) => tab.type?.toLowerCase() === 'hotel')
   if (!hotelTab || typeof hotelTab.content !== 'object' || hotelTab.content === null) {
-    return null
+    return { name: null, address: null, phone: null }
   }
   const content = hotelTab.content as Record<string, unknown>
-  const nameValue = content.hotelName
-  return typeof nameValue === 'string' ? nameValue : null
+  return {
+    name: readString(content, 'hotelName'),
+    address: readString(content, 'address'),
+    phone: readString(content, 'phone'),
+  }
+}
+
+const buildMapsLink = (address: string | null): string => {
+  if (!address) return ''
+  const trimmed = address.trim()
+  return trimmed ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}` : ''
+}
+
+const buildTelLink = (phone: string | null): string => {
+  if (!phone) return ''
+  const { normalized } = normalizePhone(phone)
+  return normalized ? `tel:${normalized}` : ''
 }
 
 const loadProfile = async () => {
@@ -45,7 +68,10 @@ const loadProfile = async () => {
       apiGet<EventDocTabDto[]>(`/api/events/${eventId.value}/docs/tabs`).catch(() => []),
     ])
     profile.value = profileData
-    hotelName.value = resolveHotelName(tabs)
+    const hotel = resolveHotelFromTabs(tabs)
+    hotelName.value = hotel.name
+    hotelAddress.value = hotel.address
+    hotelPhone.value = hotel.phone
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : t('errors.generic')
   } finally {
@@ -212,6 +238,26 @@ onMounted(loadProfile)
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.hotelName') }}</span>
             <span class="text-slate-900">{{ displayValue(hotelName ?? undefined) }}</span>
           </div>
+          <div v-if="hotelAddress" class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.hotelAddress') }}</span>
+            <a
+              v-if="buildMapsLink(hotelAddress)"
+              :href="buildMapsLink(hotelAddress)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-slate-900 underline hover:underline"
+            >{{ hotelAddress }}</a>
+            <span v-else class="text-slate-900">{{ hotelAddress }}</span>
+          </div>
+          <div v-if="hotelPhone" class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.hotelPhone') }}</span>
+            <a
+              v-if="buildTelLink(hotelPhone)"
+              :href="buildTelLink(hotelPhone)"
+              class="text-slate-900 underline hover:underline"
+            >{{ hotelPhone }}</a>
+            <span v-else class="text-slate-900">{{ hotelPhone }}</span>
+          </div>
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.roomNo') }}</span>
             <span class="text-slate-900">{{ displayValue(details?.roomNo ?? undefined) }}</span>
@@ -261,9 +307,14 @@ onMounted(loadProfile)
               </div>
               <div v-if="details?.arrivalTicketNo || details?.ticketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalTicketNo') }}</span>
-                <span class="text-slate-900">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
+                  @click="copyValue(details?.arrivalTicketNo ?? details?.ticketNo ?? null)"
+                >
                   {{ displayValue(details?.arrivalTicketNo ?? details?.ticketNo ?? undefined) }}
-                </span>
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalDepartureTime') }}</span>
@@ -275,7 +326,16 @@ onMounted(loadProfile)
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalPnr') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.arrivalPnr ?? undefined) }}</span>
+                <button
+                  v-if="details?.arrivalPnr"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
+                  @click="copyValue(details?.arrivalPnr ?? null)"
+                >
+                  {{ displayValue(details?.arrivalPnr ?? undefined) }}
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
+                <span v-else class="text-slate-900">{{ displayValue(details?.arrivalPnr ?? undefined) }}</span>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalBaggage') }}</span>
@@ -315,7 +375,14 @@ onMounted(loadProfile)
               </div>
               <div v-if="details?.returnTicketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnTicketNo') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnTicketNo ?? undefined) }}</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
+                  @click="copyValue(details?.returnTicketNo ?? null)"
+                >
+                  {{ displayValue(details?.returnTicketNo ?? undefined) }}
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnDepartureTime') }}</span>
@@ -327,7 +394,16 @@ onMounted(loadProfile)
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnPnr') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnPnr ?? undefined) }}</span>
+                <button
+                  v-if="details?.returnPnr"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
+                  @click="copyValue(details?.returnPnr ?? null)"
+                >
+                  {{ displayValue(details?.returnPnr ?? undefined) }}
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
+                <span v-else class="text-slate-900">{{ displayValue(details?.returnPnr ?? undefined) }}</span>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnBaggage') }}</span>

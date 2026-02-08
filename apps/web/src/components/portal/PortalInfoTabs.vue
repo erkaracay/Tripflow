@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatBaggage, formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
+import { useToast } from '../../lib/toast'
+import CopyIcon from '../icons/CopyIcon.vue'
 import type { PortalDocsResponse, PortalFlightInfo, PortalInsuranceInfo, PortalTransferInfo } from '../../types'
 
 type TabItem = {
@@ -15,6 +17,19 @@ type TabItem = {
 const props = defineProps<{ docs?: PortalDocsResponse | null; printMode?: boolean }>()
 
 const { t } = useI18n()
+const { pushToast } = useToast()
+
+const copyToClipboard = async (value: string) => {
+  if (!value?.trim()) return
+  try {
+    if (globalThis.navigator?.clipboard?.writeText) {
+      await globalThis.navigator.clipboard.writeText(value.trim())
+      pushToast({ key: 'toast.copied', tone: 'success' })
+    }
+  } catch {
+    pushToast({ key: 'errors.copyFailed', tone: 'error' })
+  }
+}
 
 const travel = computed(() => props.docs?.participantTravel ?? null)
 
@@ -746,7 +761,14 @@ const formatCustomValue = (value: unknown): string => {
         </div>
         <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
+          <button
+            type="button"
+            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+            @click="copyToClipboard((travel?.arrival?.ticketNo ?? travel?.ticketNo) ?? '')"
+          >
+            {{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}
+            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+          </button>
         </div>
         <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -758,7 +780,14 @@ const formatCustomValue = (value: unknown): string => {
         </div>
         <div v-if="hasText(travel?.arrival?.pnr)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.pnr) }}</span>
+          <button
+            type="button"
+            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+            @click="copyToClipboard(travel?.arrival?.pnr ?? '')"
+          >
+            {{ valueOrDash(travel?.arrival?.pnr) }}
+            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+          </button>
         </div>
         <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
@@ -789,7 +818,14 @@ const formatCustomValue = (value: unknown): string => {
           </div>
         <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
+          <button
+            type="button"
+            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+            @click="copyToClipboard(travel?.return?.ticketNo ?? '')"
+          >
+            {{ valueOrDash(travel?.return?.ticketNo) }}
+            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+          </button>
         </div>
           <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -801,7 +837,14 @@ const formatCustomValue = (value: unknown): string => {
           </div>
           <div v-if="hasText(travel?.return?.pnr)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.pnr) }}</span>
+            <button
+              type="button"
+              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+              @click="copyToClipboard(travel?.return?.pnr ?? '')"
+            >
+              {{ valueOrDash(travel?.return?.pnr) }}
+              <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+            </button>
           </div>
           <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
