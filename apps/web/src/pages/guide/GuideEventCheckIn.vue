@@ -699,6 +699,18 @@ onUnmounted(() => {
           <RouterLink class="text-sm text-slate-600 underline" to="/guide/events">
             {{ t('nav.backToGuideEvents') }}
           </RouterLink>
+          <RouterLink
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            :to="`/guide/events/${eventId}/activities/checkin`"
+          >
+            {{ t('admin.eventDetail.activityCheckIn') }}
+          </RouterLink>
+          <RouterLink
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            :to="`/guide/events/${eventId}/equipment`"
+          >
+            {{ t('admin.eventDetail.equipment') }}
+          </RouterLink>
           <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('guide.checkIn.title') }}</h1>
           <p class="text-sm text-slate-500" v-if="event">
             {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}

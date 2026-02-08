@@ -1267,6 +1267,18 @@ onMounted(loadEvent)
         >
           {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
+        <RouterLink
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          :to="`/admin/events/${eventId}/activities/checkin`"
+        >
+          {{ t('admin.eventDetail.activityCheckIn') }}
+        </RouterLink>
+        <RouterLink
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          :to="`/admin/events/${eventId}/equipment`"
+        >
+          {{ t('admin.eventDetail.equipment') }}
+        </RouterLink>
         <button
           v-if="event && !event.isDeleted"
           class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm hover:border-amber-300"

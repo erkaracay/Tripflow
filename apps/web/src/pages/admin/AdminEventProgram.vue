@@ -60,6 +60,7 @@ const activityForm = ref({
   directions: '',
   notes: '',
   checkInEnabled: false,
+  requiresCheckIn: false,
   checkInMode: 'EntryOnly',
   menuText: '',
   surveyUrl: '',
@@ -98,6 +99,7 @@ const resetActivityForm = (activity?: EventActivity) => {
     directions: activity?.directions ?? '',
     notes: activity?.notes ?? '',
     checkInEnabled: activity?.checkInEnabled ?? false,
+    requiresCheckIn: activity?.requiresCheckIn ?? false,
     checkInMode: activity?.checkInMode ?? 'EntryOnly',
     menuText: activity?.menuText ?? '',
     surveyUrl: activity?.surveyUrl ?? '',
@@ -358,11 +360,7 @@ onUnmounted(() => {
 })
 
 const timeError = computed(() => {
-  const start = parseTimeToMinutes(activityForm.value.startTime)
-  const end = parseTimeToMinutes(activityForm.value.endTime)
-  if (start !== null && end !== null && end < start) {
-    return t('admin.program.activities.validation.timeRange')
-  }
+  // Allow end < start (activity over midnight, e.g. 23:00–00:15)
   return ''
 })
 
@@ -401,6 +399,7 @@ const saveActivity = async () => {
     directions: activityForm.value.directions || null,
     notes: activityForm.value.notes || null,
     checkInEnabled: activityForm.value.checkInEnabled,
+    requiresCheckIn: activityForm.value.requiresCheckIn,
     checkInMode: activityForm.value.checkInMode || 'EntryOnly',
     menuText: activityForm.value.menuText || null,
     surveyUrl: activityForm.value.surveyUrl || null,
@@ -841,13 +840,13 @@ onMounted(loadAll)
           </label>
           <label class="inline-flex items-center gap-2 text-sm text-slate-600 md:col-span-2">
             <input
-              v-model="activityForm.checkInEnabled"
+              v-model="activityForm.requiresCheckIn"
               type="checkbox"
               class="h-4 w-4 rounded border-slate-300"
-              name="activityCheckInEnabled"
+              name="activityRequiresCheckIn"
               :disabled="savingActivity"
             />
-            {{ t('admin.program.activities.form.checkInEnabled') }}
+            {{ t('admin.program.activities.form.requiresCheckIn') }}
           </label>
           <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.checkInEnabled">
             <span class="text-slate-600">{{ t('admin.program.activities.form.checkInMode') }}</span>

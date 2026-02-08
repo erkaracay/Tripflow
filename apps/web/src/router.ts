@@ -9,12 +9,16 @@ import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
 import AdminParticipantProfile from './pages/admin/AdminParticipantProfile.vue'
 import AdminParticipantsTable from './pages/admin/AdminParticipantsTable.vue'
 import AdminEventProgram from './pages/admin/AdminEventProgram.vue'
+import AdminActivityCheckIn from '@/pages/admin/AdminActivityCheckIn.vue'
+import AdminEquipment from '@/pages/admin/AdminEquipment.vue'
 import AdminEventDocsTabs from './pages/admin/AdminEventDocsTabs.vue'
 import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
 import AdminUsers from './pages/admin/AdminUsers.vue'
 import AdminGuides from './pages/admin/AdminGuides.vue'
 import GuideEvents from './pages/guide/GuideEvents.vue'
 import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
+import GuideActivityCheckIn from '@/pages/guide/GuideActivityCheckIn.vue'
+import GuideEquipment from '@/pages/guide/GuideEquipment.vue'
 import GuideEventProgram from './pages/guide/GuideEventProgram.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
@@ -55,6 +59,18 @@ const router = createRouter({
     {
       path: '/admin/events/:eventId/program',
       component: AdminEventProgram,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/activities/checkin',
+      component: AdminActivityCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
+      path: '/admin/events/:eventId/equipment',
+      component: AdminEquipment,
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
@@ -105,6 +121,18 @@ const router = createRouter({
     {
       path: '/guide/events/:eventId/checkin',
       component: GuideEventCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
+      path: '/guide/events/:eventId/activities/checkin',
+      component: GuideActivityCheckIn,
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
+      path: '/guide/events/:eventId/equipment',
+      component: GuideEquipment,
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },

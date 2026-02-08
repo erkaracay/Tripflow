@@ -213,9 +213,99 @@ export type EventActivity = {
   directions?: string | null
   notes?: string | null
   checkInEnabled: boolean
+  requiresCheckIn: boolean
   checkInMode: string
   menuText?: string | null
   surveyUrl?: string | null
+}
+
+export type ActivityCheckInResponse = {
+  participantId: string
+  participantName: string
+  result: string
+  direction: string
+  method: string
+  loggedAt: string
+}
+
+export type ActivityLastLog = {
+  direction: string
+  method: string
+  result: string
+  createdAt: string
+}
+
+export type ActivityParticipantState = {
+  isCheckedIn: boolean
+  lastLog?: ActivityLastLog | null
+}
+
+export type ActivityParticipantTableItem = {
+  id: string
+  fullName: string
+  phone: string
+  email?: string | null
+  tcNo: string
+  checkInCode: string
+  roomNo?: string | null
+  agencyName?: string | null
+  activityState: ActivityParticipantState
+}
+
+export type ActivityParticipantTableResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: ActivityParticipantTableItem[]
+}
+
+export type EventItem = {
+  id: string
+  type: string
+  title: string
+  name: string
+  isActive: boolean
+  sortOrder: number
+}
+
+export type ItemActionResponse = {
+  participantId: string
+  participantName: string
+  result: string
+  action: string
+  method: string
+  loggedAt: string
+}
+
+export type ItemLastLog = {
+  action: string
+  method: string
+  result: string
+  createdAt: string
+}
+
+export type ItemParticipantState = {
+  given: boolean
+  lastLog?: ItemLastLog | null
+}
+
+export type ItemParticipantTableItem = {
+  id: string
+  fullName: string
+  phone: string
+  email?: string | null
+  tcNo: string
+  checkInCode: string
+  roomNo?: string | null
+  agencyName?: string | null
+  itemState: ItemParticipantState
+}
+
+export type ItemParticipantTableResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: ItemParticipantTableItem[]
 }
 
 export type EventScheduleDay = {
