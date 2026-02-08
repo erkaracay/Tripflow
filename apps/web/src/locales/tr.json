@@ -72,7 +72,14 @@
     "genderOther": "Diğer",
     "noData": "Veri yok.",
     "searchPlaceholder": "Ad, TC, telefon, kod, oda, acente ara",
-    "clearSearch": "Temizle"
+    "clearSearch": "Temizle",
+    "pageTitle": {
+      "login": "Giriş",
+      "admin": "Yönetim",
+      "guide": "Rehber",
+      "portal": "Etkinlik portalı",
+      "forbidden": "Erişim yok"
+    }
   },
   "actions": {
     "whatsapp": "WhatsApp",

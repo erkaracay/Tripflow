@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { i18n } from './i18n'
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
 import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
@@ -117,6 +118,23 @@ const router = createRouter({
     { path: '/e/:eventId/docs/print', component: PortalDocsPrint, props: true },
     { path: '/e/:eventId', component: EventPortal, props: true },
   ],
+})
+
+const getPageTitleKey = (path: string): string => {
+  if (path === '/login') return 'common.pageTitle.login'
+  if (path === '/forbidden') return 'common.pageTitle.forbidden'
+  if (path.startsWith('/admin')) return 'common.pageTitle.admin'
+  if (path.startsWith('/guide')) return 'common.pageTitle.guide'
+  if (path.startsWith('/e/')) return 'common.pageTitle.portal'
+  return 'common.appName'
+}
+
+router.afterEach((to) => {
+  const titleKey = getPageTitleKey(to.path)
+  const title = titleKey === 'common.appName'
+    ? i18n.global.t(titleKey)
+    : `${i18n.global.t(titleKey)} | ${i18n.global.t('common.appName')}`
+  document.title = title
 })
 
 router.beforeEach((to) => {

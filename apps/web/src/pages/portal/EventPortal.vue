@@ -71,8 +71,8 @@ const hasSession = computed(() => {
 
 const requiresLogin = computed(() => !hasSession.value || sessionExpired.value)
 
-const sessionTokenKey = computed(() => `tripflow.portal.session.${eventId.value}`)
-const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${eventId.value}`)
+const sessionTokenKey = computed(() => `infora.portal.session.${eventId.value}`)
+const sessionExpiryKey = computed(() => `infora.portal.session.exp.${eventId.value}`)
 
 const resolvePublicBase = () => {
   const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim()

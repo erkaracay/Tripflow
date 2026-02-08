@@ -28,8 +28,8 @@ const hasPrinted = ref(false)
 const sessionToken = ref('')
 const sessionExpiresAt = ref<Date | null>(null)
 
-const sessionTokenKey = computed(() => `tripflow.portal.session.${eventId.value}`)
-const sessionExpiryKey = computed(() => `tripflow.portal.session.exp.${eventId.value}`)
+const sessionTokenKey = computed(() => `infora.portal.session.${eventId.value}`)
+const sessionExpiryKey = computed(() => `infora.portal.session.exp.${eventId.value}`)
 
 const formatPortalDate = (value?: string | null) => {
   if (!value) return ''

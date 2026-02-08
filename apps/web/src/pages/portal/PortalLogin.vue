@@ -31,8 +31,8 @@ const isTcError = computed(
     errorKey.value === 'portal.login.ambiguousTcNo'
 )
 
-const sessionTokenKey = (eventId: string) => `tripflow.portal.session.${eventId}`
-const sessionExpiryKey = (eventId: string) => `tripflow.portal.session.exp.${eventId}`
+const sessionTokenKey = (eventId: string) => `infora.portal.session.${eventId}`
+const sessionExpiryKey = (eventId: string) => `infora.portal.session.exp.${eventId}`
 
 const sanitizeAccessCode = (value: string) =>
   value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)

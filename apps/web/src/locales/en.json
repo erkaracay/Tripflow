@@ -72,7 +72,14 @@
     "genderOther": "Other",
     "noData": "No data available.",
     "searchPlaceholder": "Search name, TC, phone, code, room, agency",
-    "clearSearch": "Clear"
+    "clearSearch": "Clear",
+    "pageTitle": {
+      "login": "Sign in",
+      "admin": "Admin",
+      "guide": "Guide",
+      "portal": "Event portal",
+      "forbidden": "Access denied"
+    }
   },
   "actions": {
     "whatsapp": "WhatsApp",

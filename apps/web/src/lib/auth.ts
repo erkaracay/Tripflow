@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
-const TOKEN_KEY = 'tripflow_token'
-const ORG_KEY = 'tripflow_org'
+const TOKEN_KEY = 'infora_token'
+const ORG_KEY = 'infora_org'
 
 const readStorage = (key: string) => globalThis.localStorage?.getItem(key) ?? ''
 

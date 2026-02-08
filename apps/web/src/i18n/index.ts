@@ -2,7 +2,7 @@ import { createI18n } from 'vue-i18n'
 import en from '../locales/en.json'
 import tr from '../locales/tr.json'
 
-const LOCALE_KEY = 'tripflow_locale'
+const LOCALE_KEY = 'infora_locale'
 
 const supportedLocales = ['en', 'tr'] as const
 export type Locale = typeof supportedLocales[number]
