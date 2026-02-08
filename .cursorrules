@@ -1,0 +1,58 @@
+# Tripflow Cursor Rules
+
+You are acting as a senior full-stack engineer for the Tripflow monorepo.
+Your goal is to implement requested changes safely, in small steps, without breaking existing behavior.
+
+## Repo structure
+
+- Backend: apps/api (NET 8 minimal API, EF Core 8, PostgreSQL)
+- Frontend: apps/web (Vue 3 + Vite + TypeScript + Tailwind v4)
+- Patterns:
+  - API code tends to be separated by Endpoints / Contracts / Handlers / Helpers.
+  - Guide endpoints are under /api/guide.
+  - Admin/SuperAdmin endpoints are under /api/events/... and /api/users...
+
+## Non-negotiables (safety)
+
+- Do not break existing API contracts unless explicitly requested.
+- If a contract changes, keep backwards compatibility (additive fields, fallback mapping, accept legacy request shapes).
+- Avoid destructive migrations. Prefer additive columns/tables and fallback logic.
+- No secrets in source control. Do not touch env/user-secrets approach.
+
+## Web UI rules
+
+- All user-visible text must be i18n (en.json + tr.json). Never ship raw i18n keys.
+- Hide empty fields/rows in UI (do not render placeholders like “—”).
+- Dates shown in UI must be dd.MM.yyyy and times HH:mm. Use shared formatters (formatDate/formatTime/formatBaggage).
+- Forms:
+  - Enter-to-submit where appropriate.
+  - Prevent double submit (loading guard).
+  - Focus first invalid input on error.
+  - Disable inputs/buttons during submit.
+- Mobile:
+  - Keep primary action visible.
+  - Move secondary actions into ⋯ menu to avoid button overflow.
+- Print/PDF pages:
+  - Improve page breaks (avoid cutting cards mid-content).
+  - Do not print raw URLs; print-friendly styling.
+
+## API rules
+
+- Always enforce org-scope + role permissions consistent with existing behavior.
+- Prefer single-query paging endpoints and avoid N+1.
+- When an operation has “effect + log”, keep it atomic with a DB transaction.
+- For logging, store client info (ip/userAgent) only if already part of the design; do not show it in UI tables unless explicitly requested (CSV export is okay when specified).
+
+## Import / parsing
+
+- Accept typed XLSX cells where possible.
+- CSV/XLSX date/time parsing should be tolerant and downgrade non-critical parse failures to warnings when safe.
+- Keep import templates in sync with parsing logic; warn on legacy headers.
+
+## Workflow
+
+- Start by proposing: plan + files to change + API/UI impact + manual test checklist.
+- Make minimal changes that compile.
+- Ensure builds pass:
+  - dotnet build (api)
+  - npm --workspace apps/web run build
