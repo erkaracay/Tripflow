@@ -48,7 +48,10 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
         ? String((data as { message?: string }).message ?? 'Request failed')
         : response.statusText
 
-    throw new Error(message)
+    const error = new Error(message) as Error & { status?: number; payload?: unknown }
+    error.status = response.status
+    error.payload = data
+    throw error
   }
 
   return data as T

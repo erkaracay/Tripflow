@@ -120,8 +120,10 @@ const createEvent = async () => {
     await router.push(`/admin/events/${created.id}`)
   } catch (err: unknown) {
     const payload = err && typeof err === 'object' && 'payload' in err ? (err as { payload?: { code?: string } }).payload : undefined
-    const code = payload?.code
-    if (code === 'event_access_code_taken') {
+    const apiCode = payload?.code
+    if (apiCode === 'event_access_code_taken') {
+      formErrorKey.value = null
+      formErrorMessage.value = null
       eventCodeErrorKey.value = 'admin.events.form.eventCodeTaken'
       return
     }
