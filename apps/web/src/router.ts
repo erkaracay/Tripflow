@@ -26,7 +26,7 @@ import type { UserRole } from './types'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/admin/events' },
+    { path: '/', redirect: '/e/login' },
     { path: '/login', component: Login },
     { path: '/forbidden', component: Forbidden },
     {

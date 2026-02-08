@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { portalGetMe, portalLogin, portalResolveEvent } from '../../lib/api'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -315,6 +315,14 @@ onMounted(() => {
           {{ errorMessage }}
         </p>
       </form>
+      <p class="mt-4 border-t border-slate-100 pt-4 text-center text-sm text-slate-500">
+        <RouterLink
+          to="/login"
+          class="font-medium text-slate-700 underline hover:text-slate-900"
+        >
+          {{ t('portal.login.staffLogin') }}
+        </RouterLink>
+      </p>
     </section>
   </div>
 </template>

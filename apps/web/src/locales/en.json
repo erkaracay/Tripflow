@@ -1103,7 +1103,8 @@
       "rateLimited": "Too many attempts. Please wait and try again.",
       "rateLimitedWithTime": "Please wait {seconds}s before trying again.",
       "requiredTitle": "Login required",
-      "requiredSubtitle": "Please log in to view the event portal."
+      "requiredSubtitle": "Please log in to view the event portal.",
+      "staffLogin": "Staff login"
     },
     "sessionExpired": {
       "message": "Your session has expired. Please verify again to continue.",

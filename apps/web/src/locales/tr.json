@@ -1088,7 +1088,8 @@
       "rateLimited": "Çok fazla deneme. Lütfen bekleyip tekrar dene.",
       "rateLimitedWithTime": "{seconds} sn sonra tekrar dene.",
       "requiredTitle": "Giriş gerekli",
-      "requiredSubtitle": "Etkinlik portalını görmek için giriş yap."
+      "requiredSubtitle": "Etkinlik portalını görmek için giriş yap.",
+      "staffLogin": "Personel girişi"
     },
     "sessionExpired": {
       "message": "Oturumun doldu, devam etmek için tekrar doğrulaman gerekiyor.",
