@@ -26,7 +26,7 @@ internal static class PortalLoginHandlers
             return Results.BadRequest(new { message = "Request body is required." });
         }
 
-        var code = NormalizeCode(request.EventAccessCode);
+        var code = EventsHelpers.NormalizeEventCode(request.EventAccessCode);
         var tcNo = NormalizeTcNo(request.TcNo);
 
         var attemptKey = $"{code}|{GetClientIp(httpContext)}";
@@ -36,7 +36,7 @@ internal static class PortalLoginHandlers
             return Results.Json(new { code = "rate_limited", retryAfterSeconds = retryAfter }, statusCode: StatusCodes.Status429TooManyRequests);
         }
 
-        if (string.IsNullOrWhiteSpace(code) || code.Length != 8)
+        if (!EventsHelpers.IsValidEventCode(code))
         {
             RegisterFailure(attemptKey);
             return Results.BadRequest(new { code = "invalid_access_code_format" });
@@ -183,8 +183,8 @@ internal static class PortalLoginHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        var code = NormalizeCode(eventAccessCode);
-        if (string.IsNullOrWhiteSpace(code) || code.Length != 8)
+        var code = EventsHelpers.NormalizeEventCode(eventAccessCode);
+        if (!EventsHelpers.IsValidEventCode(code))
         {
             return Results.BadRequest(new { code = "invalid_event_access_code_format" });
         }
@@ -200,8 +200,6 @@ internal static class PortalLoginHandlers
         return Results.Ok(new PortalResolveEventResponse(eventEntity.Id, eventEntity.Name));
     }
 
-    private static string NormalizeCode(string? value)
-        => (value ?? string.Empty).Trim().ToUpperInvariant().Replace(" ", "").Replace("-", "");
 
     private static string NormalizeTcNo(string? value)
         => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());

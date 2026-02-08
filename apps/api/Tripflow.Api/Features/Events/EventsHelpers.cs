@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
@@ -132,6 +134,23 @@ internal static class EventsHelpers
 
         error = null;
         return true;
+    }
+
+    private static readonly Regex ValidEventCodeRegex = new("^[A-Z0-9]{6,10}$", RegexOptions.Compiled);
+
+    internal static string NormalizeEventCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+        var s = value.Trim().ToUpperInvariant();
+        return new string(s.Where(c => c >= 'A' && c <= 'Z' || c >= '0' && c <= '9').ToArray());
+    }
+
+    internal static bool IsValidEventCode(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return false;
+        return ValidEventCodeRegex.IsMatch(code);
     }
 
     internal static async Task<string> GenerateEventAccessCodeAsync(TripflowDbContext db, CancellationToken ct)

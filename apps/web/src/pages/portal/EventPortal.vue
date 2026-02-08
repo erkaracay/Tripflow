@@ -43,10 +43,10 @@ const qrDataUrl = ref<string | null>(null)
 const qrError = ref(false)
 
 const welcomeVisible = ref(false)
-const welcomeTimer = ref<number | null>(null)
+const welcomeTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const hasLoadedOnce = ref(false)
 const showDayScrollHint = ref(false)
-let scrollHintTimer: number | null = null
+let scrollHintTimer: ReturnType<typeof setTimeout> | null = null
 
 const sessionToken = ref('')
 const sessionExpiresAt = ref<Date | null>(null)

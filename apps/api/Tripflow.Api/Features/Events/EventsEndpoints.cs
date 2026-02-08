@@ -37,6 +37,26 @@ public static class EventsEndpoints
                 return op;
             });
 
+        admin.MapGet("/{eventId}/access-code", EventsHandlers.GetEventAccessCode)
+            .WithSummary("Get event access code")
+            .WithDescription("Returns the event access code used for participant login.")
+            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/access-code/regenerate", EventsHandlers.RegenerateEventAccessCode)
+            .WithSummary("Regenerate event access code")
+            .WithDescription("Regenerates the event access code. Existing portal sessions remain valid.")
+            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/access-code", EventsHandlers.UpdateEventAccessCode)
+            .WithSummary("Update event access code")
+            .WithDescription("Sets the event access code (6–10 chars, A–Z/0–9, global unique).")
+            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
         admin.MapPut("/{eventId}", EventsHandlers.UpdateEvent)
             .WithSummary("Update event")
             .WithDescription("Updates event name and dates.")
@@ -56,18 +76,6 @@ public static class EventsEndpoints
             .WithDescription("Restores an archived event.")
             .Produces<EventDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
-
-        admin.MapGet("/{eventId}/access-code", EventsHandlers.GetEventAccessCode)
-            .WithSummary("Get event access code")
-            .WithDescription("Returns the event access code used for participant login.")
-            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
-
-        admin.MapPost("/{eventId}/access-code/regenerate", EventsHandlers.RegenerateEventAccessCode)
-            .WithSummary("Regenerate event access code")
-            .WithDescription("Regenerates the event access code. Existing portal sessions remain valid.")
-            .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         admin.MapGet("/{eventId}/days", EventsHandlers.GetEventDays)

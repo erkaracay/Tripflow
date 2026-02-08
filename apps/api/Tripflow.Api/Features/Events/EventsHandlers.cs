@@ -75,6 +75,29 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
+        string eventAccessCode;
+        if (!string.IsNullOrWhiteSpace(request.EventAccessCode))
+        {
+            var normalized = EventsHelpers.NormalizeEventCode(request.EventAccessCode);
+            if (!EventsHelpers.IsValidEventCode(normalized))
+            {
+                return Results.BadRequest(new { code = "invalid_event_access_code_format" });
+            }
+
+            var exists = await db.Events.AsNoTracking()
+                .AnyAsync(e => e.EventAccessCode == normalized, ct);
+            if (exists)
+            {
+                return Results.Conflict(new { code = "event_access_code_taken" });
+            }
+
+            eventAccessCode = normalized;
+        }
+        else
+        {
+            eventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
+        }
+
         var entity = new EventEntity
         {
             Id = Guid.NewGuid(),
@@ -82,7 +105,7 @@ internal static class EventsHandlers
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
-            EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
+            EventAccessCode = eventAccessCode,
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -101,7 +124,15 @@ internal static class EventsHandlers
         });
         db.EventDocTabs.AddRange(CreateDefaultDocTabs(entity));
         db.EventDays.AddRange(EventsHelpers.CreateDefaultDays(entity));
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Results.Conflict(new { code = "event_access_code_taken" });
+        }
 
         var dto = EventsHelpers.ToDto(entity);
         return Results.Created($"/api/events/{dto.Id}", dto);
@@ -889,6 +920,61 @@ internal static class EventsHandlers
 
         entity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
         await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
+    }
+
+    internal static async Task<IResult> UpdateEventAccessCode(
+        string eventId,
+        UpdateEventAccessCodeRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (request is null || string.IsNullOrWhiteSpace(request.EventAccessCode))
+        {
+            return Results.BadRequest(new { code = "invalid_event_access_code_format" });
+        }
+
+        var normalized = EventsHelpers.NormalizeEventCode(request.EventAccessCode);
+        if (!EventsHelpers.IsValidEventCode(normalized))
+        {
+            return Results.BadRequest(new { code = "invalid_event_access_code_format" });
+        }
+
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var takenByOther = await db.Events.AsNoTracking()
+            .AnyAsync(e => e.EventAccessCode == normalized && e.Id != id, ct);
+        if (takenByOther)
+        {
+            return Results.Conflict(new { code = "event_access_code_taken" });
+        }
+
+        entity.EventAccessCode = normalized;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Results.Conflict(new { code = "event_access_code_taken" });
+        }
 
         return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
     }

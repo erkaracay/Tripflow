@@ -72,9 +72,9 @@ const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
 const lastAction = ref<{ participantId: string; participantName: string } | null>(null)
-let highlightTimer: number | undefined
-let lastActionTimer: number | undefined
-let searchDebounceTimer: number | undefined
+let highlightTimer: ReturnType<typeof setTimeout> | undefined
+let lastActionTimer: ReturnType<typeof setTimeout> | undefined
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
 

@@ -26,7 +26,7 @@ const searchInput = ref('')
 const searchQuery = ref('')
 const sort = ref('fullName')
 const dir = ref<'asc' | 'desc'>('asc')
-const debounceHandle = ref<number | null>(null)
+const debounceHandle = ref<number | ReturnType<typeof setTimeout> | null>(null)
 
 const totalPages = computed(() => Math.max(Math.ceil(total.value / pageSize.value), 1))
 const canPrev = computed(() => page.value > 1)

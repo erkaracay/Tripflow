@@ -58,7 +58,7 @@ const issueFilter = ref<IssueFilter>('all')
 const search = ref('')
 
 const retryAfterSeconds = ref(0)
-let retryTimer: number | null = null
+let retryTimer: ReturnType<typeof setInterval> | null = null
 
 const summary = computed(() => {
   const current = finalReport.value ?? report.value

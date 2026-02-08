@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Tripflow.Api.Features.Events;
 
-public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate);
+public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate, string? EventAccessCode);
 public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
 
 public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? LogoUrl, Guid? GuideUserId, bool IsDeleted, string EventAccessCode);
@@ -350,3 +350,4 @@ public sealed record VerifyCheckInCodeRequest(string? CheckInCode);
 public sealed record VerifyCheckInCodeResponse(bool IsValid, string? NormalizedCode);
 public sealed record AssignGuideRequest(Guid? GuideUserId);
 public sealed record EventAccessCodeResponse(Guid EventId, string EventAccessCode);
+public sealed record UpdateEventAccessCodeRequest(string? EventAccessCode);
