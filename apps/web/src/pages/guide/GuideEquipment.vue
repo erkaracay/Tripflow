@@ -11,6 +11,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import CopyIcon from '../../components/icons/CopyIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import { formatUtcToLocal } from '../../lib/formatters'
 import type {
   Event as EventDto,
   EventItem,
@@ -287,7 +288,7 @@ const formatLastAction = (item: ItemParticipantTableResponse['items'][0]) => {
   if (!log) return '—'
   const act = log.action === 'Return' ? t('equipment.return') : t('equipment.give')
   const method = log.method === 'QrScan' ? 'QR' : t('common.manual')
-  return `${act} · ${method} · ${log.createdAt} · ${log.result}`
+  return `${act} · ${method} · ${formatUtcToLocal(log.createdAt, { timeOnly: true })} · ${log.result}`
 }
 
 const copyCode = async (value: string) => {

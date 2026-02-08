@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
+import { formatUtcDateTimeLocal } from '../../lib/formatters'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Event as EventDto, EventParticipantLogItem, EventParticipantLogListResponse } from '../../types'
@@ -137,7 +138,7 @@ const exportCsv = () => {
   ]
 
   const rows = items.value.map((row) => [
-    row.createdAt,
+    formatUtcDateTimeLocal(row.createdAt),
     row.direction,
     row.method,
     row.result,
@@ -409,7 +410,7 @@ onMounted(loadEvent)
               :key="row.id"
               class="border-b border-slate-100 last:border-b-0"
             >
-              <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ row.createdAt }}</td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ formatUtcDateTimeLocal(row.createdAt) }}</td>
               <td class="px-4 py-3">
                 <span
                   class="inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold"

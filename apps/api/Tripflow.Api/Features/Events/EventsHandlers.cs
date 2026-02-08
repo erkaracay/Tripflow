@@ -3028,7 +3028,7 @@ internal static class EventsHandlers
 
         var items = pageItems.Select(row => new EventParticipantLogItemDto(
             row.log.Id,
-            row.log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            DateTime.SpecifyKind(row.log.CreatedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
             row.log.Direction.ToString(),
             row.log.Method.ToString(),
             row.log.Result,

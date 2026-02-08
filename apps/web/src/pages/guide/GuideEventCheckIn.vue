@@ -4,7 +4,7 @@ import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
 import { normalizeQrCode } from '../../lib/qr'
-import { formatTime } from '../../lib/formatters'
+import { formatUtcToLocal } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
@@ -136,7 +136,7 @@ const formatLastLog = (log: Participant['lastLog'] | null | undefined) => {
   }
   const directionLabel = log.direction === 'Exit' ? t('common.exit') : t('common.entry')
   const methodLabel = log.method === 'QrScan' ? 'QR' : t('common.manual')
-  const time = formatTime(log.createdAt)
+  const time = formatUtcToLocal(String(log.createdAt), { timeOnly: true })
   return `${directionLabel} (${methodLabel}) • ${time}`
 }
 

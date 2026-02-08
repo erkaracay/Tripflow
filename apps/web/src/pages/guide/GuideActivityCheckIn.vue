@@ -9,7 +9,7 @@ import { useToast } from '../../lib/toast'
 import QrScannerModal from '../../components/QrScannerModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import { formatTime } from '../../lib/formatters'
+import { formatTime, formatUtcToLocal } from '../../lib/formatters'
 import type {
   Event as EventDto,
   EventActivity,
@@ -190,7 +190,7 @@ const formatLastAction = (item: ActivityParticipantTableResponse['items'][0]) =>
   if (!log) return '—'
   const dir = log.direction === 'Exit' ? t('common.exit') : t('common.entry')
   const method = log.method === 'QrScan' ? 'QR' : t('common.manual')
-  return `${dir} · ${method} · ${log.createdAt} · ${log.result}`
+  return `${dir} · ${method} · ${formatUtcToLocal(log.createdAt, { timeOnly: true })} · ${log.result}`
 }
 
 onMounted(() => {

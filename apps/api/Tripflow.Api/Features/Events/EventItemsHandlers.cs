@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -313,7 +314,7 @@ internal static class EventItemsHandlers
         {
             lastLogs.TryGetValue(p.Id, out var lastLog);
             var given = lastLog != null && lastLog.Action == "Give" && lastLog.Result == ResultSuccess;
-            var lastLogDto = lastLog == null ? null : new ItemLastLogDto(lastLog.Action, lastLog.Method, lastLog.Result, lastLog.CreatedAt.ToString("HH:mm"));
+            var lastLogDto = lastLog == null ? null : new ItemLastLogDto(lastLog.Action, lastLog.Method, lastLog.Result, DateTime.SpecifyKind(lastLog.CreatedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
             return new ItemParticipantTableItemDto(
                 p.Id,
                 p.FullName,

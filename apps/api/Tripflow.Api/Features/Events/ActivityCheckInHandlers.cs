@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -207,7 +208,7 @@ internal static class ActivityCheckInHandlers
         {
             lastLogs.TryGetValue(p.Id, out var lastLog);
             var isCheckedIn = lastLog != null && lastLog.Direction == "Entry" && (lastLog.Result == Success || lastLog.Result == AlreadyCheckedIn);
-            var lastLogDto = lastLog == null ? null : new ActivityLastLogDto(lastLog.Direction, lastLog.Method, lastLog.Result, lastLog.CreatedAt.ToString("HH:mm"));
+            var lastLogDto = lastLog == null ? null : new ActivityLastLogDto(lastLog.Direction, lastLog.Method, lastLog.Result, DateTime.SpecifyKind(lastLog.CreatedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
             return new ActivityParticipantTableItemDto(
                 p.Id,
                 p.FullName,
