@@ -1145,6 +1145,8 @@
   "activityCheckIn": {
     "title": "Aktivite yoklaması",
     "activity": "Aktivite",
+    "dayLabel": "Gün {n}",
+    "optionTimeActivity": "{time} - {title}",
     "noActivities": "Yoklama açık aktivite yok.",
     "selectActivity": "Önce bir aktivite seçin.",
     "scanQr": "QR tara",

@@ -9,8 +9,10 @@ import { useToast } from '../../lib/toast'
 import QrScannerModal from '../../components/QrScannerModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import { formatTime } from '../../lib/formatters'
 import type {
   Event as EventDto,
+  EventDay,
   EventActivity,
   ActivityCheckInResponse,
   ActivityParticipantTableResponse,
@@ -23,6 +25,7 @@ const storageKeyMode = computed(() => `infora:admin:activityCheckIn:mode:${event
 const storageKeyAuto = computed(() => `infora:admin:activityCheckIn:auto:${eventId.value}`)
 
 const event = ref<EventDto | null>(null)
+const days = ref<EventDay[]>([])
 const activities = ref<EventActivity[]>([])
 const selectedActivityId = ref<string | null>(null)
 const direction = ref<'Entry' | 'Exit'>('Entry')
@@ -35,7 +38,7 @@ const loading = ref(true)
 const loadErrorKey = ref<string | null>(null)
 const submitting = ref(false)
 const scannerOpen = ref(false)
-const autoSubmitAfterScan = ref(false)
+const autoSubmitAfterScan = ref(true)
 const codeInput = ref<HTMLInputElement | null>(null)
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
@@ -46,11 +49,13 @@ const loadEventAndActivities = async () => {
   loading.value = true
   loadErrorKey.value = null
   try {
-    const [eventData, activitiesData] = await Promise.all([
+    const [eventData, daysData, activitiesData] = await Promise.all([
       apiGet<EventDto>(`/api/events/${eventId.value}`),
+      apiGet<EventDay[]>(`/api/events/${eventId.value}/days`),
       apiGet<EventActivity[]>(`/api/events/${eventId.value}/activities/for-checkin`),
     ])
     event.value = eventData
+    days.value = daysData ?? []
     activities.value = activitiesData
     if (activitiesData.length > 0 && !selectedActivityId.value) {
       const first = activitiesData[0]
@@ -97,6 +102,28 @@ const persistAuto = () => {
     globalThis.localStorage?.setItem(storageKeyAuto.value, autoSubmitAfterScan.value ? '1' : '0')
   } catch {}
 }
+
+const activitiesByDay = computed(() => {
+  const byDay = new Map<string, EventActivity[]>()
+  for (const a of activities.value) {
+    const list = byDay.get(a.eventDayId) ?? []
+    list.push(a)
+    byDay.set(a.eventDayId, list)
+  }
+  const dayOrder = days.value.slice().sort((x, y) => x.sortOrder - y.sortOrder)
+  return dayOrder
+    .filter((d) => byDay.has(d.id))
+    .map((d) => ({
+      day: d,
+      activities: byDay.get(d.id) ?? [],
+    }))
+})
+
+const dayLabel = (day: EventDay) =>
+  (day.title && day.title.trim()) ? day.title.trim() : t('activityCheckIn.dayLabel', { n: day.sortOrder })
+
+const activityOptionLabel = (a: EventActivity) =>
+  t('activityCheckIn.optionTimeActivity', { time: formatTime(a.startTime), title: a.title })
 
 const submitCheckIn = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Manual') => {
   if (!selectedActivityId.value) {
@@ -177,7 +204,7 @@ const formatLastAction = (item: ActivityParticipantTableResponse['items'][0]) =>
 onMounted(() => {
   const storedMode = globalThis.localStorage?.getItem(storageKeyMode.value)
   if (storedMode === 'Exit' || storedMode === 'Entry') direction.value = storedMode
-  autoSubmitAfterScan.value = globalThis.localStorage?.getItem(storageKeyAuto.value) === '1'
+  // Tarayıcıya otomatik gönder: her açılışta seçili (varsayılan true)
   void loadEventAndActivities()
 })
 
@@ -225,7 +252,13 @@ watch(selectedActivityId, () => {
                 v-model="selectedActivityId"
                 class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm"
               >
-                <option v-for="a in activities" :key="a.id" :value="a.id">{{ a.title }}</option>
+                <template v-for="group in activitiesByDay" :key="group.day.id">
+                  <optgroup :label="dayLabel(group.day)">
+                    <option v-for="a in group.activities" :key="a.id" :value="a.id">
+                      {{ activityOptionLabel(a) }}
+                    </option>
+                  </optgroup>
+                </template>
                 <option v-if="activities.length === 0" value="" disabled>{{ t('activityCheckIn.noActivities') }}</option>
               </select>
             </label>

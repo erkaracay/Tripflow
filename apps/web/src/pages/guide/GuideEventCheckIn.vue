@@ -56,7 +56,7 @@ const lastResult = ref<CheckInResponse | null>(null)
 const lastErrorResult = ref<string | null>(null)
 const lastErrorCode = ref<string | null>(null)
 const codeInput = ref<HTMLInputElement | null>(null)
-const autoCheckInAfterScan = ref(false)
+const autoCheckInAfterScan = ref(true)
 const autoCheckInStorageKey = 'infora:guide:autoCheckInAfterScan'
 const checkInDirection = ref<CheckInDirection>('Entry')
 const scannerOpen = ref(false)
@@ -643,16 +643,6 @@ const initialize = async () => {
   codeInput.value?.focus()
 }
 
-const loadAutoCheckInPreference = () => {
-  const stored = globalThis.localStorage?.getItem(autoCheckInStorageKey)
-  if (stored === '1') {
-    autoCheckInAfterScan.value = true
-  } else if (stored === '0') {
-    autoCheckInAfterScan.value = false
-  }
-}
-
-
 watch(searchTerm, (value) => {
   if (searchDebounceTimer) {
     globalThis.clearTimeout(searchDebounceTimer)
@@ -674,7 +664,7 @@ watch(autoCheckInAfterScan, (value) => {
 })
 
 onMounted(() => {
-  loadAutoCheckInPreference()
+  // Tarayıcıya otomatik gönder: her açılışta seçili (varsayılan true)
   void initialize()
 })
 

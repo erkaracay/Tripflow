@@ -1160,6 +1160,8 @@
   "activityCheckIn": {
     "title": "Activity check-in",
     "activity": "Activity",
+    "dayLabel": "Day {n}",
+    "optionTimeActivity": "{time} - {title}",
     "noActivities": "No activities with check-in enabled.",
     "selectActivity": "Select an activity first.",
     "scanQr": "Scan QR",

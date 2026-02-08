@@ -59,7 +59,7 @@ const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
 const scannerOpen = ref(false)
-const autoCheckInAfterScan = ref(false)
+const autoCheckInAfterScan = ref(true)
 const autoCheckInStorageKey = 'infora:admin:autoCheckInAfterScan'
 const checkInDirection = ref<CheckInDirection>('Entry')
 let lastScannedCode: string | null = null
@@ -569,17 +569,12 @@ watch(
   }
 )
 
-const loadAutoCheckInPreference = () => {
-  const stored = globalThis.localStorage?.getItem(autoCheckInStorageKey)
-  autoCheckInAfterScan.value = stored === '1'
-}
-
 watch(autoCheckInAfterScan, (value) => {
   globalThis.localStorage?.setItem(autoCheckInStorageKey, value ? '1' : '0')
 })
 
 onMounted(() => {
-  loadAutoCheckInPreference()
+  // Tarayıcıya otomatik gönder: her açılışta seçili (varsayılan true)
   void initialize()
 })
 

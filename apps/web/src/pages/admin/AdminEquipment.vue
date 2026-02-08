@@ -37,7 +37,7 @@ const loading = ref(true)
 const loadErrorKey = ref<string | null>(null)
 const submitting = ref(false)
 const scannerOpen = ref(false)
-const autoSubmitAfterScan = ref(false)
+const autoSubmitAfterScan = ref(true)
 const codeInput = ref<HTMLInputElement | null>(null)
 let lastScannedCode: string | null = null
 let lastScannedAt = 0
@@ -290,7 +290,7 @@ const formatLastAction = (item: ItemParticipantTableResponse['items'][0]) => {
 onMounted(() => {
   const stored = globalThis.localStorage?.getItem(storageKeyMode.value)
   if (stored === 'Return' || stored === 'Give') action.value = stored
-  autoSubmitAfterScan.value = globalThis.localStorage?.getItem(storageKeyAuto.value) === '1'
+  // Tarayıcıya otomatik gönder: her açılışta seçili (varsayılan true)
   void loadEventAndItems()
 })
 
