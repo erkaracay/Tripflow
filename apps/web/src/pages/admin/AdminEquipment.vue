@@ -363,49 +363,59 @@ watch(selectedItemId, () => {
                 </tr>
                 <tr v-else class="border-b border-slate-100 bg-slate-50">
                   <td class="p-2" colspan="4">
-                    <form class="flex flex-wrap items-end justify-between gap-2" @submit.prevent="submitEdit">
-                      <div class="flex flex-wrap items-end gap-2">
-                        <label class="min-w-0">
-                          <span class="sr-only">{{ t('equipment.name') }}</span>
-                          <input
-                            v-model.trim="editForm.name"
-                            type="text"
-                            class="w-40 rounded border border-slate-200 px-2 py-1.5 text-sm"
-                            :placeholder="t('equipment.namePlaceholder')"
-                          />
-                        </label>
-                        <label class="min-w-0">
-                          <span class="sr-only">{{ t('equipment.type') }}</span>
-                          <select
-                            v-model="editForm.type"
-                            class="w-28 rounded border border-slate-200 px-2 py-1.5 text-sm"
-                          >
-                            <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
-                              {{ t('equipment.types.' + opt) }}
-                            </option>
-                          </select>
-                        </label>
-                        <label class="flex items-center gap-1 text-sm">
-                          <input v-model="editForm.isActive" type="checkbox" />
-                          {{ t('equipment.active') }}
-                        </label>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button
-                          type="submit"
-                          class="rounded bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
-                          :disabled="editSaving"
-                        >
-                          {{ editSaving ? t('common.saving') : t('equipment.save') }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-100"
-                          @click="cancelEdit"
-                        >
-                          {{ t('equipment.cancel') }}
-                        </button>
-                      </div>
+                    <form class="flex w-full" @submit.prevent="submitEdit">
+                      <table class="w-full text-sm" style="table-layout: fixed">
+                        <tbody>
+                          <tr>
+                            <td class="w-[40%] p-2 align-middle">
+                            <label class="block">
+                              <span class="sr-only">{{ t('equipment.name') }}</span>
+                              <input
+                                v-model.trim="editForm.name"
+                                type="text"
+                                class="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm"
+                                :placeholder="t('equipment.namePlaceholder')"
+                              />
+                            </label>
+                          </td>
+                          <td class="w-[25%] p-2 align-middle">
+                            <label class="block">
+                              <span class="sr-only">{{ t('equipment.type') }}</span>
+                              <select
+                                v-model="editForm.type"
+                                class="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm"
+                              >
+                                <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
+                                  {{ t('equipment.types.' + opt) }}
+                                </option>
+                              </select>
+                            </label>
+                          </td>
+                          <td class="w-[20%] p-2 align-middle">
+                            <label class="inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+                              <input v-model="editForm.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                              <span>{{ t('equipment.active') }}</span>
+                            </label>
+                          </td>
+                          <td class="w-[15%] p-2 align-middle text-right">
+                            <button
+                              type="submit"
+                              class="rounded bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
+                              :disabled="editSaving"
+                            >
+                              {{ editSaving ? t('common.saving') : t('equipment.save') }}
+                            </button>
+                            <button
+                              type="button"
+                              class="ml-1 rounded border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-100"
+                              @click="cancelEdit"
+                            >
+                              {{ t('equipment.cancel') }}
+                            </button>
+                          </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </form>
                   </td>
                 </tr>
