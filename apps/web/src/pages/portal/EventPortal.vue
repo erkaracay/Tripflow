@@ -594,7 +594,7 @@ onUnmounted(() => {
                 <p class="text-sm text-slate-500">{{ t('portal.docs.subtitle') }}</p>
               </div>
               <button
-                class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"
+                class="hidden sm:inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"
                 type="button"
                 @click="openDocsPdf"
               >
@@ -603,6 +603,14 @@ onUnmounted(() => {
             </div>
 
             <PortalInfoTabs :docs="docs" />
+
+            <button
+              class="inline-flex sm:hidden w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="openDocsPdf"
+            >
+              {{ t('portal.docs.pdf') }}
+            </button>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.linksTitle') }}</div>

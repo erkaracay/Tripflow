@@ -715,6 +715,8 @@
         "arrivedAt": "Giriş zamanı",
         "roomNo": "Oda no",
         "hotelName": "Otel adı",
+        "hotelAddress": "Otel adresi",
+        "hotelPhone": "Otel telefonu",
         "roomType": "Oda tipi",
         "personNo": "Kişi no",
         "hotelCheckInDate": "Otel giriş tarihi",
@@ -978,7 +980,7 @@
     "loading": "Etkinlik detayları yükleniyor...",
     "empty": "Portal içeriği henüz hazır değil.",
     "tabs": {
-      "days": "Günler",
+      "days": "Program",
       "docs": "Belgeler",
       "qr": "QR",
       "info": "Bilgiler"

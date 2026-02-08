@@ -55,3 +55,5 @@ TestResults/
 
 # ---- Docker ----
 docker-compose.override.yml
+
+.git-credentials

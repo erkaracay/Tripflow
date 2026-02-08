@@ -730,6 +730,8 @@
         "arrivedAt": "Arrived at",
         "roomNo": "Room no",
         "hotelName": "Hotel name",
+        "hotelAddress": "Hotel address",
+        "hotelPhone": "Hotel phone",
         "roomType": "Room type",
         "personNo": "Person no",
         "hotelCheckInDate": "Hotel check-in date",
@@ -993,7 +995,7 @@
     "loading": "Loading event details...",
     "empty": "Portal content is not available yet.",
     "tabs": {
-      "days": "Days",
+      "days": "Program",
       "docs": "Docs",
       "qr": "QR",
       "info": "Info"
