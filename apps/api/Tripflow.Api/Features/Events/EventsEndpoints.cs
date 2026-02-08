@@ -133,6 +133,62 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/activities/for-checkin", EventsHandlers.GetActivitiesForCheckIn)
+            .WithSummary("List activities with check-in enabled")
+            .WithDescription("Returns activities where RequiresCheckIn is true, for the activity check-in dropdown.")
+            .Produces<EventActivityDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/activities/{activityId}/checkins", ActivityCheckInHandlers.PostCheckIn)
+            .WithSummary("Activity check-in by code")
+            .WithDescription("Logs activity Entry/Exit by participant check-in code.")
+            .Produces<ActivityCheckInResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/activities/{activityId}/participants/table", ActivityCheckInHandlers.GetParticipantsTable)
+            .WithSummary("Activity participants table")
+            .WithDescription("Returns participants with activity check-in state and last log.")
+            .Produces<ActivityParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/items", EventItemsHandlers.GetItems)
+            .WithSummary("List event items")
+            .WithDescription("Returns equipment items. Use includeInactive=true to list all (for management).")
+            .Produces<EventItemDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/items/{itemId}", EventItemsHandlers.UpdateItem)
+            .WithSummary("Update event item")
+            .Produces<EventItemDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/items/{itemId}", EventItemsHandlers.DeleteItem)
+            .WithSummary("Delete event item")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/items/{itemId}/actions", EventItemsHandlers.PostAction)
+            .WithSummary("Give/Return item by code")
+            .WithDescription("Logs Give or Return action by participant check-in code.")
+            .Produces<ItemActionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/items/{itemId}/participants/table", EventItemsHandlers.GetParticipantsTable)
+            .WithSummary("Item participants table")
+            .WithDescription("Returns participants with item state (given/returned) and last log.")
+            .Produces<ItemParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/items/create", EventItemsHandlers.CreateItem)
+            .WithSummary("Create event item")
+            .WithDescription("Adds a new equipment item to the event.")
+            .Produces<EventItemDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapDelete("/{eventId}/purge", EventsHandlers.PurgeEvent)
             .WithSummary("Purge event")
             .WithDescription("Permanently deletes an archived event and all related data.")

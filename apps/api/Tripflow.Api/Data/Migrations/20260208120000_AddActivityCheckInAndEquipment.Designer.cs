@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tripflow.Api.Data;
@@ -11,9 +12,11 @@ using Tripflow.Api.Data;
 namespace Tripflow.Api.Data.Migrations
 {
     [DbContext(typeof(TripflowDbContext))]
-    partial class TripflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260208120000_AddActivityCheckInAndEquipment")]
+    partial class AddActivityCheckInAndEquipment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -141,7 +144,10 @@ namespace Tripflow.Api.Data.Migrations
 
                     b.HasIndex("OrganizationId", "EventDayId", "StartTime");
 
-                    b.ToTable("event_activities");
+                    b.ToTable("event_activities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_event_activities_time_range", "\"EndTime\" IS NULL OR \"StartTime\" IS NULL OR \"EndTime\" >= \"StartTime\"");
+                        });
                 });
 
             modelBuilder.Entity("Tripflow.Api.Data.Entities.EventDayEntity", b =>

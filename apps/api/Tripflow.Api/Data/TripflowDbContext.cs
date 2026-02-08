@@ -17,6 +17,9 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
     public DbSet<CheckInEntity> CheckIns => Set<CheckInEntity>();
     public DbSet<EventParticipantLogEntity> EventParticipantLogs => Set<EventParticipantLogEntity>();
+    public DbSet<ActivityParticipantLogEntity> ActivityParticipantLogs => Set<ActivityParticipantLogEntity>();
+    public DbSet<EventItemEntity> EventItems => Set<EventItemEntity>();
+    public DbSet<ParticipantItemLogEntity> ParticipantItemLogs => Set<ParticipantItemLogEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
 
@@ -129,12 +132,8 @@ public sealed class TripflowDbContext : DbContext
 
         modelBuilder.Entity<EventActivityEntity>(b =>
         {
-            b.ToTable("event_activities", table =>
-            {
-                table.HasCheckConstraint(
-                    "CK_event_activities_time_range",
-                    "\"EndTime\" IS NULL OR \"StartTime\" IS NULL OR \"EndTime\" >= \"StartTime\"");
-            });
+            b.ToTable("event_activities");
+            // No time-range constraint: allow end < start for activities over midnight (e.g. 23:00–00:15)
             b.HasKey(x => x.Id);
 
             b.Property(x => x.OrganizationId).IsRequired();
@@ -149,6 +148,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Directions).HasMaxLength(2000);
             b.Property(x => x.Notes).HasMaxLength(2000);
             b.Property(x => x.CheckInEnabled).IsRequired().HasDefaultValue(false);
+            b.Property(x => x.RequiresCheckIn).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CheckInMode).HasMaxLength(32).IsRequired().HasDefaultValue("EntryOnly");
             b.Property(x => x.MenuText).HasMaxLength(2000);
             b.Property(x => x.SurveyUrl).HasMaxLength(500);
@@ -410,6 +410,60 @@ public sealed class TripflowDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ActivityParticipantLogEntity>(b =>
+        {
+            b.ToTable("activity_participant_logs");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ActivityId).IsRequired();
+            b.Property(x => x.ParticipantId);
+            b.Property(x => x.Direction).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Method).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Result).HasMaxLength(32).IsRequired();
+            b.Property(x => x.ActorUserId);
+            b.Property(x => x.ActorRole).HasMaxLength(32);
+            b.Property(x => x.IpAddress);
+            b.Property(x => x.UserAgent);
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ActivityId, x.CreatedAt }).IsDescending(false, false, false, true);
+            b.HasIndex(x => new { x.OrganizationId, x.ActivityId, x.ParticipantId, x.CreatedAt }).IsDescending(false, false, false, true);
+        });
+
+        modelBuilder.Entity<EventItemEntity>(b =>
+        {
+            b.ToTable("event_items");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.Type).HasMaxLength(32).IsRequired();
+            b.Property(x => x.Title).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.SortOrder).IsRequired().HasDefaultValue(1);
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ParticipantItemLogEntity>(b =>
+        {
+            b.ToTable("participant_item_logs");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ItemId).IsRequired();
+            b.Property(x => x.ParticipantId);
+            b.Property(x => x.Action).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Method).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Result).HasMaxLength(32).IsRequired();
+            b.Property(x => x.ActorUserId);
+            b.Property(x => x.ActorRole).HasMaxLength(32);
+            b.Property(x => x.IpAddress);
+            b.Property(x => x.UserAgent);
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ItemId, x.CreatedAt }).IsDescending(false, false, false, true);
+            b.HasIndex(x => new { x.OrganizationId, x.ItemId, x.ParticipantId, x.CreatedAt }).IsDescending(false, false, false, true);
         });
     }
 }

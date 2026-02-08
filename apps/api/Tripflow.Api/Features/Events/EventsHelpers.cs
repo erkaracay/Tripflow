@@ -120,6 +120,7 @@ internal static class EventsHelpers
             activity.Directions,
             activity.Notes,
             activity.CheckInEnabled,
+            activity.RequiresCheckIn,
             activity.CheckInMode,
             activity.MenuText,
             activity.SurveyUrl);

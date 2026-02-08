@@ -57,6 +57,7 @@ public sealed record EventActivityDto(
     string? Directions,
     string? Notes,
     bool CheckInEnabled,
+    bool RequiresCheckIn,
     string CheckInMode,
     string? MenuText,
     string? SurveyUrl);
@@ -71,6 +72,7 @@ public sealed record CreateEventActivityRequest(
     string? Directions,
     string? Notes,
     bool? CheckInEnabled,
+    bool? RequiresCheckIn,
     string? CheckInMode,
     string? MenuText,
     string? SurveyUrl);
@@ -85,6 +87,7 @@ public sealed record UpdateEventActivityRequest(
     string? Directions,
     string? Notes,
     bool? CheckInEnabled,
+    bool? RequiresCheckIn,
     string? CheckInMode,
     string? MenuText,
     string? SurveyUrl);

@@ -538,4 +538,118 @@ internal static class GuideHandlers
             details.ReturnTransferDriverInfo,
             details.ReturnTransferNote);
     }
+
+    internal static async Task<IResult> GetActivitiesForCheckIn(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await EventsHandlers.GetActivitiesForCheckIn(eventId, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> PostActivityCheckIn(
+        string eventId,
+        string activityId,
+        ActivityCheckInRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await ActivityCheckInHandlers.PostCheckIn(eventId, activityId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> GetActivityParticipantsTable(
+        string eventId,
+        string activityId,
+        string? query,
+        string? status,
+        int? page,
+        int? pageSize,
+        string? sort,
+        string? dir,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await ActivityCheckInHandlers.GetParticipantsTable(eventId, activityId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> GetEventItems(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await EventItemsHandlers.GetItems(eventId, null, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> PostItemAction(
+        string eventId,
+        string itemId,
+        ItemActionRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await EventItemsHandlers.PostAction(eventId, itemId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> GetItemParticipantsTable(
+        string eventId,
+        string itemId,
+        string? query,
+        string? status,
+        int? page,
+        int? pageSize,
+        string? sort,
+        string? dir,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        return await EventItemsHandlers.GetParticipantsTable(eventId, itemId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
+    }
 }

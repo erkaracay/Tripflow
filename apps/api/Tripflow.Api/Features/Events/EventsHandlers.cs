@@ -124,6 +124,17 @@ internal static class EventsHandlers
         });
         db.EventDocTabs.AddRange(CreateDefaultDocTabs(entity));
         db.EventDays.AddRange(EventsHelpers.CreateDefaultDays(entity));
+        db.EventItems.Add(new EventItemEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            EventId = entity.Id,
+            Type = "Headset",
+            Title = "Equipment",
+            Name = "Headset",
+            IsActive = true,
+            SortOrder = 1
+        });
 
         try
         {
@@ -459,6 +470,32 @@ internal static class EventsHandlers
         return Results.Ok(activities.Select(EventsHelpers.ToActivityDto).ToArray());
     }
 
+    internal static async Task<IResult> GetActivitiesForCheckIn(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
+            return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            return orgError!;
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == eventGuid && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+            return Results.NotFound(new { message = "Event not found." });
+
+        var activities = await db.EventActivities.AsNoTracking()
+            .Where(x => x.EventId == eventGuid && x.OrganizationId == orgId && x.RequiresCheckIn)
+            .OrderBy(x => x.EventDayId)
+            .ThenBy(x => x.StartTime)
+            .ThenBy(x => x.Title)
+            .ToListAsync(ct);
+
+        return Results.Ok(activities.Select(EventsHelpers.ToActivityDto).ToArray());
+    }
+
     internal static async Task<IResult> CreateEventActivity(
         string eventId,
         string dayId,
@@ -510,10 +547,7 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End time is invalid.");
         }
 
-        if (startTime.HasValue && endTime.HasValue && endTime < startTime)
-        {
-            return EventsHelpers.BadRequest("End time must be after start time.");
-        }
+        // Allow end < start (activity over midnight, e.g. 23:00–00:15)
 
         var entity = new EventActivityEntity
         {
@@ -530,6 +564,7 @@ internal static class EventsHandlers
             Directions = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim(),
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             CheckInEnabled = request.CheckInEnabled ?? false,
+            RequiresCheckIn = request.RequiresCheckIn ?? false,
             CheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim(),
             MenuText = string.IsNullOrWhiteSpace(request.MenuText) ? null : request.MenuText.Trim(),
             SurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim()
@@ -609,10 +644,7 @@ internal static class EventsHandlers
             entity.EndTime = endTime;
         }
 
-        if (entity.StartTime.HasValue && entity.EndTime.HasValue && entity.EndTime < entity.StartTime)
-        {
-            return EventsHelpers.BadRequest("End time must be after start time.");
-        }
+        // Allow end < start (activity over midnight, e.g. 23:00–00:15)
 
         if (request.LocationName is not null)
         {
@@ -637,6 +669,11 @@ internal static class EventsHandlers
         if (request.CheckInEnabled.HasValue)
         {
             entity.CheckInEnabled = request.CheckInEnabled.Value;
+        }
+
+        if (request.RequiresCheckIn.HasValue)
+        {
+            entity.RequiresCheckIn = request.RequiresCheckIn.Value;
         }
 
         if (request.CheckInMode is not null)

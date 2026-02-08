@@ -73,6 +73,39 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/events/{eventId}/activities/for-checkin", GuideHandlers.GetActivitiesForCheckIn)
+            .WithSummary("Guide activities for check-in")
+            .WithDescription("Returns activities with RequiresCheckIn for the event.")
+            .Produces<EventActivityDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/activities/{activityId}/checkins", GuideHandlers.PostActivityCheckIn)
+            .WithSummary("Guide activity check-in by code")
+            .Produces<ActivityCheckInResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/activities/{activityId}/participants/table", GuideHandlers.GetActivityParticipantsTable)
+            .WithSummary("Guide activity participants table")
+            .Produces<ActivityParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/items", GuideHandlers.GetEventItems)
+            .WithSummary("Guide event items")
+            .Produces<EventItemDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/items/{itemId}/actions", GuideHandlers.PostItemAction)
+            .WithSummary("Guide give/return item by code")
+            .Produces<ItemActionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/items/{itemId}/participants/table", GuideHandlers.GetItemParticipantsTable)
+            .WithSummary("Guide item participants table")
+            .Produces<ItemParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 }
