@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -22,10 +23,13 @@ const formErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
 const showArchived = ref(false)
 
+const EVENT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
 const form = reactive({
   name: '',
   startDate: '',
   endDate: '',
+  eventCode: '',
 })
 
 const isSuperAdmin = computed(() => {
@@ -65,9 +69,21 @@ const loadEvents = async () => {
   }
 }
 
+const eventCodeErrorKey = ref<string | null>(null)
+
+const generateRandomEventCode = () => {
+  let code = ''
+  for (let i = 0; i < 8; i++) {
+    code += EVENT_CODE_ALPHABET[Math.floor(Math.random() * EVENT_CODE_ALPHABET.length)]
+  }
+  form.eventCode = code
+  eventCodeErrorKey.value = null
+}
+
 const createEvent = async () => {
   formErrorKey.value = null
   formErrorMessage.value = null
+  eventCodeErrorKey.value = null
 
   if (!form.name.trim()) {
     formErrorKey.value = 'validation.eventNameRequired'
@@ -84,16 +100,31 @@ const createEvent = async () => {
     return
   }
 
+  const code = sanitizeEventAccessCode(form.eventCode)
+  if (code && !isValidEventCodeLength(code)) {
+    eventCodeErrorKey.value = 'admin.events.form.eventCodeInvalid'
+    return
+  }
+
   submitting.value = true
   try {
-    const created = await apiPost<EventDto>('/api/events', {
+    const body: { name: string; startDate: string; endDate: string; eventAccessCode?: string } = {
       name: form.name,
       startDate: form.startDate,
       endDate: form.endDate,
-    })
+    }
+    if (code) body.eventAccessCode = code
+
+    const created = await apiPost<EventDto>('/api/events', body)
 
     await router.push(`/admin/events/${created.id}`)
-  } catch (err) {
+  } catch (err: unknown) {
+    const payload = err && typeof err === 'object' && 'payload' in err ? (err as { payload?: { code?: string } }).payload : undefined
+    const code = payload?.code
+    if (code === 'event_access_code_taken') {
+      eventCodeErrorKey.value = 'admin.events.form.eventCodeTaken'
+      return
+    }
     formErrorMessage.value = err instanceof Error ? err.message : null
     if (!formErrorMessage.value) {
       formErrorKey.value = 'errors.events.create'
@@ -200,6 +231,33 @@ onMounted(loadEvents)
             type="date"
             :min="form.startDate || undefined"
           />
+        </label>
+
+        <label class="grid gap-1 text-sm md:col-span-3">
+          <span class="text-slate-600">{{ t('admin.events.form.eventCodeLabel') }}</span>
+          <div class="flex flex-wrap items-center gap-2">
+            <input
+              v-model="form.eventCode"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none max-w-48"
+              :class="eventCodeErrorKey ? 'border-rose-400' : ''"
+              :placeholder="t('admin.events.form.eventCodePlaceholder')"
+              maxlength="10"
+              autocomplete="off"
+              autocapitalize="characters"
+              :disabled="submitting"
+              @input="form.eventCode = sanitizeEventAccessCode(form.eventCode); eventCodeErrorKey = null"
+            />
+            <button
+              type="button"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:border-slate-300"
+              :disabled="submitting"
+              @click="generateRandomEventCode"
+            >
+              {{ t('admin.events.form.eventCodeGenerate') }}
+            </button>
+          </div>
+          <p class="text-xs text-slate-500">{{ t('admin.events.form.eventCodeHint') }}</p>
+          <p v-if="eventCodeErrorKey" class="text-xs text-rose-600">{{ t(eventCodeErrorKey) }}</p>
         </label>
 
         <div class="md:col-span-3 flex flex-wrap items-center gap-3">

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
 import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import {
   formatPhoneDisplay,
   normalizeEmail,
@@ -26,10 +27,11 @@ import type {
   UserListItem,
 } from '../../types'
 
+const props = defineProps<{ eventId: string }>()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const eventId = computed(() => route.params.eventId as string)
+const eventId = computed(() => (props.eventId ?? route.params.eventId) as string)
 
 const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
@@ -46,13 +48,13 @@ const loadErrorMessage = ref<string | null>(null)
 const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
 const eventSaving = ref(false)
-const eventSavedTimer = ref<number | null>(null)
+const eventSavedTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const eventMessageKey = ref<string | null>(null)
 const eventErrorKey = ref<string | null>(null)
 const eventErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
 const portalSaving = ref(false)
-const portalSavedTimer = ref<number | null>(null)
+const portalSavedTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const portalMessageKey = ref<string | null>(null)
 const portalErrorKey = ref<string | null>(null)
 const portalErrorMessage = ref<string | null>(null)
@@ -76,6 +78,11 @@ const editPhoneInput = ref<HTMLInputElement | null>(null)
 const accessCodeLoading = ref(false)
 const accessCodeMessageKey = ref<string | null>(null)
 const accessCodeErrorKey = ref<string | null>(null)
+const editCodeModalOpen = ref(false)
+const editCodeValue = ref('')
+const editCodeSaving = ref(false)
+const editCodeErrorKey = ref<string | null>(null)
+
 const tcNoWarnings = ref<Record<string, string>>({})
 const archivingEvent = ref(false)
 const restoringEvent = ref(false)
@@ -870,6 +877,44 @@ const regenerateEventAccessCode = async () => {
   }
 }
 
+const openEditCodeModal = () => {
+  editCodeValue.value = event.value?.eventAccessCode ?? ''
+  editCodeErrorKey.value = null
+  editCodeModalOpen.value = true
+}
+
+const closeEditCodeModal = () => {
+  if (!editCodeSaving.value) editCodeModalOpen.value = false
+}
+
+const saveEditCode = async () => {
+  editCodeErrorKey.value = null
+  const code = sanitizeEventAccessCode(editCodeValue.value)
+  if (!isValidEventCodeLength(code)) {
+    editCodeErrorKey.value = 'admin.eventAccess.editCodeInvalid'
+    return
+  }
+  editCodeSaving.value = true
+  try {
+    const response = await apiPut<EventAccessCodeResponse>(
+      `/api/events/${eventId.value}/access-code`,
+      { eventAccessCode: code }
+    )
+    if (event.value) event.value.eventAccessCode = response.eventAccessCode
+    editCodeModalOpen.value = false
+    pushToast({ key: 'toast.eventAccessCodeRegenerated', tone: 'success' })
+  } catch (err: unknown) {
+    const payload = err && typeof err === 'object' && 'payload' in err ? (err as { payload?: { code?: string } }).payload : undefined
+    if (payload?.code === 'event_access_code_taken') {
+      editCodeErrorKey.value = 'admin.eventAccess.editCodeTaken'
+    } else {
+      editCodeErrorKey.value = 'admin.eventAccess.editCodeInvalid'
+    }
+  } finally {
+    editCodeSaving.value = false
+  }
+}
+
 const handleMissingWhatsAppPhone = async (participant: Participant) => {
   missingPhoneParticipantId.value = participant.id
   startEditParticipant(participant)
@@ -1344,6 +1389,13 @@ onMounted(loadEvent)
               @click="copyPortalLoginLink"
             >
               {{ t('admin.eventAccess.copyLoginLink') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="openEditCodeModal"
+            >
+              {{ t('admin.eventAccess.editCode') }}
             </button>
             <button
               class="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2070,6 +2122,56 @@ onMounted(loadEvent)
       </section>
     </template>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="editCodeModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      @click.self="closeEditCodeModal"
+    >
+      <div
+        class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-lg"
+        role="dialog"
+        aria-labelledby="edit-code-title"
+      >
+        <h2 id="edit-code-title" class="text-lg font-semibold text-slate-900">{{ t('admin.eventAccess.editCodeModalTitle') }}</h2>
+        <p class="mt-2 text-sm text-amber-700">{{ t('admin.eventAccess.editCodeWarning') }}</p>
+        <label class="mt-4 grid gap-1 text-sm">
+          <span class="text-slate-600">{{ t('admin.eventAccess.editCodeLabel') }}</span>
+          <input
+            v-model="editCodeValue"
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none"
+            :class="editCodeErrorKey ? 'border-rose-400' : ''"
+            :placeholder="t('admin.eventAccess.editCodePlaceholder')"
+            maxlength="10"
+            autocomplete="off"
+            autocapitalize="characters"
+            :disabled="editCodeSaving"
+            @input="editCodeValue = sanitizeEventAccessCode(editCodeValue); editCodeErrorKey = null"
+          />
+        </label>
+        <p v-if="editCodeErrorKey" class="mt-2 text-sm text-rose-600">{{ t(editCodeErrorKey) }}</p>
+        <div class="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+            :disabled="editCodeSaving"
+            @click="closeEditCodeModal"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            :disabled="editCodeSaving"
+            @click="saveEditCode"
+          >
+            {{ editCodeSaving ? t('common.saving') : t('admin.eventAccess.editCodeSave') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
   <ConfirmDialog
     v-model:open="confirmOpen"

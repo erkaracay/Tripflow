@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { portalGetMe, portalLogin, portalResolveEvent } from '../../lib/api'
+import { sanitizeEventAccessCode } from '../../lib/eventAccessCode'
 import LoadingState from '../../components/ui/LoadingState.vue'
 
 const route = useRoute()
@@ -18,7 +19,7 @@ const checkingSession = ref(false)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const retryAfterSeconds = ref<number | null>(null)
-const retryTimer = ref<number | null>(null)
+const retryTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const errorId = 'portal-login-error'
 
 const isAccessCodeError = computed(
@@ -34,9 +35,6 @@ const isTcError = computed(
 const sessionTokenKey = (eventId: string) => `infora.portal.session.${eventId}`
 const sessionExpiryKey = (eventId: string) => `infora.portal.session.exp.${eventId}`
 
-const sanitizeAccessCode = (value: string) =>
-  value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)
-
 const sanitizeTcNo = (value: string) => value.replace(/\D/g, '').slice(0, 11)
 
 const clearRetryTimer = () => {
@@ -50,11 +48,11 @@ const clearRetryTimer = () => {
 const handleAccessCodeInput = () => {
   errorKey.value = null
   clearRetryTimer()
-  accessCode.value = sanitizeAccessCode(accessCode.value)
+  accessCode.value = sanitizeEventAccessCode(accessCode.value)
 }
 
 const handleAccessCodeBlur = () => {
-  accessCode.value = sanitizeAccessCode(accessCode.value.trim())
+  accessCode.value = sanitizeEventAccessCode(accessCode.value.trim())
 }
 
 const handleTcNoInput = () => {
@@ -123,12 +121,12 @@ const submitLogin = async () => {
   errorMessage.value = null
   retryAfterSeconds.value = null
 
-  const normalizedCode = sanitizeAccessCode(accessCode.value.trim())
+  const normalizedCode = sanitizeEventAccessCode(accessCode.value.trim())
   const normalizedTcNo = sanitizeTcNo(tcNo.value.trim())
   accessCode.value = normalizedCode
   tcNo.value = normalizedTcNo
 
-  if (normalizedCode.length !== 8) {
+  if (normalizedCode.length < 6 || normalizedCode.length > 10) {
     errorKey.value = 'portal.login.accessCodeRequired'
     await nextTick()
     accessCodeInput.value?.focus()
@@ -237,9 +235,9 @@ onUnmounted(() => {
 onMounted(() => {
   const rawCode = route.query.code ?? route.query.eventAccessCode
   if (typeof rawCode === 'string') {
-    const normalized = sanitizeAccessCode(rawCode)
+    const normalized = sanitizeEventAccessCode(rawCode)
     accessCode.value = normalized
-    if (normalized.length === 8) {
+    if (normalized.length >= 6 && normalized.length <= 10) {
       void tryReuseExistingSession(normalized)
     }
   }
@@ -263,7 +261,7 @@ onMounted(() => {
             ref="accessCodeInput"
             class="rounded border border-slate-200 bg-white px-3 py-2 text-sm uppercase tracking-widest focus:border-slate-400 focus:outline-none"
             :placeholder="t('portal.login.accessCodePlaceholder')"
-            maxlength="8"
+            maxlength="10"
             name="eventAccessCode"
             autocomplete="off"
             autocapitalize="characters"
