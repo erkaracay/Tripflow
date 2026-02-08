@@ -66,10 +66,63 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/events/{eventId}", GuideHandlers.GetEvent)
+            .WithSummary("Guide event")
+            .WithDescription("Returns event details for the guide's event.")
+            .Produces<EventDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/events/{eventId}/schedule", GuideHandlers.GetSchedule)
             .WithSummary("Guide schedule")
             .WithDescription("Returns schedule days and activities for a guide event.")
             .Produces<EventScheduleDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/days", GuideHandlers.GetEventDays)
+            .WithSummary("Guide event days")
+            .WithDescription("Returns schedule days for the event (same as admin).")
+            .Produces<EventDayDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/days", GuideHandlers.CreateEventDay)
+            .WithSummary("Guide create day")
+            .Produces<EventDayDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPut("/events/{eventId}/days/{dayId}", GuideHandlers.UpdateEventDay)
+            .WithSummary("Guide update day")
+            .Produces<EventDayDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/events/{eventId}/days/{dayId}", GuideHandlers.DeleteEventDay)
+            .WithSummary("Guide delete day")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/days/{dayId}/activities", GuideHandlers.GetEventActivities)
+            .WithSummary("Guide day activities")
+            .Produces<EventActivityDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/days/{dayId}/activities", GuideHandlers.CreateEventActivity)
+            .WithSummary("Guide create activity")
+            .Produces<EventActivityDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPut("/events/{eventId}/activities/{activityId}", GuideHandlers.UpdateEventActivity)
+            .WithSummary("Guide update activity")
+            .Produces<EventActivityDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/events/{eventId}/activities/{activityId}", GuideHandlers.DeleteEventActivity)
+            .WithSummary("Guide delete activity")
+            .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 

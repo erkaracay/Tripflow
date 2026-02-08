@@ -652,4 +652,140 @@ internal static class GuideHandlers
         if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
         return await EventItemsHandlers.GetParticipantsTable(eventId, itemId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
     }
+
+    private static async Task<(IResult? Error, Guid EventId, Guid OrgId)> EnsureGuideEventAccess(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error)) return (error, default, default);
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return (orgError, default, default);
+        if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var parseError)) return (parseError, default, default);
+        var hasAccess = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == eventGuid && x.GuideUserId == userId && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess) return (Results.NotFound(new { message = "Event not found." }), default, default);
+        return (null, eventGuid, orgId);
+    }
+
+    internal static async Task<IResult> GetEvent(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, id, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        var entity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return Results.NotFound(new { message = "Event not found." });
+        return Results.Ok(EventsHelpers.ToDto(entity));
+    }
+
+    internal static async Task<IResult> GetEventDays(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.GetEventDays(eventId, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> CreateEventDay(
+        string eventId,
+        CreateEventDayRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.CreateEventDay(eventId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> UpdateEventDay(
+        string eventId,
+        string dayId,
+        UpdateEventDayRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.UpdateEventDay(eventId, dayId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> DeleteEventDay(
+        string eventId,
+        string dayId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.DeleteEventDay(eventId, dayId, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> GetEventActivities(
+        string eventId,
+        string dayId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.GetEventActivities(eventId, dayId, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> CreateEventActivity(
+        string eventId,
+        string dayId,
+        CreateEventActivityRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.CreateEventActivity(eventId, dayId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> UpdateEventActivity(
+        string eventId,
+        string activityId,
+        UpdateEventActivityRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.UpdateEventActivity(eventId, activityId, request, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> DeleteEventActivity(
+        string eventId,
+        string activityId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (err, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (err is not null) return err;
+        return await EventsHandlers.DeleteEventActivity(eventId, activityId, httpContext, db, ct);
+    }
 }

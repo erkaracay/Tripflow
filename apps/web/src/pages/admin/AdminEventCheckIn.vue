@@ -583,30 +583,30 @@ onMounted(() => {
 <template>
   <div class="space-y-6 sm:space-y-8">
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div class="flex items-start justify-between gap-4">
-        <div>
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-2">
             <RouterLink
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
               to="/admin/events"
             >
               {{ t('nav.backToEvents') }}
             </RouterLink>
             <RouterLink
               v-if="isSuperAdmin"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
               to="/admin/orgs"
             >
               {{ t('nav.backToOrganizations') }}
             </RouterLink>
             <RouterLink
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
               :to="`/admin/events/${eventId}`"
             >
               {{ t('nav.backToEvent') }}
             </RouterLink>
             <RouterLink
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
               :to="`/admin/events/${eventId}/logs`"
             >
               {{ t('admin.logs.link') }}

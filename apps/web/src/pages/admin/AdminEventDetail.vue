@@ -1224,18 +1224,18 @@ onMounted(loadEvent)
 
 <template>
   <div class="space-y-8">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
+    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <RouterLink
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
             to="/admin/events"
           >
             {{ t('nav.backToEvents') }}
           </RouterLink>
           <RouterLink
             v-if="isSuperAdmin"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+            class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
             to="/admin/orgs"
           >
             {{ t('nav.backToOrganizations') }}
@@ -1256,32 +1256,32 @@ onMounted(loadEvent)
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <RouterLink
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           :to="`/admin/events/${eventId}/checkin`"
         >
           {{ t('common.checkIn') }}
         </RouterLink>
         <RouterLink
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           :to="`/admin/events/${eventId}/program`"
         >
           {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
         <RouterLink
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           :to="`/admin/events/${eventId}/activities/checkin`"
         >
           {{ t('admin.eventDetail.activityCheckIn') }}
         </RouterLink>
         <RouterLink
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           :to="`/admin/events/${eventId}/equipment`"
         >
           {{ t('admin.eventDetail.equipment') }}
         </RouterLink>
         <button
           v-if="event && !event.isDeleted"
-          class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm hover:border-amber-300"
+          class="whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-sm hover:border-amber-300"
           :disabled="archivingEvent"
           type="button"
           @click="archiveEvent"
@@ -1290,7 +1290,7 @@ onMounted(loadEvent)
         </button>
         <button
           v-else-if="event"
-          class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 shadow-sm hover:border-emerald-300"
+          class="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 shadow-sm hover:border-emerald-300"
           :disabled="restoringEvent"
           type="button"
           @click="restoreEvent"
@@ -1298,7 +1298,7 @@ onMounted(loadEvent)
           {{ restoringEvent ? t('common.saving') : t('common.restore') }}
         </button>
         <a
-          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
           :href="buildPortalLoginLink(event?.eventAccessCode ?? undefined) || '/e/login'"
           rel="noreferrer"
           target="_blank"

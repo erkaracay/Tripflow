@@ -684,25 +684,46 @@ onUnmounted(() => {
 <template>
   <div class="space-y-6 sm:space-y-8">
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <RouterLink class="text-sm text-slate-600 underline" to="/guide/events">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <RouterLink
+            class="inline-block text-sm text-slate-600 underline-offset-2 hover:text-slate-900"
+            to="/guide/events"
+          >
             {{ t('nav.backToGuideEvents') }}
           </RouterLink>
-          <RouterLink
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-            :to="`/guide/events/${eventId}/activities/checkin`"
-          >
-            {{ t('admin.eventDetail.activityCheckIn') }}
-          </RouterLink>
-          <RouterLink
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300"
-            :to="`/guide/events/${eventId}/equipment`"
-          >
-            {{ t('admin.eventDetail.equipment') }}
-          </RouterLink>
-          <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('guide.checkIn.title') }}</h1>
-          <p class="text-sm text-slate-500" v-if="event">
+          <nav class="mt-3 flex flex-wrap items-center gap-2" aria-label="Event sections">
+            <RouterLink
+              :to="`/guide/events/${eventId}/checkin`"
+              active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              {{ t('common.checkIn') }}
+            </RouterLink>
+            <RouterLink
+              :to="`/guide/events/${eventId}/activities/checkin`"
+              active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              {{ t('admin.eventDetail.activityCheckIn') }}
+            </RouterLink>
+            <RouterLink
+              :to="`/guide/events/${eventId}/equipment`"
+              active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              {{ t('admin.eventDetail.equipment') }}
+            </RouterLink>
+            <RouterLink
+              :to="`/guide/events/${eventId}/program`"
+              active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+              class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              {{ t('admin.eventDetail.openProgram') }}
+            </RouterLink>
+          </nav>
+          <h1 class="mt-4 text-2xl font-semibold text-slate-900">{{ event?.name ?? t('guide.checkIn.title') }}</h1>
+          <p class="mt-1 text-sm text-slate-500" v-if="event">
             {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
           </p>
         </div>

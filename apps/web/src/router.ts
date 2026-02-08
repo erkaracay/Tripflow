@@ -19,7 +19,6 @@ import GuideEvents from './pages/guide/GuideEvents.vue'
 import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
 import GuideActivityCheckIn from '@/pages/guide/GuideActivityCheckIn.vue'
 import GuideEquipment from '@/pages/guide/GuideEquipment.vue'
-import GuideEventProgram from './pages/guide/GuideEventProgram.vue'
 import Login from './pages/Login.vue'
 import Forbidden from './pages/Forbidden.vue'
 import EventPortal from './pages/portal/EventPortal.vue'
@@ -138,7 +137,7 @@ const router = createRouter({
     },
     {
       path: '/guide/events/:eventId/program',
-      component: GuideEventProgram,
+      component: AdminEventProgram,
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },

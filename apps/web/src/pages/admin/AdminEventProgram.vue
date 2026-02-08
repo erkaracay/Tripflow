@@ -9,11 +9,13 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import type { Event as EventDto, EventActivity, EventDay } from '../../types'
 
+const props = defineProps<{ eventId?: string }>()
 const route = useRoute()
 const { t } = useI18n()
 const { pushToast } = useToast()
 
-const eventId = computed(() => route.params.eventId as string)
+const eventId = computed(() => (props.eventId ?? route.params.eventId) as string)
+const apiBase = computed(() => (route.path.startsWith('/guide') ? '/api/guide/events' : '/api/events'))
 
 const event = ref<EventDto | null>(null)
 const days = ref<EventDay[]>([])
@@ -107,11 +109,11 @@ const resetActivityForm = (activity?: EventActivity) => {
 }
 
 const loadEvent = async () => {
-  event.value = await apiGet<EventDto>(`/api/events/${eventId.value}`)
+  event.value = await apiGet<EventDto>(`${apiBase.value}/${eventId.value}`)
 }
 
 const loadDays = async () => {
-  days.value = await apiGet<EventDay[]>(`/api/events/${eventId.value}/days`)
+  days.value = await apiGet<EventDay[]>(`${apiBase.value}/${eventId.value}/days`)
   if (!selectedDayId.value) {
     const firstDay = days.value[0]
     if (firstDay) {
@@ -124,7 +126,7 @@ const loadActivities = async (dayId: string) => {
   activitiesLoading.value = true
   try {
     activities.value = await apiGet<EventActivity[]>(
-      `/api/events/${eventId.value}/days/${dayId}/activities`
+      `${apiBase.value}/${eventId.value}/days/${dayId}/activities`
     )
   } finally {
     activitiesLoading.value = false
@@ -185,9 +187,9 @@ const saveDay = async () => {
   savingDay.value = true
   try {
     if (editingDayId.value) {
-      await apiPut(`/api/events/${eventId.value}/days/${editingDayId.value}`, payload)
+      await apiPut(`${apiBase.value}/${eventId.value}/days/${editingDayId.value}`, payload)
     } else {
-      await apiPost(`/api/events/${eventId.value}/days`, payload)
+      await apiPost(`${apiBase.value}/${eventId.value}/days`, payload)
     }
     dayModalOpen.value = false
     await loadDays()
@@ -210,7 +212,7 @@ const confirmDeleteDay = (day: EventDay) => {
 const deleteDay = async () => {
   if (!editingDayId.value) return
   try {
-    await apiDelete(`/api/events/${eventId.value}/days/${editingDayId.value}`)
+    await apiDelete(`${apiBase.value}/${eventId.value}/days/${editingDayId.value}`)
     deleteDayOpen.value = false
     if (selectedDayId.value === editingDayId.value) {
       selectedDayId.value = null
@@ -231,8 +233,8 @@ const moveDay = async (index: number, direction: -1 | 1) => {
   if (!target || !swap) return
 
   await Promise.all([
-    apiPut(`/api/events/${eventId.value}/days/${target.id}`, { sortOrder: swap.sortOrder }),
-    apiPut(`/api/events/${eventId.value}/days/${swap.id}`, { sortOrder: target.sortOrder }),
+    apiPut(`${apiBase.value}/${eventId.value}/days/${target.id}`, { sortOrder: swap.sortOrder }),
+    apiPut(`${apiBase.value}/${eventId.value}/days/${swap.id}`, { sortOrder: target.sortOrder }),
   ])
 
   const current = selectedDayId.value
@@ -399,10 +401,10 @@ const saveActivity = async () => {
   savingActivity.value = true
   try {
     if (editingActivityId.value) {
-      await apiPut(`/api/events/${eventId.value}/activities/${editingActivityId.value}`, payload)
+      await apiPut(`${apiBase.value}/${eventId.value}/activities/${editingActivityId.value}`, payload)
     } else {
       await apiPost(
-        `/api/events/${eventId.value}/days/${selectedDayId.value}/activities`,
+        `${apiBase.value}/${eventId.value}/days/${selectedDayId.value}/activities`,
         payload
       )
     }
@@ -424,7 +426,7 @@ const confirmDeleteActivity = (activity: EventActivity) => {
 const deleteActivity = async () => {
   if (!editingActivityId.value) return
   try {
-    await apiDelete(`/api/events/${eventId.value}/activities/${editingActivityId.value}`)
+    await apiDelete(`${apiBase.value}/${eventId.value}/activities/${editingActivityId.value}`)
     deleteActivityOpen.value = false
     if (selectedDayId.value) {
       await loadActivities(selectedDayId.value)
@@ -448,7 +450,7 @@ onMounted(loadAll)
   <div class="space-y-6">
     <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div>
-        <RouterLink class="text-sm text-slate-600 underline" :to="`/admin/events/${eventId}`">
+        <RouterLink class="text-sm text-slate-600 underline" :to="apiBase === '/api/guide/events' ? `/guide/events/${eventId}/checkin` : `/admin/events/${eventId}`">
           {{ t('nav.backToEvent') }}
         </RouterLink>
         <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
