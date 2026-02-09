@@ -185,7 +185,7 @@ internal static class EventsHelpers
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
             entity.LogoUrl,
-            entity.GuideUserId,
+            entity.EventGuides.Select(g => g.GuideUserId).ToArray(),
             entity.IsDeleted,
             entity.EventAccessCode);
 

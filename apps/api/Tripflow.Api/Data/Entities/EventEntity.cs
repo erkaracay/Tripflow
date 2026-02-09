@@ -13,9 +13,7 @@ public sealed class EventEntity
     public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }
 
-    public Guid? GuideUserId { get; set; }
-    public UserEntity? GuideUser { get; set; }
-
+    public List<EventGuideEntity> EventGuides { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
     public EventPortalEntity? Portal { get; set; }
     public List<EventDayEntity> Days { get; set; } = new();

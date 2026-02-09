@@ -20,6 +20,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<ActivityParticipantLogEntity> ActivityParticipantLogs => Set<ActivityParticipantLogEntity>();
     public DbSet<EventItemEntity> EventItems => Set<EventItemEntity>();
     public DbSet<ParticipantItemLogEntity> ParticipantItemLogs => Set<ParticipantItemLogEntity>();
+    public DbSet<EventGuideEntity> EventGuides => Set<EventGuideEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
 
@@ -82,10 +83,10 @@ public sealed class TripflowDbContext : DbContext
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            b.HasOne(x => x.GuideUser)
-                .WithMany(x => x.GuidedEvents)
-                .HasForeignKey(x => x.GuideUserId)
-                .OnDelete(DeleteBehavior.SetNull);
+            b.HasMany(x => x.EventGuides)
+                .WithOne(x => x.Event)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             b.HasMany(x => x.Participants)
                 .WithOne(x => x.Event)
@@ -465,6 +466,28 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
             b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ItemId, x.CreatedAt }).IsDescending(false, false, false, true);
             b.HasIndex(x => new { x.OrganizationId, x.ItemId, x.ParticipantId, x.CreatedAt }).IsDescending(false, false, false, true);
+        });
+
+        modelBuilder.Entity<EventGuideEntity>(b =>
+        {
+            b.ToTable("event_guides");
+            b.HasKey(x => new { x.EventId, x.GuideUserId });
+
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.GuideUserId).IsRequired();
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.EventGuides)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.GuideUser)
+                .WithMany()
+                .HasForeignKey(x => x.GuideUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(x => x.GuideUserId);
+            b.HasIndex(x => x.EventId);
         });
     }
 }

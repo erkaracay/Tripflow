@@ -268,9 +268,9 @@ public static class EventsEndpoints
                 return op;
             });
 
-        admin.MapPut("/{eventId}/guide", EventsHandlers.AssignGuide)
-            .WithSummary("Assign guide")
-            .WithDescription("Assigns a guide user to the event.")
+        admin.MapPut("/{eventId}/guides", EventsHandlers.AssignGuides)
+            .WithSummary("Assign guides")
+            .WithDescription("Assigns guide users to the event. Replaces all existing guide assignments.")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)

@@ -27,6 +27,7 @@ internal static class EventsHandlers
         }
 
         var events = await db.Events.AsNoTracking()
+            .Include(x => x.EventGuides)
             .Where(x => x.OrganizationId == orgId && (showArchived || !x.IsDeleted))
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
             .Select(x => new EventListItemDto(
@@ -36,7 +37,7 @@ internal static class EventsHandlers
                 x.EndDate.ToString("yyyy-MM-dd"),
                 db.CheckIns.Count(c => c.EventId == x.Id),
                 db.Participants.Count(p => p.EventId == x.Id),
-                x.GuideUserId,
+                x.EventGuides.Select(g => g.GuideUserId).ToArray(),
                 x.IsDeleted,
                 x.EventAccessCode))
             .ToArrayAsync(ct);
@@ -832,6 +833,7 @@ internal static class EventsHandlers
             if (isAdmin)
             {
                 entity = await db.Events.AsNoTracking()
+                    .Include(x => x.EventGuides)
                     .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
             }
             else if (isGuide)
@@ -843,8 +845,9 @@ internal static class EventsHandlers
                 }
 
                 entity = await db.Events.AsNoTracking()
+                    .Include(x => x.EventGuides)
                     .FirstOrDefaultAsync(
-                        x => x.Id == id && x.OrganizationId == orgId && x.GuideUserId == guideId,
+                        x => x.Id == id && x.OrganizationId == orgId && x.EventGuides.Any(g => g.GuideUserId == guideId),
                         ct);
             }
             else
@@ -1118,6 +1121,7 @@ internal static class EventsHandlers
             if (isAdmin)
             {
                 eventEntity = await db.Events.AsNoTracking()
+                    .Include(x => x.EventGuides)
                     .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
             }
             else if (isGuide)
@@ -1129,8 +1133,9 @@ internal static class EventsHandlers
                 }
 
                 eventEntity = await db.Events.AsNoTracking()
+                    .Include(x => x.EventGuides)
                     .FirstOrDefaultAsync(
-                        x => x.Id == id && x.OrganizationId == orgId && x.GuideUserId == guideId,
+                        x => x.Id == id && x.OrganizationId == orgId && x.EventGuides.Any(g => g.GuideUserId == guideId),
                         ct);
             }
             else
@@ -1459,9 +1464,9 @@ internal static class EventsHandlers
         return Results.NoContent();
     }
 
-    internal static async Task<IResult> AssignGuide(
+    internal static async Task<IResult> AssignGuides(
         string eventId,
-        AssignGuideRequest request,
+        AssignGuidesRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
@@ -1476,30 +1481,51 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        if (request is null || !request.GuideUserId.HasValue || request.GuideUserId == Guid.Empty)
+        if (request is null || request.GuideUserIds is null)
         {
-            return EventsHelpers.BadRequest("Guide user id is required.");
+            return EventsHelpers.BadRequest("Guide user ids array is required.");
         }
 
-        var eventEntity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        var eventEntity = await db.Events
+            .Include(x => x.EventGuides)
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (eventEntity is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        var guideId = request.GuideUserId.Value;
-        var guideExists = await db.Users.AsNoTracking()
-            .AnyAsync(x => x.Id == guideId && x.Role == "Guide" && x.OrganizationId == orgId, ct);
+        var guideIds = request.GuideUserIds.Where(g => g != Guid.Empty).Distinct().ToArray();
 
-        if (!guideExists)
+        // Validate all guides exist and belong to the organization
+        if (guideIds.Length > 0)
         {
-            return EventsHelpers.BadRequest("Guide user not found.");
+            var validGuides = await db.Users.AsNoTracking()
+                .Where(x => guideIds.Contains(x.Id) && x.Role == "Guide" && x.OrganizationId == orgId)
+                .Select(x => x.Id)
+                .ToArrayAsync(ct);
+
+            if (validGuides.Length != guideIds.Length)
+            {
+                return EventsHelpers.BadRequest("One or more guide users not found or do not belong to the organization.");
+            }
         }
 
-        eventEntity.GuideUserId = guideId;
+        // Remove existing guides
+        db.EventGuides.RemoveRange(eventEntity.EventGuides);
+
+        // Add new guides
+        foreach (var guideId in guideIds)
+        {
+            eventEntity.EventGuides.Add(new EventGuideEntity
+            {
+                EventId = eventEntity.Id,
+                GuideUserId = guideId
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { eventId = id, guideUserId = guideId });
+        return Results.Ok(new { eventId = id, guideUserIds = guideIds });
     }
 
     internal static async Task<IResult> GetParticipants(

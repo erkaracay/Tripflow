@@ -295,12 +295,19 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
-        var eventEntity = await db.Events.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
+        var eventEntity = await db.Events
+            .Include(x => x.EventGuides)
+            .FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
         if (eventEntity is not null)
         {
-            if (eventEntity.GuideUserId != guideUserId)
+            var hasGuide = eventEntity.EventGuides.Any(g => g.GuideUserId == guideUserId);
+            if (!hasGuide)
             {
-                eventEntity.GuideUserId = guideUserId;
+                eventEntity.EventGuides.Add(new EventGuideEntity
+                {
+                    EventId = eventEntity.Id,
+                    GuideUserId = guideUserId
+                });
                 db.Events.Update(eventEntity);
                 state.Seeded = true;
             }
@@ -313,16 +320,24 @@ public static class DevSeed
             return eventEntity;
         }
 
+        var eventId = Guid.NewGuid();
         eventEntity = new EventEntity
         {
-            Id = Guid.NewGuid(),
+            Id = eventId,
             OrganizationId = organizationId,
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
             EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
             CreatedAt = now,
-            GuideUserId = guideUserId
+            EventGuides = new List<EventGuideEntity>
+            {
+                new EventGuideEntity
+                {
+                    EventId = eventId,
+                    GuideUserId = guideUserId
+                }
+            }
         };
 
         db.Events.Add(eventEntity);

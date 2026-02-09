@@ -5,7 +5,7 @@ namespace Tripflow.Api.Features.Events;
 public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate, string? EventAccessCode);
 public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
 
-public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? LogoUrl, Guid? GuideUserId, bool IsDeleted, string EventAccessCode);
+public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? LogoUrl, Guid[] GuideUserIds, bool IsDeleted, string EventAccessCode);
 public sealed record EventListItemDto(
     Guid Id,
     string Name,
@@ -13,7 +13,7 @@ public sealed record EventListItemDto(
     string EndDate,
     int ArrivedCount,
     int TotalCount,
-    Guid? GuideUserId,
+    Guid[] GuideUserIds,
     bool IsDeleted,
     string EventAccessCode);
 
@@ -358,6 +358,6 @@ public sealed record EventParticipantLogListResponseDto(
 
 public sealed record VerifyCheckInCodeRequest(string? CheckInCode);
 public sealed record VerifyCheckInCodeResponse(bool IsValid, string? NormalizedCode);
-public sealed record AssignGuideRequest(Guid? GuideUserId);
+public sealed record AssignGuidesRequest(Guid[] GuideUserIds);
 public sealed record EventAccessCodeResponse(Guid EventId, string EventAccessCode);
 public sealed record UpdateEventAccessCodeRequest(string? EventAccessCode);
