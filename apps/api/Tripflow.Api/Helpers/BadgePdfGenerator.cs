@@ -86,7 +86,7 @@ internal static class BadgePdfGenerator
 
                                         h.Item().PaddingTop(10).Text(eventTitle)
                                             .FontColor(Colors.White)
-                                            .FontSize(16)
+                                            .FontSize(13)
                                             .Bold()
                                             .FontFamily(Fonts.Calibri)
                                             .LineHeight(1.1f);
