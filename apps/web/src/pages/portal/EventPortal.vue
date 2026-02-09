@@ -18,10 +18,11 @@ type PortalParticipant = PortalMeResponse['participant']
 
 type RetryState = 'idle' | 'retrying'
 
+const props = defineProps<{ eventId?: string }>()
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
-const eventId = computed(() => route.params.eventId as string)
+const eventId = computed(() => (props.eventId ?? route.params.eventId) as string)
 
 const event = ref<PortalMeResponse['event'] | null>(null)
 const participant = ref<PortalParticipant | null>(null)
@@ -512,6 +513,13 @@ onUnmounted(() => {
                 <div v-if="selectedDay" class="space-y-4">
                   <div>
                     <div class="text-xs text-slate-500">{{ formatPortalDate(selectedDay.date) }}</div>
+                    <div v-if="selectedDay.placesToVisit" class="mt-2 flex items-start gap-2">
+                      <span class="text-slate-500" aria-hidden="true">📍</span>
+                      <div>
+                        <div class="text-xs font-medium text-slate-500">{{ t('portal.schedule.placesToVisit') }}</div>
+                        <div class="mt-0.5 text-sm font-medium text-slate-900">{{ selectedDay.placesToVisit }}</div>
+                      </div>
+                    </div>
                     <div v-if="selectedDay.notes" class="mt-2 text-sm text-slate-600">
                       {{ selectedDay.notes }}
                     </div>

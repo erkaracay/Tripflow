@@ -196,6 +196,7 @@ export type EventDay = {
   date: string
   title?: string | null
   notes?: string | null
+  placesToVisit?: string | null
   sortOrder: number
   isActive: boolean
   activityCount: number
@@ -313,6 +314,7 @@ export type EventScheduleDay = {
   date: string
   title?: string | null
   notes?: string | null
+  placesToVisit?: string | null
   sortOrder: number
   isActive: boolean
   activities: EventActivity[]

@@ -407,6 +407,7 @@
         "up": "Yukarı taşı",
         "down": "Aşağı taşı",
         "edit": "Düzenle",
+        "editDay": "Günü düzenle",
         "delete": "Sil",
         "deleteConfirm": "Bu günü ve tüm aktivitelerini silmek istiyor musun?",
         "validation": {
@@ -416,12 +417,16 @@
           "date": "Tarih",
           "title": "Başlık",
           "notes": "Notlar",
+          "placesToVisit": "Bugün gezilecek yerler",
+          "addPlace": "Yer ekle",
+          "placePlaceholder": "Yer {n}",
           "sortOrder": "Sıra",
           "active": "Aktif"
         }
       },
       "activities": {
         "title": "Aktiviteler",
+        "dayActivities": "Gün {day} aktiviteleri",
         "add": "Aktivite ekle",
         "selectDay": "Aktivite yönetmek için bir gün seç.",
         "empty": "Henüz aktivite yok.",
@@ -1069,6 +1074,7 @@
       "empty": "Program henüz yayınlanmadı.",
       "dayLabel": "Gün {day}",
       "dayFallback": "Gün {day}",
+      "placesToVisit": "Bugün gezilecek yerler",
       "noActivities": "Henüz aktivite yok.",
       "timeTba": "Saat netleşmedi",
       "typeMeal": "Yemek",

@@ -10,6 +10,7 @@ public sealed class EventDayEntity
     public DateOnly Date { get; set; }
     public string? Title { get; set; }
     public string? Notes { get; set; }
+    public string? PlacesToVisit { get; set; }
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
 

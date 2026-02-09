@@ -407,6 +407,7 @@
         "up": "Move up",
         "down": "Move down",
         "edit": "Edit",
+        "editDay": "Edit day",
         "delete": "Delete",
         "deleteConfirm": "Delete this day and all its activities?",
         "validation": {
@@ -416,12 +417,16 @@
           "date": "Date",
           "title": "Title",
           "notes": "Notes",
+          "placesToVisit": "Places to visit today",
+          "addPlace": "Add place",
+          "placePlaceholder": "Place {n}",
           "sortOrder": "Sort order",
           "active": "Active"
         }
       },
       "activities": {
         "title": "Activities",
+        "dayActivities": "Day {day} activities",
         "add": "Add activity",
         "selectDay": "Select a day to manage activities.",
         "empty": "No activities yet.",
@@ -1084,6 +1089,7 @@
       "empty": "Program not published yet.",
       "dayLabel": "Day {day}",
       "dayFallback": "Day {day}",
+      "placesToVisit": "Places to visit today",
       "noActivities": "No activities scheduled yet.",
       "timeTba": "Time TBA",
       "typeMeal": "Meal",

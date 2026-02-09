@@ -244,6 +244,7 @@ internal static class EventsHandlers
                 day.Date.ToString("yyyy-MM-dd"),
                 day.Title,
                 day.Notes,
+                day.PlacesToVisit,
                 day.SortOrder,
                 day.IsActive,
                 activityCounts.TryGetValue(day.Id, out var count) ? count : 0))
@@ -301,6 +302,7 @@ internal static class EventsHandlers
             Date = date,
             Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim(),
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            PlacesToVisit = string.IsNullOrWhiteSpace(request.PlacesToVisit) ? null : request.PlacesToVisit.Trim(),
             SortOrder = sortOrder,
             IsActive = request.IsActive ?? true
         };
@@ -313,6 +315,7 @@ internal static class EventsHandlers
             entity.Date.ToString("yyyy-MM-dd"),
             entity.Title,
             entity.Notes,
+            entity.PlacesToVisit,
             entity.SortOrder,
             entity.IsActive,
             0));
@@ -372,6 +375,11 @@ internal static class EventsHandlers
             entity.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
         }
 
+        if (request.PlacesToVisit is not null)
+        {
+            entity.PlacesToVisit = string.IsNullOrWhiteSpace(request.PlacesToVisit) ? null : request.PlacesToVisit.Trim();
+        }
+
         if (request.SortOrder.HasValue)
         {
             entity.SortOrder = request.SortOrder.Value;
@@ -392,6 +400,7 @@ internal static class EventsHandlers
             entity.Date.ToString("yyyy-MM-dd"),
             entity.Title,
             entity.Notes,
+            entity.PlacesToVisit,
             entity.SortOrder,
             entity.IsActive,
             activityCount));

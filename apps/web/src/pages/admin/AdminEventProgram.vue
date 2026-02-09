@@ -49,9 +49,20 @@ const dayForm = ref({
   date: '',
   title: '',
   notes: '',
+  placesToVisitItems: [] as string[],
   sortOrder: '',
   isActive: true,
 })
+
+const PLACES_DELIMITER = ' - '
+
+const addPlaceRow = () => {
+  dayForm.value.placesToVisitItems.push('')
+}
+
+const removePlaceRow = (index: number) => {
+  dayForm.value.placesToVisitItems.splice(index, 1)
+}
 const activityForm = ref({
   title: '',
   type: 'Other',
@@ -71,10 +82,14 @@ const activityForm = ref({
 const selectedDay = computed(() => days.value.find((day) => day.id === selectedDayId.value) ?? null)
 
 const resetDayForm = (day?: EventDay) => {
+  const items = day?.placesToVisit
+    ? day.placesToVisit.split(PLACES_DELIMITER).map((s) => s.trim()).filter(Boolean)
+    : []
   dayForm.value = {
     date: day?.date ?? '',
     title: day?.title ?? '',
     notes: day?.notes ?? '',
+    placesToVisitItems: items.length > 0 ? items : [''],
     sortOrder: day?.sortOrder?.toString() ?? '',
     isActive: day?.isActive ?? true,
   }
@@ -171,10 +186,16 @@ const saveDay = async () => {
   if (savingDay.value) {
     return
   }
+  const placesToVisit = dayForm.value.placesToVisitItems
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(PLACES_DELIMITER) || null
+
   const payload = {
     date: dayForm.value.date,
     title: dayForm.value.title,
     notes: dayForm.value.notes,
+    placesToVisit,
     sortOrder: dayForm.value.sortOrder ? Number(dayForm.value.sortOrder) : undefined,
     isActive: dayForm.value.isActive,
   }
@@ -539,17 +560,26 @@ onMounted(loadAll)
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.program.activities.title') }}</h2>
-            <p class="text-xs text-slate-500" v-if="selectedDay">{{ selectedDay.date }}</p>
+            <h2 class="text-sm font-semibold text-slate-900">
+              {{ selectedDay ? t('admin.program.activities.dayActivities', { day: selectedDay.sortOrder }) : t('admin.program.activities.title') }}
+            </h2>
           </div>
-          <button
-            class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-            type="button"
-            :disabled="!selectedDayId"
-            @click="openCreateActivity($event)"
-          >
-            {{ t('admin.program.activities.add') }}
-          </button>
+          <div class="flex gap-2" v-if="selectedDay">
+            <button
+              class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              type="button"
+              @click="openEditDay(selectedDay, $event)"
+            >
+              {{ t('admin.program.days.editDay') }}
+            </button>
+            <button
+              class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              type="button"
+              @click="openCreateActivity($event)"
+            >
+              {{ t('admin.program.activities.add') }}
+            </button>
+          </div>
         </div>
 
         <p class="mt-4 text-xs text-slate-500" v-if="!selectedDayId">
@@ -672,6 +702,41 @@ onMounted(loadAll)
               :disabled="savingDay"
             ></textarea>
           </label>
+          <div class="grid gap-2">
+            <span class="text-sm text-slate-600">{{ t('admin.program.days.form.placesToVisit') }}</span>
+            <div class="space-y-2">
+              <div
+                v-for="(_, idx) in dayForm.placesToVisitItems"
+                :key="idx"
+                class="flex gap-2"
+              >
+                <input
+                  v-model="dayForm.placesToVisitItems[idx]"
+                  type="text"
+                  class="flex-1 rounded border border-slate-200 px-3 py-2 text-sm"
+                  :placeholder="t('admin.program.days.form.placePlaceholder', { n: idx + 1 })"
+                  :disabled="savingDay"
+                />
+                <button
+                  type="button"
+                  class="rounded border border-slate-200 px-2 py-2 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                  :disabled="savingDay || dayForm.placesToVisitItems.length <= 1"
+                  :title="t('common.remove')"
+                  @click="removePlaceRow(idx)"
+                >
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                class="text-sm font-medium text-slate-600 underline-offset-2 hover:underline"
+                :disabled="savingDay"
+                @click="addPlaceRow"
+              >
+                + {{ t('admin.program.days.form.addPlace') }}
+              </button>
+            </div>
+          </div>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.sortOrder') }}</span>
             <input

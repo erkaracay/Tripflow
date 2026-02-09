@@ -98,6 +98,7 @@ internal static class EventsHelpers
                 day.Date.ToString("yyyy-MM-dd"),
                 day.Title,
                 day.Notes,
+                day.PlacesToVisit,
                 day.SortOrder,
                 day.IsActive,
                 activityGroups.TryGetValue(day.Id, out var list) ? list : Array.Empty<EventActivityDto>()

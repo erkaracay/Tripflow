@@ -27,6 +27,7 @@ public sealed record EventDayDto(
     string Date,
     string? Title,
     string? Notes,
+    string? PlacesToVisit,
     int SortOrder,
     bool IsActive,
     int ActivityCount);
@@ -35,6 +36,7 @@ public sealed record CreateEventDayRequest(
     string? Date,
     string? Title,
     string? Notes,
+    string? PlacesToVisit,
     int? SortOrder,
     bool? IsActive);
 
@@ -42,6 +44,7 @@ public sealed record UpdateEventDayRequest(
     string? Date,
     string? Title,
     string? Notes,
+    string? PlacesToVisit,
     int? SortOrder,
     bool? IsActive);
 
@@ -97,6 +100,7 @@ public sealed record EventScheduleDayDto(
     string Date,
     string? Title,
     string? Notes,
+    string? PlacesToVisit,
     int SortOrder,
     bool IsActive,
     EventActivityDto[] Activities);
