@@ -242,6 +242,8 @@
     "portalSaveFailed": "Failed to save portal.",
     "guideAssigned": "Guide assigned.",
     "guideAssignFailed": "Failed to assign guide.",
+    "guidesAssigned": "Guides assigned.",
+    "guidesAssignFailed": "Failed to assign guides.",
     "orgCreated": "Organization created.",
     "orgCreateFailed": "Failed to create organization.",
     "orgUpdated": "Organization updated.",
@@ -389,11 +391,12 @@
       "openPortal": "Open portal login",
       "guide": {
         "title": "Guide Assignment",
-        "subtitle": "Assign a guide to run check-ins for this event.",
+        "subtitle": "Assign guides to run check-ins for this event.",
         "loading": "Loading guides...",
         "empty": "No guide users found.",
         "selectPlaceholder": "Select a guide",
-        "save": "Save guide"
+        "save": "Save guides",
+        "removeGuide": "Remove guide"
       }
     },
     "program": {

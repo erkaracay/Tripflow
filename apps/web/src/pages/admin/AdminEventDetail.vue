@@ -63,7 +63,8 @@ const guideErrorKey = ref<string | null>(null)
 const guideErrorMessage = ref<string | null>(null)
 const guideLoading = ref(true)
 const guides = ref<UserListItem[]>([])
-const guideId = ref('')
+const guideIds = ref<string[]>([])
+const selectedGuideToAdd = ref('')
 const phoneErrorKey = ref<string | null>(null)
 const editPhoneErrorKey = ref<string | null>(null)
 const tcNoErrorKey = ref<string | null>(null)
@@ -395,7 +396,7 @@ const loadEvent = async () => {
     setEventForm(eventData)
     participants.value = participantsData
     portal.value = portalData
-    guideId.value = eventData.guideUserId ?? ''
+    guideIds.value = eventData.guideUserIds ?? []
     setPortalForm(portalData)
   } catch (err) {
     loadErrorMessage.value = err instanceof Error ? err.message : null
@@ -1206,30 +1207,47 @@ const savePortal = async () => {
   }
 }
 
-const saveGuide = async () => {
+const addGuide = () => {
+  if (!selectedGuideToAdd.value || guideIds.value.includes(selectedGuideToAdd.value)) {
+    selectedGuideToAdd.value = ''
+    return
+  }
+  guideIds.value = [...guideIds.value, selectedGuideToAdd.value]
+  selectedGuideToAdd.value = ''
+}
+
+const removeGuide = (guideId: string) => {
+  guideIds.value = guideIds.value.filter(id => id !== guideId)
+}
+
+const getGuideName = (guideId: string) => {
+  const guide = guides.value.find(g => g.id === guideId)
+  return guide ? (guide.fullName || guide.email) : guideId
+}
+
+const availableGuides = computed(() => {
+  return guides.value.filter(guide => !guideIds.value.includes(guide.id))
+})
+
+const saveGuides = async () => {
   guideErrorKey.value = null
   guideErrorMessage.value = null
 
-  if (!guideId.value) {
-    guideErrorKey.value = 'validation.guideRequired'
-    return
-  }
-
   guideSaving.value = true
   try {
-    await apiPut(`/api/events/${eventId.value}/guide`, {
-      guideUserId: guideId.value,
+    await apiPut(`/api/events/${eventId.value}/guides`, {
+      guideUserIds: guideIds.value,
     })
     if (event.value) {
-      event.value = { ...event.value, guideUserId: guideId.value }
+      event.value = { ...event.value, guideUserIds: [...guideIds.value] }
     }
-    pushToast({ key: 'toast.guideAssigned', tone: 'success' })
+    pushToast({ key: 'toast.guidesAssigned', tone: 'success' })
   } catch (err) {
     guideErrorMessage.value = err instanceof Error ? err.message : null
     if (!guideErrorMessage.value) {
-      guideErrorKey.value = 'errors.guide.assign'
+      guideErrorKey.value = 'errors.guides.assign'
     }
-    pushToast({ key: 'toast.guideAssignFailed', tone: 'error' })
+    pushToast({ key: 'toast.guidesAssignFailed', tone: 'error' })
   } finally {
     guideSaving.value = false
   }
@@ -1482,27 +1500,56 @@ onMounted(loadEvent)
         <div v-else-if="guides.length === 0" class="mt-4 text-sm text-slate-500">
           {{ t('admin.eventDetail.guide.empty') }}
         </div>
-        <form v-else class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="saveGuide">
-          <select
-            v-model="guideId"
-            class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none sm:w-auto"
-          >
-            <option value="" disabled>{{ t('admin.eventDetail.guide.selectPlaceholder') }}</option>
-            <option v-for="guide in guides" :key="guide.id" :value="guide.id">
-              {{ guide.fullName || guide.email }}
-            </option>
-          </select>
-          <button
-            class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            :disabled="guideSaving"
-            type="submit"
-          >
-            {{ guideSaving ? t('common.saving') : t('admin.eventDetail.guide.save') }}
-          </button>
-          <span v-if="guideErrorKey || guideErrorMessage" class="text-xs text-rose-600">
+        <div v-else class="mt-4 space-y-4">
+          <!-- Selected guides as chips -->
+          <div v-if="guideIds.length > 0" class="flex flex-wrap gap-2">
+            <div
+              v-for="guideId in guideIds"
+              :key="guideId"
+              class="group inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-200"
+            >
+              <span class="font-medium">{{ getGuideName(guideId) }}</span>
+              <button
+                type="button"
+                @click="removeGuide(guideId)"
+                class="flex h-5 w-5 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
+                :aria-label="t('admin.eventDetail.guide.removeGuide')"
+              >
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Add guide dropdown -->
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <select
+              v-model="selectedGuideToAdd"
+              @change="addGuide"
+              class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 sm:w-auto"
+            >
+              <option value="">{{ t('admin.eventDetail.guide.selectPlaceholder') }}</option>
+              <option v-for="guide in availableGuides" :key="guide.id" :value="guide.id">
+                {{ guide.fullName || guide.email }}
+              </option>
+            </select>
+            <button
+              type="button"
+              @click="saveGuides"
+              class="inline-flex items-center justify-center rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              :disabled="guideSaving"
+            >
+              <span v-if="guideSaving" class="mr-2 h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
+              {{ guideSaving ? t('common.saving') : t('admin.eventDetail.guide.save') }}
+            </button>
+          </div>
+
+          <!-- Error message -->
+          <div v-if="guideErrorKey || guideErrorMessage" class="text-xs text-rose-600">
             {{ guideErrorKey ? t(guideErrorKey) : guideErrorMessage }}
-          </span>
-        </form>
+          </div>
+        </div>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

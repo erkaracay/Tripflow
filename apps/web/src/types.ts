@@ -4,7 +4,7 @@ export type Event = {
   startDate: string
   endDate: string
   logoUrl?: string | null
-  guideUserId?: string | null
+  guideUserIds: string[]
   eventAccessCode?: string | null
   isDeleted: boolean
 }
@@ -16,7 +16,7 @@ export type EventListItem = {
   endDate: string
   arrivedCount: number
   totalCount: number
-  guideUserId?: string | null
+  guideUserIds: string[]
   isDeleted: boolean
   eventAccessCode: string
 }

@@ -242,6 +242,8 @@
     "portalSaveFailed": "Portal kaydedilemedi.",
     "guideAssigned": "Rehber atandı.",
     "guideAssignFailed": "Rehber atanamadı.",
+    "guidesAssigned": "Rehberler atandı.",
+    "guidesAssignFailed": "Rehberler atanamadı.",
     "orgCreated": "Organizasyon oluşturuldu.",
     "orgCreateFailed": "Organizasyon oluşturulamadı.",
     "orgUpdated": "Organizasyon güncellendi.",
@@ -389,11 +391,12 @@
       "openPortal": "Portal girişini aç",
       "guide": {
         "title": "Rehber Atama",
-        "subtitle": "Bu etkinlik için yoklama alacak rehberi seç.",
+        "subtitle": "Bu etkinlik için yoklama alacak rehberleri seç.",
         "loading": "Rehberler yükleniyor...",
         "empty": "Rehber bulunamadı.",
         "selectPlaceholder": "Rehber seç",
-        "save": "Rehberi kaydet"
+        "save": "Rehberleri kaydet",
+        "removeGuide": "Rehberi kaldır"
       }
     },
     "program": {
