@@ -124,6 +124,7 @@ internal static class EventsHelpers
             activity.RequiresCheckIn,
             activity.CheckInMode,
             activity.MenuText,
+            activity.ProgramContent,
             activity.SurveyUrl);
 
     internal static bool TryParseEventId(string eventIdValue, out Guid eventId, out IResult? error)

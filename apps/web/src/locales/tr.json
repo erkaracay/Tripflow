@@ -215,6 +215,7 @@
     }
   },
   "toast": {
+    "saved": "Kaydedildi.",
     "sessionExpired": "Oturum süren doldu, tekrar giriş yap.",
     "checkInUndone": "Yoklama geri alındı.",
     "alreadyUndone": "Zaten geri alınmış.",
@@ -433,6 +434,7 @@
         "loading": "Aktiviteler yükleniyor...",
         "timeTba": "Saat netleşmedi",
         "typeMeal": "Yemek",
+        "typeProgram": "Program",
         "typeOther": "Diğer",
         "edit": "Düzenle",
         "duplicate": "Kopyala",
@@ -451,6 +453,7 @@
           "directions": "Tarif",
           "notes": "Notlar",
           "menuText": "Menü",
+          "programContent": "Program içeriği",
           "surveyUrl": "Anket linki",
           "checkInEnabled": "Check-in (sonra)",
           "requiresCheckIn": "Yoklama gerekli (aktivite yoklaması ekranında göster)",
@@ -1078,7 +1081,9 @@
       "noActivities": "Henüz aktivite yok.",
       "timeTba": "Saat netleşmedi",
       "typeMeal": "Yemek",
+      "typeProgram": "Program",
       "typeOther": "Diğer",
+      "programContent": "Program",
       "menuLabel": "Menü",
       "menuView": "Görüntüle",
       "menuHide": "Kapat",

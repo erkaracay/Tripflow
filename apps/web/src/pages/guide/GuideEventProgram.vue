@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import RichTextContent from '../../components/editor/RichTextContent.vue'
 import type { EventListItem, EventSchedule, EventScheduleDay } from '../../types'
 
 const route = useRoute()
@@ -77,10 +78,15 @@ const buildMapsLink = (activity: { locationName?: string | null; address?: strin
 }
 
 const formatActivityType = (type?: string | null) => {
-  if (type?.toLowerCase() === 'meal') {
-    return t('portal.schedule.typeMeal')
-  }
+  if (type?.toLowerCase() === 'meal') return t('portal.schedule.typeMeal')
+  if (type?.toLowerCase() === 'program') return t('portal.schedule.typeProgram')
   return t('portal.schedule.typeOther')
+}
+
+const programExpanded = ref<Record<string, boolean>>({})
+const toggleProgram = (activityId: string) => {
+  programExpanded.value[activityId] = !programExpanded.value[activityId]
+  programExpanded.value = { ...programExpanded.value }
 }
 
 const loadData = async () => {
@@ -231,7 +237,9 @@ onMounted(loadData)
                       :class="
                         activity.type === 'Meal'
                           ? 'border-amber-200 bg-amber-50 text-amber-700'
-                          : 'border-slate-200 bg-white text-slate-600'
+                          : activity.type === 'Program'
+                            ? 'border-sky-200 bg-sky-50 text-sky-700'
+                            : 'border-slate-200 bg-white text-slate-600'
                       "
                     >
                       {{ formatActivityType(activity.type) }}
@@ -273,11 +281,43 @@ onMounted(loadData)
                 <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">
                   {{ t('portal.schedule.menuLabel') }}
                 </div>
-                <div class="mt-1 whitespace-pre-line">{{ activity.menuText }}</div>
+                <RichTextContent :content="activity.menuText" class="mt-1" />
+              </div>
+
+              <div
+                v-if="activity.type === 'Program' && activity.programContent"
+                class="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-800"
+              >
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+                  @click="toggleProgram(activity.id)"
+                >
+                  <span class="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                    {{ t('portal.schedule.programContent') }}
+                  </span>
+                  <span class="text-xs font-semibold text-sky-700 underline">
+                    {{ programExpanded[activity.id] ? t('portal.schedule.menuHide') : t('portal.schedule.menuView') }}
+                  </span>
+                </button>
+                <div
+                  v-if="!programExpanded[activity.id]"
+                  class="mt-2 overflow-hidden border-t border-sky-200/50 pt-2 text-sky-800 line-clamp-5"
+                >
+                  <RichTextContent :content="activity.programContent" />
+                </div>
+                <Transition name="program-expand">
+                  <div
+                    v-if="programExpanded[activity.id]"
+                    class="mt-2 overflow-hidden border-t border-sky-200/50 pt-2 text-sky-800"
+                  >
+                    <RichTextContent :content="activity.programContent" />
+                  </div>
+                </Transition>
               </div>
 
               <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
-                {{ activity.notes }}
+                <RichTextContent :content="activity.notes" />
               </div>
 
               <a
@@ -296,3 +336,20 @@ onMounted(loadData)
     </section>
   </div>
 </template>
+
+<style scoped>
+.program-expand-enter-active,
+.program-expand-leave-active {
+  transition: opacity 0.3s ease-out, max-height 0.3s ease-out;
+}
+.program-expand-enter-from,
+.program-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.program-expand-enter-to,
+.program-expand-leave-from {
+  opacity: 1;
+  max-height: 2000px;
+}
+</style>

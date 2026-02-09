@@ -63,6 +63,7 @@ public sealed record EventActivityDto(
     bool RequiresCheckIn,
     string CheckInMode,
     string? MenuText,
+    string? ProgramContent,
     string? SurveyUrl);
 
 public sealed record CreateEventActivityRequest(
@@ -78,6 +79,7 @@ public sealed record CreateEventActivityRequest(
     bool? RequiresCheckIn,
     string? CheckInMode,
     string? MenuText,
+    string? ProgramContent,
     string? SurveyUrl);
 
 public sealed record UpdateEventActivityRequest(
@@ -93,6 +95,7 @@ public sealed record UpdateEventActivityRequest(
     bool? RequiresCheckIn,
     string? CheckInMode,
     string? MenuText,
+    string? ProgramContent,
     string? SurveyUrl);
 
 public sealed record EventScheduleDayDto(

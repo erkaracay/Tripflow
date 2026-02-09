@@ -215,6 +215,7 @@
     }
   },
   "toast": {
+    "saved": "Saved.",
     "sessionExpired": "Your session expired. Please sign in again.",
     "checkInUndone": "Check-in undone.",
     "alreadyUndone": "Already undone.",
@@ -433,6 +434,7 @@
         "loading": "Loading activities...",
         "timeTba": "Time TBA",
         "typeMeal": "Meal",
+        "typeProgram": "Program",
         "typeOther": "Other",
         "edit": "Edit",
         "duplicate": "Duplicate",
@@ -451,6 +453,7 @@
           "directions": "Directions",
           "notes": "Notes",
           "menuText": "Menu",
+          "programContent": "Program content",
           "surveyUrl": "Survey URL",
           "checkInEnabled": "Enable check-in (later)",
           "requiresCheckIn": "Requires check-in (show in activity check-in screen)",
@@ -1093,7 +1096,9 @@
       "noActivities": "No activities scheduled yet.",
       "timeTba": "Time TBA",
       "typeMeal": "Meal",
+      "typeProgram": "Program",
       "typeOther": "Other",
+      "programContent": "Program",
       "menuLabel": "Menu",
       "menuView": "View",
       "menuHide": "Hide",

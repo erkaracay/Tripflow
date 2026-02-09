@@ -217,6 +217,7 @@ export type EventActivity = {
   requiresCheckIn: boolean
   checkInMode: string
   menuText?: string | null
+  programContent?: string | null
   surveyUrl?: string | null
 }
 

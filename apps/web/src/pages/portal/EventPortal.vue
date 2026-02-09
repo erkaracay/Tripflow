@@ -9,6 +9,7 @@ import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import RichTextContent from '../../components/editor/RichTextContent.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
@@ -53,6 +54,12 @@ const menuExpanded = ref<Record<string, boolean>>({})
 const toggleMenu = (activityId: string) => {
   menuExpanded.value[activityId] = !menuExpanded.value[activityId]
   menuExpanded.value = { ...menuExpanded.value }
+}
+
+const programExpanded = ref<Record<string, boolean>>({})
+const toggleProgram = (activityId: string) => {
+  programExpanded.value[activityId] = !programExpanded.value[activityId]
+  programExpanded.value = { ...programExpanded.value }
 }
 
 const sessionToken = ref('')
@@ -119,9 +126,8 @@ const buildGuideLink = (code: string) => {
 }
 
 const formatActivityType = (type?: string | null) => {
-  if (type === 'Meal') {
-    return t('portal.schedule.typeMeal')
-  }
+  if (type === 'Meal') return t('portal.schedule.typeMeal')
+  if (type === 'Program') return t('portal.schedule.typeProgram')
   return t('portal.schedule.typeOther')
 }
 
@@ -527,7 +533,7 @@ onUnmounted(() => {
                       </div>
                     </div>
                     <div v-if="selectedDay.notes" class="mt-2 text-sm text-slate-600">
-                      {{ selectedDay.notes }}
+                      <RichTextContent :content="selectedDay.notes" />
                     </div>
                   </div>
 
@@ -550,7 +556,7 @@ onUnmounted(() => {
                         </div>
                         <span
                           class="rounded-full border px-3 py-1 text-xs font-semibold"
-                          :class="activity.type === 'Meal' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600'"
+                          :class="activity.type === 'Meal' ? 'border-amber-200 bg-amber-50 text-amber-700' : activity.type === 'Program' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'"
                         >
                           {{ formatActivityType(activity.type) }}
                         </span>
@@ -593,15 +599,47 @@ onUnmounted(() => {
                         <Transition name="menu-expand">
                           <div
                             v-if="menuExpanded[activity.id]"
-                            class="mt-2 overflow-hidden whitespace-pre-line border-t border-amber-200/50 pt-2 text-amber-800"
+                            class="mt-2 overflow-hidden border-t border-amber-200/50 pt-2 text-amber-800"
                           >
-                            {{ activity.menuText }}
+                            <RichTextContent :content="activity.menuText" />
+                          </div>
+                        </Transition>
+                      </div>
+
+                      <div
+                        v-if="activity.type === 'Program' && activity.programContent"
+                        class="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-800"
+                      >
+                        <button
+                          type="button"
+                          class="flex w-full list-none cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+                          @click="toggleProgram(activity.id)"
+                        >
+                          <span class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+                            {{ t('portal.schedule.programContent') }}
+                          </span>
+                          <span class="text-xs font-semibold text-sky-700 underline">
+                            {{ programExpanded[activity.id] ? t('portal.schedule.menuHide') : t('portal.schedule.menuView') }}
+                          </span>
+                        </button>
+                        <div
+                          v-if="!programExpanded[activity.id]"
+                          class="mt-2 overflow-hidden border-t border-sky-200/50 pt-2 text-sky-800 line-clamp-5"
+                        >
+                          <RichTextContent :content="activity.programContent" />
+                        </div>
+                        <Transition name="program-expand">
+                          <div
+                            v-if="programExpanded[activity.id]"
+                            class="mt-2 overflow-hidden border-t border-sky-200/50 pt-2 text-sky-800"
+                          >
+                            <RichTextContent :content="activity.programContent" />
                           </div>
                         </Transition>
                       </div>
 
                       <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
-                        {{ activity.notes }}
+                        <RichTextContent :content="activity.notes" />
                       </div>
 
                       <a
@@ -802,5 +840,20 @@ onUnmounted(() => {
 .menu-expand-leave-from {
   opacity: 1;
   max-height: 500px;
+}
+
+.program-expand-enter-active,
+.program-expand-leave-active {
+  transition: opacity 0.3s ease-out, max-height 0.3s ease-out;
+}
+.program-expand-enter-from,
+.program-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.program-expand-enter-to,
+.program-expand-leave-from {
+  opacity: 1;
+  max-height: 2000px;
 }
 </style>

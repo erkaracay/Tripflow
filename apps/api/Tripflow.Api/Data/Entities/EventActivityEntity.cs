@@ -21,6 +21,7 @@ public sealed class EventActivityEntity
     public bool CheckInEnabled { get; set; }
     public string CheckInMode { get; set; } = "EntryOnly";
     public string? MenuText { get; set; }
+    public string? ProgramContent { get; set; }
     public string? SurveyUrl { get; set; }
     /// <summary>When true, activity appears in activity-scoped check-in dropdown.</summary>
     public bool RequiresCheckIn { get; set; }

@@ -7,6 +7,7 @@ using Npgsql;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Features.Events;
@@ -301,7 +302,7 @@ internal static class EventsHandlers
             EventId = id,
             Date = date,
             Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim(),
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            Notes = RichTextSanitizer.Sanitize(request.Notes),
             PlacesToVisit = string.IsNullOrWhiteSpace(request.PlacesToVisit) ? null : request.PlacesToVisit.Trim(),
             SortOrder = sortOrder,
             IsActive = request.IsActive ?? true
@@ -372,7 +373,7 @@ internal static class EventsHandlers
 
         if (request.Notes is not null)
         {
-            entity.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+            entity.Notes = RichTextSanitizer.Sanitize(request.Notes);
         }
 
         if (request.PlacesToVisit is not null)
@@ -571,11 +572,12 @@ internal static class EventsHandlers
             LocationName = string.IsNullOrWhiteSpace(request.LocationName) ? null : request.LocationName.Trim(),
             Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
             Directions = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim(),
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            Notes = RichTextSanitizer.Sanitize(request.Notes),
             CheckInEnabled = request.CheckInEnabled ?? false,
             RequiresCheckIn = request.RequiresCheckIn ?? false,
             CheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim(),
-            MenuText = string.IsNullOrWhiteSpace(request.MenuText) ? null : request.MenuText.Trim(),
+            MenuText = RichTextSanitizer.Sanitize(request.MenuText),
+            ProgramContent = RichTextSanitizer.Sanitize(request.ProgramContent),
             SurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim()
         };
 
@@ -672,7 +674,7 @@ internal static class EventsHandlers
 
         if (request.Notes is not null)
         {
-            entity.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+            entity.Notes = RichTextSanitizer.Sanitize(request.Notes);
         }
 
         if (request.CheckInEnabled.HasValue)
@@ -692,7 +694,12 @@ internal static class EventsHandlers
 
         if (request.MenuText is not null)
         {
-            entity.MenuText = string.IsNullOrWhiteSpace(request.MenuText) ? null : request.MenuText.Trim();
+            entity.MenuText = RichTextSanitizer.Sanitize(request.MenuText);
+        }
+
+        if (request.ProgramContent is not null)
+        {
+            entity.ProgramContent = RichTextSanitizer.Sanitize(request.ProgramContent);
         }
 
         if (request.SurveyUrl is not null)

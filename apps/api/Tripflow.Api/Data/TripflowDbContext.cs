@@ -107,7 +107,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.EventId).IsRequired();
             b.Property(x => x.Date).HasColumnType("date").IsRequired();
             b.Property(x => x.Title).HasMaxLength(200);
-            b.Property(x => x.Notes).HasMaxLength(2000);
+            b.Property(x => x.Notes).HasMaxLength(15000);
             b.Property(x => x.SortOrder).IsRequired();
             b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
 
@@ -145,12 +145,13 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.EndTime).HasColumnType("time without time zone");
             b.Property(x => x.LocationName).HasMaxLength(200);
             b.Property(x => x.Address).HasMaxLength(500);
-            b.Property(x => x.Directions).HasMaxLength(2000);
-            b.Property(x => x.Notes).HasMaxLength(2000);
+            b.Property(x => x.Directions).HasMaxLength(15000);
+            b.Property(x => x.Notes).HasMaxLength(15000);
             b.Property(x => x.CheckInEnabled).IsRequired().HasDefaultValue(false);
             b.Property(x => x.RequiresCheckIn).IsRequired().HasDefaultValue(false);
             b.Property(x => x.CheckInMode).HasMaxLength(32).IsRequired().HasDefaultValue("EntryOnly");
-            b.Property(x => x.MenuText).HasMaxLength(2000);
+            b.Property(x => x.MenuText).HasMaxLength(15000);
+            b.Property(x => x.ProgramContent).HasMaxLength(15000);
             b.Property(x => x.SurveyUrl).HasMaxLength(500);
 
             b.HasIndex(x => new { x.OrganizationId, x.EventDayId, x.StartTime });
