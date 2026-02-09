@@ -1080,6 +1080,8 @@
       "typeMeal": "Yemek",
       "typeOther": "Diğer",
       "menuLabel": "Menü",
+      "menuView": "Görüntüle",
+      "menuHide": "Kapat",
       "openSurvey": "Anketi aç",
       "scrollHint": "Kaydırarak geçiş yapabilirsiniz",
       "openMap": "Haritada aç"

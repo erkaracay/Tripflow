@@ -1095,6 +1095,8 @@
       "typeMeal": "Meal",
       "typeOther": "Other",
       "menuLabel": "Menu",
+      "menuView": "View",
+      "menuHide": "Hide",
       "openSurvey": "Open survey",
       "scrollHint": "Swipe to see more days",
       "openMap": "Open in maps"

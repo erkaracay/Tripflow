@@ -49,6 +49,12 @@ const hasLoadedOnce = ref(false)
 const showDayScrollHint = ref(false)
 let scrollHintTimer: ReturnType<typeof setTimeout> | null = null
 
+const menuExpanded = ref<Record<string, boolean>>({})
+const toggleMenu = (activityId: string) => {
+  menuExpanded.value[activityId] = !menuExpanded.value[activityId]
+  menuExpanded.value = { ...menuExpanded.value }
+}
+
 const sessionToken = ref('')
 const sessionExpiresAt = ref<Date | null>(null)
 
@@ -568,11 +574,30 @@ onUnmounted(() => {
                         {{ activity.directions }}
                       </div>
 
-                      <div v-if="activity.menuText" class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-                          {{ t('portal.schedule.menuLabel') }}
-                        </div>
-                        <div class="mt-1 whitespace-pre-line">{{ activity.menuText }}</div>
+                      <div
+                        v-if="activity.menuText"
+                        class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                      >
+                        <button
+                          type="button"
+                          class="flex w-full list-none cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+                          @click="toggleMenu(activity.id)"
+                        >
+                          <span class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+                            {{ t('portal.schedule.menuLabel') }}
+                          </span>
+                          <span class="text-xs font-semibold text-amber-700 underline">
+                            {{ menuExpanded[activity.id] ? t('portal.schedule.menuHide') : t('portal.schedule.menuView') }}
+                          </span>
+                        </button>
+                        <Transition name="menu-expand">
+                          <div
+                            v-if="menuExpanded[activity.id]"
+                            class="mt-2 overflow-hidden whitespace-pre-line border-t border-amber-200/50 pt-2 text-amber-800"
+                          >
+                            {{ activity.menuText }}
+                          </div>
+                        </Transition>
                       </div>
 
                       <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
@@ -762,3 +787,20 @@ onUnmounted(() => {
     <PortalTabBar :tabs="tabs" :active="activeTab" @select="setActiveTab" />
   </div>
 </template>
+
+<style scoped>
+.menu-expand-enter-active,
+.menu-expand-leave-active {
+  transition: opacity 0.3s ease-out, max-height 0.3s ease-out;
+}
+.menu-expand-enter-from,
+.menu-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.menu-expand-enter-to,
+.menu-expand-leave-from {
+  opacity: 1;
+  max-height: 500px;
+}
+</style>
