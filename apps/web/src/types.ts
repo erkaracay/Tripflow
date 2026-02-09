@@ -445,6 +445,8 @@ export type PortalParticipantTravel = {
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
   ticketNo?: string | null
+  arrivalBaggageAllowance?: string | null
+  returnBaggageAllowance?: string | null
   arrival?: PortalFlightInfo | null
   return?: PortalFlightInfo | null
   transferOutbound?: PortalTransferInfo | null

@@ -1,4 +1,4 @@
-export const formatBaggage = (pieces?: number | null, kg?: number | null) => {
+export const formatBaggage = (pieces?: number | null, kg?: number | null, allowance?: string | null) => {
   const segments: string[] = []
   if (typeof pieces === 'number' && pieces > 0) {
     segments.push(`${pieces} pc`)
@@ -6,7 +6,14 @@ export const formatBaggage = (pieces?: number | null, kg?: number | null) => {
   if (typeof kg === 'number' && kg > 0) {
     segments.push(`${kg} kg`)
   }
-  return segments.length > 0 ? segments.join(' · ') : '—'
+  if (segments.length > 0) {
+    return segments.join(' · ')
+  }
+  // Fallback: eğer pieces ve kg yoksa ama allowance string'i varsa onu kullan
+  if (allowance && allowance.trim()) {
+    return allowance.trim()
+  }
+  return '—'
 }
 
 export const formatDate = (value?: string | null) => {

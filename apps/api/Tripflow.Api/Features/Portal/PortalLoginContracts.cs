@@ -55,6 +55,8 @@ public sealed record PortalParticipantTravel(
     string? HotelCheckInDate,
     string? HotelCheckOutDate,
     string? TicketNo,
+    string? ArrivalBaggageAllowance,
+    string? ReturnBaggageAllowance,
     PortalFlightInfo? Arrival,
     PortalFlightInfo? Return,
     PortalTransferInfo? TransferOutbound,

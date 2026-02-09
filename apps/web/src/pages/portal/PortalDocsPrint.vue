@@ -18,6 +18,7 @@ const eventId = computed(() => route.params.eventId as string)
 const event = ref<PortalMeResponse['event'] | null>(null)
 const portal = ref<PortalMeResponse['portal'] | null>(null)
 const docs = ref<PortalMeResponse['docs'] | null>(null)
+const participant = ref<PortalMeResponse['participant'] | null>(null)
 
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
@@ -30,6 +31,11 @@ const sessionExpiresAt = ref<Date | null>(null)
 
 const sessionTokenKey = computed(() => `infora.portal.session.${eventId.value}`)
 const sessionExpiryKey = computed(() => `infora.portal.session.exp.${eventId.value}`)
+
+const hasText = (value?: string | null) => {
+  if (!value) return false
+  return Boolean(value.trim())
+}
 
 const formatPortalDate = (value?: string | null) => {
   if (!value) return ''
@@ -98,6 +104,7 @@ const loadDocs = async () => {
     event.value = response.event
     portal.value = response.portal
     docs.value = response.docs
+    participant.value = response.participant
     setPortalHeader(
       response.event.name,
       response.event.logoUrl ?? null,
@@ -169,6 +176,27 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="space-y-6">
+      <div
+        v-if="hasText(participant?.fullName) || hasText(participant?.tcNo) || hasText(participant?.birthDate)"
+        class="rounded-2xl border-2 border-slate-300 bg-white p-4 shadow-sm print-card"
+      >
+        <h1 class="mb-4 text-lg font-bold text-slate-900">{{ t('portal.docs.itineraryTitle') }}</h1>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div v-if="hasText(participant?.fullName)">
+            <div class="text-xs font-semibold uppercase text-slate-500">{{ t('portal.docs.participantName') }}</div>
+            <div class="mt-1 text-sm font-medium text-slate-900">{{ participant?.fullName }}</div>
+          </div>
+          <div v-if="hasText(participant?.tcNo)">
+            <div class="text-xs font-semibold uppercase text-slate-500">{{ t('portal.docs.participantTcNo') }}</div>
+            <div class="mt-1 text-sm font-medium text-slate-900">{{ participant?.tcNo }}</div>
+          </div>
+          <div v-if="hasText(participant?.birthDate)">
+            <div class="text-xs font-semibold uppercase text-slate-500">{{ t('portal.docs.participantBirthDate') }}</div>
+            <div class="mt-1 text-sm font-medium text-slate-900">{{ formatPortalDate(participant?.birthDate) }}</div>
+          </div>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3">
         <img
           v-if="event?.logoUrl"

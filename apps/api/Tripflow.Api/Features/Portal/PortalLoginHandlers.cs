@@ -249,6 +249,8 @@ internal static class PortalLoginHandlers
             details?.HotelCheckInDate?.ToString("yyyy-MM-dd"),
             details?.HotelCheckOutDate?.ToString("yyyy-MM-dd"),
             details?.ArrivalTicketNo ?? details?.TicketNo,
+            details?.ArrivalBaggageAllowance,
+            details?.ReturnBaggageAllowance,
             details is null
                 ? null
                 : new PortalFlightInfo(

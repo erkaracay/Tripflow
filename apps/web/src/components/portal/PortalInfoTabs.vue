@@ -471,10 +471,10 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.pnr) }}</span>
           </div>
-          <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
             <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg) }}
+              {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
             </span>
           </div>
         </div>
@@ -513,10 +513,10 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.pnr) }}</span>
           </div>
-          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3 print-row">
+          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
             <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg) }}
+              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
             </span>
           </div>
         </div>
@@ -789,10 +789,10 @@ const formatCustomValue = (value: unknown): string => {
             <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
           </button>
         </div>
-        <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+        <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
           <span class="text-right font-medium text-slate-800">
-            {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg) }}
+            {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
           </span>
         </div>
       </div>
@@ -846,10 +846,10 @@ const formatCustomValue = (value: unknown): string => {
               <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
             </button>
           </div>
-          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
             <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg) }}
+              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
             </span>
           </div>
         </div>

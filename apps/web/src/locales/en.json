@@ -1031,10 +1031,14 @@
       "dayLabel": "Day {day}",
       "dayTitle": "Day {day} - {title}"
     },
-    "docs": {
+      "docs": {
       "title": "Documents",
       "subtitle": "Event information and documents",
       "pdf": "Download PDF",
+      "itineraryTitle": "Seyahat Planı - Itinerary",
+      "participantName": "Name",
+      "participantTcNo": "ID Number",
+      "participantBirthDate": "Date of Birth",
       "linksTitle": "Documents and Links",
       "linksEmpty": "No documents yet.",
       "travelTitle": "Travel Details",

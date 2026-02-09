@@ -1016,10 +1016,14 @@
       "dayLabel": "Gün {day}",
       "dayTitle": "Gün {day} - {title}"
     },
-    "docs": {
+      "docs": {
       "title": "Belgeler",
       "subtitle": "Etkinlik bilgileri ve dökümanlar",
       "pdf": "PDF indir",
+      "itineraryTitle": "Seyahat Planı - Itinerary",
+      "participantName": "İSİM",
+      "participantTcNo": "TC KİMLİK NO",
+      "participantBirthDate": "DOĞUM TARİHİ",
       "linksTitle": "Dokümanlar ve Linkler",
       "linksEmpty": "Henüz doküman yok.",
       "travelTitle": "Seyahat Bilgileri",
