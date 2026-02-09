@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { ref } from 'vue'
+import type { Editor } from '@tiptap/core'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -47,7 +48,7 @@ const editor = useEditor({
       class: 'prose prose-sm max-w-none focus:outline-none min-h-0 px-3 py-2',
     },
   },
-  onUpdate: ({ editor }) => {
+  onUpdate: ({ editor }: { editor: Editor }) => {
     model.value = editor.getHTML()
   },
 })
