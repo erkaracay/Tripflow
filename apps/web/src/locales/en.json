@@ -503,6 +503,8 @@
       "detailsButton": "Details",
       "exportCsv": "Download CSV",
       "exportExcel": "Download Excel",
+      "badges": "Badges",
+      "badgesError": "Failed to download badges PDF.",
       "empty": "No participants yet. Add someone above.",
       "editTitle": "Edit participant",
       "deleteConfirm": "Delete {name}?",

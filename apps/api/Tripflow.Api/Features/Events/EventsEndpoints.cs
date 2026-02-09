@@ -463,6 +463,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/badges.pdf", EventsHandlers.GenerateBadgesPdf)
+            .WithSummary("Generate participant badges PDF")
+            .WithDescription("Generates a multi-page PDF with participant badges (9x12 cm). Each badge contains event title, date range, participant name, and QR code. Excludes participants with willNotAttend=true.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

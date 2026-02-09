@@ -488,6 +488,8 @@
       "detailsButton": "Bilgiler",
       "exportCsv": "CSV indir",
       "exportExcel": "Excel indir",
+      "badges": "Yaka Kartı",
+      "badgesError": "Yaka kartı PDF'i indirilemedi.",
       "empty": "Henüz katılımcı yok. Yukarıdan ekle.",
       "editTitle": "Katılımcıyı düzenle",
       "deleteConfirm": "{name} silinsin mi?",

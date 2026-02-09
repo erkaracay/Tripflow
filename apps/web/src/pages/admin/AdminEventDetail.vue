@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
-import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import {
   formatPhoneDisplay,
@@ -1095,6 +1095,54 @@ const downloadParticipantsExcel = async () => {
   writeFile(workbook, `${name}-participants.xlsx`)
 }
 
+const downloadBadgesPdf = async () => {
+  try {
+    // Build URL using the same helper as other API calls
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.trim()
+    const baseUrl = apiBase
+      ? apiBase.replace(/\/$/, '')
+      : window.location.origin
+    const url = `${baseUrl}/api/events/${eventId.value}/badges.pdf`
+
+    // Fetch with authentication headers
+    const token = getToken()
+    const headers: Record<string, string> = {
+      Accept: 'application/pdf',
+    }
+    if (token && !isTokenExpired(token)) {
+      headers.Authorization = `Bearer ${token}`
+      const role = getTokenRole(token)
+      if (role === 'SuperAdmin') {
+        const orgId = getSelectedOrgId()
+        if (orgId) {
+          headers['X-Org-Id'] = orgId
+        }
+      }
+    }
+
+    const response = await fetch(url, { headers })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        pushToast({ key: 'toast.sessionExpired', tone: 'error' })
+        return
+      }
+      throw new Error(`Failed to download PDF: ${response.statusText}`)
+    }
+
+    // Create blob and open in new tab
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    window.open(blobUrl, '_blank')
+    
+    // Clean up blob URL after a delay
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+  } catch (error) {
+    console.error('Failed to download badges PDF:', error)
+    pushToast({ key: 'admin.participants.badgesError', tone: 'error' })
+  }
+}
+
 const savePortal = async () => {
   portalMessageKey.value = null
   portalErrorKey.value = null
@@ -1725,6 +1773,14 @@ onMounted(loadEvent)
               @click="downloadParticipantsExcel"
             >
               {{ t('admin.participants.exportExcel') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
+              type="button"
+              :disabled="participants.length === 0"
+              @click="downloadBadgesPdf"
+            >
+              {{ t('admin.participants.badges') }}
             </button>
           </div>
         </div>

@@ -3570,4 +3570,38 @@ internal static class EventsHandlers
 
     private static string NormalizeTcNo(string? value)
         => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+
+    internal static async Task<IResult> GenerateBadgesPdf(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventEntity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (eventEntity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var participants = await db.Participants.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var publicBaseUrl = PublicUrlHelper.GetPublicBaseUrl(httpContext);
+        var pdfBytes = BadgePdfGenerator.GenerateBadgesPdf(eventEntity, participants, publicBaseUrl);
+
+        var fileName = $"badges_{eventEntity.Name.Replace(" ", "_")}_{DateTime.UtcNow:yyyyMMdd}.pdf";
+        return Results.File(pdfBytes, "application/pdf", fileName);
+    }
 }
