@@ -176,6 +176,19 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="space-y-6">
+      <div class="flex items-center gap-3 print-header">
+        <img
+          v-if="event?.logoUrl"
+          :src="event.logoUrl"
+          alt=""
+          class="h-12 w-12 rounded-full border border-slate-200 object-cover"
+        />
+        <div>
+          <div class="text-xl font-semibold text-slate-900">{{ event?.name }}</div>
+          <div v-if="portalDateRange" class="text-sm text-slate-500">{{ portalDateRange }}</div>
+        </div>
+      </div>
+
       <div
         v-if="hasText(participant?.fullName) || hasText(participant?.tcNo) || hasText(participant?.birthDate)"
         class="rounded-2xl border-2 border-slate-300 bg-white p-4 shadow-sm print-card"
@@ -194,19 +207,6 @@ onUnmounted(() => {
             <div class="text-xs font-semibold uppercase text-slate-500">{{ t('portal.docs.participantBirthDate') }}</div>
             <div class="mt-1 text-sm font-medium text-slate-900">{{ formatPortalDate(participant?.birthDate) }}</div>
           </div>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <img
-          v-if="event?.logoUrl"
-          :src="event.logoUrl"
-          alt=""
-          class="h-12 w-12 rounded-full border border-slate-200 object-cover"
-        />
-        <div>
-          <div class="text-xl font-semibold text-slate-900">{{ event?.name }}</div>
-          <div v-if="portalDateRange" class="text-sm text-slate-500">{{ portalDateRange }}</div>
         </div>
       </div>
 
@@ -238,16 +238,26 @@ onUnmounted(() => {
 
   body {
     background: white !important;
+    margin: 0;
+    padding: 0;
   }
 
   .portal-docs-print {
-    padding: 0 !important;
+    padding: 1.5cm !important;
     max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .portal-docs-print .print-header {
+    break-after: avoid;
+    page-break-after: avoid;
+    margin-bottom: 1.5rem;
   }
 
   .portal-docs-print .print-card {
     break-inside: avoid;
     page-break-inside: avoid;
+    margin-bottom: 1.25rem;
   }
 
   .portal-docs-print .print-row {
@@ -260,6 +270,7 @@ onUnmounted(() => {
   .portal-docs-print h3 {
     break-after: avoid;
     page-break-after: avoid;
+    margin-top: 0;
   }
 
   .portal-docs-print .print-title {
@@ -269,6 +280,15 @@ onUnmounted(() => {
 
   .portal-docs-print a[href]::after {
     content: '';
+  }
+
+  .portal-docs-print .space-y-6 > * + * {
+    margin-top: 1.5rem;
+  }
+
+  @page {
+    margin: 1.5cm;
+    size: A4;
   }
 }
 </style>
