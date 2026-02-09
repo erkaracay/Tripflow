@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* Mobilde input odaklanınca tarayıcı zoom yapmasın (iOS: font-size >= 16px gerekli) */
+@layer base {
+  @media (max-width: 768px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
