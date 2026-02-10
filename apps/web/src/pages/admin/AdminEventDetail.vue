@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
 import { getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
+import { formatBaggage } from '../../lib/formatters'
 import {
   formatPhoneDisplay,
   normalizeEmail,
@@ -573,7 +574,15 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.arrivalDepartureTime = participant.details?.arrivalDepartureTime ?? ''
   editDetails.arrivalArrivalTime = participant.details?.arrivalArrivalTime ?? ''
   editDetails.arrivalPnr = participant.details?.arrivalPnr ?? ''
-  editDetails.arrivalBaggageAllowance = participant.details?.arrivalBaggageAllowance ?? ''
+  // Prefill with formatted baggage (pieces / kg / allowance) so it matches the details view like "20 kg"
+  {
+    const formattedArrivalBaggage = formatBaggage(
+      participant.details?.arrivalBaggagePieces ?? null,
+      participant.details?.arrivalBaggageTotalKg ?? null,
+      participant.details?.arrivalBaggageAllowance ?? null
+    )
+    editDetails.arrivalBaggageAllowance = formattedArrivalBaggage === '—' ? '' : formattedArrivalBaggage
+  }
   editDetails.arrivalCabinBaggage = participant.details?.arrivalCabinBaggage ?? ''
   editDetails.returnAirline = participant.details?.returnAirline ?? ''
   editDetails.returnDepartureAirport = participant.details?.returnDepartureAirport ?? ''
@@ -582,7 +591,14 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnDepartureTime = participant.details?.returnDepartureTime ?? ''
   editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
   editDetails.returnPnr = participant.details?.returnPnr ?? ''
-  editDetails.returnBaggageAllowance = participant.details?.returnBaggageAllowance ?? ''
+  {
+    const formattedReturnBaggage = formatBaggage(
+      participant.details?.returnBaggagePieces ?? null,
+      participant.details?.returnBaggageTotalKg ?? null,
+      participant.details?.returnBaggageAllowance ?? null
+    )
+    editDetails.returnBaggageAllowance = formattedReturnBaggage === '—' ? '' : formattedReturnBaggage
+  }
   editDetails.returnCabinBaggage = participant.details?.returnCabinBaggage ?? ''
   editDetails.arrivalTransferPickupTime = participant.details?.arrivalTransferPickupTime ?? ''
   editDetails.arrivalTransferPickupPlace = participant.details?.arrivalTransferPickupPlace ?? ''

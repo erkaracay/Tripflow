@@ -1118,7 +1118,8 @@
       "imageAlt": "QR",
       "codeCleared": "Kod temizlendi.",
       "enterCode": "Önce kod girin.",
-      "linkNeedsCode": "Link için önce doğrulayın."
+      "linkNeedsCode": "Link için önce doğrulayın.",
+      "screenshotHint": "Yurtdışında internet paketi bulunmayan veya mobil internet kullanmak istemeyen misafirlerimizin, Infora uygulamasındaki QR kod ekranının ekran görüntüsünü alarak telefonlarına kaydetmeleri önemle rica olunur. Bu sayede internet bağlantısına ihtiyaç duymadan, gerekli kontroller sırasında QR kodunuzu kolayca gösterebilirsiniz."
     },
     "login": {
       "title": "Katılımcı girişi",

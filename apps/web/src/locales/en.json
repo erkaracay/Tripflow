@@ -1133,7 +1133,8 @@
       "imageAlt": "QR",
       "codeCleared": "Code cleared.",
       "enterCode": "Enter a code first.",
-      "linkNeedsCode": "Verify to build the link."
+      "linkNeedsCode": "Verify to build the link.",
+      "screenshotHint": "If you do not have an international data plan or prefer not to use mobile internet abroad, please take a screenshot of the QR screen in the Infora app and save it on your phone. This way you can show your QR code easily during checks without needing an internet connection."
     },
     "login": {
       "title": "Participant login",

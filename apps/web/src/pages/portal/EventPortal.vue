@@ -727,6 +727,9 @@ onUnmounted(() => {
                 />
                 <div v-else class="text-sm text-slate-500">{{ t('portal.qr.empty') }}</div>
 
+                <p class="mt-2 max-w-xs text-center text-xs leading-relaxed text-slate-500">
+                  {{ t('portal.qr.screenshotHint') }}
+                </p>
               </div>
             </div>
           </section>
