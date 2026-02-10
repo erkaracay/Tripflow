@@ -104,6 +104,7 @@ export type ParticipantDetails = {
   arrivalBaggageAllowance?: string | null
   arrivalBaggagePieces?: number | null
   arrivalBaggageTotalKg?: number | null
+  arrivalCabinBaggage?: string | null
   returnAirline?: string | null
   returnDepartureAirport?: string | null
   returnArrivalAirport?: string | null
@@ -114,6 +115,7 @@ export type ParticipantDetails = {
   returnBaggageAllowance?: string | null
   returnBaggagePieces?: number | null
   returnBaggageTotalKg?: number | null
+  returnCabinBaggage?: string | null
   arrivalTransferPickupTime?: string | null
   arrivalTransferPickupPlace?: string | null
   arrivalTransferDropoffPlace?: string | null
@@ -419,6 +421,7 @@ export type PortalFlightInfo = {
   pnr?: string | null
   baggagePieces?: number | null
   baggageTotalKg?: number | null
+  cabinBaggage?: string | null
 }
 
 export type PortalInsuranceInfo = {

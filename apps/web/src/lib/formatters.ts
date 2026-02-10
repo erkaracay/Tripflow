@@ -16,6 +16,35 @@ export const formatBaggage = (pieces?: number | null, kg?: number | null, allowa
   return '—'
 }
 
+export const formatCabinBaggage = (value?: string | null) => {
+  if (!value || !value.trim()) {
+    return '—'
+  }
+
+  const trimmed = value.trim()
+
+  // Try to parse patterns like "1pc 8kg", "1 pc 8kg", "1 pc 8 kg", etc.
+  // Match: optional number + optional "pc"/"pcs" + optional number + optional "kg"/"kgs"
+  const pattern1 = /^(\d+)\s*(?:pc|pcs)?\s*(\d+)\s*(?:kg|kgs)?$/i
+  const match1 = trimmed.match(pattern1)
+  if (match1) {
+    const pieces = match1[1]
+    const kg = match1[2]
+    return `${pieces} pc · ${kg} kg`
+  }
+
+  // Try to parse patterns like "8kg", "8 kg", "8"
+  const pattern2 = /^(\d+)\s*(?:kg|kgs)?$/i
+  const match2 = trimmed.match(pattern2)
+  if (match2) {
+    const kg = match2[1]
+    return `${kg} kg`
+  }
+
+  // If it doesn't match known patterns, return as-is (might already be formatted)
+  return trimmed
+}
+
 export const formatDate = (value?: string | null) => {
   if (!value) {
     return '—'

@@ -158,6 +158,7 @@ const editDetails = reactive({
   arrivalArrivalTime: '',
   arrivalPnr: '',
   arrivalBaggageAllowance: '',
+  arrivalCabinBaggage: '',
   returnAirline: '',
   returnDepartureAirport: '',
   returnArrivalAirport: '',
@@ -166,6 +167,7 @@ const editDetails = reactive({
   returnArrivalTime: '',
   returnPnr: '',
   returnBaggageAllowance: '',
+  returnCabinBaggage: '',
   arrivalTransferPickupTime: '',
   arrivalTransferPickupPlace: '',
   arrivalTransferDropoffPlace: '',
@@ -572,6 +574,7 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.arrivalArrivalTime = participant.details?.arrivalArrivalTime ?? ''
   editDetails.arrivalPnr = participant.details?.arrivalPnr ?? ''
   editDetails.arrivalBaggageAllowance = participant.details?.arrivalBaggageAllowance ?? ''
+  editDetails.arrivalCabinBaggage = participant.details?.arrivalCabinBaggage ?? ''
   editDetails.returnAirline = participant.details?.returnAirline ?? ''
   editDetails.returnDepartureAirport = participant.details?.returnDepartureAirport ?? ''
   editDetails.returnArrivalAirport = participant.details?.returnArrivalAirport ?? ''
@@ -580,6 +583,7 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
   editDetails.returnPnr = participant.details?.returnPnr ?? ''
   editDetails.returnBaggageAllowance = participant.details?.returnBaggageAllowance ?? ''
+  editDetails.returnCabinBaggage = participant.details?.returnCabinBaggage ?? ''
   editDetails.arrivalTransferPickupTime = participant.details?.arrivalTransferPickupTime ?? ''
   editDetails.arrivalTransferPickupPlace = participant.details?.arrivalTransferPickupPlace ?? ''
   editDetails.arrivalTransferDropoffPlace = participant.details?.arrivalTransferDropoffPlace ?? ''
@@ -691,6 +695,7 @@ const saveParticipant = async (participant: Participant) => {
           arrivalArrivalTime: editDetails.arrivalArrivalTime || undefined,
           arrivalPnr: editDetails.arrivalPnr || undefined,
           arrivalBaggageAllowance: editDetails.arrivalBaggageAllowance || undefined,
+          arrivalCabinBaggage: editDetails.arrivalCabinBaggage || undefined,
           returnAirline: editDetails.returnAirline || undefined,
           returnDepartureAirport: editDetails.returnDepartureAirport || undefined,
           returnArrivalAirport: editDetails.returnArrivalAirport || undefined,
@@ -699,6 +704,7 @@ const saveParticipant = async (participant: Participant) => {
           returnArrivalTime: editDetails.returnArrivalTime || undefined,
           returnPnr: editDetails.returnPnr || undefined,
           returnBaggageAllowance: editDetails.returnBaggageAllowance || undefined,
+          returnCabinBaggage: editDetails.returnCabinBaggage || undefined,
           arrivalTransferPickupTime: editDetails.arrivalTransferPickupTime || undefined,
           arrivalTransferPickupPlace: editDetails.arrivalTransferPickupPlace || undefined,
           arrivalTransferDropoffPlace: editDetails.arrivalTransferDropoffPlace || undefined,
@@ -2002,6 +2008,10 @@ onMounted(loadEvent)
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalBaggageAllowance') }}</span>
                     <input v-model.trim="editDetails.arrivalBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.cabinBaggage') }}</span>
+                    <input v-model.trim="editDetails.arrivalCabinBaggage" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
                 </div>
                 <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.returnTitle') }}</div>
                 <div class="grid gap-3 md:grid-cols-3">
@@ -2036,6 +2046,10 @@ onMounted(loadEvent)
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnBaggageAllowance') }}</span>
                     <input v-model.trim="editDetails.returnBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.cabinBaggage') }}</span>
+                    <input v-model.trim="editDetails.returnCabinBaggage" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                 </div>
                 <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.transferTitle') }}</div>

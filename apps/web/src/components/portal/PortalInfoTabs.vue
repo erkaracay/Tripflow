@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatBaggage, formatTime } from '../../lib/formatters'
+import { formatBaggage, formatCabinBaggage, formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import CopyIcon from '../icons/CopyIcon.vue'
@@ -155,7 +155,8 @@ const hasFlightValue = (flight?: PortalFlightInfo | null) => {
       flight.arrivalTime?.trim() ||
       flight.pnr?.trim() ||
       (typeof flight.baggagePieces === 'number' && flight.baggagePieces > 0) ||
-      (typeof flight.baggageTotalKg === 'number' && flight.baggageTotalKg > 0)
+      (typeof flight.baggageTotalKg === 'number' && flight.baggageTotalKg > 0) ||
+      flight.cabinBaggage?.trim()
   )
 }
 
@@ -477,6 +478,12 @@ const formatCustomValue = (value: unknown): string => {
               {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
             </span>
           </div>
+          <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+            <span class="text-right font-medium text-slate-800">
+              {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
+            </span>
+          </div>
         </div>
 
         <div class="mt-4 space-y-2 text-sm">
@@ -517,6 +524,12 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
             <span class="text-right font-medium text-slate-800">
               {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
+            </span>
+          </div>
+          <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+            <span class="text-right font-medium text-slate-800">
+              {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
             </span>
           </div>
         </div>
@@ -795,6 +808,12 @@ const formatCustomValue = (value: unknown): string => {
             {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
           </span>
         </div>
+        <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+          <span class="text-right font-medium text-slate-800">
+            {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
+          </span>
+        </div>
       </div>
 
       <div class="mt-5 border-t border-slate-100 pt-4">
@@ -850,6 +869,12 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
             <span class="text-right font-medium text-slate-800">
               {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
+            </span>
+          </div>
+          <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+            <span class="text-right font-medium text-slate-800">
+              {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
             </span>
           </div>
         </div>

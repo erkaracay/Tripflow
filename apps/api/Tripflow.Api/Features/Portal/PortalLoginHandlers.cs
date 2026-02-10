@@ -263,7 +263,8 @@ internal static class PortalLoginHandlers
                     details.ArrivalArrivalTime?.ToString("HH:mm"),
                     details.ArrivalPnr,
                     details.ArrivalBaggagePieces,
-                    details.ArrivalBaggageTotalKg),
+                    details.ArrivalBaggageTotalKg,
+                    details.ArrivalCabinBaggage),
             details is null
                 ? null
                 : new PortalFlightInfo(
@@ -276,7 +277,8 @@ internal static class PortalLoginHandlers
                     details.ReturnArrivalTime?.ToString("HH:mm"),
                     details.ReturnPnr,
                     details.ReturnBaggagePieces,
-                    details.ReturnBaggageTotalKg),
+                    details.ReturnBaggageTotalKg,
+                    details.ReturnCabinBaggage),
             transferOutbound,
             transferReturn,
             insuranceInfo);

@@ -259,6 +259,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ArrivalBaggageAllowance).HasMaxLength(100);
             b.Property(x => x.ArrivalBaggagePieces);
             b.Property(x => x.ArrivalBaggageTotalKg);
+            b.Property(x => x.ArrivalCabinBaggage).HasMaxLength(100);
 
             b.Property(x => x.ReturnAirline).HasMaxLength(100);
             b.Property(x => x.ReturnDepartureAirport).HasMaxLength(100);
@@ -270,6 +271,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnBaggageAllowance).HasMaxLength(100);
             b.Property(x => x.ReturnBaggagePieces);
             b.Property(x => x.ReturnBaggageTotalKg);
+            b.Property(x => x.ReturnCabinBaggage).HasMaxLength(100);
 
         });
 

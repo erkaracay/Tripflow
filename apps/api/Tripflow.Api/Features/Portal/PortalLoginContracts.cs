@@ -73,7 +73,8 @@ public sealed record PortalFlightInfo(
     string? ArrivalTime,
     string? Pnr,
     int? BaggagePieces,
-    int? BaggageTotalKg);
+    int? BaggageTotalKg,
+    string? CabinBaggage);
 
 public sealed record PortalInsuranceInfo(
     string? CompanyName,

@@ -1783,6 +1783,7 @@ internal static class EventsHandlers
                 row.details.ArrivalBaggageAllowance,
                 row.details.ArrivalBaggagePieces,
                 row.details.ArrivalBaggageTotalKg,
+                row.details.ArrivalCabinBaggage,
                 row.details.ReturnAirline,
                 row.details.ReturnDepartureAirport,
                 row.details.ReturnArrivalAirport,
@@ -1793,6 +1794,7 @@ internal static class EventsHandlers
                 row.details.ReturnBaggageAllowance,
                 row.details.ReturnBaggagePieces,
                 row.details.ReturnBaggageTotalKg,
+                row.details.ReturnCabinBaggage,
                 row.details.ArrivalTransferPickupTime?.ToString("HH:mm"),
                 row.details.ArrivalTransferPickupPlace,
                 row.details.ArrivalTransferDropoffPlace,
@@ -3405,6 +3407,7 @@ internal static class EventsHandlers
             details.ArrivalBaggageAllowance,
             details.ArrivalBaggagePieces,
             details.ArrivalBaggageTotalKg,
+            details.ArrivalCabinBaggage,
             details.ReturnAirline,
             details.ReturnDepartureAirport,
             details.ReturnArrivalAirport,
@@ -3415,6 +3418,7 @@ internal static class EventsHandlers
             details.ReturnBaggageAllowance,
             details.ReturnBaggagePieces,
             details.ReturnBaggageTotalKg,
+            details.ReturnCabinBaggage,
             details.ArrivalTransferPickupTime?.ToString("HH:mm"),
             details.ArrivalTransferPickupPlace,
             details.ArrivalTransferDropoffPlace,
@@ -3507,6 +3511,7 @@ internal static class EventsHandlers
         details.ArrivalBaggageAllowance = request.ArrivalBaggageAllowance;
         details.ArrivalBaggagePieces = request.ArrivalBaggagePieces;
         details.ArrivalBaggageTotalKg = request.ArrivalBaggageTotalKg;
+        details.ArrivalCabinBaggage = request.ArrivalCabinBaggage;
         details.ReturnAirline = request.ReturnAirline;
         details.ReturnDepartureAirport = request.ReturnDepartureAirport;
         details.ReturnArrivalAirport = request.ReturnArrivalAirport;
@@ -3527,6 +3532,7 @@ internal static class EventsHandlers
         details.ReturnBaggageAllowance = request.ReturnBaggageAllowance;
         details.ReturnBaggagePieces = request.ReturnBaggagePieces;
         details.ReturnBaggageTotalKg = request.ReturnBaggageTotalKg;
+        details.ReturnCabinBaggage = request.ReturnCabinBaggage;
         if (!TryParseTimeOnly(request.ArrivalTransferPickupTime, out var arrivalTransferPickupTime))
         {
             error = "Arrival transfer pickup time must be in HH:mm format.";

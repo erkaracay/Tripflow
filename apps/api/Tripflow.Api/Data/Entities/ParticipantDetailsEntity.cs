@@ -36,6 +36,7 @@ public sealed class ParticipantDetailsEntity
     public string? ArrivalBaggageAllowance { get; set; }
     public int? ArrivalBaggagePieces { get; set; }
     public int? ArrivalBaggageTotalKg { get; set; }
+    public string? ArrivalCabinBaggage { get; set; }
 
     public string? ReturnAirline { get; set; }
     public string? ReturnDepartureAirport { get; set; }
@@ -47,6 +48,7 @@ public sealed class ParticipantDetailsEntity
     public string? ReturnBaggageAllowance { get; set; }
     public int? ReturnBaggagePieces { get; set; }
     public int? ReturnBaggageTotalKg { get; set; }
+    public string? ReturnCabinBaggage { get; set; }
 
     public TimeOnly? ArrivalTransferPickupTime { get; set; }
     public string? ArrivalTransferPickupPlace { get; set; }

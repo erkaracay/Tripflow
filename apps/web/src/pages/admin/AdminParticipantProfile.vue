@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import { useToast } from '../../lib/toast'
-import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
+import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
 import CopyIcon from '../../components/icons/CopyIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -349,6 +349,12 @@ onMounted(loadProfile)
                   }}
                 </span>
               </div>
+              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.cabinBaggage') }}</span>
+                <span class="text-slate-900">
+                  {{ formatCabinBaggage(details?.arrivalCabinBaggage) }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -415,6 +421,12 @@ onMounted(loadProfile)
                       details?.returnBaggageAllowance
                     )
                   }}
+                </span>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.cabinBaggage') }}</span>
+                <span class="text-slate-900">
+                  {{ formatCabinBaggage(details?.returnCabinBaggage) }}
                 </span>
               </div>
             </div>
