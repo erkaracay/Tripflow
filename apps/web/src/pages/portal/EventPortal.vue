@@ -659,6 +659,9 @@ onUnmounted(() => {
           </section>
 
           <section v-else-if="activeTab === 'docs'" class="space-y-4">
+            <p v-if="participant?.fullName" class="text-base font-medium text-slate-700">
+              {{ t('portal.greeting', { name: participant.fullName }) }}
+            </p>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 class="text-lg font-semibold">{{ t('portal.docs.title') }}</h2>
@@ -705,6 +708,9 @@ onUnmounted(() => {
           </section>
 
           <section v-else-if="activeTab === 'qr'" class="space-y-4">
+            <p v-if="participant?.fullName" class="text-base font-medium text-slate-700">
+              {{ t('portal.greeting', { name: participant.fullName }) }}
+            </p>
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.qr.title') }}</h2>
 
