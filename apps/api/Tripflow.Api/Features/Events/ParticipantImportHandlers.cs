@@ -46,6 +46,7 @@ internal static class ParticipantImportHandlers
         "arrival_departure_airport",
         "arrival_arrival_airport",
         "arrival_flight_code",
+        "arrival_flight_date",
         "arrival_departure_time",
         "arrival_arrival_time",
         "arrival_pnr",
@@ -56,6 +57,7 @@ internal static class ParticipantImportHandlers
         "return_departure_airport",
         "return_arrival_airport",
         "return_flight_code",
+        "return_flight_date",
         "return_departure_time",
         "return_arrival_time",
         "return_pnr",
@@ -105,6 +107,7 @@ internal static class ParticipantImportHandlers
         "IST",
         "ASR",
         "TK202",
+        "2026-03-10",
         "08:15",
         "09:35",
         "PNR123",
@@ -115,6 +118,7 @@ internal static class ParticipantImportHandlers
         "ASR",
         "IST",
         "TK303",
+        "2026-03-12",
         "18:45",
         "20:10",
         "PNR456",
@@ -146,7 +150,9 @@ internal static class ParticipantImportHandlers
         "hotel_check_in_date",
         "hotel_check_out_date",
         "insurance_start_date",
-        "insurance_end_date"
+        "insurance_end_date",
+        "arrival_flight_date",
+        "return_flight_date"
     };
 
     private static readonly HashSet<string> TimeColumns = new(StringComparer.OrdinalIgnoreCase)
@@ -453,6 +459,30 @@ internal static class ParticipantImportHandlers
                         "invalid_date")
                     {
                         Field = "insurance_end_date"
+                    });
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("arrival_flight_date"), out var arrivalFlightDate))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "arrival_flight_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "arrival_flight_date"
+                    });
+                }
+
+                if (!TryParseOptionalDate(row.GetValue("return_flight_date"), out var returnFlightDate))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "return_flight_date invalid",
+                        "invalid_date")
+                    {
+                        Field = "return_flight_date"
                     });
                 }
 
@@ -825,7 +855,7 @@ internal static class ParticipantImportHandlers
                         {
                             participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
                             ApplyDetails(participant.Details, row, hotelCheckIn, hotelCheckOut, insuranceStart,
-                                insuranceEnd, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime,
+                                insuranceEnd, arrivalFlightDate, returnFlightDate, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime,
                                 returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
                                 arrivalTransferPickupTime, returnTransferPickupTime);
@@ -863,7 +893,7 @@ internal static class ParticipantImportHandlers
                                 ParticipantId = newParticipant.Id
                             };
                             ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, insuranceStart, insuranceEnd,
-                                arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
+                                arrivalFlightDate, returnFlightDate, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
                                 arrivalTransferPickupTime, returnTransferPickupTime);
                             newParticipant.Details = details;
@@ -948,7 +978,9 @@ internal static class ParticipantImportHandlers
             "hotel_check_in_date",
             "hotel_check_out_date",
             "insurance_start_date",
-            "insurance_end_date"
+            "insurance_end_date",
+            "arrival_flight_date",
+            "return_flight_date"
         };
         var timeHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1648,6 +1680,8 @@ internal static class ParticipantImportHandlers
         DateOnly? hotelCheckOut,
         DateOnly? insuranceStart,
         DateOnly? insuranceEnd,
+        DateOnly? arrivalFlightDate,
+        DateOnly? returnFlightDate,
         TimeOnly? arrivalDeparture,
         TimeOnly? arrivalArrival,
         TimeOnly? returnDeparture,
@@ -1685,6 +1719,7 @@ internal static class ParticipantImportHandlers
         details.ArrivalDepartureAirport = row.GetValue("arrival_departure_airport");
         details.ArrivalArrivalAirport = row.GetValue("arrival_arrival_airport");
         details.ArrivalFlightCode = row.GetValue("arrival_flight_code");
+        details.ArrivalFlightDate = arrivalFlightDate;
         details.ArrivalDepartureTime = arrivalDeparture;
         details.ArrivalArrivalTime = arrivalArrival;
         details.ArrivalPnr = row.GetValue("arrival_pnr");
@@ -1696,6 +1731,7 @@ internal static class ParticipantImportHandlers
         details.ReturnDepartureAirport = row.GetValue("return_departure_airport");
         details.ReturnArrivalAirport = row.GetValue("return_arrival_airport");
         details.ReturnFlightCode = row.GetValue("return_flight_code");
+        details.ReturnFlightDate = returnFlightDate;
         details.ReturnDepartureTime = returnDeparture;
         details.ReturnArrivalTime = returnArrival;
         details.ReturnPnr = row.GetValue("return_pnr");

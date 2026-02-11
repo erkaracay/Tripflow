@@ -253,6 +253,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ArrivalDepartureAirport).HasMaxLength(100);
             b.Property(x => x.ArrivalArrivalAirport).HasMaxLength(100);
             b.Property(x => x.ArrivalFlightCode).HasMaxLength(100);
+            b.Property(x => x.ArrivalFlightDate).HasColumnType("date");
             b.Property(x => x.ArrivalDepartureTime).HasColumnType("time without time zone");
             b.Property(x => x.ArrivalArrivalTime).HasColumnType("time without time zone");
             b.Property(x => x.ArrivalPnr).HasMaxLength(100);
@@ -265,6 +266,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnDepartureAirport).HasMaxLength(100);
             b.Property(x => x.ReturnArrivalAirport).HasMaxLength(100);
             b.Property(x => x.ReturnFlightCode).HasMaxLength(100);
+            b.Property(x => x.ReturnFlightDate).HasColumnType("date");
             b.Property(x => x.ReturnDepartureTime).HasColumnType("time without time zone");
             b.Property(x => x.ReturnArrivalTime).HasColumnType("time without time zone");
             b.Property(x => x.ReturnPnr).HasMaxLength(100);

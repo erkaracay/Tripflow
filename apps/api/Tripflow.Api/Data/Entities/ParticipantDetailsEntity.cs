@@ -30,6 +30,7 @@ public sealed class ParticipantDetailsEntity
     public string? ArrivalDepartureAirport { get; set; }
     public string? ArrivalArrivalAirport { get; set; }
     public string? ArrivalFlightCode { get; set; }
+    public DateOnly? ArrivalFlightDate { get; set; }
     public TimeOnly? ArrivalDepartureTime { get; set; }
     public TimeOnly? ArrivalArrivalTime { get; set; }
     public string? ArrivalPnr { get; set; }
@@ -42,6 +43,7 @@ public sealed class ParticipantDetailsEntity
     public string? ReturnDepartureAirport { get; set; }
     public string? ReturnArrivalAirport { get; set; }
     public string? ReturnFlightCode { get; set; }
+    public DateOnly? ReturnFlightDate { get; set; }
     public TimeOnly? ReturnDepartureTime { get; set; }
     public TimeOnly? ReturnArrivalTime { get; set; }
     public string? ReturnPnr { get; set; }

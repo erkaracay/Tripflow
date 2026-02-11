@@ -1777,6 +1777,7 @@ internal static class EventsHandlers
                 row.details.ArrivalDepartureAirport,
                 row.details.ArrivalArrivalAirport,
                 row.details.ArrivalFlightCode,
+                row.details.ArrivalFlightDate?.ToString("yyyy-MM-dd"),
                 row.details.ArrivalDepartureTime?.ToString("HH:mm"),
                 row.details.ArrivalArrivalTime?.ToString("HH:mm"),
                 row.details.ArrivalPnr,
@@ -1788,6 +1789,7 @@ internal static class EventsHandlers
                 row.details.ReturnDepartureAirport,
                 row.details.ReturnArrivalAirport,
                 row.details.ReturnFlightCode,
+                row.details.ReturnFlightDate?.ToString("yyyy-MM-dd"),
                 row.details.ReturnDepartureTime?.ToString("HH:mm"),
                 row.details.ReturnArrivalTime?.ToString("HH:mm"),
                 row.details.ReturnPnr,
@@ -3401,6 +3403,7 @@ internal static class EventsHandlers
             details.ArrivalDepartureAirport,
             details.ArrivalArrivalAirport,
             details.ArrivalFlightCode,
+            details.ArrivalFlightDate?.ToString("yyyy-MM-dd"),
             details.ArrivalDepartureTime?.ToString("HH:mm"),
             details.ArrivalArrivalTime?.ToString("HH:mm"),
             details.ArrivalPnr,
@@ -3412,6 +3415,7 @@ internal static class EventsHandlers
             details.ReturnDepartureAirport,
             details.ReturnArrivalAirport,
             details.ReturnFlightCode,
+            details.ReturnFlightDate?.ToString("yyyy-MM-dd"),
             details.ReturnDepartureTime?.ToString("HH:mm"),
             details.ReturnArrivalTime?.ToString("HH:mm"),
             details.ReturnPnr,
@@ -3495,6 +3499,12 @@ internal static class EventsHandlers
         details.ArrivalDepartureAirport = request.ArrivalDepartureAirport;
         details.ArrivalArrivalAirport = request.ArrivalArrivalAirport;
         details.ArrivalFlightCode = request.ArrivalFlightCode;
+        if (!TryParseDateOnly(request.ArrivalFlightDate, out var arrivalFlightDate))
+        {
+            error = "Arrival flight date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        details.ArrivalFlightDate = arrivalFlightDate;
         if (!TryParseTimeOnly(request.ArrivalDepartureTime, out var arrivalDeparture))
         {
             error = "Arrival departure time must be in HH:mm format.";
@@ -3516,6 +3526,12 @@ internal static class EventsHandlers
         details.ReturnDepartureAirport = request.ReturnDepartureAirport;
         details.ReturnArrivalAirport = request.ReturnArrivalAirport;
         details.ReturnFlightCode = request.ReturnFlightCode;
+        if (!TryParseDateOnly(request.ReturnFlightDate, out var returnFlightDate))
+        {
+            error = "Return flight date must be in YYYY-MM-DD format.";
+            return false;
+        }
+        details.ReturnFlightDate = returnFlightDate;
         if (!TryParseTimeOnly(request.ReturnDepartureTime, out var returnDeparture))
         {
             error = "Return departure time must be in HH:mm format.";
