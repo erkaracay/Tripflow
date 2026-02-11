@@ -492,6 +492,9 @@ onUnmounted(() => {
 
         <div class="space-y-6">
           <section v-if="activeTab === 'days'" class="space-y-4">
+            <p v-if="participant?.fullName" class="text-base font-medium text-slate-700">
+              {{ t('portal.greeting', { name: participant.fullName }) }}
+            </p>
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.days.title') }}</h2>
               <p class="mt-1 text-sm text-slate-500" v-if="scheduleDays.length === 0">
