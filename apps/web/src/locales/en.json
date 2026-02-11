@@ -767,6 +767,7 @@
         "arrivalArrivalAirport": "Arrival airport",
         "arrivalFlightCode": "Flight code",
         "arrivalTicketNo": "Ticket no (Outbound)",
+        "arrivalFlightDate": "Date",
         "arrivalDepartureTime": "Departure time",
         "arrivalArrivalTime": "Arrival time",
         "arrivalPnr": "PNR",
@@ -778,6 +779,7 @@
         "returnArrivalAirport": "Arrival airport",
         "returnFlightCode": "Flight code",
         "returnTicketNo": "Ticket no (Return)",
+        "returnFlightDate": "Date",
         "returnDepartureTime": "Departure time",
         "returnArrivalTime": "Arrival time",
         "returnPnr": "PNR",
@@ -1013,6 +1015,7 @@
     }
   },
   "portal": {
+    "greeting": "Welcome, {name}",
     "header": {
       "kicker": "Participant Portal"
     },
@@ -1077,6 +1080,7 @@
       "ticketNo": "Ticket no",
       "ticketNoOutbound": "Ticket no (Outbound)",
       "ticketNoReturn": "Ticket no (Return)",
+      "flightDate": "Date",
       "departureTime": "Departure time",
       "arrivalTime": "Arrival time",
       "pnr": "PNR",

@@ -317,6 +317,10 @@ onMounted(loadProfile)
                 </button>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalFlightDate') }}</span>
+                <span class="text-slate-900">{{ formatDate(details?.arrivalFlightDate) }}</span>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalDepartureTime') }}</span>
                 <span class="text-slate-900">{{ formatTime(details?.arrivalDepartureTime) }}</span>
               </div>
@@ -389,6 +393,10 @@ onMounted(loadProfile)
                   {{ displayValue(details?.returnTicketNo ?? undefined) }}
                   <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
                 </button>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnFlightDate') }}</span>
+                <span class="text-slate-900">{{ formatDate(details?.returnFlightDate) }}</span>
               </div>
               <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
                 <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnDepartureTime') }}</span>

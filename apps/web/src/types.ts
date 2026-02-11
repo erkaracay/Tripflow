@@ -98,6 +98,7 @@ export type ParticipantDetails = {
   arrivalDepartureAirport?: string | null
   arrivalArrivalAirport?: string | null
   arrivalFlightCode?: string | null
+  arrivalFlightDate?: string | null
   arrivalDepartureTime?: string | null
   arrivalArrivalTime?: string | null
   arrivalPnr?: string | null
@@ -109,6 +110,7 @@ export type ParticipantDetails = {
   returnDepartureAirport?: string | null
   returnArrivalAirport?: string | null
   returnFlightCode?: string | null
+  returnFlightDate?: string | null
   returnDepartureTime?: string | null
   returnArrivalTime?: string | null
   returnPnr?: string | null
@@ -416,6 +418,7 @@ export type PortalFlightInfo = {
   arrivalAirport?: string | null
   flightCode?: string | null
   ticketNo?: string | null
+  date?: string | null
   departureTime?: string | null
   arrivalTime?: string | null
   pnr?: string | null

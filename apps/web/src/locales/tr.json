@@ -533,6 +533,7 @@
         "arrivalDepartureAirport": "Geliş kalkış havaalanı",
         "arrivalArrivalAirport": "Geliş varış havaalanı",
         "arrivalFlightCode": "Geliş uçuş kodu",
+        "arrivalFlightDate": "Geliş uçuş tarihi",
         "arrivalDepartureTime": "Geliş kalkış saati",
         "arrivalArrivalTime": "Geliş varış saati",
         "arrivalPnr": "Geliş PNR",
@@ -543,6 +544,7 @@
         "returnDepartureAirport": "Dönüş kalkış havaalanı",
         "returnArrivalAirport": "Dönüş varış havaalanı",
         "returnFlightCode": "Dönüş uçuş kodu",
+        "returnFlightDate": "Dönüş uçuş tarihi",
         "returnDepartureTime": "Dönüş kalkış saati",
         "returnArrivalTime": "Dönüş varış saati",
         "returnPnr": "Dönüş PNR",
@@ -752,6 +754,7 @@
         "arrivalArrivalAirport": "Varış havalimanı",
         "arrivalFlightCode": "Uçuş kodu",
         "arrivalTicketNo": "Bilet no (Gidiş)",
+        "arrivalFlightDate": "Tarih",
         "arrivalDepartureTime": "Kalkış saati",
         "arrivalArrivalTime": "Varış saati",
         "arrivalPnr": "PNR",
@@ -763,6 +766,7 @@
         "returnArrivalAirport": "Varış havalimanı",
         "returnFlightCode": "Uçuş kodu",
         "returnTicketNo": "Bilet no (Dönüş)",
+        "returnFlightDate": "Tarih",
         "returnDepartureTime": "Kalkış saati",
         "returnArrivalTime": "Varış saati",
         "returnPnr": "PNR",
@@ -998,6 +1002,7 @@
     }
   },
   "portal": {
+    "greeting": "Hoş geldiniz, {name}",
     "header": {
       "kicker": "Katılımcı Portalı"
     },
@@ -1062,6 +1067,7 @@
       "ticketNo": "Bilet no",
       "ticketNoOutbound": "Bilet no (Gidiş)",
       "ticketNoReturn": "Bilet no (Dönüş)",
+      "flightDate": "Tarih",
       "departureTime": "Kalkış saati",
       "arrivalTime": "Varış saati",
       "pnr": "PNR",

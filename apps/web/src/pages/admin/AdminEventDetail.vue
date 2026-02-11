@@ -155,6 +155,7 @@ const editDetails = reactive({
   arrivalDepartureAirport: '',
   arrivalArrivalAirport: '',
   arrivalFlightCode: '',
+  arrivalFlightDate: '',
   arrivalDepartureTime: '',
   arrivalArrivalTime: '',
   arrivalPnr: '',
@@ -164,6 +165,7 @@ const editDetails = reactive({
   returnDepartureAirport: '',
   returnArrivalAirport: '',
   returnFlightCode: '',
+  returnFlightDate: '',
   returnDepartureTime: '',
   returnArrivalTime: '',
   returnPnr: '',
@@ -571,6 +573,7 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.arrivalDepartureAirport = participant.details?.arrivalDepartureAirport ?? ''
   editDetails.arrivalArrivalAirport = participant.details?.arrivalArrivalAirport ?? ''
   editDetails.arrivalFlightCode = participant.details?.arrivalFlightCode ?? ''
+  editDetails.arrivalFlightDate = participant.details?.arrivalFlightDate ?? ''
   editDetails.arrivalDepartureTime = participant.details?.arrivalDepartureTime ?? ''
   editDetails.arrivalArrivalTime = participant.details?.arrivalArrivalTime ?? ''
   editDetails.arrivalPnr = participant.details?.arrivalPnr ?? ''
@@ -588,6 +591,7 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnDepartureAirport = participant.details?.returnDepartureAirport ?? ''
   editDetails.returnArrivalAirport = participant.details?.returnArrivalAirport ?? ''
   editDetails.returnFlightCode = participant.details?.returnFlightCode ?? ''
+  editDetails.returnFlightDate = participant.details?.returnFlightDate ?? ''
   editDetails.returnDepartureTime = participant.details?.returnDepartureTime ?? ''
   editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
   editDetails.returnPnr = participant.details?.returnPnr ?? ''
@@ -707,6 +711,7 @@ const saveParticipant = async (participant: Participant) => {
           arrivalDepartureAirport: editDetails.arrivalDepartureAirport || undefined,
           arrivalArrivalAirport: editDetails.arrivalArrivalAirport || undefined,
           arrivalFlightCode: editDetails.arrivalFlightCode || undefined,
+          arrivalFlightDate: editDetails.arrivalFlightDate || undefined,
           arrivalDepartureTime: editDetails.arrivalDepartureTime || undefined,
           arrivalArrivalTime: editDetails.arrivalArrivalTime || undefined,
           arrivalPnr: editDetails.arrivalPnr || undefined,
@@ -716,6 +721,7 @@ const saveParticipant = async (participant: Participant) => {
           returnDepartureAirport: editDetails.returnDepartureAirport || undefined,
           returnArrivalAirport: editDetails.returnArrivalAirport || undefined,
           returnFlightCode: editDetails.returnFlightCode || undefined,
+          returnFlightDate: editDetails.returnFlightDate || undefined,
           returnDepartureTime: editDetails.returnDepartureTime || undefined,
           returnArrivalTime: editDetails.returnArrivalTime || undefined,
           returnPnr: editDetails.returnPnr || undefined,
@@ -2009,6 +2015,10 @@ onMounted(loadEvent)
                     <input v-model.trim="editDetails.arrivalFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                   <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalFlightDate') }}</span>
+                    <input v-model.trim="editDetails.arrivalFlightDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalDepartureTime') }}</span>
                     <input v-model.trim="editDetails.arrivalDepartureTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
@@ -2046,6 +2056,10 @@ onMounted(loadEvent)
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnFlightCode') }}</span>
                     <input v-model.trim="editDetails.returnFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnFlightDate') }}</span>
+                    <input v-model.trim="editDetails.returnFlightDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnDepartureTime') }}</span>

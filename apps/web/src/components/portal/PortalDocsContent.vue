@@ -264,6 +264,10 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
               <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
               <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
             </div>
+            <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
+            </div>
             <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
               <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
               <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
@@ -312,6 +316,10 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
             <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3">
               <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
               <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
+            </div>
+            <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
             </div>
             <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
               <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>

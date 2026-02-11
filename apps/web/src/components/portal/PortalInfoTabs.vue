@@ -460,6 +460,10 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
           </div>
+          <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
+          </div>
           <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
             <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
@@ -507,6 +511,10 @@ const formatCustomValue = (value: unknown): string => {
           <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
+          </div>
+          <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
           </div>
           <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
@@ -783,6 +791,10 @@ const formatCustomValue = (value: unknown): string => {
             <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
           </button>
         </div>
+        <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
+        </div>
         <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
           <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
@@ -846,6 +858,10 @@ const formatCustomValue = (value: unknown): string => {
             <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
           </button>
         </div>
+          <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
+          </div>
           <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
             <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
