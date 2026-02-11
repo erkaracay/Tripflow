@@ -51,6 +51,7 @@ internal static class ParticipantImportHandlers
         "arrival_pnr",
         "arrival_baggage_pieces",
         "arrival_baggage_total_kg",
+        "arrival_cabin_baggage",
         "return_airline",
         "return_departure_airport",
         "return_arrival_airport",
@@ -60,6 +61,7 @@ internal static class ParticipantImportHandlers
         "return_pnr",
         "return_baggage_pieces",
         "return_baggage_total_kg",
+        "return_cabin_baggage",
         "arrival_transfer_pickup_time",
         "arrival_transfer_pickup_place",
         "arrival_transfer_dropoff_place",
@@ -108,6 +110,7 @@ internal static class ParticipantImportHandlers
         "PNR123",
         "1",
         "23",
+        "8 kg",
         "Turkish Airlines",
         "ASR",
         "IST",
@@ -117,6 +120,7 @@ internal static class ParticipantImportHandlers
         "PNR456",
         "1",
         "23",
+        "8 kg",
         "07:30",
         "Istanbul Airport",
         "Hotel Lobby",
@@ -1687,6 +1691,7 @@ internal static class ParticipantImportHandlers
         details.ArrivalBaggageAllowance = row.GetValue("arrival_baggage_allowance");
         details.ArrivalBaggagePieces = arrivalBaggagePieces;
         details.ArrivalBaggageTotalKg = arrivalBaggageTotalKg;
+        details.ArrivalCabinBaggage = row.GetValue("arrival_cabin_baggage");
         details.ReturnAirline = row.GetValue("return_airline");
         details.ReturnDepartureAirport = row.GetValue("return_departure_airport");
         details.ReturnArrivalAirport = row.GetValue("return_arrival_airport");
@@ -1697,6 +1702,7 @@ internal static class ParticipantImportHandlers
         details.ReturnBaggageAllowance = row.GetValue("return_baggage_allowance");
         details.ReturnBaggagePieces = returnBaggagePieces;
         details.ReturnBaggageTotalKg = returnBaggageTotalKg;
+        details.ReturnCabinBaggage = row.GetValue("return_cabin_baggage");
         details.ArrivalTransferPickupTime = arrivalTransferPickupTime;
         details.ArrivalTransferPickupPlace = row.GetValue("arrival_transfer_pickup_place");
         details.ArrivalTransferDropoffPlace = row.GetValue("arrival_transfer_dropoff_place");
