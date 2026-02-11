@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
@@ -262,10 +262,16 @@ const logoutPortal = async () => {
 }
 
 const restoreSession = () => {
+  // Guard: ensure eventId is available before reading from localStorage
+  if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
+    return false
+  }
+
   const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
   const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
 
-  if (!token || !expiry) {
+  // Defensive check: ensure both values are non-empty strings
+  if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
     clearSession()
     return false
   }
@@ -289,7 +295,17 @@ const loadPortal = async () => {
 
   if (!restoreSession()) {
     loading.value = false
-    sessionExpired.value = false
+    // Only set sessionExpired to true if there was actually a session that expired
+    // If no token exists, this is a first-time user, not an expired session
+    if (eventId.value && typeof eventId.value === 'string' && eventId.value.trim() !== '') {
+      const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
+      const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
+      // If token exists but restoreSession failed, it means the session expired
+      // If no token exists, user never logged in, so sessionExpired should be false
+      sessionExpired.value = Boolean(token || expiry)
+    } else {
+      sessionExpired.value = false
+    }
     return
   }
 
@@ -382,9 +398,13 @@ watch(checkInCode, () => {
 
 watch(
   () => eventId.value,
-  () => {
-    void loadPortal()
-  }
+  (newEventId) => {
+    // Only load if eventId is actually available
+    if (newEventId && typeof newEventId === 'string' && newEventId.trim() !== '') {
+      void loadPortal()
+    }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -407,9 +427,7 @@ watch(
   }
 )
 
-onMounted(() => {
-  void loadPortal()
-})
+// Session restoration is handled by watch(() => eventId.value) with immediate: true
 
 onUnmounted(() => {
   if (welcomeTimer.value) {

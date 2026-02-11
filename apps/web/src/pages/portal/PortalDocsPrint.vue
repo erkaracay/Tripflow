@@ -60,15 +60,24 @@ const portalDateRange = computed(() => {
 })
 
 const restoreSession = () => {
+  if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
+    return false
+  }
+
   const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
   const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-  if (!token || !expiry) {
+
+  if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
+    clearSession()
     return false
   }
+
   const expiresAt = new Date(expiry)
   if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    clearSession()
     return false
   }
+
   sessionToken.value = token
   sessionExpiresAt.value = expiresAt
   return true
@@ -96,6 +105,16 @@ const loadDocs = async () => {
 
   if (!restoreSession()) {
     loading.value = false
+    // If no token exists, this is a first-time user, not an expired session
+    if (eventId.value && typeof eventId.value === 'string' && eventId.value.trim() !== '') {
+      const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
+      const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
+      // If token exists but restoreSession failed, it means the session expired
+      // If no token exists, user never logged in, so sessionExpired should be false
+      sessionExpired.value = Boolean(token || expiry)
+    } else {
+      sessionExpired.value = false
+    }
     return
   }
 
