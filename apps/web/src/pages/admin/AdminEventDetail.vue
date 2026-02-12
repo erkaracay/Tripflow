@@ -185,6 +185,10 @@ const editDetails = reactive({
   returnTransferPlate: '',
   returnTransferDriverInfo: '',
   returnTransferNote: '',
+  insuranceCompanyName: '',
+  insurancePolicyNo: '',
+  insuranceStartDate: '',
+  insuranceEndDate: '',
 })
 
 const genderOptions = [
@@ -618,6 +622,10 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnTransferPlate = participant.details?.returnTransferPlate ?? ''
   editDetails.returnTransferDriverInfo = participant.details?.returnTransferDriverInfo ?? ''
   editDetails.returnTransferNote = participant.details?.returnTransferNote ?? ''
+  editDetails.insuranceCompanyName = participant.details?.insuranceCompanyName ?? ''
+  editDetails.insurancePolicyNo = participant.details?.insurancePolicyNo ?? ''
+  editDetails.insuranceStartDate = participant.details?.insuranceStartDate ?? ''
+  editDetails.insuranceEndDate = participant.details?.insuranceEndDate ?? ''
 }
 
 const cancelEditParticipant = () => {
@@ -741,6 +749,10 @@ const saveParticipant = async (participant: Participant) => {
           returnTransferPlate: editDetails.returnTransferPlate || undefined,
           returnTransferDriverInfo: editDetails.returnTransferDriverInfo || undefined,
           returnTransferNote: editDetails.returnTransferNote || undefined,
+          insuranceCompanyName: editDetails.insuranceCompanyName || undefined,
+          insurancePolicyNo: editDetails.insurancePolicyNo || undefined,
+          insuranceStartDate: editDetails.insuranceStartDate || undefined,
+          insuranceEndDate: editDetails.insuranceEndDate || undefined,
         },
       }
     )
@@ -1994,6 +2006,25 @@ onMounted(loadEvent)
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.attendanceStatus') }}</span>
                     <input v-model.trim="editDetails.attendanceStatus" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                </div>
+                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.insuranceTitle') }}</div>
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.insuranceCompanyName') }}</span>
+                    <input v-model.trim="editDetails.insuranceCompanyName" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.insurancePolicyNo') }}</span>
+                    <input v-model.trim="editDetails.insurancePolicyNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.insuranceStartDate') }}</span>
+                    <input v-model.trim="editDetails.insuranceStartDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.insuranceEndDate') }}</span>
+                    <input v-model.trim="editDetails.insuranceEndDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
                   </label>
                 </div>
                 <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.arrivalTitle') }}</div>

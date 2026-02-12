@@ -40,6 +40,7 @@ const direction = ref<'Entry' | 'Exit'>('Entry')
 const code = ref('')
 const table = ref<ActivityParticipantTableResponse | null>(null)
 const summaryTable = ref<ActivityParticipantTableResponse | null>(null)
+const willNotAttendCount = ref(0)
 const tablePage = ref(1)
 const tableQuery = ref('')
 const tableStatus = ref<'all' | 'checked_in' | 'not_checked_in' | 'will_not_attend'>('all')
@@ -86,6 +87,7 @@ const loadTable = async () => {
   if (!selectedActivityId.value) {
     table.value = null
     summaryTable.value = null
+    willNotAttendCount.value = 0
     return
   }
   try {
@@ -125,9 +127,24 @@ const loadTable = async () => {
         }
       }
     }
+
+    // Load will-not-attend count separately (backend excludes them from "all" status)
+    try {
+      const willNotAttendParams = new URLSearchParams()
+      willNotAttendParams.set('status', 'will_not_attend')
+      willNotAttendParams.set('page', '1')
+      willNotAttendParams.set('pageSize', '1') // We only need the total count
+      const willNotAttendRes = await apiGet<ActivityParticipantTableResponse>(
+        `${API}/${eventId.value}/activities/${selectedActivityId.value}/participants/table?${willNotAttendParams}`
+      )
+      willNotAttendCount.value = willNotAttendRes.total
+    } catch {
+      willNotAttendCount.value = 0
+    }
   } catch {
     table.value = null
     summaryTable.value = null
+    willNotAttendCount.value = 0
   }
 }
 
@@ -175,7 +192,10 @@ const selectedActivity = computed(() => {
   return activities.value.find((a) => a.id === selectedActivityId.value) ?? null
 })
 
-const submitCheckIn = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Manual') => {
+const submitCheckIn = async (
+  codeValue: string,
+  options?: { method?: 'Manual' | 'QrScan'; direction?: 'Entry' | 'Exit' }
+) => {
   if (!selectedActivityId.value) {
     pushToast({ key: 'activityCheckIn.selectActivity', tone: 'error' })
     return
@@ -187,9 +207,11 @@ const submitCheckIn = async (codeValue: string, method: 'Manual' | 'QrScan' = 'M
   }
   submitting.value = true
   try {
+    const checkInDirection = options?.direction ?? direction.value
+    const checkInMethod = options?.method ?? 'Manual'
     const res = await apiPostWithPayload<ActivityCheckInResponse>(
       `${API}/${eventId.value}/activities/${selectedActivityId.value}/checkins`,
-      { checkInCode: normalized, direction: direction.value, method }
+      { checkInCode: normalized, direction: checkInDirection, method: checkInMethod }
     )
     if (res.result === 'AlreadyCheckedIn') {
       pushToast({ key: 'toast.alreadyCheckedIn', tone: 'info' })
@@ -213,7 +235,7 @@ const submitCheckIn = async (codeValue: string, method: 'Manual' | 'QrScan' = 'M
 }
 
 const onCodeSubmit = () => {
-  void submitCheckIn(code.value, 'Manual')
+  void submitCheckIn(code.value, { method: 'Manual' })
 }
 
 const openScanner = () => {
@@ -243,7 +265,7 @@ const onScanResult = async (raw: string) => {
     return
   }
   const toastId = pushToast({ key: 'common.checkingIn', tone: 'info', timeout: 0 })
-  await submitCheckIn(extracted, 'QrScan')
+  await submitCheckIn(extracted, { method: 'QrScan' })
   removeToast(toastId)
 }
 
@@ -293,10 +315,10 @@ const activitySummary = computed(() => {
   const allItems = dataTable.items
   const checkedInCount = allItems.filter((item) => item.activityState?.isCheckedIn).length
   const totalCount = dataTable.total
-  const willNotAttendCount = allItems.filter((item) => item.activityState?.willNotAttend).length
-  const effectiveTotal = Math.max(totalCount - willNotAttendCount, 0)
+  // Use separate willNotAttendCount ref (fetched from backend with status="will_not_attend")
+  const effectiveTotal = Math.max(totalCount - willNotAttendCount.value, 0)
   const notCheckedInCount = Math.max(effectiveTotal - checkedInCount, 0)
-  return { checkedInCount, totalCount, notCheckedInCount, willNotAttendCount, effectiveTotal }
+  return { checkedInCount, totalCount, notCheckedInCount, willNotAttendCount: willNotAttendCount.value, effectiveTotal }
 })
 
 const setActivityFilter = (value: typeof tableStatus.value) => {
@@ -354,6 +376,20 @@ const openWhatsApp = (row: ActivityParticipantTableItem) => {
   }
 
   globalThis.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const markActivityArrived = async (row: ActivityParticipantTableItem) => {
+  if (row.activityState?.isCheckedIn) {
+    return
+  }
+  await submitCheckIn(row.checkInCode, { method: 'Manual', direction: 'Entry' })
+}
+
+const markActivityDeparted = async (row: ActivityParticipantTableItem) => {
+  if (!row.activityState?.isCheckedIn) {
+    return
+  }
+  await submitCheckIn(row.checkInCode, { method: 'Manual', direction: 'Exit' })
 }
 
 const setActivityWillNotAttend = async (row: ActivityParticipantTableItem, willNotAttend: boolean) => {
@@ -708,10 +744,10 @@ watch(selectedActivityId, () => {
                   <td class="p-2 font-medium">{{ row.fullName }}</td>
                   <td class="p-2">{{ row.checkInCode }}</td>
                   <td class="p-2">
-                    <span v-if="row.activityState?.isCheckedIn" class="rounded bg-emerald-100 px-2 py-0.5 text-emerald-800">
+                    <span v-if="row.activityState?.isCheckedIn" class="whitespace-nowrap rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">
                       {{ t('activityCheckIn.checkedIn') }}
                     </span>
-                    <span v-else-if="row.activityState?.lastLog?.direction === 'Exit'" class="rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                    <span v-else-if="row.activityState?.lastLog?.direction === 'Exit'" class="whitespace-nowrap rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                       {{ t('activityCheckIn.exited') }}
                     </span>
                     <span v-else class="text-slate-500">—</span>
@@ -721,6 +757,24 @@ watch(selectedActivityId, () => {
                 <tr class="border-b border-slate-200 bg-slate-50">
                   <td colspan="4" class="p-2">
                     <div class="flex flex-row flex-wrap items-center gap-2">
+                      <button
+                        v-if="!row.activityState?.isCheckedIn"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        :disabled="submitting"
+                        @click="markActivityArrived(row)"
+                      >
+                        {{ t('guide.checkIn.markArrived') }}
+                      </button>
+                      <button
+                        v-if="row.activityState?.isCheckedIn"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        :disabled="submitting"
+                        @click="markActivityDeparted(row)"
+                      >
+                        {{ t('guide.checkIn.markDeparted') }}
+                      </button>
                       <button
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                         type="button"

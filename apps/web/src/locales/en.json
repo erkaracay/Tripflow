@@ -489,6 +489,7 @@
       "participantsTitle": "Participants",
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
+      "markDeparted": "Mark departed",
       "success": "Check-in successful.",
       "alreadyCheckedIn": "Already checked in.",
       "whatsappMessage": "Hi {name}, {event} has started. {locationPart}If you have any issues, you can reach us on this number.",
@@ -791,7 +792,12 @@
         "city": "City",
         "flightCity": "Flight city",
         "ticketNo": "Ticket no",
-        "attendanceStatus": "Attendance status"
+        "attendanceStatus": "Attendance status",
+        "insuranceTitle": "Insurance",
+        "insuranceCompanyName": "Insurance company",
+        "insurancePolicyNo": "Policy number",
+        "insuranceStartDate": "Start date",
+        "insuranceEndDate": "End date"
       }
     },
     "import": {
@@ -1007,6 +1013,7 @@
       "resetAllConfirm": "Reset check-ins for all participants?",
       "empty": "No participants found.",
       "markArrived": "Mark arrived",
+      "markDeparted": "Mark departed",
       "success": "Check-in successful.",
       "alreadyCheckedIn": "Already checked in."
     },
