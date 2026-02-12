@@ -29,6 +29,10 @@ const event = ref<EventDto | null>(null)
 const items = ref<EventItem[]>([])
 const activeItems = computed(() => items.value.filter((i) => i.isActive))
 const selectedItemId = ref<string | null>(null)
+const selectedItem = computed(() => {
+  if (!selectedItemId.value) return null
+  return items.value.find((i) => i.id === selectedItemId.value) ?? null
+})
 const action = ref<'Give' | 'Return'>('Give')
 const code = ref('')
 const table = ref<ItemParticipantTableResponse | null>(null)
@@ -328,8 +332,23 @@ const formatLastAction = (item: ItemParticipantTableResponse['items'][0]) => {
   const log = item.itemState?.lastLog
   if (!log) return '—'
   const act = log.action === 'Return' ? t('equipment.return') : t('equipment.give')
-  const method = log.method === 'QrScan' ? 'QR' : t('common.manual')
-  return `${act} · ${method} · ${formatUtcToLocal(log.createdAt, { timeOnly: true })} · ${log.result}`
+  const time = formatUtcToLocal(log.createdAt, { timeOnly: true })
+  return `${act} · ${time}`
+}
+
+const equipmentSummary = computed(() => {
+  if (!table.value) {
+    return { givenCount: 0, totalCount: 0, notReturnedCount: 0 }
+  }
+  const givenCount = table.value.items.filter((item) => item.itemState?.given).length
+  const totalCount = table.value.total
+  const notReturnedCount = givenCount // given=true means not returned yet
+  return { givenCount, totalCount, notReturnedCount }
+})
+
+const setEquipmentFilter = (value: typeof tableStatus.value) => {
+  tableStatus.value = value
+  tablePage.value = 1
 }
 
 const copyCode = async (value: string) => {
@@ -629,6 +648,27 @@ watch(selectedItemId, () => {
             {{ submitting ? t('common.saving') : (action === 'Give' ? t('equipment.give') : t('equipment.return')) }}
           </button>
         </form>
+      </div>
+
+      <div v-if="selectedItemId && table" class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-lg font-semibold">{{ selectedItem?.name ?? t('equipment.title') }}</h2>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('equipment.givenLabel') }}</div>
+          <div class="mt-1 text-xl font-semibold text-slate-800">
+            {{ equipmentSummary.givenCount }} / {{ equipmentSummary.totalCount }}
+          </div>
+          <div class="mt-2 flex flex-col gap-1">
+            <button
+              class="block text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setEquipmentFilter(tableStatus === 'not_returned' ? 'all' : 'not_returned')"
+            >
+              {{ t('equipment.notReturnedLabel') }}: {{ equipmentSummary.notReturnedCount }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-if="selectedItemId" class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
