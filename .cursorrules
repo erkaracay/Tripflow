@@ -24,6 +24,7 @@ Secondary goal: maximize user experience (QoL) — reduce friction, avoid surpri
   - prefer additive columns/tables
   - backfill when safe
   - keep legacy columns during transition
+- Migration files: Always use `dotnet ef migrations add` to create migrations. This automatically generates both the migration file (.cs) and the designer file (.Designer.cs). Never manually create migration files without the designer, as EF Core requires both files to track the model snapshot correctly.
 - No secrets in source control. Do not change the env/user-secrets approach.
 - Do not introduce new heavy dependencies unless absolutely necessary (call it out first in plan).
 

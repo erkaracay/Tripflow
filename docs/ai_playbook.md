@@ -104,6 +104,7 @@ This document explains how we implement features in Infora, what patterns we fol
   - backfill when safe
   - introduce fallback mapping (legacy -> new)
 - Only remove legacy columns after production confidence + explicit follow-up migration plan.
+- Migration files: Always use `dotnet ef migrations add` to create migrations. This automatically generates both the migration file (.cs) and the designer file (.Designer.cs). Never manually create migration files without the designer, as EF Core requires both files to track the model snapshot correctly.
 
 ### Logging semantics
 
