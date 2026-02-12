@@ -147,6 +147,38 @@ const router = createRouter({
   ],
 })
 
+/**
+ * Checks if a valid portal session exists in localStorage for the given eventId
+ * @param eventId - The event ID to check session for
+ * @returns true if session exists and is valid (not expired), false otherwise
+ */
+function restorePortalSession(eventId: string): boolean {
+  if (!eventId || typeof eventId !== 'string' || eventId.trim() === '') {
+    return false
+  }
+
+  const tokenKey = `infora.portal.session.${eventId}`
+  const expiryKey = `infora.portal.session.exp.${eventId}`
+
+  try {
+    const token = globalThis.localStorage?.getItem(tokenKey) ?? ''
+    const expiry = globalThis.localStorage?.getItem(expiryKey) ?? ''
+
+    if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
+      return false
+    }
+
+    const expiresAt = new Date(expiry)
+    if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+      return false
+    }
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 const getPageTitleKey = (path: string): string => {
   if (path === '/login') return 'common.pageTitle.login'
   if (path === '/forbidden') return 'common.pageTitle.forbidden'
@@ -165,6 +197,18 @@ router.afterEach((to) => {
 })
 
 router.beforeEach((to) => {
+  // Portal session check - must happen before admin/auth checks
+  if (to.path.startsWith('/e/') && to.path !== '/e/login') {
+    const eventId = to.params.eventId as string
+    if (eventId && restorePortalSession(eventId)) {
+      // Valid portal session exists, allow access
+      return true
+    }
+    // No valid session, redirect to login with eventId as query param
+    return { path: '/e/login', query: { eventId } }
+  }
+
+  // Admin/auth guard - only applies to routes with requiresAuth meta
   if (!to.meta.requiresAuth) {
     return true
   }
