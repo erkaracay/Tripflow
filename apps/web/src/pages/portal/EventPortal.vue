@@ -341,7 +341,9 @@ const loadPortal = async () => {
   }
 
   try {
+    console.log('[Portal] loadPortal: calling portalGetMe', { hasToken: !!sessionToken.value })
     const response = await portalGetMe(sessionToken.value)
+    console.log('[Portal] loadPortal: portalGetMe success', { eventId: response.event.id, participantId: response.participant.id })
     event.value = response.event
     setPortalHeader(
       response.event.name,
@@ -359,9 +361,12 @@ const loadPortal = async () => {
     setDefaultDay()
     showWelcomeBanner(response.participant.id)
   } catch (err) {
+    console.error('[Portal] loadPortal: portalGetMe error', err)
     if (err && typeof err === 'object' && 'status' in err) {
       const status = (err as { status?: number }).status
+      console.log('[Portal] loadPortal: portalGetMe status', { status })
       if (status === 401 || status === 403) {
+        console.log('[Portal] loadPortal: session invalid, clearing session')
         clearSession()
         sessionExpired.value = true
         return
