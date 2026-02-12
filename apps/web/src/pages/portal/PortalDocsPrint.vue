@@ -64,23 +64,37 @@ const restoreSession = () => {
     return false
   }
 
-  const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
-  const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
+  try {
+    const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
+    const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
 
-  if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
+    if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
+      clearSession()
+      return false
+    }
+
+    // Parse expiry date - handle both ISO string and other formats
+    const expiresAt = new Date(expiry)
+    if (Number.isNaN(expiresAt.getTime())) {
+      console.error('[Portal] Invalid expiry date format', { expiry, eventId: eventId.value })
+      clearSession()
+      return false
+    }
+
+    if (expiresAt <= new Date()) {
+      console.log('[Portal] Session expired', { expiresAt, now: new Date(), eventId: eventId.value })
+      clearSession()
+      return false
+    }
+
+    sessionToken.value = token
+    sessionExpiresAt.value = expiresAt
+    return true
+  } catch (error) {
+    console.error('[Portal] Error reading session from localStorage', error, { eventId: eventId.value })
     clearSession()
     return false
   }
-
-  const expiresAt = new Date(expiry)
-  if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
-    clearSession()
-    return false
-  }
-
-  sessionToken.value = token
-  sessionExpiresAt.value = expiresAt
-  return true
 }
 
 const clearSession = () => {

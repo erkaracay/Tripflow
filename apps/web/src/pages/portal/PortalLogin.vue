@@ -70,8 +70,29 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
     return
   }
 
-  globalThis.localStorage?.setItem(sessionTokenKey(eventId), token)
-  globalThis.localStorage?.setItem(sessionExpiryKey(eventId), expiresAt)
+  try {
+    // Normalize expiresAt to ISO string format if it's a DateTime object
+    let expiryString = expiresAt
+    if (typeof expiresAt === 'string') {
+      // Ensure it's a valid ISO date string
+      const date = new Date(expiresAt)
+      if (!Number.isNaN(date.getTime())) {
+        expiryString = date.toISOString()
+      }
+    }
+
+    globalThis.localStorage?.setItem(sessionTokenKey(eventId), token)
+    globalThis.localStorage?.setItem(sessionExpiryKey(eventId), expiryString)
+    
+    // Verify write succeeded
+    const writtenToken = globalThis.localStorage?.getItem(sessionTokenKey(eventId))
+    const writtenExpiry = globalThis.localStorage?.getItem(sessionExpiryKey(eventId))
+    if (writtenToken !== token || writtenExpiry !== expiryString) {
+      console.error('[Portal] Failed to write session to localStorage', { eventId, token, expiresAt })
+    }
+  } catch (error) {
+    console.error('[Portal] Error writing session to localStorage', error, { eventId, token, expiresAt })
+  }
 }
 
 const clearSession = (eventId: string) => {
