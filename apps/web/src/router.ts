@@ -197,6 +197,20 @@ router.afterEach((to) => {
 })
 
 router.beforeEach((to) => {
+  // Home page "remember me" check - redirect to last used eventId if valid session exists
+  if (to.path === '/' || to.path === '/e/login') {
+    const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
+    if (lastEventId && restorePortalSession(lastEventId)) {
+      // Valid session exists for last used eventId, redirect there
+      return { path: `/e/${lastEventId}`, replace: true }
+    }
+    // No valid session, allow login page
+    if (to.path === '/') {
+      return { path: '/e/login', replace: true }
+    }
+    return true
+  }
+
   // Portal session check - must happen before admin/auth checks
   if (to.path.startsWith('/e/') && to.path !== '/e/login') {
     const eventId = to.params.eventId as string

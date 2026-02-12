@@ -100,6 +100,11 @@ const restoreSession = () => {
 const clearSession = () => {
   globalThis.localStorage?.removeItem(sessionTokenKey.value)
   globalThis.localStorage?.removeItem(sessionExpiryKey.value)
+  // Clear lastEventId if this is the last used eventId
+  const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
+  if (lastEventId === eventId.value) {
+    globalThis.localStorage?.removeItem('infora.portal.lastEventId')
+  }
   sessionToken.value = ''
   sessionExpiresAt.value = null
 }

@@ -91,6 +91,8 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
     
     globalThis.localStorage?.setItem(tokenKey, token)
     globalThis.localStorage?.setItem(expiryKey, expiryString)
+    // Save last used eventId for "remember me" functionality
+    globalThis.localStorage?.setItem('infora.portal.lastEventId', eventId)
     
     // Verify write succeeded
     const writtenToken = globalThis.localStorage?.getItem(tokenKey)
@@ -124,6 +126,11 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
 const clearSession = (eventId: string) => {
   globalThis.localStorage?.removeItem(sessionTokenKey(eventId))
   globalThis.localStorage?.removeItem(sessionExpiryKey(eventId))
+  // Clear lastEventId if this is the last used eventId
+  const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
+  if (lastEventId === eventId) {
+    globalThis.localStorage?.removeItem('infora.portal.lastEventId')
+  }
 }
 
 const tryReuseExistingSession = async (eventAccessCode: string) => {
