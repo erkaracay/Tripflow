@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { portalGetMe, portalLogin, portalResolveEvent } from '../../lib/api'
 import { sanitizeEventAccessCode } from '../../lib/eventAccessCode'
+import { resetViewportZoom } from '../../lib/viewport'
 import LoadingState from '../../components/ui/LoadingState.vue'
 
 const route = useRoute()
@@ -66,10 +67,7 @@ const handleTcNoBlur = () => {
 }
 
 const setSession = (eventId: string, token: string, expiresAt: string) => {
-  console.log('[Portal] setSession called', { eventId, token: token ? `${token.substring(0, 20)}...` : null, expiresAt })
-  
   if (!eventId || !token) {
-    console.log('[Portal] setSession: missing eventId or token', { eventId, hasToken: !!token })
     return
   }
 
@@ -87,8 +85,6 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
     const tokenKey = sessionTokenKey(eventId)
     const expiryKey = sessionExpiryKey(eventId)
     
-    console.log('[Portal] setSession: writing to localStorage', { tokenKey, expiryKey, expiryString })
-    
     globalThis.localStorage?.setItem(tokenKey, token)
     globalThis.localStorage?.setItem(expiryKey, expiryString)
     // Save last used eventId for "remember me" functionality
@@ -97,13 +93,6 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
     // Verify write succeeded
     const writtenToken = globalThis.localStorage?.getItem(tokenKey)
     const writtenExpiry = globalThis.localStorage?.getItem(expiryKey)
-    
-    console.log('[Portal] setSession: verification', { 
-      tokenMatch: writtenToken === token, 
-      expiryMatch: writtenExpiry === expiryString,
-      writtenToken: writtenToken ? `${writtenToken.substring(0, 20)}...` : null,
-      writtenExpiry
-    })
     
     if (writtenToken !== token || writtenExpiry !== expiryString) {
       console.error('[Portal] Failed to write session to localStorage', { 
@@ -115,8 +104,6 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
         tokenKey,
         expiryKey
       })
-    } else {
-      console.log('[Portal] setSession: successfully written to localStorage')
     }
   } catch (error) {
     console.error('[Portal] Error writing session to localStorage', error, { eventId, token, expiresAt })
@@ -287,6 +274,7 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
+  resetViewportZoom()
   const rawCode = route.query.code ?? route.query.eventAccessCode
   if (typeof rawCode === 'string') {
     const normalized = sanitizeEventAccessCode(rawCode)

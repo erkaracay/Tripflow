@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { i18n } from './i18n'
 import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { resetViewportZoom } from './lib/viewport'
 import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
 import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
@@ -194,6 +195,11 @@ router.afterEach((to) => {
     ? i18n.global.t(titleKey)
     : `${i18n.global.t(titleKey)} | ${i18n.global.t('common.appName')}`
   document.title = title
+  
+  // Reset viewport zoom for portal routes
+  if (to.path.startsWith('/e/')) {
+    resetViewportZoom()
+  }
 })
 
 router.beforeEach((to) => {

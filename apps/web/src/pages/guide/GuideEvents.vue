@@ -84,6 +84,12 @@ onMounted(loadEvents)
           </RouterLink>
           <RouterLink
             class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
+            :to="`/guide/events/${event.id}/activities/checkin`"
+          >
+            {{ t('guide.events.openActivityCheckIn') }}
+          </RouterLink>
+          <RouterLink
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
             :to="`/guide/events/${event.id}/program`"
           >
             {{ t('guide.events.openProgram') }}

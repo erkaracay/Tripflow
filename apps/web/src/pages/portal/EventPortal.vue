@@ -5,6 +5,7 @@ import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type Locale } from '../../i18n'
 import { portalGetMe } from '../../lib/api'
+import { resetViewportZoom } from '../../lib/viewport'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -267,28 +268,17 @@ const logoutPortal = async () => {
 }
 
 const restoreSession = () => {
-  console.log('[Portal] restoreSession called', { eventId: eventId.value, sessionTokenKey: sessionTokenKey.value, sessionExpiryKey: sessionExpiryKey.value })
-  
   // Guard: ensure eventId is available before reading from localStorage
   if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
-    console.log('[Portal] restoreSession: eventId not available', { eventId: eventId.value })
     return false
   }
 
   try {
     const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
     const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-    
-    console.log('[Portal] restoreSession: read from localStorage', { 
-      token: token ? `${token.substring(0, 20)}...` : null, 
-      expiry,
-      tokenLength: token?.length,
-      expiryLength: expiry?.length
-    })
 
     // Defensive check: ensure both values are non-empty strings
     if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
-      console.log('[Portal] restoreSession: missing token or expiry', { hasToken: !!token, hasExpiry: !!expiry, tokenType: typeof token, expiryType: typeof expiry })
       clearSession()
       return false
     }
@@ -303,12 +293,10 @@ const restoreSession = () => {
 
     const now = new Date()
     if (expiresAt <= now) {
-      console.log('[Portal] Session expired', { expiresAt, now, eventId: eventId.value })
       clearSession()
       return false
     }
 
-    console.log('[Portal] restoreSession: session restored successfully', { expiresAt, now, timeUntilExpiry: expiresAt.getTime() - now.getTime() })
     sessionToken.value = token
     sessionExpiresAt.value = expiresAt
     return true
@@ -320,14 +308,12 @@ const restoreSession = () => {
 }
 
 const loadPortal = async () => {
-  console.log('[Portal] loadPortal called', { eventId: eventId.value })
   loading.value = true
   errorKey.value = null
   errorMessage.value = null
   sessionExpired.value = false
 
   const restored = restoreSession()
-  console.log('[Portal] loadPortal: restoreSession result', { restored })
   
   if (!restored) {
     loading.value = false
@@ -346,9 +332,8 @@ const loadPortal = async () => {
   }
 
   try {
-    console.log('[Portal] loadPortal: calling portalGetMe', { hasToken: !!sessionToken.value })
     const response = await portalGetMe(sessionToken.value)
-    console.log('[Portal] loadPortal: portalGetMe success', { eventId: response.event.id, participantId: response.participant.id })
+    resetViewportZoom()
     event.value = response.event
     setPortalHeader(
       response.event.name,
@@ -369,9 +354,7 @@ const loadPortal = async () => {
     console.error('[Portal] loadPortal: portalGetMe error', err)
     if (err && typeof err === 'object' && 'status' in err) {
       const status = (err as { status?: number }).status
-      console.log('[Portal] loadPortal: portalGetMe status', { status })
       if (status === 401 || status === 403) {
-        console.log('[Portal] loadPortal: session invalid, clearing session')
         clearSession()
         sessionExpired.value = true
         return

@@ -82,7 +82,6 @@ const restoreSession = () => {
     }
 
     if (expiresAt <= new Date()) {
-      console.log('[Portal] Session expired', { expiresAt, now: new Date(), eventId: eventId.value })
       clearSession()
       return false
     }
