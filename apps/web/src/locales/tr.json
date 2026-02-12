@@ -477,7 +477,9 @@
       "success": "Yoklama alındı.",
       "alreadyCheckedIn": "Zaten geldi olarak işaretlenmiş.",
       "whatsappMessage": "Merhaba {name}, {event} için program başladı. {locationPart}Bir sorun varsa bu numaradan ulaşabilirsiniz.",
-      "whatsappLocation": "Şu an {location} noktasındayız, sizi bekliyoruz. "
+      "whatsappLocation": "Şu an {location} noktasındayız, sizi bekliyoruz. ",
+      "resetAllConfirm": "Tüm katılımcı yoklamaları sıfırlansın mı?",
+      "resetAllActivityConfirm": "Tüm aktivite yoklamalarını sıfırlamak istediğinizden emin misiniz?"
     },
     "participants": {
       "title": "Katılımcılar",
@@ -486,6 +488,7 @@
       "resetAll": "Yoklamaları sıfırla",
       "deleteAll": "Tümünü sil",
       "resetAllConfirm": "Tüm katılımcı yoklamaları sıfırlansın mı?",
+      "resetAllActivityConfirm": "Tüm aktivite yoklamalarını sıfırlamak istediğinizden emin misiniz?",
       "deleteAllConfirm": "Bu etkinlikteki tüm katılımcılar silinsin mi?",
       "addTitle": "Katılımcı ekle",
       "detailsButton": "Bilgiler",
@@ -963,6 +966,7 @@
       "loading": "Etkinlikler yükleniyor...",
       "empty": "Henüz atanmış etkinlik yok.",
       "openCheckIn": "Yoklama al",
+      "openActivityCheckIn": "Aktivite yoklaması",
       "openProgram": "Programı gör"
     },
     "checkIn": {
@@ -1195,7 +1199,8 @@
     "noParticipants": "Eşleşen katılımcı yok.",
     "entrySuccess": "{name} için giriş yapıldı.",
     "exitSuccess": "{name} için çıkış yapıldı.",
-    "exited": "Çıkış yapıldı"
+    "exited": "Çıkış yapıldı",
+    "whatsappMessage": "Merhaba {name}, {activity} başlamak üzere, sizi bekliyoruz."
   },
   "equipment": {
     "title": "Ekipman",
@@ -1211,6 +1216,8 @@
     "lastAction": "Son işlem",
     "filterAll": "Tümü",
     "filterNotReturned": "Teslim edilmeyen",
+    "givenLabel": "Ekipman verildi",
+    "notReturnedLabel": "Teslim etmeyen",
     "given": "Verildi",
     "returned": "Teslim edildi",
     "noParticipants": "Eşleşen katılımcı yok.",

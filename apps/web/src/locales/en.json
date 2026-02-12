@@ -492,7 +492,9 @@
       "success": "Check-in successful.",
       "alreadyCheckedIn": "Already checked in.",
       "whatsappMessage": "Hi {name}, {event} has started. {locationPart}If you have any issues, you can reach us on this number.",
-      "whatsappLocation": "We are at {location} and waiting for you. "
+      "whatsappLocation": "We are at {location} and waiting for you. ",
+      "resetAllConfirm": "Reset check-ins for all participants?",
+      "resetAllActivityConfirm": "Are you sure you want to reset all activity check-ins?"
     },
     "participants": {
       "title": "Participants",
@@ -501,6 +503,7 @@
       "resetAll": "Reset all check-ins",
       "deleteAll": "Delete all",
       "resetAllConfirm": "Reset check-ins for all participants?",
+      "resetAllActivityConfirm": "Are you sure you want to reset all activity check-ins?",
       "deleteAllConfirm": "Delete all participants in this event?",
       "addTitle": "Add participant",
       "detailsButton": "Details",
@@ -976,6 +979,7 @@
       "loading": "Loading events...",
       "empty": "No events assigned yet.",
       "openCheckIn": "Open check-in",
+      "openActivityCheckIn": "Activity check-in",
       "openProgram": "View program"
     },
     "checkIn": {
@@ -1208,7 +1212,8 @@
     "noParticipants": "No participants match.",
     "entrySuccess": "Entry recorded for {name}.",
     "exitSuccess": "Exit recorded for {name}.",
-    "exited": "Exited"
+    "exited": "Exited",
+    "whatsappMessage": "Hi {name}, {activity} is about to start, we are waiting for you."
   },
   "equipment": {
     "title": "Equipment",
@@ -1224,6 +1229,8 @@
     "lastAction": "Last action",
     "filterAll": "All",
     "filterNotReturned": "Not returned",
+    "givenLabel": "Equipment given",
+    "notReturnedLabel": "Not returned",
     "given": "Given",
     "returned": "Returned",
     "noParticipants": "No participants match.",
