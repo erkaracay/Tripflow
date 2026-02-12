@@ -149,6 +149,20 @@ internal static class ActivityCheckInHandlers
         }
 
         var statusValue = (status ?? "all").Trim().ToLowerInvariant();
+        
+        // Exclude willNotAttend participants from all filters except "will_not_attend"
+        if (statusValue != "will_not_attend")
+        {
+            var willNotAttendParticipantIds = await db.ParticipantActivityWillNotAttend.AsNoTracking()
+                .Where(x => x.ActivityId == actId && x.WillNotAttend)
+                .Select(x => x.ParticipantId)
+                .ToListAsync(ct);
+            if (willNotAttendParticipantIds.Count > 0)
+            {
+                participantsQuery = participantsQuery.Where(x => !willNotAttendParticipantIds.Contains(x.Id));
+            }
+        }
+
         if (statusValue is "checked_in" or "not_checked_in")
         {
             var activityLogsByParticipant = db.ActivityParticipantLogs.AsNoTracking()
@@ -168,6 +182,14 @@ internal static class ActivityCheckInHandlers
                 participantsQuery = participantsQuery.Where(x => activityLogsByParticipant.Contains(x.Id));
             else
                 participantsQuery = participantsQuery.Where(x => !activityLogsByParticipant.Contains(x.Id));
+        }
+        else if (statusValue == "will_not_attend")
+        {
+            var willNotAttendParticipantIds = await db.ParticipantActivityWillNotAttend.AsNoTracking()
+                .Where(x => x.ActivityId == actId && x.WillNotAttend)
+                .Select(x => x.ParticipantId)
+                .ToListAsync(ct);
+            participantsQuery = participantsQuery.Where(x => willNotAttendParticipantIds.Contains(x.Id));
         }
 
         var total = await participantsQuery.CountAsync(ct);
@@ -204,10 +226,15 @@ internal static class ActivityCheckInHandlers
             })
             .ToDictionaryAsync(x => x.ParticipantId, x => x.Log, ct);
 
+        var willNotAttendDict = await db.ParticipantActivityWillNotAttend.AsNoTracking()
+            .Where(x => x.ActivityId == actId && participantIds.Contains(x.ParticipantId))
+            .ToDictionaryAsync(x => x.ParticipantId, x => x.WillNotAttend, ct);
+
         var items = pageItems.Select(p =>
         {
             lastLogs.TryGetValue(p.Id, out var lastLog);
             var isCheckedIn = lastLog != null && lastLog.Direction == "Entry" && (lastLog.Result == Success || lastLog.Result == AlreadyCheckedIn);
+            willNotAttendDict.TryGetValue(p.Id, out var willNotAttend);
             var lastLogDto = lastLog == null ? null : new ActivityLastLogDto(lastLog.Direction, lastLog.Method, lastLog.Result, DateTime.SpecifyKind(lastLog.CreatedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
             return new ActivityParticipantTableItemDto(
                 p.Id,
@@ -218,7 +245,7 @@ internal static class ActivityCheckInHandlers
                 p.CheckInCode,
                 p.Details?.RoomNo,
                 p.Details?.AgencyName,
-                new ActivityParticipantStateDto(isCheckedIn, lastLogDto));
+                new ActivityParticipantStateDto(isCheckedIn, willNotAttend, lastLogDto));
         }).ToArray();
 
         return Results.Ok(new ActivityParticipantTableResponseDto(resolvedPage, resolvedPageSize, total, items));
@@ -271,6 +298,122 @@ internal static class ActivityCheckInHandlers
             UserAgent = userAgent,
             CreatedAt = createdAt
         };
+    }
+
+    internal static async Task<IResult> SetActivityParticipantWillNotAttend(
+        string eventId,
+        string activityId,
+        string participantId,
+        ActivityParticipantWillNotAttendRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var evtError))
+            return evtError!;
+        if (!Guid.TryParse(activityId, out var activityGuid))
+            return EventsHelpers.BadRequest("Invalid activity id.");
+        if (!Guid.TryParse(participantId, out var participantGuid))
+            return EventsHelpers.BadRequest("Invalid participant id.");
+
+        if (request is null || !request.WillNotAttend.HasValue)
+            return EventsHelpers.BadRequest("willNotAttend is required.");
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+            return Results.NotFound(new { message = "Event not found." });
+
+        var activityExists = await db.EventActivities.AsNoTracking()
+            .AnyAsync(x => x.Id == activityGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (!activityExists)
+            return Results.NotFound(new { message = "Activity not found." });
+
+        var participant = await db.Participants.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (participant is null)
+            return Results.NotFound(new { message = "Participant not found." });
+
+        var entity = await db.ParticipantActivityWillNotAttend
+            .FirstOrDefaultAsync(x => x.ParticipantId == participantGuid && x.ActivityId == activityGuid, ct);
+
+        if (entity is null)
+        {
+            entity = new ParticipantActivityWillNotAttendEntity
+            {
+                Id = Guid.NewGuid(),
+                ParticipantId = participantGuid,
+                ActivityId = activityGuid,
+                WillNotAttend = request.WillNotAttend.Value,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ParticipantActivityWillNotAttend.Add(entity);
+        }
+        else
+        {
+            entity.WillNotAttend = request.WillNotAttend.Value;
+            entity.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var lastLog = await db.ActivityParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ActivityId == activityGuid
+                        && x.ParticipantId == participantGuid
+                        && (x.Result == Success || x.Result == AlreadyCheckedIn))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ActivityLastLogDto(
+                x.Direction,
+                x.Method,
+                x.Result,
+                DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)))
+            .FirstOrDefaultAsync(ct);
+
+        var isCheckedIn = lastLog != null && lastLog.Direction == "Entry" && (lastLog.Result == Success || lastLog.Result == AlreadyCheckedIn);
+        var activityState = new ActivityParticipantStateDto(isCheckedIn, entity.WillNotAttend, lastLog);
+
+        return Results.Ok(new ActivityParticipantWillNotAttendResponse(participantGuid, entity.WillNotAttend, activityState));
+    }
+
+    internal static async Task<IResult> ResetAllActivityCheckIns(
+        string eventId,
+        string activityId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var evtId, out var evtError))
+            return evtError!;
+        if (!Guid.TryParse(activityId, out var actId))
+            return EventsHelpers.BadRequest("Invalid activity id.");
+
+        var activityExists = await db.EventActivities.AsNoTracking()
+            .AnyAsync(x => x.Id == actId && x.EventId == evtId && x.OrganizationId == orgId, ct);
+        if (!activityExists)
+            return Results.NotFound(new { message = "Activity not found." });
+
+        var logsToRemove = await db.ActivityParticipantLogs
+            .Where(x => x.ActivityId == actId && x.OrganizationId == orgId && x.ParticipantId != null
+                && x.Direction == "Entry" && (x.Result == Success || x.Result == AlreadyCheckedIn))
+            .ToListAsync(ct);
+
+        var removedCount = logsToRemove.Count;
+        if (removedCount > 0)
+        {
+            db.ActivityParticipantLogs.RemoveRange(logsToRemove);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var totalCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.EventId == evtId && x.OrganizationId == orgId, ct);
+
+        return Results.Ok(new ResetAllActivityCheckInsResponse(removedCount, totalCount));
     }
 
     private const string Success = "Success";

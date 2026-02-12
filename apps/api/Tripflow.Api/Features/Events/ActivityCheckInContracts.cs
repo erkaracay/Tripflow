@@ -20,7 +20,7 @@ public sealed record ActivityParticipantTableItemDto(
     string? AgencyName,
     ActivityParticipantStateDto ActivityState);
 
-public sealed record ActivityParticipantStateDto(bool IsCheckedIn, ActivityLastLogDto? LastLog);
+public sealed record ActivityParticipantStateDto(bool IsCheckedIn, bool WillNotAttend, ActivityLastLogDto? LastLog);
 public sealed record ActivityLastLogDto(string Direction, string Method, string Result, string CreatedAt); // HH:mm
 
 public sealed record ActivityParticipantTableResponseDto(
@@ -28,3 +28,13 @@ public sealed record ActivityParticipantTableResponseDto(
     int PageSize,
     int Total,
     ActivityParticipantTableItemDto[] Items);
+
+public sealed record ActivityParticipantWillNotAttendRequest(bool? WillNotAttend);
+public sealed record ActivityParticipantWillNotAttendResponse(
+    Guid Id,
+    bool WillNotAttend,
+    ActivityParticipantStateDto ActivityState);
+
+public sealed record ResetAllActivityCheckInsResponse(
+    int RemovedCount,
+    int TotalCount);

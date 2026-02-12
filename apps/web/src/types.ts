@@ -67,6 +67,12 @@ export type ParticipantWillNotAttendResponse = {
   lastLog?: ParticipantLastLog | null
 }
 
+export type ActivityParticipantWillNotAttendResponse = {
+  id: string
+  willNotAttend: boolean
+  activityState: ActivityParticipantState
+}
+
 export type ParticipantResolve = {
   id: string
   fullName: string
@@ -243,6 +249,7 @@ export type ActivityLastLog = {
 
 export type ActivityParticipantState = {
   isCheckedIn: boolean
+  willNotAttend: boolean
   lastLog?: ActivityLastLog | null
 }
 
@@ -375,6 +382,11 @@ export type EventParticipantLogListResponse = {
   pageSize: number
   total: number
   items: EventParticipantLogItem[]
+}
+
+export type ResetAllActivityCheckInsResponse = {
+  removedCount: number
+  totalCount: number
 }
 
 export type ResetAllCheckInsResponse = {

@@ -612,6 +612,135 @@ internal static class GuideHandlers
         return await ActivityCheckInHandlers.GetParticipantsTable(eventId, activityId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
     }
 
+    internal static async Task<IResult> ResetAllActivityCheckIns(
+        string eventId,
+        string activityId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+            return error!;
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+            return orgError!;
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
+            return parseError!;
+
+        var hasAccess = await db.Events.AsNoTracking()
+            .Include(x => x.EventGuides)
+            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess)
+            return Results.NotFound(new { message = "Event not found." });
+
+        return await ActivityCheckInHandlers.ResetAllActivityCheckIns(eventId, activityId, httpContext, db, ct);
+    }
+
+    internal static async Task<IResult> SetActivityParticipantWillNotAttend(
+        string eventId,
+        string activityId,
+        string participantId,
+        ActivityParticipantWillNotAttendRequest request,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!TryGetUserId(user, out var userId, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
+        {
+            return parseError!;
+        }
+
+        if (!Guid.TryParse(activityId, out var activityGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid activity id.");
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (request is null || !request.WillNotAttend.HasValue)
+        {
+            return EventsHelpers.BadRequest("willNotAttend is required.");
+        }
+
+        var hasAccess = await db.Events.AsNoTracking()
+            .Include(x => x.EventGuides)
+            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
+        if (!hasAccess)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var activityExists = await db.EventActivities.AsNoTracking()
+            .AnyAsync(x => x.Id == activityGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (!activityExists)
+        {
+            return Results.NotFound(new { message = "Activity not found." });
+        }
+
+        var participant = await db.Participants.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var entity = await db.ParticipantActivityWillNotAttend
+            .FirstOrDefaultAsync(x => x.ParticipantId == participantGuid && x.ActivityId == activityGuid, ct);
+
+        if (entity is null)
+        {
+            entity = new ParticipantActivityWillNotAttendEntity
+            {
+                Id = Guid.NewGuid(),
+                ParticipantId = participantGuid,
+                ActivityId = activityGuid,
+                WillNotAttend = request.WillNotAttend.Value,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ParticipantActivityWillNotAttend.Add(entity);
+        }
+        else
+        {
+            entity.WillNotAttend = request.WillNotAttend.Value;
+            entity.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var lastLog = await db.ActivityParticipantLogs.AsNoTracking()
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ActivityId == activityGuid
+                        && x.ParticipantId == participantGuid
+                        && (x.Result == "Success" || x.Result == "AlreadyCheckedIn"))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ActivityLastLogDto(
+                x.Direction,
+                x.Method,
+                x.Result,
+                x.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture)))
+            .FirstOrDefaultAsync(ct);
+
+        var isCheckedIn = lastLog != null && lastLog.Direction == "Entry" && (lastLog.Result == "Success" || lastLog.Result == "AlreadyCheckedIn");
+        var activityState = new ActivityParticipantStateDto(isCheckedIn, entity.WillNotAttend, lastLog);
+
+        return Results.Ok(new ActivityParticipantWillNotAttendResponse(participantGuid, entity.WillNotAttend, activityState));
+    }
+
     internal static async Task<IResult> GetEventItems(
         string eventId,
         bool? includeInactive,

@@ -21,6 +21,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventItemEntity> EventItems => Set<EventItemEntity>();
     public DbSet<ParticipantItemLogEntity> ParticipantItemLogs => Set<ParticipantItemLogEntity>();
     public DbSet<EventGuideEntity> EventGuides => Set<EventGuideEntity>();
+    public DbSet<ParticipantActivityWillNotAttendEntity> ParticipantActivityWillNotAttend => Set<ParticipantActivityWillNotAttendEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
 
@@ -492,6 +493,30 @@ public sealed class TripflowDbContext : DbContext
 
             b.HasIndex(x => x.GuideUserId);
             b.HasIndex(x => x.EventId);
+        });
+
+        modelBuilder.Entity<ParticipantActivityWillNotAttendEntity>(b =>
+        {
+            b.ToTable("participant_activity_will_not_attend");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.ParticipantId).IsRequired();
+            b.Property(x => x.ActivityId).IsRequired();
+            b.Property(x => x.WillNotAttend).IsRequired().HasDefaultValue(false);
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            b.Property(x => x.UpdatedAt);
+
+            b.HasIndex(x => new { x.ParticipantId, x.ActivityId }).IsUnique();
+
+            b.HasOne(x => x.Participant)
+                .WithMany()
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Activity)
+                .WithMany()
+                .HasForeignKey(x => x.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -143,6 +143,20 @@ public static class GuideEndpoints
             .Produces<ActivityParticipantTableResponseDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapPatch("/events/{eventId}/activities/{activityId}/participants/{participantId}/will-not-attend", GuideHandlers.SetActivityParticipantWillNotAttend)
+            .WithSummary("Guide activity participant will-not-attend")
+            .WithDescription("Marks a participant as will-not-attend for a specific activity.")
+            .Produces<ActivityParticipantWillNotAttendResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/activities/{activityId}/checkins/reset-all", GuideHandlers.ResetAllActivityCheckIns)
+            .WithSummary("Guide reset all activity check-ins")
+            .WithDescription("Removes all activity check-ins for the specified activity.")
+            .Produces<ResetAllActivityCheckInsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/events/{eventId}/items", GuideHandlers.GetEventItems)
             .WithSummary("Guide event items")
             .WithDescription("Returns equipment items. Use includeInactive=true to list all (for management).")

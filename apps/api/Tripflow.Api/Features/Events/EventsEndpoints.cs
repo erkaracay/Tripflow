@@ -152,6 +152,20 @@ public static class EventsEndpoints
             .Produces<ActivityParticipantTableResponseDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPatch("/{eventId}/activities/{activityId}/participants/{participantId}/will-not-attend", ActivityCheckInHandlers.SetActivityParticipantWillNotAttend)
+            .WithSummary("Activity participant will-not-attend")
+            .WithDescription("Marks a participant as will-not-attend for a specific activity.")
+            .Produces<ActivityParticipantWillNotAttendResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/activities/{activityId}/checkins/reset-all", ActivityCheckInHandlers.ResetAllActivityCheckIns)
+            .WithSummary("Reset all activity check-ins")
+            .WithDescription("Removes all activity check-ins for the specified activity.")
+            .Produces<ResetAllActivityCheckInsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/items", EventItemsHandlers.GetItems)
             .WithSummary("List event items")
             .WithDescription("Returns equipment items. Use includeInactive=true to list all (for management).")
