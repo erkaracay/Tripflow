@@ -66,7 +66,10 @@ const handleTcNoBlur = () => {
 }
 
 const setSession = (eventId: string, token: string, expiresAt: string) => {
+  console.log('[Portal] setSession called', { eventId, token: token ? `${token.substring(0, 20)}...` : null, expiresAt })
+  
   if (!eventId || !token) {
+    console.log('[Portal] setSession: missing eventId or token', { eventId, hasToken: !!token })
     return
   }
 
@@ -81,14 +84,37 @@ const setSession = (eventId: string, token: string, expiresAt: string) => {
       }
     }
 
-    globalThis.localStorage?.setItem(sessionTokenKey(eventId), token)
-    globalThis.localStorage?.setItem(sessionExpiryKey(eventId), expiryString)
+    const tokenKey = sessionTokenKey(eventId)
+    const expiryKey = sessionExpiryKey(eventId)
+    
+    console.log('[Portal] setSession: writing to localStorage', { tokenKey, expiryKey, expiryString })
+    
+    globalThis.localStorage?.setItem(tokenKey, token)
+    globalThis.localStorage?.setItem(expiryKey, expiryString)
     
     // Verify write succeeded
-    const writtenToken = globalThis.localStorage?.getItem(sessionTokenKey(eventId))
-    const writtenExpiry = globalThis.localStorage?.getItem(sessionExpiryKey(eventId))
+    const writtenToken = globalThis.localStorage?.getItem(tokenKey)
+    const writtenExpiry = globalThis.localStorage?.getItem(expiryKey)
+    
+    console.log('[Portal] setSession: verification', { 
+      tokenMatch: writtenToken === token, 
+      expiryMatch: writtenExpiry === expiryString,
+      writtenToken: writtenToken ? `${writtenToken.substring(0, 20)}...` : null,
+      writtenExpiry
+    })
+    
     if (writtenToken !== token || writtenExpiry !== expiryString) {
-      console.error('[Portal] Failed to write session to localStorage', { eventId, token, expiresAt })
+      console.error('[Portal] Failed to write session to localStorage', { 
+        eventId, 
+        token, 
+        expiresAt,
+        writtenToken,
+        writtenExpiry,
+        tokenKey,
+        expiryKey
+      })
+    } else {
+      console.log('[Portal] setSession: successfully written to localStorage')
     }
   } catch (error) {
     console.error('[Portal] Error writing session to localStorage', error, { eventId, token, expiresAt })

@@ -262,17 +262,28 @@ const logoutPortal = async () => {
 }
 
 const restoreSession = () => {
+  console.log('[Portal] restoreSession called', { eventId: eventId.value, sessionTokenKey: sessionTokenKey.value, sessionExpiryKey: sessionExpiryKey.value })
+  
   // Guard: ensure eventId is available before reading from localStorage
   if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
+    console.log('[Portal] restoreSession: eventId not available', { eventId: eventId.value })
     return false
   }
 
   try {
     const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
     const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
+    
+    console.log('[Portal] restoreSession: read from localStorage', { 
+      token: token ? `${token.substring(0, 20)}...` : null, 
+      expiry,
+      tokenLength: token?.length,
+      expiryLength: expiry?.length
+    })
 
     // Defensive check: ensure both values are non-empty strings
     if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
+      console.log('[Portal] restoreSession: missing token or expiry', { hasToken: !!token, hasExpiry: !!expiry, tokenType: typeof token, expiryType: typeof expiry })
       clearSession()
       return false
     }
@@ -285,12 +296,14 @@ const restoreSession = () => {
       return false
     }
 
-    if (expiresAt <= new Date()) {
-      console.log('[Portal] Session expired', { expiresAt, now: new Date(), eventId: eventId.value })
+    const now = new Date()
+    if (expiresAt <= now) {
+      console.log('[Portal] Session expired', { expiresAt, now, eventId: eventId.value })
       clearSession()
       return false
     }
 
+    console.log('[Portal] restoreSession: session restored successfully', { expiresAt, now, timeUntilExpiry: expiresAt.getTime() - now.getTime() })
     sessionToken.value = token
     sessionExpiresAt.value = expiresAt
     return true
@@ -302,12 +315,16 @@ const restoreSession = () => {
 }
 
 const loadPortal = async () => {
+  console.log('[Portal] loadPortal called', { eventId: eventId.value })
   loading.value = true
   errorKey.value = null
   errorMessage.value = null
   sessionExpired.value = false
 
-  if (!restoreSession()) {
+  const restored = restoreSession()
+  console.log('[Portal] loadPortal: restoreSession result', { restored })
+  
+  if (!restored) {
     loading.value = false
     // Only set sessionExpired to true if there was actually a session that expired
     // If no token exists, this is a first-time user, not an expired session
