@@ -158,11 +158,21 @@ onMounted(loadData)
           {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
       </nav>
-      <h1 class="mt-4 text-2xl font-semibold text-slate-900">{{ event?.name ?? t('common.event') }}</h1>
-      <p v-if="event" class="mt-1 text-sm text-slate-500">
-        {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
-      </p>
-      <p class="mt-2 text-sm text-slate-500">{{ t('guide.program.subtitle') }}</p>
+      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold text-slate-900">{{ event?.name ?? t('common.event') }}</h1>
+          <p v-if="event" class="mt-1 text-sm text-slate-500">
+            {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+          </p>
+          <p class="mt-2 text-sm text-slate-500">{{ t('guide.program.subtitle') }}</p>
+        </div>
+        <RouterLink
+          :to="`/guide/events/${eventId}/program/edit`"
+          class="whitespace-nowrap rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+        >
+          {{ t('guide.program.edit') }}
+        </RouterLink>
+      </div>
     </section>
 
     <LoadingState v-if="loading" message-key="guide.program.loading" />

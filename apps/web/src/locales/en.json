@@ -1021,7 +1021,8 @@
       "title": "Program",
       "subtitle": "Review the event schedule and activity details.",
       "loading": "Loading program...",
-      "empty": "Program has not been published yet.",
+      "empty": "Program information not found.",
+      "edit": "Edit program",
       "checkInEnabled": "Check-in enabled"
     }
   },

@@ -1008,7 +1008,8 @@
       "title": "Program",
       "subtitle": "Etkinlik akışını ve aktiviteleri görüntüle.",
       "loading": "Program yükleniyor...",
-      "empty": "Program henüz yayınlanmadı.",
+      "empty": "Program bilgisi bulunamadı.",
+      "edit": "Programı düzenle",
       "checkInEnabled": "Check-in açık"
     }
   },
