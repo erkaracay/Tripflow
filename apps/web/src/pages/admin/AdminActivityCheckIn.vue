@@ -319,12 +319,12 @@ const activitySummary = computed(() => {
   if (!dataTable) {
     return { checkedInCount: 0, totalCount: 0, notCheckedInCount: 0, willNotAttendCount: 0, effectiveTotal: 0 }
   }
-  // Calculate from all items in summary table (first page of "all" status)
+  // Summary table is loaded with status=all; backend already excludes willNotAttend, so total is "attending" count
   const allItems = dataTable.items
   const checkedInCount = allItems.filter((item) => item.activityState?.isCheckedIn).length
   const totalCount = dataTable.total
-  // Use separate willNotAttendCount ref (fetched from backend with status="will_not_attend")
-  const effectiveTotal = Math.max(totalCount - willNotAttendCount.value, 0)
+  // effectiveTotal = attending count; backend "all" total already excludes willNotAttend, do not subtract again
+  const effectiveTotal = totalCount
   const notCheckedInCount = Math.max(effectiveTotal - checkedInCount, 0)
   return { checkedInCount, totalCount, notCheckedInCount, willNotAttendCount: willNotAttendCount.value, effectiveTotal }
 })
