@@ -404,6 +404,12 @@ export type LoginResponse = {
   fullName?: string | null
 }
 
+export type AuthMeResponse = {
+  role: string
+  userId: string
+  fullName?: string | null
+}
+
 export type PortalLoginResponse = {
   portalSessionToken: string
   expiresAt: string
