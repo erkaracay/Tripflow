@@ -12,11 +12,23 @@ namespace Tripflow.Api.Features.Auth;
 
 internal static class AuthHandlers
 {
+    internal static IResult GetMe(ClaimsPrincipal user)
+    {
+        var sub = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
+        if (string.IsNullOrEmpty(sub) || !Guid.TryParse(sub, out var userId))
+            return Results.Unauthorized();
+        var role = user.FindFirstValue("role") ?? user.FindFirstValue(ClaimTypes.Role) ?? "";
+        var fullName = user.FindFirstValue("name");
+        return Results.Ok(new AuthMeResponse(role, userId, string.IsNullOrWhiteSpace(fullName) ? null : fullName));
+    }
+
     internal static async Task<IResult> Login(
         LoginRequest request,
+        HttpContext httpContext,
         TripflowDbContext db,
         IPasswordHasher<UserEntity> hasher,
         JwtOptions options,
+        InforaCookieOptions cookieOptions,
         CancellationToken ct)
     {
         if (request is null)
@@ -71,6 +83,14 @@ internal static class AuthHandlers
             signingCredentials: credentials);
 
         var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+        var cookieOpts = cookieOptions.BuildCookieOptions(maxAge: options.Lifetime);
+        httpContext.Response.Cookies.Append(InforaCookieOptions.AuthCookieName, accessToken, cookieOpts);
         return Results.Ok(new LoginResponse(accessToken, user.Role, user.Id, user.FullName));
+    }
+
+    internal static IResult Logout(HttpContext httpContext, InforaCookieOptions cookieOptions)
+    {
+        httpContext.Response.Cookies.Delete(InforaCookieOptions.AuthCookieName, cookieOptions.BuildClearCookieOptions());
+        return Results.Ok();
     }
 }
