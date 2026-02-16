@@ -21,9 +21,15 @@ public static class PortalLoginEndpoints
         group.MapGet("/me", PortalLoginHandlers.GetMe)
             .AllowAnonymous()
             .WithSummary("Portal session details")
-            .WithDescription("Requires X-Portal-Session header.")
+            .WithDescription("Requires X-Portal-Session header or cookie.")
             .Produces<PortalMeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/logout", PortalLoginHandlers.Logout)
+            .AllowAnonymous()
+            .WithSummary("Portal logout")
+            .WithDescription("Clears the portal session cookie.")
+            .Produces(StatusCodes.Status200OK);
 
         group.MapGet("/resolve", PortalLoginHandlers.ResolveEventAccessCode)
             .AllowAnonymous()

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Auth;
 
 namespace Tripflow.Api.Features.Portal;
 
@@ -29,9 +30,9 @@ internal static class PortalSessionHelpers
     {
         var token = httpContext.Request.Headers["X-Portal-Session"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(token))
-        {
+            token = httpContext.Request.Cookies[InforaCookieOptions.PortalCookieName];
+        if (string.IsNullOrWhiteSpace(token))
             return null;
-        }
 
         var tokenHash = HashToken(token);
         var now = DateTime.UtcNow;

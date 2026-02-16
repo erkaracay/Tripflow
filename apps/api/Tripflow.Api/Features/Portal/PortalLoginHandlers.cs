@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Auth;
 using Tripflow.Api.Features.Events;
 
 namespace Tripflow.Api.Features.Portal;
@@ -19,6 +20,7 @@ internal static class PortalLoginHandlers
         PortalLoginRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        InforaCookieOptions cookieOptions,
         CancellationToken ct)
     {
         if (request is null)
@@ -116,6 +118,8 @@ internal static class PortalLoginHandlers
 
         await db.SaveChangesAsync(ct);
 
+        var cookieOpts = cookieOptions.BuildCookieOptions(expires: expiresAt);
+        httpContext.Response.Cookies.Append(InforaCookieOptions.PortalCookieName, token, cookieOpts);
         return Results.Ok(new PortalLoginResponse(token, expiresAt, eventEntity.Id, participant.Id));
     }
 
@@ -176,6 +180,12 @@ internal static class PortalLoginHandlers
             docs);
 
         return Results.Ok(response);
+    }
+
+    internal static IResult Logout(HttpContext httpContext, InforaCookieOptions cookieOptions)
+    {
+        httpContext.Response.Cookies.Delete(InforaCookieOptions.PortalCookieName, cookieOptions.BuildClearCookieOptions());
+        return Results.Ok();
     }
 
     internal static async Task<IResult> ResolveEventAccessCode(
