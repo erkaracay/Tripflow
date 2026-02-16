@@ -178,17 +178,20 @@ router.afterEach((to) => {
 })
 
 router.beforeEach((to) => {
-  // Home or portal login - if cookie session exists, redirect to that event
-  if (to.path === '/' || to.path === '/e/login') {
+  // Home - redirect to login
+  if (to.path === '/') {
+    return { path: '/e/login', replace: true }
+  }
+
+  // Portal login page - check if session exists, if so redirect to event
+  if (to.path === '/e/login') {
     return checkPortalSession()
       .then((me) => {
         if (me) return { path: `/e/${me.event.id}`, replace: true }
-        if (to.path === '/') return { path: '/e/login', replace: true }
-        return true
+        return true // Allow navigation to login page
       })
       .catch(() => {
-        // Network error or server error - allow navigation to login
-        if (to.path === '/') return { path: '/e/login', replace: true }
+        // Network error or 401 (no session) - allow navigation to login page
         return true
       })
   }

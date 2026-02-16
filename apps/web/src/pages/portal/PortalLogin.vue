@@ -70,11 +70,18 @@ const tryReuseExistingSession = async (eventAccessCode: string) => {
 
   checkingSession.value = true
   try {
-    const resolved = await portalResolveEvent(eventAccessCode)
+    // Check if we already have a valid session for this event
     const me = await checkPortalSession()
-    if (me && me.event.id === resolved.eventId) {
-      await router.replace(`/e/${resolved.eventId}`)
+    if (me) {
+      // Resolve event to verify access code matches
+      const resolved = await portalResolveEvent(eventAccessCode)
+      if (me.event.id === resolved.eventId) {
+        await router.replace(`/e/${resolved.eventId}`)
+        return
+      }
     }
+  } catch {
+    // Silently ignore - user needs to login (401 is expected when not logged in)
   } finally {
     checkingSession.value = false
   }
@@ -113,6 +120,8 @@ const submitLogin = async () => {
     try {
       globalThis.localStorage?.setItem('infora.portal.lastEventId', response.eventId)
     } catch {}
+    // Small delay to ensure cookie is set by browser before navigation
+    await new Promise(resolve => setTimeout(resolve, 100))
     await router.replace(`/e/${response.eventId}`)
   } catch (err) {
     const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: number }).status : null

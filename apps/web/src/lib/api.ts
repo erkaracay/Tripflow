@@ -306,13 +306,21 @@ export const portalGetMe = async (sessionToken?: string): Promise<PortalMeRespon
 }
 
 export const checkPortalSession = async (): Promise<PortalMeResponse | null> => {
-  const res = await fetch(buildUrl('/api/portal/me'), {
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  })
-  if (res.status === 401) return null
-  if (!res.ok) throw new Error(await res.text() || res.statusText)
-  return res.json() as Promise<PortalMeResponse>
+  try {
+    const res = await fetch(buildUrl('/api/portal/me'), {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+    if (res.status === 401) return null
+    if (!res.ok) throw new Error(await res.text() || res.statusText)
+    return res.json() as Promise<PortalMeResponse>
+  } catch (err) {
+    // Network errors or 401 are expected when not logged in - return null silently
+    if (err instanceof TypeError || (err instanceof Error && /Failed to fetch|NetworkError/i.test(err.message))) {
+      return null
+    }
+    throw err
+  }
 }
 
 export const portalResolveEvent = async (eventAccessCode: string): Promise<PortalResolveEventResponse> => {
