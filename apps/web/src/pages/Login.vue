@@ -3,7 +3,7 @@ import { nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiPost } from '../lib/api'
-import { setToken } from '../lib/auth'
+import { setAuthState } from '../lib/auth'
 import type { LoginResponse } from '../types'
 
 const router = useRouter()
@@ -44,7 +44,7 @@ const submit = async () => {
       password: password.value,
     })
 
-    setToken(response.accessToken)
+    setAuthState({ role: response.role, userId: response.userId, fullName: response.fullName ?? null })
     let target = '/admin/events'
     if (response.role === 'Guide') {
       target = '/guide/events'

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ToastHost from './components/ui/ToastHost.vue'
-import { clearToken, getTokenRole, isTokenExpired, orgState, tokenState } from './lib/auth'
+import { clearToken, getAuthRole, orgState } from './lib/auth'
 import { setLocale, type Locale } from './i18n'
 import { useI18n } from 'vue-i18n'
 import {
@@ -17,12 +17,7 @@ const route = useRoute()
 const { locale, t } = useI18n()
 const mobileMenuOpen = ref(false)
 const userRole = computed(() => {
-  const token = tokenState.value
-  if (!token || isTokenExpired(token)) {
-    return null
-  }
-
-  return getTokenRole(token)
+  return getAuthRole()
 })
 const showOrgLink = computed(() => userRole.value === 'SuperAdmin')
 const showAuthActions = computed(() => Boolean(userRole.value))
