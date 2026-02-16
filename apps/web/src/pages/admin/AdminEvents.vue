@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
-import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { getAuthRole } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -33,12 +33,7 @@ const form = reactive({
 })
 
 const isSuperAdmin = computed(() => {
-  const token = getToken()
-  if (!token || isTokenExpired(token)) {
-    return false
-  }
-
-  return getTokenRole(token) === 'SuperAdmin'
+  return getAuthRole() === 'SuperAdmin'
 })
 
 watch(

@@ -2,8 +2,8 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders } from '../../lib/api'
-import { getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders, buildUrl } from '../../lib/api'
+import { getAuthRole, getSelectedOrgId } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { formatBaggage } from '../../lib/formatters'
 import {
@@ -100,12 +100,7 @@ const deletingAllParticipants = ref(false)
 
 const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
-  const token = getToken()
-  if (!token || isTokenExpired(token)) {
-    return false
-  }
-
-  return getTokenRole(token) === 'SuperAdmin'
+  return getAuthRole() === 'SuperAdmin'
 })
 
 const purgeConfirmValid = computed(() => {
@@ -1138,30 +1133,19 @@ const downloadParticipantsExcel = async () => {
 
 const downloadBadgesPdf = async () => {
   try {
-    // Build URL using the same helper as other API calls
-    const apiBase = import.meta.env.VITE_API_BASE_URL?.trim()
-    const baseUrl = apiBase
-      ? apiBase.replace(/\/$/, '')
-      : window.location.origin
-    const url = `${baseUrl}/api/events/${eventId.value}/badges.pdf`
-
-    // Fetch with authentication headers
-    const token = getToken()
+    const url = buildUrl(`/api/events/${eventId.value}/badges.pdf`)
     const headers: Record<string, string> = {
       Accept: 'application/pdf',
     }
-    if (token && !isTokenExpired(token)) {
-      headers.Authorization = `Bearer ${token}`
-      const role = getTokenRole(token)
-      if (role === 'SuperAdmin') {
-        const orgId = getSelectedOrgId()
-        if (orgId) {
-          headers['X-Org-Id'] = orgId
-        }
+    const role = getAuthRole()
+    if (role === 'SuperAdmin') {
+      const orgId = getSelectedOrgId()
+      if (orgId) {
+        headers['X-Org-Id'] = orgId
       }
     }
 
-    const response = await fetch(url, { headers })
+    const response = await fetch(url, { credentials: 'include', headers })
     
     if (!response.ok) {
       if (response.status === 401) {

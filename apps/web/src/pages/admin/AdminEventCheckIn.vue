@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
-import { getToken, getTokenRole, isTokenExpired } from '../../lib/auth'
+import { getAuthRole } from '../../lib/auth'
 import { normalizeQrCode } from '../../lib/qr'
 import { formatUtcToLocal } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
@@ -67,12 +67,7 @@ let lastScannedAt = 0
 
 const { pushToast, removeToast } = useToast()
 const isSuperAdmin = computed(() => {
-  const token = getToken()
-  if (!token || isTokenExpired(token)) {
-    return false
-  }
-
-  return getTokenRole(token) === 'SuperAdmin'
+  return getAuthRole() === 'SuperAdmin'
 })
 
 const filteredParticipants = computed(() => {
