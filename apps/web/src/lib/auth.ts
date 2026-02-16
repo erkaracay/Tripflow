@@ -1,12 +1,13 @@
 import { ref } from 'vue'
+import type { AuthMeResponse } from '../types'
 
-const TOKEN_KEY = 'infora_token'
 const ORG_KEY = 'infora_org'
 
 const readStorage = (key: string) => globalThis.localStorage?.getItem(key) ?? ''
 
-const tokenRef = ref(readStorage(TOKEN_KEY))
+const tokenRef = ref('')
 const orgRef = ref(readStorage(ORG_KEY))
+const authStateRef = ref<AuthMeResponse | null>(null)
 
 const decodeBase64Url = (value: string) => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
@@ -22,18 +23,24 @@ export type JwtPayload = Record<string, unknown>
 
 export const tokenState = tokenRef
 export const orgState = orgRef
+export const authState = authStateRef
 
 export const getToken = () => tokenRef.value
 
-export const setToken = (token: string) => {
-  tokenRef.value = token
-  globalThis.localStorage?.setItem(TOKEN_KEY, token)
+export const setAuthState = (me: AuthMeResponse) => {
+  authStateRef.value = me
+}
+
+export const getAuthRole = (): string | null => authStateRef.value?.role ?? null
+
+export const setToken = (_token: string) => {
+  // Cookie is set by backend on login; no localStorage
 }
 
 export const clearToken = () => {
   tokenRef.value = ''
+  authStateRef.value = null
   clearSelectedOrgId()
-  globalThis.localStorage?.removeItem(TOKEN_KEY)
 }
 
 export const getTokenPayload = (token: string): JwtPayload | null => {
@@ -56,9 +63,10 @@ export const getTokenPayload = (token: string): JwtPayload | null => {
 }
 
 export const getTokenRole = (token: string): string | null => {
+  if (!token) return getAuthRole()
   const payload = getTokenPayload(token)
   if (!payload) {
-    return null
+    return getAuthRole()
   }
 
   const role =
@@ -84,6 +92,9 @@ export const getTokenOrgId = (token: string): string | null => {
 }
 
 export const isTokenExpired = (token: string): boolean => {
+  if (!token || typeof token !== 'string' || !token.trim()) {
+    return true
+  }
   const payload = getTokenPayload(token)
   const exp = payload?.exp
   if (typeof exp !== 'number') {
