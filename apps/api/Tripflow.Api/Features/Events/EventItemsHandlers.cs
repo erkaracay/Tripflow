@@ -248,6 +248,58 @@ internal static class EventItemsHandlers
         var participantsQuery = db.Participants.AsNoTracking()
             .Where(x => x.EventId == evtId && x.OrganizationId == orgId);
 
+        var statusValue = (status ?? "all").Trim().ToLowerInvariant();
+        if (statusValue == "not_returned")
+        {
+            // "not_returned" = last successful action is Give (still has the item)
+            var notReturnedParticipantIds = await db.ParticipantItemLogs.AsNoTracking()
+                .Where(x => x.ItemId == itId && x.OrganizationId == orgId && x.ParticipantId != null && x.Result == ResultSuccess)
+                .GroupBy(x => x.ParticipantId!.Value)
+                .Select(g => new { ParticipantId = g.Key, LastAction = g.OrderByDescending(z => z.CreatedAt).Select(z => z.Action).FirstOrDefault() })
+                .Where(x => x.LastAction == "Give")
+                .Select(x => x.ParticipantId)
+                .ToListAsync(ct);
+
+            participantsQuery = participantsQuery.Where(x => notReturnedParticipantIds.Contains(x.Id));
+        }
+        else if (statusValue == "given")
+        {
+            // "given" = has at least one successful Give (includes returned)
+            var everGivenParticipantIds = await db.ParticipantItemLogs.AsNoTracking()
+                .Where(x => x.ItemId == itId && x.OrganizationId == orgId && x.ParticipantId != null && x.Result == ResultSuccess && x.Action == "Give")
+                .Select(x => x.ParticipantId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+
+            participantsQuery = participantsQuery.Where(x => everGivenParticipantIds.Contains(x.Id));
+        }
+        else if (statusValue == "returned")
+        {
+            var returnedParticipantIds = await db.ParticipantItemLogs.AsNoTracking()
+                .Where(x => x.ItemId == itId && x.OrganizationId == orgId && x.ParticipantId != null && x.Result == ResultSuccess)
+                .GroupBy(x => x.ParticipantId!.Value)
+                .Select(g => new { ParticipantId = g.Key, LastAction = g.OrderByDescending(z => z.CreatedAt).Select(z => z.Action).FirstOrDefault() })
+                .Where(x => x.LastAction == "Return")
+                .Select(x => x.ParticipantId)
+                .ToListAsync(ct);
+
+            participantsQuery = participantsQuery.Where(x => returnedParticipantIds.Contains(x.Id));
+        }
+        else if (statusValue == "never_given")
+        {
+            var allParticipantIds = await db.Participants.AsNoTracking()
+                .Where(x => x.EventId == evtId && x.OrganizationId == orgId)
+                .Select(x => x.Id)
+                .ToListAsync(ct);
+            var participantsWithSuccessGiveLogs = await db.ParticipantItemLogs.AsNoTracking()
+                .Where(x => x.ItemId == itId && x.OrganizationId == orgId && x.Result == ResultSuccess && x.ParticipantId != null && x.Action == "Give")
+                .Select(x => x.ParticipantId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+            var neverGivenParticipantIds = allParticipantIds.Except(participantsWithSuccessGiveLogs).ToList();
+            participantsQuery = participantsQuery.Where(x => neverGivenParticipantIds.Contains(x.Id));
+        }
+
         var search = query?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -262,20 +314,6 @@ internal static class EventItemsHandlers
                     (x.Details.RoomNo != null && EF.Functions.ILike(x.Details.RoomNo, pattern))
                     || (x.Details.AgencyName != null && EF.Functions.ILike(x.Details.AgencyName, pattern))
                 )));
-        }
-
-        var statusValue = (status ?? "all").Trim().ToLowerInvariant();
-        if (statusValue == "not_returned" || statusValue == "given")
-        {
-            var givenParticipantIds = await db.ParticipantItemLogs.AsNoTracking()
-                .Where(x => x.ItemId == itId && x.OrganizationId == orgId && x.ParticipantId != null && x.Result == ResultSuccess)
-                .GroupBy(x => x.ParticipantId!.Value)
-                .Select(g => new { ParticipantId = g.Key, LastAction = g.OrderByDescending(z => z.CreatedAt).Select(z => z.Action).FirstOrDefault() })
-                .Where(x => x.LastAction == "Give")
-                .Select(x => x.ParticipantId)
-                .ToListAsync(ct);
-
-            participantsQuery = participantsQuery.Where(x => givenParticipantIds.Contains(x.Id));
         }
 
         var total = await participantsQuery.CountAsync(ct);

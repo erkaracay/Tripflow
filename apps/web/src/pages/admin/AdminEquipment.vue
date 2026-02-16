@@ -38,12 +38,13 @@ const code = ref('')
 const table = ref<ItemParticipantTableResponse | null>(null)
 const tablePage = ref(1)
 const tableQuery = ref('')
-const tableStatus = ref<'all' | 'given' | 'not_returned'>('all')
+const tableStatus = ref<'all' | 'given' | 'not_returned' | 'returned' | 'never_given'>('all')
 const tableSort = ref('fullName')
 const tableDir = ref<'asc' | 'desc'>('asc')
 const loading = ref(true)
 const loadErrorKey = ref<string | null>(null)
 const submitting = ref(false)
+const processingParticipantId = ref<string | null>(null)
 const scannerOpen = ref(false)
 const autoSubmitAfterScan = ref(true)
 const codeInput = ref<HTMLInputElement | null>(null)
@@ -217,7 +218,9 @@ const loadTable = async () => {
   try {
     const params = new URLSearchParams()
     if (tableQuery.value.trim()) params.set('query', tableQuery.value.trim())
-    params.set('status', tableStatus.value === 'not_returned' ? 'not_returned' : tableStatus.value)
+    if (tableStatus.value !== 'all') {
+      params.set('status', tableStatus.value)
+    }
     params.set('page', String(tablePage.value))
     params.set('pageSize', '50')
     params.set('sort', tableSort.value)
@@ -257,7 +260,7 @@ const persistAuto = () => {
   } catch {}
 }
 
-const submitAction = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Manual') => {
+const submitAction = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Manual', actionOverride?: 'Give' | 'Return') => {
   if (!selectedItemId.value) {
     pushToast({ key: 'equipment.selectItem', tone: 'error' })
     return
@@ -267,14 +270,15 @@ const submitAction = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Ma
     pushToast({ key: 'toast.invalidCodeFormat', tone: 'error' })
     return
   }
+  const actionToUse = actionOverride ?? action.value
   submitting.value = true
   try {
     const res = await apiPostWithPayload<ItemActionResponse>(
       `/api/events/${eventId.value}/items/${selectedItemId.value}/actions`,
-      { checkInCode: normalized, action: action.value, method }
+      { checkInCode: normalized, action: actionToUse, method }
     )
     pushToast({
-      key: action.value === 'Give' ? 'equipment.giveSuccess' : 'equipment.returnSuccess',
+      key: actionToUse === 'Give' ? 'equipment.giveSuccess' : 'equipment.returnSuccess',
       params: { name: res.participantName },
       tone: 'success',
     })
@@ -290,6 +294,30 @@ const submitAction = async (codeValue: string, method: 'Manual' | 'QrScan' = 'Ma
     else pushToast({ key: 'common.checkInFailed', tone: 'error' })
   } finally {
     submitting.value = false
+  }
+}
+
+const markGiven = async (row: ItemParticipantTableResponse['items'][0]) => {
+  if (row.itemState?.given || processingParticipantId.value === row.id) {
+    return
+  }
+  processingParticipantId.value = row.id
+  try {
+    await submitAction(row.checkInCode, 'Manual', 'Give')
+  } finally {
+    processingParticipantId.value = null
+  }
+}
+
+const markReturned = async (row: ItemParticipantTableResponse['items'][0]) => {
+  if (!row.itemState?.given || processingParticipantId.value === row.id) {
+    return
+  }
+  processingParticipantId.value = row.id
+  try {
+    await submitAction(row.checkInCode, 'Manual', 'Return')
+  } finally {
+    processingParticipantId.value = null
   }
 }
 
@@ -681,19 +709,63 @@ watch(selectedItemId, () => {
           />
           <button
             type="button"
-            :class="tableStatus === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-            class="rounded px-3 py-1.5 text-sm"
-            @click="tableStatus = 'all'"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              tableStatus === 'all'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            @click="setEquipmentFilter('all')"
           >
             {{ t('equipment.filterAll') }}
           </button>
           <button
             type="button"
-            :class="tableStatus === 'not_returned' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-            class="rounded px-3 py-1.5 text-sm"
-            @click="tableStatus = 'not_returned'"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              tableStatus === 'given'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            @click="setEquipmentFilter('given')"
+          >
+            {{ t('equipment.filterGiven') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              tableStatus === 'not_returned'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            @click="setEquipmentFilter('not_returned')"
           >
             {{ t('equipment.filterNotReturned') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              tableStatus === 'returned'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            @click="setEquipmentFilter('returned')"
+          >
+            {{ t('equipment.filterReturned') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="
+              tableStatus === 'never_given'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            "
+            @click="setEquipmentFilter('never_given')"
+          >
+            {{ t('equipment.filterNeverGiven') }}
           </button>
         </div>
 
@@ -716,30 +788,56 @@ watch(selectedItemId, () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in table?.items" :key="row.id" class="border-b border-slate-100">
-                <td class="p-2 font-medium">{{ row.fullName }}</td>
-                <td class="p-2">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded font-mono text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                    :title="t('common.copy')"
-                    @click="copyCode(row.checkInCode)"
-                  >
-                    <span>{{ row.checkInCode }}</span>
-                    <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-                  </button>
-                </td>
-                <td class="min-w-[120px] whitespace-nowrap p-2">
-                  <span v-if="row.itemState?.given" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-amber-800">
-                    {{ t('equipment.given') }}
-                  </span>
-                  <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="inline-block rounded bg-slate-100 px-2 py-0.5 text-slate-700">
-                    {{ t('equipment.returned') }}
-                  </span>
-                  <span v-else class="text-slate-500">—</span>
-                </td>
-                <td class="min-w-[220px] whitespace-nowrap p-2 text-slate-600">{{ formatLastAction(row) }}</td>
-              </tr>
+              <template v-for="row in table?.items" :key="row.id">
+                <tr class="border-b border-slate-100">
+                  <td class="p-2 font-medium">{{ row.fullName }}</td>
+                  <td class="p-2">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1.5 rounded font-mono text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                      :title="t('common.copy')"
+                      @click="copyCode(row.checkInCode)"
+                    >
+                      <span>{{ row.checkInCode }}</span>
+                      <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                    </button>
+                  </td>
+                  <td class="min-w-[120px] whitespace-nowrap p-2">
+                    <span v-if="row.itemState?.given" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-amber-800">
+                      {{ t('equipment.given') }}
+                    </span>
+                    <span v-else-if="row.itemState?.lastLog?.action === 'Return'" class="inline-block rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                      {{ t('equipment.returned') }}
+                    </span>
+                    <span v-else class="text-slate-500">—</span>
+                  </td>
+                  <td class="min-w-[220px] whitespace-nowrap p-2 text-slate-600">{{ formatLastAction(row) }}</td>
+                </tr>
+                <tr class="border-b border-slate-200 bg-slate-50">
+                  <td colspan="4" class="p-2">
+                    <div class="flex flex-row flex-wrap items-center gap-2">
+                      <button
+                        v-if="!row.itemState?.given"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        :disabled="processingParticipantId === row.id"
+                        @click="markGiven(row)"
+                      >
+                        {{ t('equipment.give') }}
+                      </button>
+                      <button
+                        v-if="row.itemState?.given"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        :disabled="processingParticipantId === row.id"
+                        @click="markReturned(row)"
+                      >
+                        {{ t('equipment.return') }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="table && table.items.length === 0">
                 <td colspan="4" class="p-4 text-center text-slate-500">{{ t('equipment.noParticipants') }}</td>
               </tr>
