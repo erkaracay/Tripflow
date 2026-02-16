@@ -19,6 +19,13 @@ public sealed record InforaCookieOptions(
         var domain = configuration["Cookie:Domain"]?.Trim();
         var secureRaw = configuration["Cookie:Secure"];
         var secure = string.IsNullOrEmpty(secureRaw) || string.Equals(secureRaw, "true", StringComparison.OrdinalIgnoreCase);
+        // In development (localhost), Secure cookies won't work over HTTP, so disable Secure
+        var isDevelopment = string.Equals(configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrEmpty(domain) || domain.Contains("localhost", StringComparison.OrdinalIgnoreCase);
+        if (isDevelopment && secure)
+        {
+            secure = false;
+        }
         var sameSiteRaw = configuration["Cookie:SameSite"]?.Trim();
         var sameSite = sameSiteRaw switch
         {
