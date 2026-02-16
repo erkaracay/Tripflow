@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { portalGetMe, portalLogin, portalResolveEvent } from '../../lib/api'
+import { checkPortalSession, portalLogin, portalResolveEvent } from '../../lib/api'
 import { sanitizeEventAccessCode } from '../../lib/eventAccessCode'
 import { resetViewportZoom } from '../../lib/viewport'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -32,9 +32,6 @@ const isTcError = computed(
     errorKey.value === 'portal.login.tcNotFound' ||
     errorKey.value === 'portal.login.ambiguousTcNo'
 )
-
-const sessionTokenKey = (eventId: string) => `infora.portal.session.${eventId}`
-const sessionExpiryKey = (eventId: string) => `infora.portal.session.exp.${eventId}`
 
 const sanitizeTcNo = (value: string) => value.replace(/\D/g, '').slice(0, 11)
 
@@ -66,60 +63,6 @@ const handleTcNoBlur = () => {
   tcNo.value = sanitizeTcNo(tcNo.value.trim())
 }
 
-const setSession = (eventId: string, token: string, expiresAt: string) => {
-  if (!eventId || !token) {
-    return
-  }
-
-  try {
-    // Normalize expiresAt to ISO string format if it's a DateTime object
-    let expiryString = expiresAt
-    if (typeof expiresAt === 'string') {
-      // Ensure it's a valid ISO date string
-      const date = new Date(expiresAt)
-      if (!Number.isNaN(date.getTime())) {
-        expiryString = date.toISOString()
-      }
-    }
-
-    const tokenKey = sessionTokenKey(eventId)
-    const expiryKey = sessionExpiryKey(eventId)
-    
-    globalThis.localStorage?.setItem(tokenKey, token)
-    globalThis.localStorage?.setItem(expiryKey, expiryString)
-    // Save last used eventId for "remember me" functionality
-    globalThis.localStorage?.setItem('infora.portal.lastEventId', eventId)
-    
-    // Verify write succeeded
-    const writtenToken = globalThis.localStorage?.getItem(tokenKey)
-    const writtenExpiry = globalThis.localStorage?.getItem(expiryKey)
-    
-    if (writtenToken !== token || writtenExpiry !== expiryString) {
-      console.error('[Portal] Failed to write session to localStorage', { 
-        eventId, 
-        token, 
-        expiresAt,
-        writtenToken,
-        writtenExpiry,
-        tokenKey,
-        expiryKey
-      })
-    }
-  } catch (error) {
-    console.error('[Portal] Error writing session to localStorage', error, { eventId, token, expiresAt })
-  }
-}
-
-const clearSession = (eventId: string) => {
-  globalThis.localStorage?.removeItem(sessionTokenKey(eventId))
-  globalThis.localStorage?.removeItem(sessionExpiryKey(eventId))
-  // Clear lastEventId if this is the last used eventId
-  const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
-  if (lastEventId === eventId) {
-    globalThis.localStorage?.removeItem('infora.portal.lastEventId')
-  }
-}
-
 const tryReuseExistingSession = async (eventAccessCode: string) => {
   if (checkingSession.value) {
     return
@@ -128,26 +71,9 @@ const tryReuseExistingSession = async (eventAccessCode: string) => {
   checkingSession.value = true
   try {
     const resolved = await portalResolveEvent(eventAccessCode)
-    const token = globalThis.localStorage?.getItem(sessionTokenKey(resolved.eventId)) ?? ''
-    const expiry = globalThis.localStorage?.getItem(sessionExpiryKey(resolved.eventId)) ?? ''
-    if (!token || !expiry) {
-      return
-    }
-
-    const expiresAt = new Date(expiry)
-    if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
-      clearSession(resolved.eventId)
-      return
-    }
-
-    try {
-      await portalGetMe(token)
+    const me = await checkPortalSession()
+    if (me && me.event.id === resolved.eventId) {
       await router.replace(`/e/${resolved.eventId}`)
-    } catch (err) {
-      const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: number }).status : null
-      if (status === 401 || status === 403) {
-        clearSession(resolved.eventId)
-      }
     }
   } finally {
     checkingSession.value = false
@@ -184,7 +110,9 @@ const submitLogin = async () => {
   submitting.value = true
   try {
     const response = await portalLogin(normalizedCode, normalizedTcNo)
-    setSession(response.eventId, response.portalSessionToken, response.expiresAt)
+    try {
+      globalThis.localStorage?.setItem('infora.portal.lastEventId', response.eventId)
+    } catch {}
     await router.replace(`/e/${response.eventId}`)
   } catch (err) {
     const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: number }).status : null

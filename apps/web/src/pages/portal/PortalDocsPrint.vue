@@ -25,12 +25,7 @@ const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const sessionExpired = ref(false)
 const hasPrinted = ref(false)
-
-const sessionToken = ref('')
-const sessionExpiresAt = ref<Date | null>(null)
-
-const sessionTokenKey = computed(() => `infora.portal.session.${eventId.value}`)
-const sessionExpiryKey = computed(() => `infora.portal.session.exp.${eventId.value}`)
+const hasValidSession = ref(false)
 
 const hasText = (value?: string | null) => {
   if (!value) return false
@@ -59,85 +54,18 @@ const portalDateRange = computed(() => {
   return t('common.dateRange', { start, end })
 })
 
-const restoreSession = () => {
-  if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
-    return false
-  }
-
-  try {
-    const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
-    const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-
-    if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
-      clearSession()
-      return false
-    }
-
-    // Parse expiry date - handle both ISO string and other formats
-    const expiresAt = new Date(expiry)
-    if (Number.isNaN(expiresAt.getTime())) {
-      console.error('[Portal] Invalid expiry date format', { expiry, eventId: eventId.value })
-      clearSession()
-      return false
-    }
-
-    if (expiresAt <= new Date()) {
-      clearSession()
-      return false
-    }
-
-    sessionToken.value = token
-    sessionExpiresAt.value = expiresAt
-    return true
-  } catch (error) {
-    console.error('[Portal] Error reading session from localStorage', error, { eventId: eventId.value })
-    clearSession()
-    return false
-  }
-}
-
-const clearSession = () => {
-  globalThis.localStorage?.removeItem(sessionTokenKey.value)
-  globalThis.localStorage?.removeItem(sessionExpiryKey.value)
-  // Clear lastEventId if this is the last used eventId
-  const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
-  if (lastEventId === eventId.value) {
-    globalThis.localStorage?.removeItem('infora.portal.lastEventId')
-  }
-  sessionToken.value = ''
-  sessionExpiresAt.value = null
-}
-
-const requiresLogin = computed(() => {
-  if (!sessionToken.value || !sessionExpiresAt.value) {
-    return true
-  }
-  return sessionExpiresAt.value <= new Date()
-})
+const requiresLogin = computed(() => !hasValidSession.value || sessionExpired.value)
 
 const loadDocs = async () => {
   loading.value = true
   errorKey.value = null
   errorMessage.value = null
   sessionExpired.value = false
-
-  if (!restoreSession()) {
-    loading.value = false
-    // If no token exists, this is a first-time user, not an expired session
-    if (eventId.value && typeof eventId.value === 'string' && eventId.value.trim() !== '') {
-      const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
-      const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-      // If token exists but restoreSession failed, it means the session expired
-      // If no token exists, user never logged in, so sessionExpired should be false
-      sessionExpired.value = Boolean(token || expiry)
-    } else {
-      sessionExpired.value = false
-    }
-    return
-  }
+  hasValidSession.value = false
 
   try {
-    const response = await portalGetMe(sessionToken.value)
+    const response = await portalGetMe()
+    hasValidSession.value = true
     event.value = response.event
     portal.value = response.portal
     docs.value = response.docs
@@ -158,7 +86,6 @@ const loadDocs = async () => {
     if (err && typeof err === 'object' && 'status' in err) {
       const status = (err as { status?: number }).status
       if (status === 401 || status === 403) {
-        clearSession()
         sessionExpired.value = true
         return
       }

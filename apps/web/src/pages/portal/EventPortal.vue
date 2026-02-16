@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import * as QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
 import { setLocale, type Locale } from '../../i18n'
-import { portalGetMe } from '../../lib/api'
+import { portalGetMe, portalLogout } from '../../lib/api'
 import { resetViewportZoom } from '../../lib/viewport'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
@@ -63,8 +63,7 @@ const toggleProgram = (activityId: string) => {
   programExpanded.value = { ...programExpanded.value }
 }
 
-const sessionToken = ref('')
-const sessionExpiresAt = ref<Date | null>(null)
+const hasValidSession = ref(false)
 
 const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'days', label: t('portal.tabs.days') },
@@ -76,18 +75,7 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
 const scheduleDays = computed(() => schedule.value?.days ?? [])
 const selectedDay = computed(() => scheduleDays.value[selectedDayIndex.value] ?? null)
 
-const hasSession = computed(() => {
-  if (!sessionToken.value || !sessionExpiresAt.value) {
-    return false
-  }
-
-  return sessionExpiresAt.value > new Date()
-})
-
-const requiresLogin = computed(() => !hasSession.value || sessionExpired.value)
-
-const sessionTokenKey = computed(() => `infora.portal.session.${eventId.value}`)
-const sessionExpiryKey = computed(() => `infora.portal.session.exp.${eventId.value}`)
+const requiresLogin = computed(() => !hasValidSession.value || sessionExpired.value)
 
 const resolvePublicBase = () => {
   const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim()
@@ -250,61 +238,12 @@ const clearNetworkError = () => {
   networkErrorKey.value = null
 }
 
-const clearSession = () => {
-  globalThis.localStorage?.removeItem(sessionTokenKey.value)
-  globalThis.localStorage?.removeItem(sessionExpiryKey.value)
-  // Clear lastEventId if this is the last used eventId
-  const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
-  if (lastEventId === eventId.value) {
-    globalThis.localStorage?.removeItem('infora.portal.lastEventId')
-  }
-  sessionToken.value = ''
-  sessionExpiresAt.value = null
-}
-
 const logoutPortal = async () => {
-  clearSession()
-  await router.push({ path: '/e/login' })
-}
-
-const restoreSession = () => {
-  // Guard: ensure eventId is available before reading from localStorage
-  if (!eventId.value || typeof eventId.value !== 'string' || eventId.value.trim() === '') {
-    return false
-  }
-
+  hasValidSession.value = false
   try {
-    const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
-    const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-
-    // Defensive check: ensure both values are non-empty strings
-    if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
-      clearSession()
-      return false
-    }
-
-    // Parse expiry date - handle both ISO string and other formats
-    const expiresAt = new Date(expiry)
-    if (Number.isNaN(expiresAt.getTime())) {
-      console.error('[Portal] Invalid expiry date format', { expiry, eventId: eventId.value })
-      clearSession()
-      return false
-    }
-
-    const now = new Date()
-    if (expiresAt <= now) {
-      clearSession()
-      return false
-    }
-
-    sessionToken.value = token
-    sessionExpiresAt.value = expiresAt
-    return true
-  } catch (error) {
-    console.error('[Portal] Error reading session from localStorage', error, { eventId: eventId.value })
-    clearSession()
-    return false
-  }
+    await portalLogout()
+  } catch {}
+  await router.push({ path: '/e/login' })
 }
 
 const loadPortal = async () => {
@@ -312,28 +251,12 @@ const loadPortal = async () => {
   errorKey.value = null
   errorMessage.value = null
   sessionExpired.value = false
-
-  const restored = restoreSession()
-  
-  if (!restored) {
-    loading.value = false
-    // Only set sessionExpired to true if there was actually a session that expired
-    // If no token exists, this is a first-time user, not an expired session
-    if (eventId.value && typeof eventId.value === 'string' && eventId.value.trim() !== '') {
-      const token = globalThis.localStorage?.getItem(sessionTokenKey.value) ?? ''
-      const expiry = globalThis.localStorage?.getItem(sessionExpiryKey.value) ?? ''
-      // If token exists but restoreSession failed, it means the session expired
-      // If no token exists, user never logged in, so sessionExpired should be false
-      sessionExpired.value = Boolean(token || expiry)
-    } else {
-      sessionExpired.value = false
-    }
-    return
-  }
+  hasValidSession.value = false
 
   try {
-    const response = await portalGetMe(sessionToken.value)
+    const response = await portalGetMe()
     resetViewportZoom()
+    hasValidSession.value = true
     event.value = response.event
     setPortalHeader(
       response.event.name,
@@ -355,7 +278,6 @@ const loadPortal = async () => {
     if (err && typeof err === 'object' && 'status' in err) {
       const status = (err as { status?: number }).status
       if (status === 401 || status === 403) {
-        clearSession()
         sessionExpired.value = true
         return
       }
