@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { i18n } from './i18n'
-import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './lib/auth'
+import { checkAuth, checkPortalSession } from './lib/api'
+import { clearToken, getSelectedOrgId, setAuthState } from './lib/auth'
 import { resetViewportZoom } from './lib/viewport'
 import AdminEvents from './pages/admin/AdminEvents.vue'
 import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
@@ -154,38 +155,6 @@ const router = createRouter({
   ],
 })
 
-/**
- * Checks if a valid portal session exists in localStorage for the given eventId
- * @param eventId - The event ID to check session for
- * @returns true if session exists and is valid (not expired), false otherwise
- */
-function restorePortalSession(eventId: string): boolean {
-  if (!eventId || typeof eventId !== 'string' || eventId.trim() === '') {
-    return false
-  }
-
-  const tokenKey = `infora.portal.session.${eventId}`
-  const expiryKey = `infora.portal.session.exp.${eventId}`
-
-  try {
-    const token = globalThis.localStorage?.getItem(tokenKey) ?? ''
-    const expiry = globalThis.localStorage?.getItem(expiryKey) ?? ''
-
-    if (!token || !expiry || typeof token !== 'string' || typeof expiry !== 'string') {
-      return false
-    }
-
-    const expiresAt = new Date(expiry)
-    if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
-      return false
-    }
-
-    return true
-  } catch {
-    return false
-  }
-}
-
 const getPageTitleKey = (path: string): string => {
   if (path === '/login') return 'common.pageTitle.login'
   if (path === '/forbidden') return 'common.pageTitle.forbidden'
@@ -209,29 +178,33 @@ router.afterEach((to) => {
 })
 
 router.beforeEach((to) => {
-  // Home page "remember me" check - redirect to last used eventId if valid session exists
+  // Home or portal login - if cookie session exists, redirect to that event
   if (to.path === '/' || to.path === '/e/login') {
-    const lastEventId = globalThis.localStorage?.getItem('infora.portal.lastEventId')
-    if (lastEventId && restorePortalSession(lastEventId)) {
-      // Valid session exists for last used eventId, redirect there
-      return { path: `/e/${lastEventId}`, replace: true }
-    }
-    // No valid session, allow login page
-    if (to.path === '/') {
-      return { path: '/e/login', replace: true }
-    }
-    return true
+    return checkPortalSession()
+      .then((me) => {
+        if (me) return { path: `/e/${me.event.id}`, replace: true }
+        if (to.path === '/') return { path: '/e/login', replace: true }
+        return true
+      })
+      .catch(() => {
+        // Network error or server error - allow navigation to login
+        if (to.path === '/') return { path: '/e/login', replace: true }
+        return true
+      })
   }
 
-  // Portal session check - must happen before admin/auth checks
+  // Portal session check - cookie-based
   if (to.path.startsWith('/e/') && to.path !== '/e/login') {
     const eventId = to.params.eventId as string
-    if (eventId && restorePortalSession(eventId)) {
-      // Valid portal session exists, allow access
-      return true
-    }
-    // No valid session, redirect to login with eventId as query param
-    return { path: '/e/login', query: { eventId } }
+    return checkPortalSession()
+      .then((me) => {
+        if (me) return true
+        return { path: '/e/login', query: eventId ? { eventId } : {} }
+      })
+      .catch(() => {
+        // Network error or server error - redirect to login
+        return { path: '/e/login', query: eventId ? { eventId } : {} }
+      })
   }
 
   // Admin/auth guard - only applies to routes with requiresAuth meta
@@ -239,31 +212,33 @@ router.beforeEach((to) => {
     return true
   }
 
-  const token = getToken()
-  if (!token || isTokenExpired(token)) {
-    if (token) {
+  return checkAuth()
+    .then((me) => {
+      if (!me) {
+        clearToken()
+        return { path: '/login' }
+      }
+      setAuthState(me)
+      const role = me.role
+      const roles = to.meta.roles as UserRole[] | undefined
+      if (roles && roles.length > 0) {
+        if (!role || !roles.includes(role as UserRole)) {
+          return { path: '/forbidden' }
+        }
+      }
+      if (role === 'SuperAdmin') {
+        const hasOrg = Boolean(getSelectedOrgId())
+        if (!hasOrg && to.path.startsWith('/admin') && to.path !== '/admin/orgs') {
+          return { path: '/admin/orgs' }
+        }
+      }
+      return true
+    })
+    .catch(() => {
+      // Network error or server error - redirect to login
       clearToken()
-    }
-    return { path: '/login' }
-  }
-
-  const roles = to.meta.roles as UserRole[] | undefined
-  if (roles && roles.length > 0) {
-    const role = getTokenRole(token)
-    if (!role || !roles.includes(role as UserRole)) {
-      return { path: '/forbidden' }
-    }
-  }
-
-  const role = getTokenRole(token)
-  if (role === 'SuperAdmin') {
-    const hasOrg = Boolean(getSelectedOrgId())
-    if (!hasOrg && to.path.startsWith('/admin') && to.path !== '/admin/orgs') {
-      return { path: '/admin/orgs' }
-    }
-  }
-
-  return true
+      return { path: '/login' }
+    })
 })
 
 export default router
