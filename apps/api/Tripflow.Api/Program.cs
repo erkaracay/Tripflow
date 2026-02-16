@@ -59,6 +59,9 @@ builder.Services.AddDbContext<TripflowDbContext>(opt => opt.UseNpgsql(connection
 var jwtOptions = JwtOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(jwtOptions);
 
+var cookieOptions = InforaCookieOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(cookieOptions);
+
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -75,6 +78,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
             RoleClaimType = "role",
             NameClaimType = "sub"
+        };
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var tokenFromHeader = ctx.Request.Headers.Authorization.FirstOrDefault()?.Trim();
+                if (!string.IsNullOrEmpty(tokenFromHeader) && tokenFromHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    ctx.Token = tokenFromHeader["Bearer ".Length..].Trim();
+                    return Task.CompletedTask;
+                }
+                var tokenFromCookie = ctx.Request.Cookies[InforaCookieOptions.AuthCookieName];
+                if (!string.IsNullOrWhiteSpace(tokenFromCookie))
+                    ctx.Token = tokenFromCookie.Trim();
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -124,6 +143,7 @@ builder.Services.AddCors(options =>
             })
             .AllowAnyHeader()
             .AllowAnyMethod()
+            .AllowCredentials()
             .WithExposedHeaders("X-Warning", "X-Tripflow-Warn");
     });
 });
