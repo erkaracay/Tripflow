@@ -1,10 +1,10 @@
-import { clearToken, getSelectedOrgId, getToken, getTokenRole, isTokenExpired } from './auth'
+import { clearToken, getAuthRole, getSelectedOrgId } from './auth'
 import { pushToast } from './toast'
-import type { PortalLoginResponse, PortalMeResponse, PortalResolveEventResponse } from '../types'
+import type { AuthMeResponse, PortalLoginResponse, PortalMeResponse, PortalResolveEventResponse } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
-const buildUrl = (path: string) => {
+export const buildUrl = (path: string) => {
   if (path.startsWith('http')) {
     return path
   }
@@ -34,6 +34,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     const path = globalThis.location?.pathname ?? ''
     const isPortal = path.startsWith('/e/')
     clearToken()
+    fetch(buildUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => {})
     if (!isPortal) {
       pushToast({ key: 'toast.sessionExpired', tone: 'error' })
       if (path !== '/login') {
@@ -94,6 +95,7 @@ const handleResponseWithPayload = async <T>(response: Response): Promise<T> => {
     const path = globalThis.location?.pathname ?? ''
     const isPortal = path.startsWith('/e/')
     clearToken()
+    fetch(buildUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => {})
     if (!isPortal) {
       pushToast({ key: 'toast.sessionExpired', tone: 'error' })
       if (path !== '/login') {
@@ -118,24 +120,33 @@ const buildHeaders = (contentType?: string) => {
     headers['Content-Type'] = contentType
   }
 
-  const token = getToken()
-  if (token && !isTokenExpired(token)) {
-    headers.Authorization = `Bearer ${token}`
-
-    const role = getTokenRole(token)
-    if (role === 'SuperAdmin') {
-      const orgId = getSelectedOrgId()
-      if (orgId) {
-        headers['X-Org-Id'] = orgId
-      }
+  const role = getAuthRole()
+  if (role === 'SuperAdmin') {
+    const orgId = getSelectedOrgId()
+    if (orgId) {
+      headers['X-Org-Id'] = orgId
     }
   }
 
   return headers
 }
 
+export const checkAuth = async (): Promise<AuthMeResponse | null> => {
+  const res = await fetch(buildUrl('/api/auth/me'), {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (res.status === 401) return null
+  if (!res.ok) {
+    const data = await res.text()
+    throw new Error(data || res.statusText)
+  }
+  return res.json() as Promise<AuthMeResponse>
+}
+
 export const apiGet = async <T>(path: string): Promise<T> => {
   const response = await fetch(buildUrl(path), {
+    credentials: 'include',
     headers: buildHeaders(),
   })
 
@@ -145,6 +156,7 @@ export const apiGet = async <T>(path: string): Promise<T> => {
 export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -155,6 +167,7 @@ export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
 export const apiPostWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -168,6 +181,7 @@ export const apiPostWithHeaders = async <T>(
 ): Promise<{ data: T; headers: Headers }> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -179,6 +193,7 @@ export const apiPostWithHeaders = async <T>(
 export const apiPut = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'PUT',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -192,6 +207,7 @@ export const apiPutWithHeaders = async <T>(
 ): Promise<{ data: T; headers: Headers }> => {
   const response = await fetch(buildUrl(path), {
     method: 'PUT',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -203,6 +219,7 @@ export const apiPutWithHeaders = async <T>(
 export const apiPatch = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'PATCH',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -213,6 +230,7 @@ export const apiPatch = async <T>(path: string, body: unknown): Promise<T> => {
 export const apiPatchWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'PATCH',
+    credentials: 'include',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
   })
@@ -223,6 +241,7 @@ export const apiPatchWithPayload = async <T>(path: string, body: unknown): Promi
 export const apiDelete = async <T>(path: string): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'DELETE',
+    credentials: 'include',
     headers: buildHeaders(),
   })
 
@@ -231,6 +250,7 @@ export const apiDelete = async <T>(path: string): Promise<T> => {
 
 export const apiDownload = async (path: string): Promise<Blob> => {
   const response = await fetch(buildUrl(path), {
+    credentials: 'include',
     headers: buildHeaders(),
   })
 
@@ -245,6 +265,7 @@ export const apiDownload = async (path: string): Promise<Blob> => {
 export const apiPostForm = async <T>(path: string, formData: FormData): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
+    credentials: 'include',
     headers: buildHeaders(),
     body: formData,
   })
@@ -255,6 +276,7 @@ export const apiPostForm = async <T>(path: string, formData: FormData): Promise<
 const portalPost = async <T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> => {
   const response = await fetch(buildUrl(path), {
     method: 'POST',
+    credentials: 'include',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
@@ -264,6 +286,7 @@ const portalPost = async <T>(path: string, body: unknown, headers?: Record<strin
 
 const portalGet = async <T>(path: string, headers?: Record<string, string>): Promise<T> => {
   const response = await fetch(buildUrl(path), {
+    credentials: 'include',
     headers: { Accept: 'application/json', ...headers },
   })
 
@@ -277,12 +300,27 @@ export const portalLogin = async (
   return portalPost<PortalLoginResponse>('/api/portal/login', { eventAccessCode, tcNo })
 }
 
-export const portalGetMe = async (sessionToken: string): Promise<PortalMeResponse> => {
-  return portalGet<PortalMeResponse>('/api/portal/me', { 'X-Portal-Session': sessionToken })
+export const portalGetMe = async (sessionToken?: string): Promise<PortalMeResponse> => {
+  const headers = sessionToken ? { 'X-Portal-Session': sessionToken } : undefined
+  return portalGet<PortalMeResponse>('/api/portal/me', headers)
+}
+
+export const checkPortalSession = async (): Promise<PortalMeResponse | null> => {
+  const res = await fetch(buildUrl('/api/portal/me'), {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (res.status === 401) return null
+  if (!res.ok) throw new Error(await res.text() || res.statusText)
+  return res.json() as Promise<PortalMeResponse>
 }
 
 export const portalResolveEvent = async (eventAccessCode: string): Promise<PortalResolveEventResponse> => {
   return portalGet<PortalResolveEventResponse>(
     `/api/portal/resolve?eventAccessCode=${encodeURIComponent(eventAccessCode)}`
   )
+}
+
+export const portalLogout = async (): Promise<void> => {
+  await fetch(buildUrl('/api/portal/logout'), { method: 'POST', credentials: 'include' })
 }
