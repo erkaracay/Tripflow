@@ -15,7 +15,10 @@ vi.mock('../../../src/lib/toast', () => ({
 
 const router = createRouter({
   history: createMemoryHistory(),
-  routes: [{ path: '/guide/events/:eventId/activities/checkin', component: GuideActivityCheckIn }],
+  routes: [
+    { path: '/guide/events/:eventId/activities/checkin', component: GuideActivityCheckIn },
+    { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+  ],
 })
 
 describe('GuideActivityCheckIn', () => {

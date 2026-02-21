@@ -6,7 +6,10 @@ import AdminActivityCheckIn from '../../../src/pages/admin/AdminActivityCheckIn.
 
 const router = createRouter({
   history: createMemoryHistory(),
-  routes: [{ path: '/admin/events/:eventId/activities/checkin', name: 'AdminActivityCheckIn', component: AdminActivityCheckIn }],
+  routes: [
+    { path: '/admin/events/:eventId/activities/checkin', name: 'AdminActivityCheckIn', component: AdminActivityCheckIn },
+    { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+  ],
 })
 
 vi.mock('../../../src/lib/api', () => ({
