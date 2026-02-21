@@ -14,7 +14,7 @@ type TabItem = {
   content?: unknown
 }
 
-const props = defineProps<{ docs?: PortalDocsResponse | null; printMode?: boolean }>()
+const props = defineProps<{ docs?: PortalDocsResponse | null; printMode?: boolean; participantName?: string | null }>()
 
 const { t } = useI18n()
 const { pushToast } = useToast()
@@ -440,6 +440,10 @@ const formatCustomValue = (value: unknown): string => {
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.infoTabs.flight') }}</div>
         <div class="mt-3 space-y-2 text-sm">
           <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.flightOutboundTitle') }}</div>
+          <div v-if="hasText(props.participantName)" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
+          </div>
           <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
@@ -492,6 +496,10 @@ const formatCustomValue = (value: unknown): string => {
 
         <div class="mt-4 space-y-2 text-sm">
           <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.flightReturnTitle') }}</div>
+          <div v-if="hasText(props.participantName)" class="flex items-start justify-between gap-3 print-row">
+            <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
+          </div>
           <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3 print-row">
             <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>
@@ -764,6 +772,10 @@ const formatCustomValue = (value: unknown): string => {
     <div v-if="activeTab?.kind === 'flight'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.flightOutboundTitle') }}</div>
       <div class="mt-3 space-y-2 text-sm">
+        <div v-if="hasText(props.participantName)" class="flex items-start justify-between gap-3">
+          <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
+          <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
+        </div>
         <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3">
           <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
           <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
@@ -831,6 +843,10 @@ const formatCustomValue = (value: unknown): string => {
       <div class="mt-5 border-t border-slate-100 pt-4">
         <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.flightReturnTitle') }}</div>
         <div class="mt-3 space-y-2 text-sm">
+          <div v-if="hasText(props.participantName)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
+          </div>
           <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3">
             <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>

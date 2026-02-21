@@ -643,7 +643,7 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <PortalInfoTabs :docs="docs" />
+            <PortalInfoTabs :docs="docs" :participant-name="participant?.fullName" />
 
             <button
               class="inline-flex sm:hidden w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"

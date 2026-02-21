@@ -174,7 +174,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <PortalInfoTabs :docs="docs" print-mode />
+      <PortalInfoTabs :docs="docs" :participant-name="participant?.fullName" print-mode />
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.docs.linksTitle') }}</div>
