@@ -744,10 +744,10 @@ const saveParticipant = async (participant: Participant) => {
           returnTransferPlate: editDetails.returnTransferPlate || undefined,
           returnTransferDriverInfo: editDetails.returnTransferDriverInfo || undefined,
           returnTransferNote: editDetails.returnTransferNote || undefined,
-          insuranceCompanyName: editDetails.insuranceCompanyName || undefined,
-          insurancePolicyNo: editDetails.insurancePolicyNo || undefined,
-          insuranceStartDate: editDetails.insuranceStartDate || undefined,
-          insuranceEndDate: editDetails.insuranceEndDate || undefined,
+          insuranceCompanyName: editDetails.insuranceCompanyName.trim(),
+          insurancePolicyNo: editDetails.insurancePolicyNo.trim(),
+          insuranceStartDate: editDetails.insuranceStartDate.trim(),
+          insuranceEndDate: editDetails.insuranceEndDate.trim(),
         },
       }
     )

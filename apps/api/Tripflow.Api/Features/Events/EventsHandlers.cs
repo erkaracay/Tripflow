@@ -3481,18 +3481,18 @@ internal static class EventsHandlers
             details.TicketNo = legacyTicketNo;
         }
         details.AttendanceStatus = request.AttendanceStatus;
-        if (!TryParseDateOnly(request.InsuranceStartDate, out var insuranceStart))
+        details.InsuranceCompanyName = MergeOptionalText(details.InsuranceCompanyName, request.InsuranceCompanyName);
+        details.InsurancePolicyNo = MergeOptionalText(details.InsurancePolicyNo, request.InsurancePolicyNo);
+        if (!TryMergeDateOnly(details.InsuranceStartDate, request.InsuranceStartDate, out var insuranceStart))
         {
             error = "Insurance start date must be in YYYY-MM-DD format.";
             return false;
         }
-        if (!TryParseDateOnly(request.InsuranceEndDate, out var insuranceEnd))
+        if (!TryMergeDateOnly(details.InsuranceEndDate, request.InsuranceEndDate, out var insuranceEnd))
         {
             error = "Insurance end date must be in YYYY-MM-DD format.";
             return false;
         }
-        details.InsuranceCompanyName = request.InsuranceCompanyName;
-        details.InsurancePolicyNo = request.InsurancePolicyNo;
         details.InsuranceStartDate = insuranceStart;
         details.InsuranceEndDate = insuranceEnd;
         details.ArrivalAirline = request.ArrivalAirline;
@@ -3614,6 +3614,28 @@ internal static class EventsHandlers
 
         time = null;
         return false;
+    }
+
+    private static string? MergeOptionalText(string? existing, string? incoming)
+    {
+        if (incoming is null)
+        {
+            return existing;
+        }
+
+        var trimmed = incoming.Trim();
+        return trimmed.Length == 0 ? null : trimmed;
+    }
+
+    private static bool TryMergeDateOnly(DateOnly? existing, string? incoming, out DateOnly? date)
+    {
+        if (incoming is null)
+        {
+            date = existing;
+            return true;
+        }
+
+        return TryParseDateOnly(incoming, out date);
     }
 
     private static string NormalizeTcNo(string? value)
