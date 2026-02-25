@@ -29,6 +29,7 @@ public sealed class ParticipantEntity
     public string CheckInCode { get; set; } = default!;
 
     public ParticipantDetailsEntity? Details { get; set; }
+    public List<ParticipantFlightSegmentEntity> FlightSegments { get; set; } = new();
 
     public DateTime CreatedAt { get; set; }
 }

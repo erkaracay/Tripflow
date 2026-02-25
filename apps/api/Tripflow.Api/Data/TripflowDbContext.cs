@@ -12,6 +12,7 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventActivityEntity> EventActivities => Set<EventActivityEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
+    public DbSet<ParticipantFlightSegmentEntity> ParticipantFlightSegments => Set<ParticipantFlightSegmentEntity>();
     public DbSet<EventDocTabEntity> EventDocTabs => Set<EventDocTabEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
@@ -205,6 +206,11 @@ public sealed class TripflowDbContext : DbContext
                 .WithOne(x => x.Participant)
                 .HasForeignKey<ParticipantDetailsEntity>(x => x.ParticipantId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.FlightSegments)
+                .WithOne(x => x.Participant)
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ParticipantDetailsEntity>(b =>
@@ -276,6 +282,59 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.ReturnBaggageTotalKg);
             b.Property(x => x.ReturnCabinBaggage).HasMaxLength(100);
 
+        });
+
+        modelBuilder.Entity<ParticipantFlightSegmentEntity>(b =>
+        {
+            b.ToTable("participant_flight_segments", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_participant_flight_segments_segment_index",
+                    "\"SegmentIndex\" >= 1");
+                table.HasCheckConstraint(
+                    "CK_participant_flight_segments_baggage_pieces",
+                    "\"BaggagePieces\" IS NULL OR \"BaggagePieces\" > 0");
+                table.HasCheckConstraint(
+                    "CK_participant_flight_segments_baggage_total_kg",
+                    "\"BaggageTotalKg\" IS NULL OR \"BaggageTotalKg\" > 0");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ParticipantId).IsRequired();
+
+            b.Property(x => x.Direction)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsRequired();
+            b.Property(x => x.SegmentIndex).IsRequired();
+
+            b.Property(x => x.Airline).HasMaxLength(100);
+            b.Property(x => x.DepartureAirport).HasMaxLength(20);
+            b.Property(x => x.ArrivalAirport).HasMaxLength(20);
+            b.Property(x => x.FlightCode).HasMaxLength(50);
+            b.Property(x => x.DepartureDate).HasColumnType("date");
+            b.Property(x => x.DepartureTime).HasColumnType("time without time zone");
+            b.Property(x => x.ArrivalDate).HasColumnType("date");
+            b.Property(x => x.ArrivalTime).HasColumnType("time without time zone");
+            b.Property(x => x.Pnr).HasMaxLength(100);
+            b.Property(x => x.TicketNo).HasMaxLength(100);
+            b.Property(x => x.BaggagePieces);
+            b.Property(x => x.BaggageTotalKg);
+
+            b.HasIndex(x => new { x.ParticipantId, x.Direction, x.SegmentIndex }).IsUnique();
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ParticipantId, x.Direction, x.SegmentIndex });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.ParticipantFlightSegments)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.ParticipantFlightSegments)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<EventDocTabEntity>(b =>

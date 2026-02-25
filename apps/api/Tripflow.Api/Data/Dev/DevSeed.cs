@@ -426,6 +426,7 @@ public static class DevSeed
             }
 
             await EnsureParticipantDetailsAsync(db, eventEntity, organizationId, existingParticipants, now, ct, state);
+            await EnsureParticipantFlightSegmentsAsync(db, eventEntity, organizationId, existingParticipants, ct, state);
             return;
         }
 
@@ -463,6 +464,7 @@ public static class DevSeed
         state.Seeded = true;
 
         await EnsureParticipantDetailsAsync(db, eventEntity, organizationId, participants, now, ct, state);
+        await EnsureParticipantFlightSegmentsAsync(db, eventEntity, organizationId, participants, ct, state);
     }
 
     private static async Task EnsureParticipantDetailsAsync(
@@ -778,6 +780,327 @@ public static class DevSeed
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task EnsureParticipantFlightSegmentsAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        IReadOnlyList<ParticipantEntity> participants,
+        CancellationToken ct,
+        SeedState state)
+    {
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        var participantIds = participants.Select(x => x.Id).ToArray();
+        var participantsWithSegments = await db.ParticipantFlightSegments
+            .Where(x => x.OrganizationId == organizationId
+                && x.EventId == eventEntity.Id
+                && participantIds.Contains(x.ParticipantId))
+            .Select(x => x.ParticipantId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var participantsWithSegmentsSet = participantsWithSegments.ToHashSet();
+        if (participantsWithSegmentsSet.Count == participantIds.Length)
+        {
+            return;
+        }
+
+        var detailsByParticipantId = await db.ParticipantDetails
+            .Where(x => participantIds.Contains(x.ParticipantId))
+            .ToDictionaryAsync(x => x.ParticipantId, x => x, ct);
+
+        var created = false;
+        for (var i = 0; i < participants.Count; i++)
+        {
+            var participant = participants[i];
+            if (participantsWithSegmentsSet.Contains(participant.Id))
+            {
+                continue;
+            }
+
+            detailsByParticipantId.TryGetValue(participant.Id, out var detail);
+            var generated = BuildDefaultFlightSegments(eventEntity, organizationId, participant, detail, i + 1);
+            if (generated.Count == 0)
+            {
+                continue;
+            }
+
+            db.ParticipantFlightSegments.AddRange(generated);
+            created = true;
+        }
+
+        if (!created)
+        {
+            return;
+        }
+
+        await db.SaveChangesAsync(ct);
+        state.Seeded = true;
+    }
+
+    private static List<ParticipantFlightSegmentEntity> BuildDefaultFlightSegments(
+        EventEntity eventEntity,
+        Guid organizationId,
+        ParticipantEntity participant,
+        ParticipantDetailsEntity? detail,
+        int index)
+    {
+        var segments = new List<ParticipantFlightSegmentEntity>(4);
+        var multiLeg = index % 3 == 0;
+
+        var arrivalOrigin = NormalizeAirport(detail?.ArrivalDepartureAirport, index % 2 == 0 ? "IST" : "SAW");
+        var arrivalDestination = NormalizeAirport(detail?.ArrivalArrivalAirport, index % 2 == 0 ? "ASR" : "ADB");
+        if (string.Equals(arrivalOrigin, arrivalDestination, StringComparison.OrdinalIgnoreCase))
+        {
+            arrivalDestination = "ASR";
+        }
+
+        var arrivalDate = detail?.ArrivalFlightDate ?? eventEntity.StartDate.AddDays(-1);
+        var arrivalDepartureTime = detail?.ArrivalDepartureTime ?? new TimeOnly(7 + (index % 5), index % 2 == 0 ? 15 : 45);
+        var arrivalAirline = NormalizeText(detail?.ArrivalAirline, index % 2 == 0 ? "THY" : "Pegasus");
+        var arrivalTicketNo = NormalizeNullableText(detail?.ArrivalTicketNo) ?? NormalizeNullableText(detail?.TicketNo);
+        var arrivalPnr = NormalizeNullableText(detail?.ArrivalPnr) ?? $"ARR{index:0000}";
+        var arrivalPieces = detail?.ArrivalBaggagePieces ?? ((index % 2) + 1);
+        var arrivalTotalKg = detail?.ArrivalBaggageTotalKg ?? (arrivalPieces == 1 ? 23 : 30);
+
+        if (multiLeg)
+        {
+            var arrivalConnection = PickConnectionAirport(arrivalOrigin, arrivalDestination, index);
+            var firstArrivalAt = AddMinutes(arrivalDepartureTime, 75);
+            var secondDepartureAt = AddMinutes(firstArrivalAt, 60);
+            var secondArrivalAt = detail?.ArrivalArrivalTime ?? AddMinutes(secondDepartureAt, 80);
+            var arrivalCodeBase = NormalizeText(detail?.ArrivalFlightCode, $"TFA{index:000}");
+
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Arrival,
+                1,
+                arrivalAirline,
+                arrivalOrigin,
+                arrivalConnection,
+                $"{arrivalCodeBase}A",
+                arrivalDate,
+                arrivalDepartureTime,
+                arrivalDate,
+                firstArrivalAt,
+                arrivalPnr,
+                arrivalTicketNo,
+                arrivalPieces,
+                arrivalTotalKg));
+
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Arrival,
+                2,
+                arrivalAirline,
+                arrivalConnection,
+                arrivalDestination,
+                $"{arrivalCodeBase}B",
+                arrivalDate,
+                secondDepartureAt,
+                arrivalDate,
+                secondArrivalAt,
+                arrivalPnr,
+                arrivalTicketNo,
+                arrivalPieces,
+                arrivalTotalKg));
+        }
+        else
+        {
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Arrival,
+                1,
+                arrivalAirline,
+                arrivalOrigin,
+                arrivalDestination,
+                NormalizeText(detail?.ArrivalFlightCode, $"TFA{index:000}"),
+                arrivalDate,
+                arrivalDepartureTime,
+                arrivalDate,
+                detail?.ArrivalArrivalTime ?? AddMinutes(arrivalDepartureTime, 90),
+                arrivalPnr,
+                arrivalTicketNo,
+                arrivalPieces,
+                arrivalTotalKg));
+        }
+
+        var returnOrigin = NormalizeAirport(detail?.ReturnDepartureAirport, arrivalDestination);
+        var returnDestination = NormalizeAirport(detail?.ReturnArrivalAirport, arrivalOrigin);
+        if (string.Equals(returnOrigin, returnDestination, StringComparison.OrdinalIgnoreCase))
+        {
+            returnDestination = "IST";
+        }
+
+        var returnDate = detail?.ReturnFlightDate ?? eventEntity.EndDate;
+        var returnDepartureTime = detail?.ReturnDepartureTime ?? new TimeOnly(16 + (index % 4), 10);
+        var returnAirline = NormalizeText(detail?.ReturnAirline, arrivalAirline);
+        var returnTicketNo = NormalizeNullableText(detail?.ReturnTicketNo);
+        var returnPnr = NormalizeNullableText(detail?.ReturnPnr) ?? $"RET{index:0000}";
+        var returnPieces = detail?.ReturnBaggagePieces ?? ((index % 2) + 1);
+        var returnTotalKg = detail?.ReturnBaggageTotalKg ?? (returnPieces == 1 ? 23 : 30);
+
+        if (multiLeg)
+        {
+            var returnConnection = PickConnectionAirport(returnOrigin, returnDestination, index + 7);
+            var firstReturnAt = AddMinutes(returnDepartureTime, 80);
+            var secondReturnDeparture = AddMinutes(firstReturnAt, 55);
+            var secondReturnArrival = detail?.ReturnArrivalTime ?? AddMinutes(secondReturnDeparture, 85);
+            var returnCodeBase = NormalizeText(detail?.ReturnFlightCode, $"TFR{index:000}");
+
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Return,
+                1,
+                returnAirline,
+                returnOrigin,
+                returnConnection,
+                $"{returnCodeBase}A",
+                returnDate,
+                returnDepartureTime,
+                returnDate,
+                firstReturnAt,
+                returnPnr,
+                returnTicketNo,
+                returnPieces,
+                returnTotalKg));
+
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Return,
+                2,
+                returnAirline,
+                returnConnection,
+                returnDestination,
+                $"{returnCodeBase}B",
+                returnDate,
+                secondReturnDeparture,
+                returnDate,
+                secondReturnArrival,
+                returnPnr,
+                returnTicketNo,
+                returnPieces,
+                returnTotalKg));
+        }
+        else
+        {
+            segments.Add(CreateFlightSegment(
+                organizationId,
+                eventEntity.Id,
+                participant.Id,
+                ParticipantFlightSegmentDirection.Return,
+                1,
+                returnAirline,
+                returnOrigin,
+                returnDestination,
+                NormalizeText(detail?.ReturnFlightCode, $"TFR{index:000}"),
+                returnDate,
+                returnDepartureTime,
+                returnDate,
+                detail?.ReturnArrivalTime ?? AddMinutes(returnDepartureTime, 95),
+                returnPnr,
+                returnTicketNo,
+                returnPieces,
+                returnTotalKg));
+        }
+
+        return segments;
+    }
+
+    private static ParticipantFlightSegmentEntity CreateFlightSegment(
+        Guid organizationId,
+        Guid eventId,
+        Guid participantId,
+        ParticipantFlightSegmentDirection direction,
+        int segmentIndex,
+        string airline,
+        string departureAirport,
+        string arrivalAirport,
+        string flightCode,
+        DateOnly departureDate,
+        TimeOnly departureTime,
+        DateOnly arrivalDate,
+        TimeOnly arrivalTime,
+        string? pnr,
+        string? ticketNo,
+        int? baggagePieces,
+        int? baggageTotalKg)
+    {
+        return new ParticipantFlightSegmentEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
+            EventId = eventId,
+            ParticipantId = participantId,
+            Direction = direction,
+            SegmentIndex = segmentIndex,
+            Airline = airline,
+            DepartureAirport = departureAirport,
+            ArrivalAirport = arrivalAirport,
+            FlightCode = flightCode,
+            DepartureDate = departureDate,
+            DepartureTime = departureTime,
+            ArrivalDate = arrivalDate,
+            ArrivalTime = arrivalTime,
+            Pnr = pnr,
+            TicketNo = ticketNo,
+            BaggagePieces = baggagePieces is > 0 ? baggagePieces : null,
+            BaggageTotalKg = baggageTotalKg is > 0 ? baggageTotalKg : null
+        };
+    }
+
+    private static string PickConnectionAirport(string departureAirport, string arrivalAirport, int seed)
+    {
+        var candidates = new[] { "ESB", "ADB", "AYT", "ASR", "BJV", "DLM" };
+        for (var i = 0; i < candidates.Length; i++)
+        {
+            var candidate = candidates[(seed + i) % candidates.Length];
+            if (!string.Equals(candidate, departureAirport, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(candidate, arrivalAirport, StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+
+        return "ESB";
+    }
+
+    private static string NormalizeAirport(string? value, string fallback)
+    {
+        var normalized = NormalizeNullableText(value)?.ToUpperInvariant();
+        return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+    }
+
+    private static string NormalizeText(string? value, string fallback)
+    {
+        var normalized = NormalizeNullableText(value);
+        return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+    }
+
+    private static string? NormalizeNullableText(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static TimeOnly AddMinutes(TimeOnly source, int minutes)
+    {
+        return TimeOnly.FromDateTime(DateTime.UnixEpoch.Add(source.ToTimeSpan()).AddMinutes(minutes));
     }
 
     private static async Task EnsureDocTabsAsync(
