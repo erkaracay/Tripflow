@@ -5,7 +5,13 @@ import { formatBaggage, formatCabinBaggage, formatTime } from '../../lib/formatt
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import CopyIcon from '../icons/CopyIcon.vue'
-import type { PortalDocsResponse, PortalFlightInfo, PortalInsuranceInfo, PortalTransferInfo } from '../../types'
+import type {
+  FlightSegment,
+  PortalDocsResponse,
+  PortalFlightInfo,
+  PortalInsuranceInfo,
+  PortalTransferInfo,
+} from '../../types'
 
 type TabItem = {
   id: string
@@ -32,6 +38,14 @@ const copyToClipboard = async (value: string) => {
 }
 
 const travel = computed(() => props.docs?.participantTravel ?? null)
+
+const sortedSegments = (segments?: FlightSegment[] | null) =>
+  [...(segments ?? [])]
+    .filter((x) => x && typeof x.segmentIndex === 'number')
+    .sort((a, b) => a.segmentIndex - b.segmentIndex)
+
+const arrivalSegments = computed(() => sortedSegments(travel.value?.arrivalSegments))
+const returnSegments = computed(() => sortedSegments(travel.value?.returnSegments))
 
 const normalizeType = (value?: string | null) => (value ?? '').trim().toLowerCase()
 
@@ -157,6 +171,24 @@ const hasFlightValue = (flight?: PortalFlightInfo | null) => {
       (typeof flight.baggagePieces === 'number' && flight.baggagePieces > 0) ||
       (typeof flight.baggageTotalKg === 'number' && flight.baggageTotalKg > 0) ||
       flight.cabinBaggage?.trim()
+  )
+}
+
+const hasSegmentValue = (segment?: FlightSegment | null) => {
+  if (!segment) return false
+  return Boolean(
+    segment.airline?.trim() ||
+      segment.departureAirport?.trim() ||
+      segment.arrivalAirport?.trim() ||
+      segment.flightCode?.trim() ||
+      segment.ticketNo?.trim() ||
+      segment.departureDate?.trim() ||
+      segment.departureTime?.trim() ||
+      segment.arrivalDate?.trim() ||
+      segment.arrivalTime?.trim() ||
+      segment.pnr?.trim() ||
+      (typeof segment.baggagePieces === 'number' && segment.baggagePieces > 0) ||
+      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0)
   )
 }
 
@@ -444,54 +476,116 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
           </div>
-          <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
-          </div>
-          <div v-if="hasText(travel?.arrival?.departureAirport)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.departureAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.arrival?.arrivalAirport)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.arrivalAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.arrival?.flightCode)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
-          </div>
-          <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
-          </div>
-          <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.arrival?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.arrivalTime) }}</span>
-          </div>
-          <div v-if="hasText(travel?.arrival?.pnr)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.pnr) }}</span>
-          </div>
-          <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
-            </span>
-          </div>
-          <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
-            </span>
-          </div>
+          <template v-if="arrivalSegments.length > 0">
+            <template
+              v-for="(segment, index) in arrivalSegments"
+              :key="`print-arrival-${segment.segmentIndex}-${index}`"
+            >
+              <div v-if="hasSegmentValue(segment)" class="space-y-2 rounded-xl border border-slate-100 p-3 print-row">
+                <div class="text-xs font-semibold text-slate-500">
+                  {{ t('portal.docs.flight.segments.segmentTitle', { index: segment.segmentIndex }) }}
+                </div>
+                <div v-if="hasText(segment.airline)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.airline) }}</span>
+                </div>
+                <div v-if="hasText(segment.departureAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.departureAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.arrivalAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.arrivalAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.flightCode)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.flightCode) }}</span>
+                </div>
+                <div v-if="hasText(segment.ticketNo)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.ticketNo) }}</span>
+                </div>
+                <div v-if="formatDate(segment.departureDate) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatDate(segment.departureDate) }}</span>
+                </div>
+                <div v-if="formatTime(segment.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.departureTime) }}</span>
+                </div>
+                <div v-if="formatTime(segment.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.arrivalTime) }}</span>
+                </div>
+                <div v-if="hasText(segment.pnr)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.pnr) }}</span>
+                </div>
+                <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+                </div>
+              </div>
+              <div
+                v-if="index < arrivalSegments.length - 1"
+                class="flex items-center gap-3 py-1 text-xs font-semibold text-slate-500 print-row"
+              >
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+                <span>{{ t('common.transferDivider') }}</span>
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+              </div>
+            </template>
+          </template>
+          <template v-else>
+            <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
+            </div>
+            <div v-if="hasText(travel?.arrival?.departureAirport)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.departureAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.arrival?.arrivalAirport)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.arrivalAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.arrival?.flightCode)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
+            </div>
+            <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}</span>
+            </div>
+            <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.arrival?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.arrivalTime) }}</span>
+            </div>
+            <div v-if="hasText(travel?.arrival?.pnr)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.pnr) }}</span>
+            </div>
+            <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
+              </span>
+            </div>
+            <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
+              </span>
+            </div>
+          </template>
         </div>
 
         <div class="mt-4 space-y-2 text-sm">
@@ -500,56 +594,121 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
           </div>
-          <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.departureAirport)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.departureAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.arrivalAirport)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.arrivalAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
-          </div>
-          <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.return?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.arrivalTime) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.pnr)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.pnr) }}</span>
-          </div>
-          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
-            </span>
-          </div>
-          <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
-            </span>
-          </div>
+          <template v-if="returnSegments.length > 0">
+            <template
+              v-for="(segment, index) in returnSegments"
+              :key="`print-return-${segment.segmentIndex}-${index}`"
+            >
+              <div v-if="hasSegmentValue(segment)" class="space-y-2 rounded-xl border border-slate-100 p-3 print-row">
+                <div class="text-xs font-semibold text-slate-500">
+                  {{ t('portal.docs.flight.segments.segmentTitle', { index: segment.segmentIndex }) }}
+                </div>
+                <div v-if="hasText(segment.airline)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.airline) }}</span>
+                </div>
+                <div v-if="hasText(segment.departureAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.departureAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.arrivalAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.arrivalAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.flightCode)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.flightCode) }}</span>
+                </div>
+                <div v-if="hasText(segment.ticketNo)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.ticketNo) }}</span>
+                </div>
+                <div v-if="formatDate(segment.departureDate) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatDate(segment.departureDate) }}</span>
+                </div>
+                <div v-if="formatTime(segment.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.departureTime) }}</span>
+                </div>
+                <div v-if="formatTime(segment.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.arrivalTime) }}</span>
+                </div>
+                <div v-if="hasText(segment.pnr)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.pnr) }}</span>
+                </div>
+                <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+                </div>
+              </div>
+              <div
+                v-if="index < returnSegments.length - 1"
+                class="flex items-center gap-3 py-1 text-xs font-semibold text-slate-500 print-row"
+              >
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+                <span>{{ t('common.transferDivider') }}</span>
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+              </div>
+            </template>
+          </template>
+          <template v-else>
+            <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.departureAirport)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.departureAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.arrivalAirport)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.arrivalAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.ticketNo) }}</span>
+            </div>
+            <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.return?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.arrivalTime) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.pnr)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.pnr) }}</span>
+            </div>
+            <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
+              </span>
+            </div>
+            <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
+              </span>
+            </div>
+          </template>
         </div>
-        <p v-if="!hasFlightValue(travel?.arrival) && !hasFlightValue(travel?.return)" class="mt-3 text-xs text-slate-500">
+        <p
+          v-if="arrivalSegments.length === 0 && returnSegments.length === 0 && !hasFlightValue(travel?.arrival) && !hasFlightValue(travel?.return)"
+          class="mt-3 text-xs text-slate-500"
+        >
           {{ t('portal.infoTabs.empty') }}
         </p>
       </div>
@@ -776,68 +935,141 @@ const formatCustomValue = (value: unknown): string => {
           <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
           <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
         </div>
-        <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
-        </div>
-        <div v-if="hasText(travel?.arrival?.departureAirport)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.departureAirport) }}</span>
-        </div>
-        <div v-if="hasText(travel?.arrival?.arrivalAirport)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.arrivalAirport) }}</span>
-        </div>
-        <div v-if="hasText(travel?.arrival?.flightCode)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
-        </div>
-        <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
-          <button
-            type="button"
-            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
-            @click="copyToClipboard((travel?.arrival?.ticketNo ?? travel?.ticketNo) ?? '')"
-          >
-            {{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}
-            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-          </button>
-        </div>
-        <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
-        </div>
-        <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
-        </div>
-        <div v-if="formatTime(travel?.arrival?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.arrivalTime) }}</span>
-        </div>
-        <div v-if="hasText(travel?.arrival?.pnr)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-          <button
-            type="button"
-            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
-            @click="copyToClipboard(travel?.arrival?.pnr ?? '')"
-          >
-            {{ valueOrDash(travel?.arrival?.pnr) }}
-            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-          </button>
-        </div>
-        <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
-          <span class="text-right font-medium text-slate-800">
-            {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
-          </span>
-        </div>
-        <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
-          <span class="text-right font-medium text-slate-800">
-            {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
-          </span>
-        </div>
+        <template v-if="arrivalSegments.length > 0">
+          <template v-for="(segment, index) in arrivalSegments" :key="`arrival-${segment.segmentIndex}-${index}`">
+            <div v-if="hasSegmentValue(segment)" class="space-y-2 rounded-xl border border-slate-100 p-3">
+              <div class="text-xs font-semibold text-slate-500">
+                {{ t('portal.docs.flight.segments.segmentTitle', { index: segment.segmentIndex }) }}
+              </div>
+              <div v-if="hasText(segment.airline)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.airline) }}</span>
+              </div>
+              <div v-if="hasText(segment.departureAirport)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.departureAirport) }}</span>
+              </div>
+              <div v-if="hasText(segment.arrivalAirport)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.arrivalAirport) }}</span>
+              </div>
+              <div v-if="hasText(segment.flightCode)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.flightCode) }}</span>
+              </div>
+              <div v-if="hasText(segment.ticketNo)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                  @click="copyToClipboard(segment.ticketNo ?? '')"
+                >
+                  {{ valueOrDash(segment.ticketNo) }}
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
+              </div>
+              <div v-if="formatDate(segment.departureDate) !== '—'" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatDate(segment.departureDate) }}</span>
+              </div>
+              <div v-if="formatTime(segment.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatTime(segment.departureTime) }}</span>
+              </div>
+              <div v-if="formatTime(segment.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatTime(segment.arrivalTime) }}</span>
+              </div>
+              <div v-if="hasText(segment.pnr)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                  @click="copyToClipboard(segment.pnr ?? '')"
+                >
+                  {{ valueOrDash(segment.pnr) }}
+                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                </button>
+              </div>
+              <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+              </div>
+            </div>
+            <div
+              v-if="index < arrivalSegments.length - 1"
+              class="flex items-center gap-3 py-1 text-xs font-semibold text-slate-500"
+            >
+              <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+              <span>{{ t('common.transferDivider') }}</span>
+              <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+            </div>
+          </template>
+        </template>
+        <template v-else>
+          <div v-if="hasText(travel?.arrival?.airline)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.airline) }}</span>
+          </div>
+          <div v-if="hasText(travel?.arrival?.departureAirport)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.departureAirport) }}</span>
+          </div>
+          <div v-if="hasText(travel?.arrival?.arrivalAirport)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.arrivalAirport) }}</span>
+          </div>
+          <div v-if="hasText(travel?.arrival?.flightCode)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.arrival?.flightCode) }}</span>
+          </div>
+          <div v-if="hasText(travel?.arrival?.ticketNo ?? travel?.ticketNo)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
+            <button
+              type="button"
+              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+              @click="copyToClipboard((travel?.arrival?.ticketNo ?? travel?.ticketNo) ?? '')"
+            >
+              {{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}
+              <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+            </button>
+          </div>
+          <div v-if="formatDate(travel?.arrival?.date) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.arrival?.date) }}</span>
+          </div>
+          <div v-if="formatTime(travel?.arrival?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.departureTime) }}</span>
+          </div>
+          <div v-if="formatTime(travel?.arrival?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.arrival?.arrivalTime) }}</span>
+          </div>
+          <div v-if="hasText(travel?.arrival?.pnr)" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+            <button
+              type="button"
+              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+              @click="copyToClipboard(travel?.arrival?.pnr ?? '')"
+            >
+              {{ valueOrDash(travel?.arrival?.pnr) }}
+              <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+            </button>
+          </div>
+          <div v-if="formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+            <span class="text-right font-medium text-slate-800">
+              {{ formatBaggage(travel?.arrival?.baggagePieces, travel?.arrival?.baggageTotalKg, travel?.arrivalBaggageAllowance) }}
+            </span>
+          </div>
+          <div v-if="travel?.arrival?.cabinBaggage" class="flex items-start justify-between gap-3">
+            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+            <span class="text-right font-medium text-slate-800">
+              {{ formatCabinBaggage(travel?.arrival?.cabinBaggage) }}
+            </span>
+          </div>
+        </template>
       </div>
 
       <div class="mt-5 border-t border-slate-100 pt-4">
@@ -847,70 +1079,146 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.fullName') }}</span>
             <span class="text-right font-medium text-slate-800">{{ valueOrDash(props.participantName) }}</span>
           </div>
-          <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.departureAirport)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.departureAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.arrivalAirport)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.arrivalAirport) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
-          </div>
-        <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
-          <button
-            type="button"
-            class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
-            @click="copyToClipboard(travel?.return?.ticketNo ?? '')"
-          >
-            {{ valueOrDash(travel?.return?.ticketNo) }}
-            <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-          </button>
+          <template v-if="returnSegments.length > 0">
+            <template v-for="(segment, index) in returnSegments" :key="`return-${segment.segmentIndex}-${index}`">
+              <div v-if="hasSegmentValue(segment)" class="space-y-2 rounded-xl border border-slate-100 p-3">
+                <div class="text-xs font-semibold text-slate-500">
+                  {{ t('portal.docs.flight.segments.segmentTitle', { index: segment.segmentIndex }) }}
+                </div>
+                <div v-if="hasText(segment.airline)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.airline) }}</span>
+                </div>
+                <div v-if="hasText(segment.departureAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.departureAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.arrivalAirport)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.arrivalAirport) }}</span>
+                </div>
+                <div v-if="hasText(segment.flightCode)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ valueOrDash(segment.flightCode) }}</span>
+                </div>
+                <div v-if="hasText(segment.ticketNo)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                    @click="copyToClipboard(segment.ticketNo ?? '')"
+                  >
+                    {{ valueOrDash(segment.ticketNo) }}
+                    <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                  </button>
+                </div>
+                <div v-if="formatDate(segment.departureDate) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatDate(segment.departureDate) }}</span>
+                </div>
+                <div v-if="formatTime(segment.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.departureTime) }}</span>
+                </div>
+                <div v-if="formatTime(segment.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatTime(segment.arrivalTime) }}</span>
+                </div>
+                <div v-if="hasText(segment.pnr)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                    @click="copyToClipboard(segment.pnr ?? '')"
+                  >
+                    {{ valueOrDash(segment.pnr) }}
+                    <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+                  </button>
+                </div>
+                <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+                </div>
+              </div>
+              <div
+                v-if="index < returnSegments.length - 1"
+                class="flex items-center gap-3 py-1 text-xs font-semibold text-slate-500"
+              >
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+                <span>{{ t('common.transferDivider') }}</span>
+                <span aria-hidden="true" class="h-px flex-1 bg-slate-200" />
+              </div>
+            </template>
+          </template>
+          <template v-else>
+            <div v-if="hasText(travel?.return?.airline)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.airline') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.airline) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.departureAirport)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.departureAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.departureAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.arrivalAirport)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalAirport') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.arrivalAirport) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.flightCode)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.flightCode') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.return?.flightCode) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.ticketNo)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
+              <button
+                type="button"
+                class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                @click="copyToClipboard(travel?.return?.ticketNo ?? '')"
+              >
+                {{ valueOrDash(travel?.return?.ticketNo) }}
+                <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+              </button>
+            </div>
+            <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
+            </div>
+            <div v-if="formatTime(travel?.return?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.arrivalTime) }}</span>
+            </div>
+            <div v-if="hasText(travel?.return?.pnr)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
+              <button
+                type="button"
+                class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                @click="copyToClipboard(travel?.return?.pnr ?? '')"
+              >
+                {{ valueOrDash(travel?.return?.pnr) }}
+                <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
+              </button>
+            </div>
+            <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
+              </span>
+            </div>
+            <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
+              </span>
+            </div>
+          </template>
         </div>
-          <div v-if="formatDate(travel?.return?.date) !== '—'" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.flightDate') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.return?.date) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.return?.departureTime) !== '—'" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.departureTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.departureTime) }}</span>
-          </div>
-          <div v-if="formatTime(travel?.return?.arrivalTime) !== '—'" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.arrivalTime') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatTime(travel?.return?.arrivalTime) }}</span>
-          </div>
-          <div v-if="hasText(travel?.return?.pnr)" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
-            <button
-              type="button"
-              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
-              @click="copyToClipboard(travel?.return?.pnr ?? '')"
-            >
-              {{ valueOrDash(travel?.return?.pnr) }}
-              <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-            </button>
-          </div>
-          <div v-if="formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) !== '—'" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatBaggage(travel?.return?.baggagePieces, travel?.return?.baggageTotalKg, travel?.returnBaggageAllowance) }}
-            </span>
-          </div>
-          <div v-if="travel?.return?.cabinBaggage" class="flex items-start justify-between gap-3">
-            <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              {{ formatCabinBaggage(travel?.return?.cabinBaggage) }}
-            </span>
-          </div>
-        </div>
-        <p v-if="!hasFlightValue(travel?.arrival) && !hasFlightValue(travel?.return)" class="mt-3 text-xs text-slate-500">
+        <p
+          v-if="arrivalSegments.length === 0 && returnSegments.length === 0 && !hasFlightValue(travel?.arrival) && !hasFlightValue(travel?.return)"
+          class="mt-3 text-xs text-slate-500"
+        >
           {{ t('portal.infoTabs.empty') }}
         </p>
       </div>

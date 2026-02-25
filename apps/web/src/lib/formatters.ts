@@ -53,10 +53,37 @@ export const formatDate = (value?: string | null) => {
   if (!trimmed) {
     return '—'
   }
-  const datePart = trimmed.includes('T')
-    ? trimmed.split('T')[0]
-    : trimmed.split(' ')[0]
-  return datePart || trimmed
+
+  const datePart = trimmed.includes('T') ? trimmed.split('T')[0] : trimmed.split(' ')[0]
+  const normalizedDatePart = datePart || trimmed
+
+  // yyyy-MM-dd / yyyy.MM.dd / yyyy/MM/dd
+  const yearFirst = normalizedDatePart.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/)
+  if (yearFirst) {
+    const year = yearFirst[1] ?? ''
+    const month = yearFirst[2] ?? ''
+    const day = yearFirst[3] ?? ''
+    return `${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`
+  }
+
+  // dd-MM-yyyy / dd.MM.yyyy / dd/MM/yyyy
+  const dayFirst = normalizedDatePart.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
+  if (dayFirst) {
+    const day = dayFirst[1] ?? ''
+    const month = dayFirst[2] ?? ''
+    const year = dayFirst[3] ?? ''
+    return `${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`
+  }
+
+  const parsed = new Date(trimmed)
+  if (!Number.isNaN(parsed.getTime())) {
+    const day = parsed.getDate().toString().padStart(2, '0')
+    const month = (parsed.getMonth() + 1).toString().padStart(2, '0')
+    const year = parsed.getFullYear().toString()
+    return `${day}.${month}.${year}`
+  }
+
+  return normalizedDatePart
 }
 
 export const formatTime = (value?: string | null) => {
