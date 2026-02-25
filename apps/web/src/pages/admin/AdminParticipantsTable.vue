@@ -3,13 +3,27 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
+import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
-import type { Event as EventDto, ParticipantTableItem, ParticipantTableResponse } from '../../types'
+import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
+import { formatDate } from '../../lib/formatters'
+import {
+  buildFlightSegmentsSheetRows,
+  buildParticipantsSheetRows,
+  FLIGHT_SEGMENTS_SHEET_HEADERS,
+  PARTICIPANTS_SHEET_HEADERS,
+} from '../../lib/participantsExportWorkbook'
+import type {
+  Event as EventDto,
+  ParticipantProfile,
+  ParticipantTableItem,
+  ParticipantTableResponse,
+} from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
+const { pushToast } = useToast()
 
 const eventId = computed(() => String(route.params.eventId ?? ''))
 
@@ -120,118 +134,78 @@ const sortIndicator = (col: string) => {
   return dir.value === 'asc' ? ' ↑' : ' ↓'
 }
 
-const buildCsvValue = (value: string | number | null | undefined) =>
-  `"${String(value ?? '').replace(/"/g, '""')}"`
+const fetchProfilesForExport = async (participantIds: string[]) => {
+  const profilesById = new Map<string, ParticipantProfile | null>()
+  const failedParticipantIds: string[] = []
 
-const exportCsv = () => {
-  if (tableItems.value.length === 0) return
+  if (participantIds.length === 0) {
+    return { profilesById, failedParticipantIds }
+  }
 
-  const headers = [
-    'fullName',
-    'tcNo',
-    'phone',
-    'email',
-    'gender',
-    'birthDate',
-    'arrived',
-    'arrivedAt',
-    'checkInCode',
-    'roomNo',
-    'roomType',
-    'personNo',
-    'agencyName',
-    'city',
-    'flightCity',
-    'hotelCheckInDate',
-    'hotelCheckOutDate',
-    'arrivalTicketNo',
-    'returnTicketNo',
-    'ticketNo',
-    'attendanceStatus',
-    'arrivalAirline',
-    'arrivalDepartureAirport',
-    'arrivalArrivalAirport',
-    'arrivalFlightCode',
-    'arrivalDepartureTime',
-    'arrivalArrivalTime',
-    'arrivalPnr',
-    'arrivalBaggagePieces',
-    'arrivalBaggageTotalKg',
-    'arrivalBaggageAllowance',
-    'returnAirline',
-    'returnDepartureAirport',
-    'returnArrivalAirport',
-    'returnFlightCode',
-    'returnDepartureTime',
-    'returnArrivalTime',
-    'returnPnr',
-    'returnBaggagePieces',
-    'returnBaggageTotalKg',
-    'returnBaggageAllowance',
-  ]
+  const ids = [...participantIds]
+  const concurrency = Math.min(8, ids.length)
+  let cursor = 0
 
-  const rows = tableItems.value.map((row) => {
-    const details = row.details ?? {}
-    return [
-      row.fullName,
-      row.tcNo,
-      row.phone,
-      row.email ?? '',
-      row.gender,
-      row.birthDate,
-      row.arrived ? 'true' : 'false',
-      row.arrivedAt ?? '',
-      row.checkInCode,
-      details.roomNo ?? '',
-      details.roomType ?? '',
-      details.personNo ?? '',
-      details.agencyName ?? '',
-      details.city ?? '',
-      details.flightCity ?? '',
-      details.hotelCheckInDate ?? '',
-      details.hotelCheckOutDate ?? '',
-      details.arrivalTicketNo ?? details.ticketNo ?? '',
-      details.returnTicketNo ?? '',
-      details.ticketNo ?? '',
-      details.attendanceStatus ?? '',
-      details.arrivalAirline ?? '',
-      details.arrivalDepartureAirport ?? '',
-      details.arrivalArrivalAirport ?? '',
-      details.arrivalFlightCode ?? '',
-      details.arrivalDepartureTime ?? '',
-      details.arrivalArrivalTime ?? '',
-      details.arrivalPnr ?? '',
-      details.arrivalBaggagePieces ?? '',
-      details.arrivalBaggageTotalKg ?? '',
-      details.arrivalBaggageAllowance ?? '',
-      details.returnAirline ?? '',
-      details.returnDepartureAirport ?? '',
-      details.returnArrivalAirport ?? '',
-      details.returnFlightCode ?? '',
-      details.returnDepartureTime ?? '',
-      details.returnArrivalTime ?? '',
-      details.returnPnr ?? '',
-      details.returnBaggagePieces ?? '',
-      details.returnBaggageTotalKg ?? '',
-      details.returnBaggageAllowance ?? '',
-    ]
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (true) {
+      const index = cursor
+      cursor += 1
+      if (index >= ids.length) {
+        break
+      }
+
+      const participantId = ids[index]
+      if (!participantId) {
+        continue
+      }
+      try {
+        const profile = await apiGet<ParticipantProfile>(
+          `/api/events/${eventId.value}/participants/${participantId}`
+        )
+        profilesById.set(participantId, profile)
+      } catch {
+        profilesById.set(participantId, null)
+        failedParticipantIds.push(participantId)
+      }
+    }
   })
 
-  const csv = [headers, ...rows]
-    .map((row) => row.map((value) => buildCsvValue(value)).join(','))
-    .join('\n')
+  await Promise.all(workers)
+  return { profilesById, failedParticipantIds }
+}
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
-  const id = route.params.eventId ?? 'event'
-  const timestamp = new Date()
-  const stamp = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, '0')}${String(timestamp.getDate()).padStart(2, '0')}_${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}`
-  link.href = URL.createObjectURL(blob)
-  link.download = `participants_${id}_${stamp}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(link.href)
+const exportExcel = async () => {
+  if (tableItems.value.length === 0) return
+
+  try {
+    const participantIds = tableItems.value.map((row) => row.id)
+    const { profilesById, failedParticipantIds } = await fetchProfilesForExport(participantIds)
+    const participantRows = buildParticipantsSheetRows(tableItems.value)
+    const flightSegmentRows = buildFlightSegmentsSheetRows(tableItems.value, profilesById)
+
+    const { utils, writeFile } = await import('xlsx')
+    const workbook = utils.book_new()
+    const participantsSheet = utils.aoa_to_sheet([PARTICIPANTS_SHEET_HEADERS, ...participantRows])
+    const segmentsSheet = utils.aoa_to_sheet([FLIGHT_SEGMENTS_SHEET_HEADERS, ...flightSegmentRows])
+
+    utils.book_append_sheet(workbook, participantsSheet, 'participants')
+    utils.book_append_sheet(workbook, segmentsSheet, 'flight_segments')
+
+    const id = route.params.eventId ?? 'event'
+    const timestamp = new Date()
+    const stamp = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, '0')}${String(timestamp.getDate()).padStart(2, '0')}_${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}`
+    writeFile(workbook, `participants_${id}_${stamp}.xlsx`)
+
+    if (failedParticipantIds.length > 0) {
+      pushToast({
+        key: 'admin.participantsTable.exportSegmentsPartial',
+        params: { count: failedParticipantIds.length },
+        tone: 'info',
+      })
+    }
+  } catch {
+    pushToast({ key: 'errors.generic', tone: 'error' })
+  }
 }
 
 watch([status, pageSize], () => {
@@ -265,9 +239,9 @@ onMounted(loadEvent)
       <button
         class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
         type="button"
-        @click="exportCsv"
+        @click="exportExcel"
       >
-        {{ t('admin.participantsTable.exportCsv') }}
+        {{ t('admin.participantsTable.exportExcel') }}
       </button>
     </div>
 
@@ -392,22 +366,7 @@ onMounted(loadEvent)
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.hotelCheckOutDate') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.ticketNo') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.attendanceStatus') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalAirline') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalDepartureAirport') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalArrivalAirport') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalFlightCode') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalDepartureTime') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalArrivalTime') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalPnr') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.arrivalBaggage') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnAirline') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnDepartureAirport') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnArrivalAirport') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnFlightCode') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnDepartureTime') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnArrivalTime') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnPnr') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.returnBaggage') }}</th>
+              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.flights') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.actions') }}</th>
             </tr>
           </thead>
@@ -451,35 +410,14 @@ onMounted(loadEvent)
                 <span v-else>—</span>
               </td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.attendanceStatus ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalAirline ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalDepartureAirport ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalArrivalAirport ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalFlightCode ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ formatTime(row.details?.arrivalDepartureTime) }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ formatTime(row.details?.arrivalArrivalTime) }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.arrivalPnr ?? '—' }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">
-                {{
-                  formatBaggage(
-                    row.details?.arrivalBaggagePieces ?? undefined,
-                    row.details?.arrivalBaggageTotalKg ?? undefined
-                  )
-                }}
-              </td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.returnAirline ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.returnDepartureAirport ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.returnArrivalAirport ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.returnFlightCode ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ formatTime(row.details?.returnDepartureTime) }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ formatTime(row.details?.returnArrivalTime) }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.returnPnr ?? '—' }}</td>
-              <td class="px-3 py-2 text-xs text-slate-700">
-                {{
-                  formatBaggage(
-                    row.details?.returnBaggagePieces ?? undefined,
-                    row.details?.returnBaggageTotalKg ?? undefined
-                  )
-                }}
+                <ParticipantFlightsModal
+                  :event-id="eventId"
+                  :participant-id="row.id"
+                  :participant-name="row.fullName"
+                  :button-label="t('admin.participantsTable.flights.open')"
+                  button-class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-slate-300"
+                />
               </td>
               <td class="px-3 py-2 text-xs text-slate-700">
                 <RouterLink
@@ -491,7 +429,7 @@ onMounted(loadEvent)
               </td>
             </tr>
             <tr v-if="tableItems.length === 0 && !loading">
-              <td class="px-3 py-6 text-center text-sm text-slate-500" colspan="36">
+              <td class="px-3 py-6 text-center text-sm text-slate-500" colspan="21">
                 {{ t('admin.participantsTable.empty') }}
               </td>
             </tr>

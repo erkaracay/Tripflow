@@ -4,9 +4,9 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import { useToast } from '../../lib/toast'
-import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
+import { formatDate, formatTime } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
-import CopyIcon from '../../components/icons/CopyIcon.vue'
+import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { EventDocTabDto, ParticipantProfile } from '../../types'
@@ -91,18 +91,6 @@ const formatGender = (value?: string | null) => {
   if (value === 'Male') return t('common.genderMale')
   if (value === 'Other') return t('common.genderOther')
   return value
-}
-
-const formatBaggageWithFallback = (
-  pieces?: number | null,
-  kg?: number | null,
-  allowance?: string | null
-) => {
-  const formatted = formatBaggage(pieces, kg)
-  if (formatted === '—' && allowance) {
-    return allowance
-  }
-  return formatted
 }
 
 const copyText = async (value?: string | null) => {
@@ -283,162 +271,14 @@ onMounted(loadProfile)
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold text-slate-900">{{ t('admin.participantProfile.sections.flights') }}</h2>
-        <div class="mt-4 grid gap-6 lg:grid-cols-2">
-          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 class="text-sm font-semibold text-slate-900">
-              {{ t('admin.participantProfile.fields.arrivalTitle') }}
-            </h3>
-            <div class="mt-3 space-y-3 text-sm">
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalAirline') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.arrivalAirline ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalDepartureAirport') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.arrivalDepartureAirport ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalArrivalAirport') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.arrivalArrivalAirport ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalFlightCode') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.arrivalFlightCode ?? undefined) }}</span>
-              </div>
-              <div v-if="details?.arrivalTicketNo || details?.ticketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalTicketNo') }}</span>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
-                  @click="copyValue(details?.arrivalTicketNo ?? details?.ticketNo ?? null)"
-                >
-                  {{ displayValue(details?.arrivalTicketNo ?? details?.ticketNo ?? undefined) }}
-                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-                </button>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalFlightDate') }}</span>
-                <span class="text-slate-900">{{ formatDate(details?.arrivalFlightDate) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalDepartureTime') }}</span>
-                <span class="text-slate-900">{{ formatTime(details?.arrivalDepartureTime) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalArrivalTime') }}</span>
-                <span class="text-slate-900">{{ formatTime(details?.arrivalArrivalTime) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalPnr') }}</span>
-                <button
-                  v-if="details?.arrivalPnr"
-                  type="button"
-                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
-                  @click="copyValue(details?.arrivalPnr ?? null)"
-                >
-                  {{ displayValue(details?.arrivalPnr ?? undefined) }}
-                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-                </button>
-                <span v-else class="text-slate-900">{{ displayValue(details?.arrivalPnr ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.arrivalBaggage') }}</span>
-                <span class="text-slate-900">
-                  {{
-                    formatBaggageWithFallback(
-                      details?.arrivalBaggagePieces,
-                      details?.arrivalBaggageTotalKg,
-                      details?.arrivalBaggageAllowance
-                    )
-                  }}
-                </span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.cabinBaggage') }}</span>
-                <span class="text-slate-900">
-                  {{ formatCabinBaggage(details?.arrivalCabinBaggage) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 class="text-sm font-semibold text-slate-900">
-              {{ t('admin.participantProfile.fields.returnTitle') }}
-            </h3>
-            <div class="mt-3 space-y-3 text-sm">
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnAirline') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnAirline ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnDepartureAirport') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnDepartureAirport ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnArrivalAirport') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnArrivalAirport ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnFlightCode') }}</span>
-                <span class="text-slate-900">{{ displayValue(details?.returnFlightCode ?? undefined) }}</span>
-              </div>
-              <div v-if="details?.returnTicketNo" class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnTicketNo') }}</span>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
-                  @click="copyValue(details?.returnTicketNo ?? null)"
-                >
-                  {{ displayValue(details?.returnTicketNo ?? undefined) }}
-                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-                </button>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnFlightDate') }}</span>
-                <span class="text-slate-900">{{ formatDate(details?.returnFlightDate) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnDepartureTime') }}</span>
-                <span class="text-slate-900">{{ formatTime(details?.returnDepartureTime) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnArrivalTime') }}</span>
-                <span class="text-slate-900">{{ formatTime(details?.returnArrivalTime) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnPnr') }}</span>
-                <button
-                  v-if="details?.returnPnr"
-                  type="button"
-                  class="inline-flex items-center gap-1.5 text-slate-900 cursor-pointer hover:underline focus:outline-none focus:underline text-left"
-                  @click="copyValue(details?.returnPnr ?? null)"
-                >
-                  {{ displayValue(details?.returnPnr ?? undefined) }}
-                  <CopyIcon :size="14" icon-class="shrink-0 text-slate-500" />
-                </button>
-                <span v-else class="text-slate-900">{{ displayValue(details?.returnPnr ?? undefined) }}</span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.returnBaggage') }}</span>
-                <span class="text-slate-900">
-                  {{
-                    formatBaggageWithFallback(
-                      details?.returnBaggagePieces,
-                      details?.returnBaggageTotalKg,
-                      details?.returnBaggageAllowance
-                    )
-                  }}
-                </span>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
-                <span class="text-slate-500">{{ t('admin.participantProfile.fields.cabinBaggage') }}</span>
-                <span class="text-slate-900">
-                  {{ formatCabinBaggage(details?.returnCabinBaggage) }}
-                </span>
-              </div>
-            </div>
-          </div>
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-slate-500">{{ t('admin.participant.flights.modalSubtitle') }}</p>
+          <ParticipantFlightsModal
+            :event-id="eventId"
+            :participant-id="participantId"
+            :participant-name="profile.fullName"
+            :button-label="t('admin.participant.flights.openButton')"
+          />
         </div>
       </section>
 
@@ -465,4 +305,5 @@ onMounted(loadProfile)
       </section>
     </template>
   </div>
+
 </template>

@@ -15,6 +15,13 @@ import {
 } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
+import {
+  buildFlightSegmentsSheetRows,
+  buildParticipantsSheetRows,
+  FLIGHT_SEGMENTS_SHEET_HEADERS,
+  PARTICIPANTS_SHEET_HEADERS,
+} from '../../lib/participantsExportWorkbook'
+import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
@@ -23,6 +30,7 @@ import type {
   EventAccessCodeResponse,
   LinkInfo,
   Participant,
+  ParticipantProfile,
   Event as EventDto,
   EventPortalInfo,
   UserListItem,
@@ -143,29 +151,7 @@ const editDetails = reactive({
   flightCity: '',
   hotelCheckInDate: '',
   hotelCheckOutDate: '',
-  arrivalTicketNo: '',
-  returnTicketNo: '',
   attendanceStatus: '',
-  arrivalAirline: '',
-  arrivalDepartureAirport: '',
-  arrivalArrivalAirport: '',
-  arrivalFlightCode: '',
-  arrivalFlightDate: '',
-  arrivalDepartureTime: '',
-  arrivalArrivalTime: '',
-  arrivalPnr: '',
-  arrivalBaggageAllowance: '',
-  arrivalCabinBaggage: '',
-  returnAirline: '',
-  returnDepartureAirport: '',
-  returnArrivalAirport: '',
-  returnFlightCode: '',
-  returnFlightDate: '',
-  returnDepartureTime: '',
-  returnArrivalTime: '',
-  returnPnr: '',
-  returnBaggageAllowance: '',
-  returnCabinBaggage: '',
   arrivalTransferPickupTime: '',
   arrivalTransferPickupPlace: '',
   arrivalTransferDropoffPlace: '',
@@ -185,6 +171,207 @@ const editDetails = reactive({
   insuranceStartDate: '',
   insuranceEndDate: '',
 })
+
+type LegacyFlightDirection = 'arrival' | 'return'
+
+type LegacyFlightField = {
+  labelKey: string
+  value: string
+}
+
+const normalizeAttendanceStatus = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/ı/g, 'i')
+
+const attendanceStatusIsWillNotAttend = (value: string) => {
+  const normalized = normalizeAttendanceStatus(value)
+  if (!normalized) {
+    return false
+  }
+
+  return [
+    'katilmayacak',
+    'will not attend',
+    'will_not_attend',
+    'willnotattend',
+    'not attending',
+    'not_attending',
+    'false',
+    '0',
+    'no',
+    'hayir',
+  ].includes(normalized)
+}
+
+const attendanceStatusIsWillAttend = (value: string) => {
+  const normalized = normalizeAttendanceStatus(value)
+  if (!normalized) {
+    return true
+  }
+
+  return [
+    'katilacak',
+    'will attend',
+    'will_attend',
+    'willattend',
+    'attending',
+    'true',
+    '1',
+    'yes',
+    'evet',
+  ].includes(normalized)
+}
+
+const attendanceToggle = computed(() => {
+  if (attendanceStatusIsWillNotAttend(editDetails.attendanceStatus)) {
+    return false
+  }
+  if (attendanceStatusIsWillAttend(editDetails.attendanceStatus)) {
+    return true
+  }
+  return true
+})
+
+const attendanceToggleLabel = computed(() =>
+  attendanceToggle.value ? t('common.willAttend') : t('common.willNotAttend')
+)
+
+const toggleAttendanceStatus = () => {
+  editDetails.attendanceStatus = attendanceToggle.value ? t('common.willNotAttend') : t('common.willAttend')
+}
+
+const pushLegacyFlightField = (
+  fields: LegacyFlightField[],
+  labelKey: string,
+  value: string | null | undefined
+) => {
+  if (!value || !value.trim()) {
+    return
+  }
+
+  fields.push({
+    labelKey,
+    value: value.trim(),
+  })
+}
+
+const getLegacyFlightFields = (
+  participant: Participant,
+  direction: LegacyFlightDirection
+): LegacyFlightField[] => {
+  const details = participant.details
+  if (!details) {
+    return []
+  }
+
+  const fields: LegacyFlightField[] = []
+
+  if (direction === 'arrival') {
+    pushLegacyFlightField(fields, 'admin.participants.details.arrivalAirline', details.arrivalAirline)
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalDepartureAirport',
+      details.arrivalDepartureAirport
+    )
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalArrivalAirport',
+      details.arrivalArrivalAirport
+    )
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalFlightCode',
+      details.arrivalFlightCode
+    )
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalFlightDate',
+      details.arrivalFlightDate
+    )
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalDepartureTime',
+      details.arrivalDepartureTime
+    )
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalArrivalTime',
+      details.arrivalArrivalTime
+    )
+    pushLegacyFlightField(fields, 'admin.participants.details.arrivalPnr', details.arrivalPnr)
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.arrivalTicketNo',
+      details.arrivalTicketNo ?? details.ticketNo
+    )
+    const baggage = formatBaggage(
+      details.arrivalBaggagePieces,
+      details.arrivalBaggageTotalKg,
+      details.arrivalBaggageAllowance
+    )
+    if (baggage !== '—') {
+      fields.push({
+        labelKey: 'admin.participants.details.arrivalBaggageAllowance',
+        value: baggage,
+      })
+    }
+    pushLegacyFlightField(
+      fields,
+      'admin.participants.details.cabinBaggage',
+      details.arrivalCabinBaggage
+    )
+    return fields
+  }
+
+  pushLegacyFlightField(fields, 'admin.participants.details.returnAirline', details.returnAirline)
+  pushLegacyFlightField(
+    fields,
+    'admin.participants.details.returnDepartureAirport',
+    details.returnDepartureAirport
+  )
+  pushLegacyFlightField(
+    fields,
+    'admin.participants.details.returnArrivalAirport',
+    details.returnArrivalAirport
+  )
+  pushLegacyFlightField(fields, 'admin.participants.details.returnFlightCode', details.returnFlightCode)
+  pushLegacyFlightField(fields, 'admin.participants.details.returnFlightDate', details.returnFlightDate)
+  pushLegacyFlightField(
+    fields,
+    'admin.participants.details.returnDepartureTime',
+    details.returnDepartureTime
+  )
+  pushLegacyFlightField(
+    fields,
+    'admin.participants.details.returnArrivalTime',
+    details.returnArrivalTime
+  )
+  pushLegacyFlightField(fields, 'admin.participants.details.returnPnr', details.returnPnr)
+  pushLegacyFlightField(fields, 'admin.participants.details.returnTicketNo', details.returnTicketNo)
+  const baggage = formatBaggage(
+    details.returnBaggagePieces,
+    details.returnBaggageTotalKg,
+    details.returnBaggageAllowance
+  )
+  if (baggage !== '—') {
+    fields.push({
+      labelKey: 'admin.participants.details.returnBaggageAllowance',
+      value: baggage,
+    })
+  }
+  pushLegacyFlightField(fields, 'admin.participants.details.cabinBaggage', details.returnCabinBaggage)
+  return fields
+}
+
+const hasLegacyFlight = (participant: Participant, direction: LegacyFlightDirection) =>
+  getLegacyFlightFields(participant, direction).length > 0
+
+const hasAnyLegacyFlight = (participant: Participant) =>
+  hasLegacyFlight(participant, 'arrival') || hasLegacyFlight(participant, 'return')
 
 const genderOptions = [
   { value: 'Female', label: 'common.genderFemale' },
@@ -565,44 +752,7 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.flightCity = participant.details?.flightCity ?? ''
   editDetails.hotelCheckInDate = participant.details?.hotelCheckInDate ?? ''
   editDetails.hotelCheckOutDate = participant.details?.hotelCheckOutDate ?? ''
-  editDetails.arrivalTicketNo = participant.details?.arrivalTicketNo ?? participant.details?.ticketNo ?? ''
-  editDetails.returnTicketNo = participant.details?.returnTicketNo ?? ''
   editDetails.attendanceStatus = participant.details?.attendanceStatus ?? ''
-  editDetails.arrivalAirline = participant.details?.arrivalAirline ?? ''
-  editDetails.arrivalDepartureAirport = participant.details?.arrivalDepartureAirport ?? ''
-  editDetails.arrivalArrivalAirport = participant.details?.arrivalArrivalAirport ?? ''
-  editDetails.arrivalFlightCode = participant.details?.arrivalFlightCode ?? ''
-  editDetails.arrivalFlightDate = participant.details?.arrivalFlightDate ?? ''
-  editDetails.arrivalDepartureTime = participant.details?.arrivalDepartureTime ?? ''
-  editDetails.arrivalArrivalTime = participant.details?.arrivalArrivalTime ?? ''
-  editDetails.arrivalPnr = participant.details?.arrivalPnr ?? ''
-  // Prefill with formatted baggage (pieces / kg / allowance) so it matches the details view like "20 kg"
-  {
-    const formattedArrivalBaggage = formatBaggage(
-      participant.details?.arrivalBaggagePieces ?? null,
-      participant.details?.arrivalBaggageTotalKg ?? null,
-      participant.details?.arrivalBaggageAllowance ?? null
-    )
-    editDetails.arrivalBaggageAllowance = formattedArrivalBaggage === '—' ? '' : formattedArrivalBaggage
-  }
-  editDetails.arrivalCabinBaggage = participant.details?.arrivalCabinBaggage ?? ''
-  editDetails.returnAirline = participant.details?.returnAirline ?? ''
-  editDetails.returnDepartureAirport = participant.details?.returnDepartureAirport ?? ''
-  editDetails.returnArrivalAirport = participant.details?.returnArrivalAirport ?? ''
-  editDetails.returnFlightCode = participant.details?.returnFlightCode ?? ''
-  editDetails.returnFlightDate = participant.details?.returnFlightDate ?? ''
-  editDetails.returnDepartureTime = participant.details?.returnDepartureTime ?? ''
-  editDetails.returnArrivalTime = participant.details?.returnArrivalTime ?? ''
-  editDetails.returnPnr = participant.details?.returnPnr ?? ''
-  {
-    const formattedReturnBaggage = formatBaggage(
-      participant.details?.returnBaggagePieces ?? null,
-      participant.details?.returnBaggageTotalKg ?? null,
-      participant.details?.returnBaggageAllowance ?? null
-    )
-    editDetails.returnBaggageAllowance = formattedReturnBaggage === '—' ? '' : formattedReturnBaggage
-  }
-  editDetails.returnCabinBaggage = participant.details?.returnCabinBaggage ?? ''
   editDetails.arrivalTransferPickupTime = participant.details?.arrivalTransferPickupTime ?? ''
   editDetails.arrivalTransferPickupPlace = participant.details?.arrivalTransferPickupPlace ?? ''
   editDetails.arrivalTransferDropoffPlace = participant.details?.arrivalTransferDropoffPlace ?? ''
@@ -701,35 +851,41 @@ const saveParticipant = async (participant: Participant) => {
         details: {
           roomNo: editDetails.roomNo || undefined,
           roomType: editDetails.roomType || undefined,
+          boardType: participant.details?.boardType || undefined,
           personNo: editDetails.personNo || undefined,
           agencyName: editDetails.agencyName || undefined,
           city: editDetails.city || undefined,
           flightCity: editDetails.flightCity || undefined,
           hotelCheckInDate: editDetails.hotelCheckInDate || undefined,
           hotelCheckOutDate: editDetails.hotelCheckOutDate || undefined,
-          arrivalTicketNo: editDetails.arrivalTicketNo || undefined,
-          returnTicketNo: editDetails.returnTicketNo || undefined,
+          ticketNo: participant.details?.ticketNo || undefined,
+          arrivalTicketNo: participant.details?.arrivalTicketNo || undefined,
+          returnTicketNo: participant.details?.returnTicketNo || undefined,
           attendanceStatus: editDetails.attendanceStatus || undefined,
-          arrivalAirline: editDetails.arrivalAirline || undefined,
-          arrivalDepartureAirport: editDetails.arrivalDepartureAirport || undefined,
-          arrivalArrivalAirport: editDetails.arrivalArrivalAirport || undefined,
-          arrivalFlightCode: editDetails.arrivalFlightCode || undefined,
-          arrivalFlightDate: editDetails.arrivalFlightDate || undefined,
-          arrivalDepartureTime: editDetails.arrivalDepartureTime || undefined,
-          arrivalArrivalTime: editDetails.arrivalArrivalTime || undefined,
-          arrivalPnr: editDetails.arrivalPnr || undefined,
-          arrivalBaggageAllowance: editDetails.arrivalBaggageAllowance || undefined,
-          arrivalCabinBaggage: editDetails.arrivalCabinBaggage || undefined,
-          returnAirline: editDetails.returnAirline || undefined,
-          returnDepartureAirport: editDetails.returnDepartureAirport || undefined,
-          returnArrivalAirport: editDetails.returnArrivalAirport || undefined,
-          returnFlightCode: editDetails.returnFlightCode || undefined,
-          returnFlightDate: editDetails.returnFlightDate || undefined,
-          returnDepartureTime: editDetails.returnDepartureTime || undefined,
-          returnArrivalTime: editDetails.returnArrivalTime || undefined,
-          returnPnr: editDetails.returnPnr || undefined,
-          returnBaggageAllowance: editDetails.returnBaggageAllowance || undefined,
-          returnCabinBaggage: editDetails.returnCabinBaggage || undefined,
+          arrivalAirline: participant.details?.arrivalAirline || undefined,
+          arrivalDepartureAirport: participant.details?.arrivalDepartureAirport || undefined,
+          arrivalArrivalAirport: participant.details?.arrivalArrivalAirport || undefined,
+          arrivalFlightCode: participant.details?.arrivalFlightCode || undefined,
+          arrivalFlightDate: participant.details?.arrivalFlightDate || undefined,
+          arrivalDepartureTime: participant.details?.arrivalDepartureTime || undefined,
+          arrivalArrivalTime: participant.details?.arrivalArrivalTime || undefined,
+          arrivalPnr: participant.details?.arrivalPnr || undefined,
+          arrivalBaggageAllowance: participant.details?.arrivalBaggageAllowance || undefined,
+          arrivalBaggagePieces: participant.details?.arrivalBaggagePieces ?? undefined,
+          arrivalBaggageTotalKg: participant.details?.arrivalBaggageTotalKg ?? undefined,
+          arrivalCabinBaggage: participant.details?.arrivalCabinBaggage || undefined,
+          returnAirline: participant.details?.returnAirline || undefined,
+          returnDepartureAirport: participant.details?.returnDepartureAirport || undefined,
+          returnArrivalAirport: participant.details?.returnArrivalAirport || undefined,
+          returnFlightCode: participant.details?.returnFlightCode || undefined,
+          returnFlightDate: participant.details?.returnFlightDate || undefined,
+          returnDepartureTime: participant.details?.returnDepartureTime || undefined,
+          returnArrivalTime: participant.details?.returnArrivalTime || undefined,
+          returnPnr: participant.details?.returnPnr || undefined,
+          returnBaggageAllowance: participant.details?.returnBaggageAllowance || undefined,
+          returnBaggagePieces: participant.details?.returnBaggagePieces ?? undefined,
+          returnBaggageTotalKg: participant.details?.returnBaggageTotalKg ?? undefined,
+          returnCabinBaggage: participant.details?.returnCabinBaggage || undefined,
           arrivalTransferPickupTime: editDetails.arrivalTransferPickupTime || undefined,
           arrivalTransferPickupPlace: editDetails.arrivalTransferPickupPlace || undefined,
           arrivalTransferDropoffPlace: editDetails.arrivalTransferDropoffPlace || undefined,
@@ -997,123 +1153,44 @@ const openWhatsApp = async (participant: Participant) => {
   }
 }
 
-const buildParticipantsExport = () => {
-  const headers = [
-    'room_no',
-    'room_type',
-    'board_type',
-    'person_no',
-    'agency_name',
-    'city',
-    'full_name',
-    'birth_date',
-    'tc_no',
-    'gender',
-    'phone',
-    'email',
-    'flight_city',
-    'hotel_check_in_date',
-    'hotel_check_out_date',
-    'arrival_ticket_no',
-    'return_ticket_no',
-    'insurance_company_name',
-    'insurance_policy_no',
-    'insurance_start_date',
-    'insurance_end_date',
-    'arrival_airline',
-    'arrival_departure_airport',
-    'arrival_arrival_airport',
-    'arrival_flight_code',
-    'arrival_departure_time',
-    'arrival_arrival_time',
-    'arrival_pnr',
-    'arrival_baggage_pieces',
-    'arrival_baggage_total_kg',
-    'return_airline',
-    'return_departure_airport',
-    'return_arrival_airport',
-    'return_flight_code',
-    'return_departure_time',
-    'return_arrival_time',
-    'return_pnr',
-    'return_baggage_pieces',
-    'return_baggage_total_kg',
-    'arrival_transfer_pickup_time',
-    'arrival_transfer_pickup_place',
-    'arrival_transfer_dropoff_place',
-    'arrival_transfer_vehicle',
-    'arrival_transfer_plate',
-    'arrival_transfer_driver_info',
-    'arrival_transfer_note',
-    'return_transfer_pickup_time',
-    'return_transfer_pickup_place',
-    'return_transfer_dropoff_place',
-    'return_transfer_vehicle',
-    'return_transfer_plate',
-    'return_transfer_driver_info',
-    'return_transfer_note',
-  ]
+const fetchParticipantProfilesForExport = async (participantIds: string[]) => {
+  const profilesById = new Map<string, ParticipantProfile | null>()
+  const failedParticipantIds: string[] = []
 
-  const rows = participants.value.map((participant) => {
-    const details = participant.details ?? {}
-    return [
-      details.roomNo ?? '',
-      details.roomType ?? '',
-      details.boardType ?? '',
-      details.personNo ?? '',
-      details.agencyName ?? '',
-      details.city ?? '',
-      participant.fullName,
-      participant.birthDate,
-      participant.tcNo,
-      participant.gender,
-      participant.phone ?? '',
-      participant.email ?? '',
-      details.flightCity ?? '',
-      details.hotelCheckInDate ?? '',
-      details.hotelCheckOutDate ?? '',
-      details.arrivalTicketNo ?? details.ticketNo ?? '',
-      details.returnTicketNo ?? '',
-      details.insuranceCompanyName ?? '',
-      details.insurancePolicyNo ?? '',
-      details.insuranceStartDate ?? '',
-      details.insuranceEndDate ?? '',
-      details.arrivalAirline ?? '',
-      details.arrivalDepartureAirport ?? '',
-      details.arrivalArrivalAirport ?? '',
-      details.arrivalFlightCode ?? '',
-      details.arrivalDepartureTime ?? '',
-      details.arrivalArrivalTime ?? '',
-      details.arrivalPnr ?? '',
-      details.arrivalBaggagePieces ?? '',
-      details.arrivalBaggageTotalKg ?? '',
-      details.returnAirline ?? '',
-      details.returnDepartureAirport ?? '',
-      details.returnArrivalAirport ?? '',
-      details.returnFlightCode ?? '',
-      details.returnDepartureTime ?? '',
-      details.returnArrivalTime ?? '',
-      details.returnPnr ?? '',
-      details.returnBaggagePieces ?? '',
-      details.returnBaggageTotalKg ?? '',
-      details.arrivalTransferPickupTime ?? '',
-      details.arrivalTransferPickupPlace ?? '',
-      details.arrivalTransferDropoffPlace ?? '',
-      details.arrivalTransferVehicle ?? '',
-      details.arrivalTransferPlate ?? '',
-      details.arrivalTransferDriverInfo ?? '',
-      details.arrivalTransferNote ?? '',
-      details.returnTransferPickupTime ?? '',
-      details.returnTransferPickupPlace ?? '',
-      details.returnTransferDropoffPlace ?? '',
-      details.returnTransferVehicle ?? '',
-      details.returnTransferPlate ?? '',
-      details.returnTransferDriverInfo ?? '',
-      details.returnTransferNote ?? '',
-    ]
+  if (participantIds.length === 0) {
+    return { profilesById, failedParticipantIds }
+  }
+
+  const ids = [...participantIds]
+  const concurrency = Math.min(8, ids.length)
+  let cursor = 0
+
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (true) {
+      const index = cursor
+      cursor += 1
+      if (index >= ids.length) {
+        break
+      }
+
+      const participantId = ids[index]
+      if (!participantId) {
+        continue
+      }
+      try {
+        const profile = await apiGet<ParticipantProfile>(
+          `/api/events/${eventId.value}/participants/${participantId}`
+        )
+        profilesById.set(participantId, profile)
+      } catch {
+        profilesById.set(participantId, null)
+        failedParticipantIds.push(participantId)
+      }
+    }
   })
 
-  return { headers, rows }
+  await Promise.all(workers)
+  return { profilesById, failedParticipantIds }
 }
 
 const downloadParticipantsExcel = async () => {
@@ -1121,14 +1198,34 @@ const downloadParticipantsExcel = async () => {
     return
   }
 
-  const { headers, rows } = buildParticipantsExport()
-  const { utils, writeFile } = await import('xlsx')
-  const worksheet = utils.aoa_to_sheet([headers, ...rows])
-  const workbook = utils.book_new()
-  utils.book_append_sheet(workbook, worksheet, 'Participants')
+  try {
+    const participantIds = participants.value.map((participant) => participant.id)
+    const { profilesById, failedParticipantIds } = await fetchParticipantProfilesForExport(
+      participantIds
+    )
+    const participantRows = buildParticipantsSheetRows(participants.value)
+    const flightSegmentRows = buildFlightSegmentsSheetRows(participants.value, profilesById)
 
-  const name = event.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
-  writeFile(workbook, `${name}-participants.xlsx`)
+    const { utils, writeFile } = await import('xlsx')
+    const participantsSheet = utils.aoa_to_sheet([PARTICIPANTS_SHEET_HEADERS, ...participantRows])
+    const segmentsSheet = utils.aoa_to_sheet([FLIGHT_SEGMENTS_SHEET_HEADERS, ...flightSegmentRows])
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, participantsSheet, 'participants')
+    utils.book_append_sheet(workbook, segmentsSheet, 'flight_segments')
+
+    const name = event.value?.name?.trim().replace(/\s+/g, '-') || 'participants'
+    writeFile(workbook, `${name}-participants.xlsx`)
+
+    if (failedParticipantIds.length > 0) {
+      pushToast({
+        key: 'admin.participants.exportSegmentsPartial',
+        params: { count: failedParticipantIds.length },
+        tone: 'info',
+      })
+    }
+  } catch {
+    pushToast({ key: 'errors.generic', tone: 'error' })
+  }
 }
 
 const downloadBadgesPdf = async () => {
@@ -1945,7 +2042,20 @@ onMounted(loadEvent)
                 </label>
               </div>
               <div class="space-y-3">
-                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.title') }}</div>
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M9 3H5.75A1.75 1.75 0 0 0 4 4.75v14.5C4 20.216 4.784 21 5.75 21h12.5A1.75 1.75 0 0 0 20 19.25V8.5L14.5 3H13"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M9 3v4.25c0 .69.56 1.25 1.25 1.25H14.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                  </svg>
+                  <span>{{ t('admin.participants.details.title') }}</span>
+                </div>
                 <div class="grid gap-3 md:grid-cols-3">
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.roomNo') }}</span>
@@ -1973,26 +2083,47 @@ onMounted(loadEvent)
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.hotelCheckInDate') }}</span>
-                    <input v-model.trim="editDetails.hotelCheckInDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                    <input v-model.trim="editDetails.hotelCheckInDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.hotelCheckOutDate') }}</span>
-                    <input v-model.trim="editDetails.hotelCheckOutDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                    <input v-model.trim="editDetails.hotelCheckOutDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
                   </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTicketNo') }}</span>
-                    <input v-model.trim="editDetails.arrivalTicketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnTicketNo') }}</span>
-                    <input v-model.trim="editDetails.returnTicketNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
+                  <div class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.attendanceStatus') }}</span>
-                    <input v-model.trim="editDetails.attendanceStatus" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
+                    <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="attendanceToggle"
+                      class="inline-flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-slate-300"
+                      @click="toggleAttendanceStatus"
+                    >
+                      <span class="font-medium text-slate-700">{{ attendanceToggleLabel }}</span>
+                      <span
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                        :class="attendanceToggle ? 'bg-emerald-500' : 'bg-slate-300'"
+                      >
+                        <span
+                          class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
+                          :class="attendanceToggle ? 'translate-x-5' : 'translate-x-1'"
+                        />
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.insuranceTitle') }}</div>
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M12 3l7 3v5.5c0 4.5-2.8 8.6-7 10-4.2-1.4-7-5.5-7-10V6l7-3z"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M9 12.3l2 2 4-4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span>{{ t('admin.participants.details.insuranceTitle') }}</span>
+                </div>
                 <div class="grid gap-3 md:grid-cols-3">
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.insuranceCompanyName') }}</span>
@@ -2011,98 +2142,84 @@ onMounted(loadEvent)
                     <input v-model.trim="editDetails.insuranceEndDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
                   </label>
                 </div>
-                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.arrivalTitle') }}</div>
-                <div class="grid gap-3 md:grid-cols-3">
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalAirline') }}</span>
-                    <input v-model.trim="editDetails.arrivalAirline" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalDepartureAirport') }}</span>
-                    <input v-model.trim="editDetails.arrivalDepartureAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalArrivalAirport') }}</span>
-                    <input v-model.trim="editDetails.arrivalArrivalAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalFlightCode') }}</span>
-                    <input v-model.trim="editDetails.arrivalFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalFlightDate') }}</span>
-                    <input v-model.trim="editDetails.arrivalFlightDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalDepartureTime') }}</span>
-                    <input v-model.trim="editDetails.arrivalDepartureTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalArrivalTime') }}</span>
-                    <input v-model.trim="editDetails.arrivalArrivalTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalPnr') }}</span>
-                    <input v-model.trim="editDetails.arrivalPnr" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalBaggageAllowance') }}</span>
-                    <input v-model.trim="editDetails.arrivalBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.cabinBaggage') }}</span>
-                    <input v-model.trim="editDetails.arrivalCabinBaggage" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M3 11.5l18-8-8 18-2-8-8-2z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>{{ t('admin.participant.flights.openButton') }}</span>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-500">{{ t('admin.participant.flights.modalSubtitle') }}</p>
+                    </div>
+                    <ParticipantFlightsModal
+                      :event-id="eventId"
+                      :participant-id="participant.id"
+                      :participant-name="participant.fullName"
+                      :button-label="t('admin.participant.flights.openButton')"
+                      button-class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+                    />
+                  </div>
+                  <div
+                    v-if="hasAnyLegacyFlight(participant)"
+                    class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3"
+                  >
+                    <div class="text-xs font-semibold text-amber-800">
+                      {{ t('admin.participants.details.legacyFlightsTitle') }}
+                    </div>
+                    <p class="mt-1 text-xs text-amber-700">{{ t('admin.participants.details.legacyFlightsHint') }}</p>
+                    <div class="mt-3 grid gap-2 md:grid-cols-2">
+                      <div
+                        v-if="hasLegacyFlight(participant, 'arrival')"
+                        class="rounded-md border border-amber-200 bg-white p-2"
+                      >
+                        <div class="mb-1 text-xs font-semibold text-slate-700">
+                          {{ t('admin.participants.details.arrivalTitle') }}
+                        </div>
+                        <div class="space-y-1 text-xs text-slate-600">
+                          <div
+                            v-for="field in getLegacyFlightFields(participant, 'arrival')"
+                            :key="`legacy-arrival-${field.labelKey}`"
+                            class="flex items-start justify-between gap-2"
+                          >
+                            <span>{{ t(field.labelKey) }}</span>
+                            <span class="text-right font-medium text-slate-800">{{ field.value }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        v-if="hasLegacyFlight(participant, 'return')"
+                        class="rounded-md border border-amber-200 bg-white p-2"
+                      >
+                        <div class="mb-1 text-xs font-semibold text-slate-700">
+                          {{ t('admin.participants.details.returnTitle') }}
+                        </div>
+                        <div class="space-y-1 text-xs text-slate-600">
+                          <div
+                            v-for="field in getLegacyFlightFields(participant, 'return')"
+                            :key="`legacy-return-${field.labelKey}`"
+                            class="flex items-start justify-between gap-2"
+                          >
+                            <span>{{ t(field.labelKey) }}</span>
+                            <span class="text-right font-medium text-slate-800">{{ field.value }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.returnTitle') }}</div>
-                <div class="grid gap-3 md:grid-cols-3">
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnAirline') }}</span>
-                    <input v-model.trim="editDetails.returnAirline" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnDepartureAirport') }}</span>
-                    <input v-model.trim="editDetails.returnDepartureAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnArrivalAirport') }}</span>
-                    <input v-model.trim="editDetails.returnArrivalAirport" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnFlightCode') }}</span>
-                    <input v-model.trim="editDetails.returnFlightCode" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnFlightDate') }}</span>
-                    <input v-model.trim="editDetails.returnFlightDate" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="date" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnDepartureTime') }}</span>
-                    <input v-model.trim="editDetails.returnDepartureTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnArrivalTime') }}</span>
-                    <input v-model.trim="editDetails.returnArrivalTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnPnr') }}</span>
-                    <input v-model.trim="editDetails.returnPnr" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.returnBaggageAllowance') }}</span>
-                    <input v-model.trim="editDetails.returnBaggageAllowance" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
-                  <label class="grid gap-1 text-sm">
-                    <span class="text-slate-600">{{ t('admin.participants.details.cabinBaggage') }}</span>
-                    <input v-model.trim="editDetails.returnCabinBaggage" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
-                  </label>
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 7h11m0 0-3-3m3 3-3 3M20 17H9m0 0 3-3m-3 3 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span>{{ t('admin.participants.details.transferTitle') }}</span>
                 </div>
-                <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.details.transferTitle') }}</div>
                 <div class="text-sm font-semibold text-slate-600">{{ t('admin.participants.details.arrivalTransferTitle') }}</div>
                 <div class="grid gap-3 md:grid-cols-3">
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferPickupTime') }}</span>
-                    <input v-model.trim="editDetails.arrivalTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                    <input v-model.trim="editDetails.arrivalTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="time" />
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferPickupPlace') }}</span>
@@ -2133,7 +2250,7 @@ onMounted(loadEvent)
                 <div class="grid gap-3 md:grid-cols-3">
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnTransferPickupTime') }}</span>
-                    <input v-model.trim="editDetails.returnTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                    <input v-model.trim="editDetails.returnTransferPickupTime" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="time" />
                   </label>
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnTransferPickupPlace') }}</span>
