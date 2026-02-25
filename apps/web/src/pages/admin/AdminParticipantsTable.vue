@@ -49,6 +49,13 @@ const canNext = computed(() => page.value < totalPages.value)
 const tableItems = computed(() => items.value)
 const hasItems = computed(() => tableItems.value.length > 0)
 
+const participantDisplayName = (participant: Pick<ParticipantTableItem, 'firstName' | 'lastName' | 'fullName'>) => {
+  const first = participant.firstName?.trim() ?? ''
+  const last = participant.lastName?.trim() ?? ''
+  const combined = `${first} ${last}`.trim()
+  return combined || participant.fullName
+}
+
 const loadEvent = async () => {
   eventError.value = null
   try {
@@ -372,7 +379,7 @@ onMounted(loadEvent)
           </thead>
           <tbody>
             <tr v-for="row in tableItems" :key="row.id" class="odd:bg-white even:bg-slate-50">
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.fullName }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ participantDisplayName(row) }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.tcNo }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.phone }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ row.email ?? '—' }}</td>
@@ -414,7 +421,7 @@ onMounted(loadEvent)
                 <ParticipantFlightsModal
                   :event-id="eventId"
                   :participant-id="row.id"
-                  :participant-name="row.fullName"
+                  :participant-name="participantDisplayName(row)"
                   :button-label="t('admin.participantsTable.flights.open')"
                   button-class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-slate-300"
                 />

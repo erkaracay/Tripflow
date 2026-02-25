@@ -27,6 +27,8 @@ internal static class ParticipantImportHandlers
         "person_no",
         "agency_name",
         "city",
+        "first_name",
+        "last_name",
         "full_name",
         "birth_date",
         "tc_no",
@@ -88,7 +90,8 @@ internal static class ParticipantImportHandlers
         "person_no",
         "agency_name",
         "city",
-        "full_name",
+        "first_name",
+        "last_name",
         "birth_date",
         "tc_no",
         "gender",
@@ -125,7 +128,8 @@ internal static class ParticipantImportHandlers
         "2",
         "Sky Travel",
         "Istanbul",
-        "Ayse Demir",
+        "Ayse",
+        "Demir",
         "1990-05-10",
         "12345678901",
         "Female",
@@ -564,11 +568,19 @@ internal static class ParticipantImportHandlers
                 var tcNoRaw = row.GetValue("tc_no");
                 var tcNo = NormalizeTcNo(tcNoRaw);
 
-                var fullName = NormalizeName(row.GetValue("full_name"));
-                if (string.IsNullOrWhiteSpace(fullName))
+                var firstName = NormalizeName(row.GetValue("first_name"));
+                var lastName = NormalizeName(row.GetValue("last_name"));
+                var legacyFullName = NormalizeName(row.GetValue("full_name"));
+
+                if ((!string.IsNullOrWhiteSpace(legacyFullName))
+                    && (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName)))
                 {
-                    fullName = NormalizeName(JoinFirstLast(row.GetValue("first_name"), row.GetValue("last_name")));
+                    SplitFullName(legacyFullName, out var parsedFirstName, out var parsedLastName);
+                    firstName = parsedFirstName;
+                    lastName = parsedLastName;
                 }
+
+                var fullName = BuildFullName(firstName, lastName);
 
                 var phone = NormalizePhone(row.GetValue("phone"));
                 var email = NormalizeEmail(row.GetValue("email"));
@@ -578,10 +590,16 @@ internal static class ParticipantImportHandlers
                 var errorFields = new List<string>();
                 var tcNoForIssues = string.IsNullOrWhiteSpace(tcNo) ? null : tcNo;
 
-                if (string.IsNullOrWhiteSpace(fullName))
+                if (string.IsNullOrWhiteSpace(firstName))
                 {
-                    rowErrors.Add("full_name required");
-                    errorFields.Add("full_name");
+                    rowErrors.Add("first_name required");
+                    errorFields.Add("first_name");
+                }
+
+                if (string.IsNullOrWhiteSpace(lastName))
+                {
+                    rowErrors.Add("last_name required");
+                    errorFields.Add("last_name");
                 }
 
                 if (string.IsNullOrWhiteSpace(phone))
@@ -1057,6 +1075,8 @@ internal static class ParticipantImportHandlers
                     if (importMode == ParticipantImportMode.Apply)
                     {
                         var participant = matches[0];
+                        participant.FirstName = firstName;
+                        participant.LastName = lastName;
                         participant.FullName = fullName;
                         participant.Phone = phone;
                         participant.Email = email;
@@ -1089,6 +1109,8 @@ internal static class ParticipantImportHandlers
                             Id = Guid.NewGuid(),
                             EventId = id,
                             OrganizationId = orgId,
+                            FirstName = firstName,
+                            LastName = lastName,
                             FullName = fullName,
                             Phone = phone,
                             Email = email,
@@ -1117,7 +1139,12 @@ internal static class ParticipantImportHandlers
                     }
                     else
                     {
-                        existingByTc[tcNo] = [new ParticipantEntity { Id = Guid.NewGuid(), TcNo = tcNo }];
+                        existingByTc[tcNo] = [new ParticipantEntity
+                        {
+                            Id = Guid.NewGuid(),
+                            TcNo = tcNo,
+                            FullName = fullName
+                        }];
                     }
                 }
 
@@ -1318,7 +1345,7 @@ internal static class ParticipantImportHandlers
                 {
                     previewRows.Add(new ParticipantImportPreviewRow(
                         row.RowNumber,
-                        null,
+                        string.IsNullOrWhiteSpace(matches[0].FullName) ? null : matches[0].FullName,
                         null,
                         tcNo,
                         null,
@@ -1795,6 +1822,11 @@ internal static class ParticipantImportHandlers
                 legacyHeadersDetected = true;
             }
 
+            if (canonical.Equals("full_name", StringComparison.OrdinalIgnoreCase))
+            {
+                legacyHeadersDetected = true;
+            }
+
             if (canonical.Equals("first_name", StringComparison.OrdinalIgnoreCase))
             {
                 firstNameIndex = i;
@@ -1813,7 +1845,15 @@ internal static class ParticipantImportHandlers
             }
         }
 
-        var hasDetails = canonicalIndexes.Keys.Any(key => key is not "full_name" and not "phone" and not "tc_no" and not "birth_date" and not "gender" and not "email");
+        var hasDetails = canonicalIndexes.Keys.Any(key =>
+            key is not "first_name"
+                and not "last_name"
+                and not "full_name"
+                and not "phone"
+                and not "tc_no"
+                and not "birth_date"
+                and not "gender"
+                and not "email");
 
         var missingRequiredColumns = GetMissingRequiredColumns(canonicalIndexes, firstNameIndex, lastNameIndex);
 
@@ -2072,7 +2112,7 @@ internal static class ParticipantImportHandlers
         return string.Join(' ', parts);
     }
 
-    private static string JoinFirstLast(string? first, string? last)
+    private static string BuildFullName(string? first, string? last)
     {
         var firstName = NormalizeName(first);
         var lastName = NormalizeName(last);
@@ -2092,6 +2132,28 @@ internal static class ParticipantImportHandlers
         }
 
         return $"{firstName} {lastName}";
+    }
+
+    private static void SplitFullName(string? fullName, out string firstName, out string lastName)
+    {
+        var normalized = NormalizeName(fullName);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            firstName = string.Empty;
+            lastName = string.Empty;
+            return;
+        }
+
+        var parts = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 1)
+        {
+            firstName = parts[0];
+            lastName = parts[0];
+            return;
+        }
+
+        lastName = parts[^1];
+        firstName = string.Join(' ', parts[..^1]);
     }
 
     private static bool TryParseDate(string? value, out DateOnly date)
@@ -2529,12 +2591,18 @@ internal static class ParticipantImportHandlers
     {
         var missing = new List<string>();
 
-        var hasFullName = canonicalIndexes.ContainsKey("full_name")
-                          || (firstNameIndex is not null && lastNameIndex is not null);
+        var hasFirstName = firstNameIndex is not null;
+        var hasLastName = lastNameIndex is not null;
+        var hasLegacyFullName = canonicalIndexes.ContainsKey("full_name");
 
-        if (!hasFullName)
+        if (!hasFirstName && !hasLegacyFullName)
         {
-            missing.Add("full_name");
+            missing.Add("first_name");
+        }
+
+        if (!hasLastName && !hasLegacyFullName)
+        {
+            missing.Add("last_name");
         }
 
         if (!canonicalIndexes.ContainsKey("phone"))

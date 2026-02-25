@@ -40,6 +40,8 @@ export type Organization = {
 
 export type Participant = {
   id: string
+  firstName: string
+  lastName: string
   fullName: string
   phone: string
   email?: string | null
@@ -75,6 +77,8 @@ export type ActivityParticipantWillNotAttendResponse = {
 
 export type ParticipantResolve = {
   id: string
+  firstName: string
+  lastName: string
   fullName: string
   arrived: boolean
   checkInCode: string
@@ -158,6 +162,8 @@ export type FlightSegment = {
 
 export type ParticipantTableItem = {
   id: string
+  firstName: string
+  lastName: string
   fullName: string
   phone: string
   email?: string | null
@@ -179,6 +185,8 @@ export type ParticipantTableResponse = {
 
 export type ParticipantProfile = {
   id: string
+  firstName: string
+  lastName: string
   fullName: string
   phone: string
   email?: string | null

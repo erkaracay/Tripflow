@@ -86,6 +86,8 @@ internal static class GuideHandlers
             var pattern = $"%{search}%";
             participantsQuery = participantsQuery.Where(x =>
                 EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.FirstName, pattern)
+                || EF.Functions.ILike(x.LastName, pattern)
                 || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
                 || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)));
         }
@@ -108,6 +110,8 @@ internal static class GuideHandlers
                 (participant, checkIns) => new
                 {
                     participant.Id,
+                    participant.FirstName,
+                    participant.LastName,
                     participant.FullName,
                     participant.Phone,
                     participant.Email,
@@ -128,6 +132,8 @@ internal static class GuideHandlers
 
         var participants = rows.Select(row => new ParticipantDto(
                 row.Id,
+                row.FirstName,
+                row.LastName,
                 row.FullName,
                 row.Phone,
                 row.Email,
@@ -275,6 +281,8 @@ internal static class GuideHandlers
 
         return Results.Ok(new ParticipantResolveDto(
             participant.Id,
+            participant.FirstName,
+            participant.LastName,
             participant.FullName,
             arrived,
             participant.CheckInCode));

@@ -125,7 +125,8 @@ const purgeConfirmValid = computed(() => {
 })
 
 const form = reactive({
-  fullName: '',
+  firstName: '',
+  lastName: '',
   tcNo: '',
   birthDate: '',
   gender: '',
@@ -134,7 +135,8 @@ const form = reactive({
 })
 
 const editForm = reactive({
-  fullName: '',
+  firstName: '',
+  lastName: '',
   tcNo: '',
   birthDate: '',
   gender: '',
@@ -372,6 +374,13 @@ const hasLegacyFlight = (participant: Participant, direction: LegacyFlightDirect
 
 const hasAnyLegacyFlight = (participant: Participant) =>
   hasLegacyFlight(participant, 'arrival') || hasLegacyFlight(participant, 'return')
+
+const participantDisplayName = (participant: Pick<Participant, 'firstName' | 'lastName' | 'fullName'>) => {
+  const first = normalizeName(participant.firstName)
+  const last = normalizeName(participant.lastName)
+  const combined = `${first} ${last}`.trim()
+  return combined || participant.fullName
+}
 
 const genderOptions = [
   { value: 'Female', label: 'common.genderFemale' },
@@ -660,9 +669,10 @@ const addParticipant = async () => {
   phoneErrorKey.value = null
   tcNoErrorKey.value = null
 
-  const fullName = normalizeName(form.fullName)
-  if (fullName.length < 2) {
-    formErrorKey.value = 'validation.fullNameRequired'
+  const firstName = normalizeName(form.firstName)
+  const lastName = normalizeName(form.lastName)
+  if (firstName.length < 1 || lastName.length < 1) {
+    formErrorKey.value = 'validation.firstLastNameRequired'
     return
   }
 
@@ -697,7 +707,8 @@ const addParticipant = async () => {
     const { data: created, headers } = await apiPostWithHeaders<Participant>(
       `/api/events/${eventId.value}/participants`,
       {
-        fullName,
+        firstName,
+        lastName,
         phone: normalizedPhone || undefined,
         email: normalizeEmail(form.email) || undefined,
         tcNo,
@@ -712,7 +723,8 @@ const addParticipant = async () => {
       tcNoWarnings.value = { ...tcNoWarnings.value, [created.id]: warning }
       pushToast({ key: 'warnings.tcNoDuplicate', tone: 'info' })
     }
-    form.fullName = ''
+    form.firstName = ''
+    form.lastName = ''
     form.tcNo = ''
     form.birthDate = ''
     form.gender = ''
@@ -737,7 +749,8 @@ const startEditParticipant = (participant: Participant) => {
   editParticipantErrorMessage.value = null
   editPhoneErrorKey.value = null
   editTcNoErrorKey.value = null
-  editForm.fullName = participant.fullName
+  editForm.firstName = participant.firstName
+  editForm.lastName = participant.lastName
   editForm.tcNo = participant.tcNo
   editForm.birthDate = participant.birthDate
   editForm.gender = participant.gender
@@ -805,9 +818,10 @@ const saveParticipant = async (participant: Participant) => {
   editPhoneErrorKey.value = null
   editTcNoErrorKey.value = null
 
-  const fullName = normalizeName(editForm.fullName)
-  if (fullName.length < 2) {
-    editParticipantErrorKey.value = 'validation.fullNameRequired'
+  const firstName = normalizeName(editForm.firstName)
+  const lastName = normalizeName(editForm.lastName)
+  if (firstName.length < 1 || lastName.length < 1) {
+    editParticipantErrorKey.value = 'validation.firstLastNameRequired'
     return
   }
 
@@ -842,7 +856,8 @@ const saveParticipant = async (participant: Participant) => {
     const { data: updated, headers } = await apiPutWithHeaders<Participant>(
       `/api/events/${eventId.value}/participants/${participant.id}`,
       {
-        fullName,
+        firstName,
+        lastName,
         phone: normalizedPhone || undefined,
         email: normalizeEmail(editForm.email) || undefined,
         tcNo,
@@ -938,7 +953,7 @@ const saveParticipant = async (participant: Participant) => {
 
 const deleteParticipant = async (participant: Participant) => {
   const confirmed = globalThis.confirm?.(
-    t('admin.participants.deleteConfirm', { name: participant.fullName })
+    t('admin.participants.deleteConfirm', { name: participantDisplayName(participant) })
   )
   if (!confirmed) {
     return
@@ -1136,7 +1151,7 @@ const openWhatsApp = async (participant: Participant) => {
       return
     }
     const message = t('admin.eventAccess.whatsappTemplate', {
-      name: participant.fullName,
+      name: participantDisplayName(participant),
       eventName: event.value?.name ?? t('admin.eventAccess.eventNameFallback'),
       code,
       url: portalUrl,
@@ -1676,13 +1691,22 @@ onMounted(loadEvent)
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-lg font-semibold">{{ t('admin.participants.addTitle') }}</h2>
         <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="addParticipant">
-          <label class="grid gap-1 text-sm md:col-span-1">
-            <span class="text-slate-600">{{ t('admin.participants.form.fullName') }}</span>
+          <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.participants.form.firstName') }}</span>
             <input
-              v-model.trim="form.fullName"
+              v-model.trim="form.firstName"
               ref="nameInput"
               class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :placeholder="t('admin.participants.form.fullNamePlaceholder')"
+              :placeholder="t('admin.participants.form.firstNamePlaceholder')"
+              type="text"
+            />
+          </label>
+          <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.participants.form.lastName') }}</span>
+            <input
+              v-model.trim="form.lastName"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              :placeholder="t('admin.participants.form.lastNamePlaceholder')"
               type="text"
             />
           </label>
@@ -1969,10 +1993,18 @@ onMounted(loadEvent)
             <div v-if="editingParticipantId === participant.id" class="space-y-3">
               <div class="text-sm font-semibold text-slate-700">{{ t('admin.participants.editTitle') }}</div>
               <div class="grid gap-3 md:grid-cols-3">
-                <label class="grid gap-1 text-sm md:col-span-1">
-                  <span class="text-slate-600">{{ t('admin.participants.form.fullName') }}</span>
+                <label class="grid gap-1 text-sm">
+                  <span class="text-slate-600">{{ t('admin.participants.form.firstName') }}</span>
                   <input
-                    v-model.trim="editForm.fullName"
+                    v-model.trim="editForm.firstName"
+                    class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                    type="text"
+                  />
+                </label>
+                <label class="grid gap-1 text-sm">
+                  <span class="text-slate-600">{{ t('admin.participants.form.lastName') }}</span>
+                  <input
+                    v-model.trim="editForm.lastName"
                     class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                     type="text"
                   />
@@ -2156,7 +2188,7 @@ onMounted(loadEvent)
                     <ParticipantFlightsModal
                       :event-id="eventId"
                       :participant-id="participant.id"
-                      :participant-name="participant.fullName"
+                      :participant-name="participantDisplayName(participant)"
                       :button-label="t('admin.participant.flights.openButton')"
                       button-class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
                     />
@@ -2309,7 +2341,7 @@ onMounted(loadEvent)
             <div v-else class="space-y-2">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div class="font-medium">{{ participant.fullName }}</div>
+                  <div class="font-medium">{{ participantDisplayName(participant) }}</div>
                   <div class="mt-1 text-xs text-slate-500" v-if="participant.email || participant.phone">
                     <span v-if="participant.email">{{ participant.email }}</span>
                     <span v-if="participant.email && participant.phone"> | </span>

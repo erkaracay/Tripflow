@@ -159,9 +159,11 @@ const previewTypeLabel = (row: ParticipantImportPreviewRow) =>
     ? t('admin.import.previewTable.typeFlightSegment')
     : t('admin.import.previewTable.typeParticipant')
 
+const previewParticipantText = (row: ParticipantImportPreviewRow) => row.fullName?.trim() || t('common.noData')
+
 const previewMainText = (row: ParticipantImportPreviewRow) => {
   if (!isSegmentPreviewRow(row)) {
-    return row.fullName ?? t('common.noData')
+    return t('common.noData')
   }
 
   const direction = mapDirectionLabel(row.direction)
@@ -264,6 +266,7 @@ const filteredPreviewRows = computed(() => {
     const searchableParts = [
       row.tcNo,
       row.fullName,
+      previewParticipantText(row),
       row.direction,
       row.segmentIndex ? String(row.segmentIndex) : null,
       row.flightCode,
@@ -287,6 +290,9 @@ const previewStats = computed(() => ({
   shown: filteredPreviewRows.value.length,
   total: previewRows.value.length,
 }))
+
+const showSegmentPreviewColumns = computed(() => previewTypeFilter.value !== 'participant')
+const previewNoRowsColspan = computed(() => (showSegmentPreviewColumns.value ? 8 : 4))
 
 const filteredIssueRows = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -661,7 +667,10 @@ const translateImportError = (error: ParticipantImportError) => {
   if (message.includes('matches multiple existing participants')) return t('admin.import.messages.tcNoAmbiguous')
   if (message.includes('tc_no not found in this event')) return t('admin.import.messages.tcNoNotFoundInEvent')
   if (message.includes('direction must be arrival, return')) return t('admin.import.messages.directionInvalid')
-  if (message.includes('full_name required')) return t('admin.import.messages.fullNameRequired')
+  if (message.includes('first_name required') || message.includes('last_name required')) {
+    return t('admin.import.messages.firstLastNameRequired')
+  }
+  if (message.includes('full_name required')) return t('admin.import.messages.firstLastNameRequired')
   if (message.includes('phone required')) return t('admin.import.messages.phoneRequired')
   if (message.includes('tc_no must be 11 digits')) return t('admin.import.messages.tcNoInvalid')
   if (message.includes('birth_date invalid')) return t('admin.import.messages.birthDateInvalid')
@@ -973,10 +982,11 @@ onBeforeUnmount(() => {
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.row') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.type') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.tcNo') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.participant') }}</th>
+                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
+                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
+                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
+                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -988,13 +998,14 @@ onBeforeUnmount(() => {
                       <td class="px-3 py-2 font-mono text-xs">{{ row.rowIndex }}</td>
                       <td class="px-3 py-2 text-xs text-slate-700">{{ previewTypeLabel(row) }}</td>
                       <td class="px-3 py-2 text-xs text-slate-700">{{ row.tcNo ?? t('common.noData') }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewBaggageText(row) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewParticipantText(row) }}</td>
+                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
+                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
+                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>
+                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewBaggageText(row) }}</td>
                     </tr>
                     <tr v-if="filteredPreviewRows.length === 0">
-                      <td class="px-3 py-4 text-xs text-slate-500" colspan="7">{{ t('admin.import.noRows') }}</td>
+                      <td class="px-3 py-4 text-xs text-slate-500" :colspan="previewNoRowsColspan">{{ t('admin.import.noRows') }}</td>
                     </tr>
                   </tbody>
                 </table>

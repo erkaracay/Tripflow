@@ -111,6 +111,8 @@ public sealed record EventScheduleDayDto(
 public sealed record EventScheduleDto(EventScheduleDayDto[] Days);
 
 public sealed record CreateParticipantRequest(
+    string? FirstName,
+    string? LastName,
     string? FullName,
     string? Phone,
     string? Email,
@@ -119,6 +121,8 @@ public sealed record CreateParticipantRequest(
     string? Gender);
 
 public sealed record UpdateParticipantRequest(
+    string? FirstName,
+    string? LastName,
     string? FullName,
     string? Phone,
     string? Email,
@@ -266,6 +270,8 @@ public sealed record ParticipantFlightsResponse(
 
 public sealed record ParticipantDto(
     Guid Id,
+    string FirstName,
+    string LastName,
     string FullName,
     string Phone,
     string? Email,
@@ -316,6 +322,8 @@ public sealed record ParticipantWillNotAttendResponseDto(
 
 public sealed record ParticipantProfileDto(
     Guid Id,
+    string FirstName,
+    string LastName,
     string FullName,
     string Phone,
     string? Email,
@@ -332,6 +340,8 @@ public sealed record ParticipantProfileDto(
 
 public sealed record ParticipantTableItemDto(
     Guid Id,
+    string FirstName,
+    string LastName,
     string FullName,
     string Phone,
     string? Email,
@@ -348,7 +358,13 @@ public sealed record ParticipantTableResponseDto(
     int PageSize,
     int Total,
     ParticipantTableItemDto[] Items);
-public sealed record ParticipantResolveDto(Guid Id, string FullName, bool Arrived, string CheckInCode);
+public sealed record ParticipantResolveDto(
+    Guid Id,
+    string FirstName,
+    string LastName,
+    string FullName,
+    bool Arrived,
+    string CheckInCode);
 
 public sealed record CheckInRequest(string? Code, Guid? ParticipantId, string? Method, string? Direction = null);
 public sealed record CheckInCodeRequest(string? CheckInCode, string? Code = null, string? Direction = null, string? Method = null);

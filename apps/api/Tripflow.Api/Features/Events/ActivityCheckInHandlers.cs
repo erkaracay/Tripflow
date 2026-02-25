@@ -138,6 +138,8 @@ internal static class ActivityCheckInHandlers
             var pattern = $"%{search}%";
             participantsQuery = participantsQuery.Where(x =>
                 EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.FirstName, pattern)
+                || EF.Functions.ILike(x.LastName, pattern)
                 || EF.Functions.ILike(x.TcNo, pattern)
                 || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern))
                 || (x.Email != null && EF.Functions.ILike(x.Email, pattern))

@@ -1562,6 +1562,8 @@ internal static class EventsHandlers
             var pattern = $"%{search}%";
             participantsQuery = participantsQuery.Where(x =>
                 EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.FirstName, pattern)
+                || EF.Functions.ILike(x.LastName, pattern)
                 || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
                 || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)));
         }
@@ -1584,6 +1586,8 @@ internal static class EventsHandlers
                 (participant, checkIns) => new
                 {
                     participant.Id,
+                    participant.FirstName,
+                    participant.LastName,
                     participant.FullName,
                     participant.Phone,
                     participant.Email,
@@ -1604,6 +1608,8 @@ internal static class EventsHandlers
 
         var participants = rows.Select(row => new ParticipantDto(
                 row.Id,
+                row.FirstName,
+                row.LastName,
                 row.FullName,
                 row.Phone,
                 row.Email,
@@ -1682,6 +1688,8 @@ internal static class EventsHandlers
             var pattern = $"%{search}%";
             participantsQuery = participantsQuery.Where(x =>
                 EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.FirstName, pattern)
+                || EF.Functions.ILike(x.LastName, pattern)
                 || EF.Functions.ILike(x.TcNo, pattern)
                 || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern))
                 || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
@@ -1746,6 +1754,8 @@ internal static class EventsHandlers
 
         var items = pageItems.Select(row => new ParticipantTableItemDto(
             row.participant.Id,
+            row.participant.FirstName,
+            row.participant.LastName,
             row.participant.FullName,
             row.participant.Phone,
             row.participant.Email,
@@ -1865,6 +1875,8 @@ internal static class EventsHandlers
 
         var dto = new ParticipantProfileDto(
             participant.Id,
+            participant.FirstName,
+            participant.LastName,
             participant.FullName,
             participant.Phone,
             participant.Email,
@@ -1906,11 +1918,19 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        var fullName = request.FullName?.Trim();
-        if (string.IsNullOrWhiteSpace(fullName))
+        var firstName = NormalizeName(request.FirstName);
+        if (string.IsNullOrWhiteSpace(firstName))
         {
-            return EventsHelpers.BadRequest("Full name is required.");
+            return EventsHelpers.BadRequest("First name is required.");
         }
+
+        var lastName = NormalizeName(request.LastName);
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            return EventsHelpers.BadRequest("Last name is required.");
+        }
+
+        var fullName = BuildFullName(firstName, lastName);
 
         var phone = request.Phone?.Trim();
         if (string.IsNullOrWhiteSpace(phone))
@@ -1953,6 +1973,8 @@ internal static class EventsHandlers
             Id = Guid.NewGuid(),
             EventId = id,
             OrganizationId = orgId,
+            FirstName = firstName,
+            LastName = lastName,
             FullName = fullName,
             Phone = phone,
             Email = request.Email?.Trim(),
@@ -1977,6 +1999,8 @@ internal static class EventsHandlers
         return Results.Created($"/api/events/{id}/participants/{entity.Id}",
             new ParticipantDto(
                 entity.Id,
+                entity.FirstName,
+                entity.LastName,
                 entity.FullName,
                 entity.Phone,
                 entity.Email,
@@ -2033,11 +2057,19 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Participant not found." });
         }
 
-        var fullName = request.FullName?.Trim();
-        if (string.IsNullOrWhiteSpace(fullName))
+        var firstName = NormalizeName(request.FirstName);
+        if (string.IsNullOrWhiteSpace(firstName))
         {
-            return EventsHelpers.BadRequest("Full name is required.");
+            return EventsHelpers.BadRequest("First name is required.");
         }
+
+        var lastName = NormalizeName(request.LastName);
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            return EventsHelpers.BadRequest("Last name is required.");
+        }
+
+        var fullName = BuildFullName(firstName, lastName);
 
         var phone = request.Phone?.Trim();
         if (string.IsNullOrWhiteSpace(phone))
@@ -2073,6 +2105,8 @@ internal static class EventsHandlers
             }
         }
 
+        entity.FirstName = firstName;
+        entity.LastName = lastName;
         entity.FullName = fullName;
         entity.Email = email;
         entity.Phone = phone;
@@ -2103,6 +2137,8 @@ internal static class EventsHandlers
 
         return Results.Ok(new ParticipantDto(
             entity.Id,
+            entity.FirstName,
+            entity.LastName,
             entity.FullName,
             entity.Phone,
             entity.Email,
@@ -3138,6 +3174,8 @@ internal static class EventsHandlers
             baseQuery = baseQuery.Where(x =>
                 (x.participant != null && (
                     EF.Functions.ILike(x.participant.FullName, pattern)
+                    || EF.Functions.ILike(x.participant.FirstName, pattern)
+                    || EF.Functions.ILike(x.participant.LastName, pattern)
                     || EF.Functions.ILike(x.participant.TcNo, pattern)
                     || (x.participant.Phone != null && EF.Functions.ILike(x.participant.Phone, pattern))
                     || (x.participant.Email != null && EF.Functions.ILike(x.participant.Email, pattern))
@@ -3903,6 +3941,24 @@ internal static class EventsHandlers
         }
 
         return TryParseDateOnly(incoming, out date);
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return string.Join(' ', parts);
+    }
+
+    private static string BuildFullName(string firstName, string lastName)
+    {
+        var normalizedFirstName = NormalizeName(firstName);
+        var normalizedLastName = NormalizeName(lastName);
+        return $"{normalizedFirstName} {normalizedLastName}".Trim();
     }
 
     private static string NormalizeTcNo(string? value)

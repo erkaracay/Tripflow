@@ -23,6 +23,7 @@ const generalItems = [
 
 const participantItems = [
   'admin.import.helper.participantsCoreRule',
+  'admin.import.helper.participantsNameRule',
   'admin.import.helper.participantsNoFlightRule',
   'admin.import.helper.participantsUpdateRule',
 ] as const

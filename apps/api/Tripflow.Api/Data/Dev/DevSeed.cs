@@ -419,6 +419,17 @@ public static class DevSeed
                             _ => ParticipantGender.Other
                         };
                     }
+
+                    var normalizedFullName = NormalizePersonName(participant.FullName);
+                    if (string.IsNullOrWhiteSpace(normalizedFullName))
+                    {
+                        normalizedFullName = SampleNames[(index - 1) % SampleNames.Length];
+                    }
+
+                    SplitName(normalizedFullName, out var firstName, out var lastName);
+                    participant.FirstName = firstName;
+                    participant.LastName = lastName;
+                    participant.FullName = $"{firstName} {lastName}".Trim();
                 }
 
                 await db.SaveChangesAsync(ct);
@@ -435,6 +446,7 @@ public static class DevSeed
         {
             var code = await GenerateUniqueCheckInCodeAsync(db, ct);
             var name = SampleNames[(i - 1) % SampleNames.Length];
+            SplitName(name, out var firstName, out var lastName);
             var phoneDigits = 5300000000 + i;
             var tcNo = (10000000000L + i).ToString();
             var birthDate = new DateOnly(1990, 1, 1).AddDays(i);
@@ -449,7 +461,9 @@ public static class DevSeed
                 Id = Guid.NewGuid(),
                 EventId = eventEntity.Id,
                 OrganizationId = organizationId,
-                FullName = name,
+                FirstName = firstName,
+                LastName = lastName,
+                FullName = $"{firstName} {lastName}".Trim(),
                 Email = BuildDemoEmail(prefix, i),
                 Phone = $"+90{phoneDigits:0000000000}",
                 TcNo = tcNo,
@@ -1300,6 +1314,39 @@ public static class DevSeed
         }
 
         state.Seeded = true;
+    }
+
+    private static string NormalizePersonName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return string.Join(' ', parts);
+    }
+
+    private static void SplitName(string? fullName, out string firstName, out string lastName)
+    {
+        var normalized = NormalizePersonName(fullName);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            firstName = "Unknown";
+            lastName = "Unknown";
+            return;
+        }
+
+        var parts = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 1)
+        {
+            firstName = parts[0];
+            lastName = parts[0];
+            return;
+        }
+
+        lastName = parts[^1];
+        firstName = string.Join(' ', parts[..^1]);
     }
 
     private static string CreatePortalJson(string eventName, string time, string place, string mapsUrl)

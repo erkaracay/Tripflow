@@ -177,6 +177,8 @@ public sealed class TripflowDbContext : DbContext
             b.HasKey(x => x.Id);
 
             b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
+            b.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             b.Property(x => x.FullName).HasMaxLength(200).IsRequired();
             b.Property(x => x.Phone).HasMaxLength(50).IsRequired();
             b.Property(x => x.Email).HasMaxLength(200);

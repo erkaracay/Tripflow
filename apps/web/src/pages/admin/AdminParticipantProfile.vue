@@ -26,6 +26,17 @@ const hotelAddress = ref<string | null>(null)
 const hotelPhone = ref<string | null>(null)
 
 const details = computed(() => profile.value?.details ?? null)
+const participantDisplayName = computed(() => {
+  const current = profile.value
+  if (!current) {
+    return t('admin.participantProfile.title')
+  }
+
+  const first = current.firstName?.trim() ?? ''
+  const last = current.lastName?.trim() ?? ''
+  const combined = `${first} ${last}`.trim()
+  return combined || current.fullName
+})
 
 const readString = (content: Record<string, unknown>, key: string): string | null => {
   const v = content[key]
@@ -127,7 +138,7 @@ onMounted(loadProfile)
           {{ t('nav.backToEvent') }}
         </RouterLink>
         <h1 class="mt-1 text-2xl font-semibold text-slate-900">
-          {{ profile?.fullName ?? t('admin.participantProfile.title') }}
+          {{ participantDisplayName }}
         </h1>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <span
@@ -156,7 +167,7 @@ onMounted(loadProfile)
         <div class="mt-4 space-y-3 text-sm">
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.fullName') }}</span>
-            <span class="text-slate-900">{{ profile.fullName }}</span>
+            <span class="text-slate-900">{{ participantDisplayName }}</span>
           </div>
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.phone') }}</span>
@@ -276,7 +287,7 @@ onMounted(loadProfile)
           <ParticipantFlightsModal
             :event-id="eventId"
             :participant-id="participantId"
-            :participant-name="profile.fullName"
+            :participant-name="participantDisplayName"
             :button-label="t('admin.participant.flights.openButton')"
           />
         </div>

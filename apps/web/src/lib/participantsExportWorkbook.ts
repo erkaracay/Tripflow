@@ -2,7 +2,9 @@ import type { FlightSegment, ParticipantDetails, ParticipantProfile } from '../t
 
 export type ParticipantExportSource = {
   id: string
-  fullName: string
+  firstName: string
+  lastName: string
+  fullName?: string | null
   tcNo: string
   birthDate: string
   gender: string
@@ -168,7 +170,8 @@ export const PARTICIPANTS_SHEET_HEADERS = [
   'person_no',
   'agency_name',
   'city',
-  'full_name',
+  'first_name',
+  'last_name',
   'birth_date',
   'tc_no',
   'gender',
@@ -226,7 +229,8 @@ export const buildParticipantsSheetRows = (participants: ParticipantExportSource
       toText(details.personNo),
       toText(details.agencyName),
       toText(details.city),
-      toText(participant.fullName),
+      toText(participant.firstName),
+      toText(participant.lastName),
       toText(participant.birthDate),
       toText(participant.tcNo),
       toText(participant.gender),

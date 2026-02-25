@@ -16,6 +16,8 @@ public sealed class ParticipantEntity
     public Guid OrganizationId { get; set; }
     public OrganizationEntity Organization { get; set; } = default!;
 
+    public string FirstName { get; set; } = default!;
+    public string LastName { get; set; } = default!;
     public string FullName { get; set; } = default!;
     public string Phone { get; set; } = default!;
     public string? Email { get; set; }
