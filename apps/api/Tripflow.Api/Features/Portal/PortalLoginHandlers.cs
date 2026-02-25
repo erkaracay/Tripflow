@@ -155,6 +155,7 @@ internal static class PortalLoginHandlers
         {
             return Results.NotFound();
         }
+        portal = portal with { EventContacts = EventsHelpers.ToEventContactsDto(eventEntity) };
 
         var schedule = await EventsHandlers.BuildScheduleAsync(eventEntity.Id, eventEntity.OrganizationId, db, ct);
         var docs = await BuildDocsAsync(db, eventEntity, participant, ct);

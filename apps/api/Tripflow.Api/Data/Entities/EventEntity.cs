@@ -9,6 +9,12 @@ public sealed class EventEntity
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string? LogoUrl { get; set; }
+    public string? GuideName { get; set; }
+    public string? GuidePhone { get; set; }
+    public string? LeaderName { get; set; }
+    public string? LeaderPhone { get; set; }
+    public string? EmergencyPhone { get; set; }
+    public string? WhatsappGroupUrl { get; set; }
     public string EventAccessCode { get; set; } = default!;
     public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }

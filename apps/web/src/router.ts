@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
+      path: '/admin/events/:eventId/contacts',
+      component: () => import('./pages/admin/AdminEventContacts.vue'),
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
       path: '/admin/events/:eventId/checkin',
       component: () => import('./pages/admin/AdminEventCheckIn.vue'),
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },

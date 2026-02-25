@@ -225,6 +225,16 @@ export type EventPortalInfo = {
   links: LinkInfo[]
   days: DayPlan[]
   notes: string[]
+  eventContacts?: EventContacts | null
+}
+
+export type EventContacts = {
+  guideName?: string | null
+  guidePhone?: string | null
+  leaderName?: string | null
+  leaderPhone?: string | null
+  emergencyPhone?: string | null
+  whatsappGroupUrl?: string | null
 }
 
 export type EventDay = {

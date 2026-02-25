@@ -208,6 +208,80 @@ internal static class EventsHandlers
         return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
+    internal static async Task<IResult> GetEventContacts(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var entity = await db.Events.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        return Results.Ok(EventsHelpers.ToEventContactsDto(entity));
+    }
+
+    internal static async Task<IResult> UpdateEventContacts(
+        string eventId,
+        UpdateEventContactsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (!EventsHelpers.TryNormalizeHttpsAbsoluteUrl(request.WhatsappGroupUrl, out var normalizedWhatsappGroupUrl))
+        {
+            return Results.BadRequest(new
+            {
+                code = "invalid_whatsapp_group_url",
+                message = "whatsappGroupUrl must be an absolute https URL."
+            });
+        }
+
+        var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        entity.GuideName = EventsHelpers.NormalizeContactText(request.GuideName);
+        entity.GuidePhone = EventsHelpers.NormalizeContactText(request.GuidePhone);
+        entity.LeaderName = EventsHelpers.NormalizeContactText(request.LeaderName);
+        entity.LeaderPhone = EventsHelpers.NormalizeContactText(request.LeaderPhone);
+        entity.EmergencyPhone = EventsHelpers.NormalizeContactText(request.EmergencyPhone);
+        entity.WhatsappGroupUrl = normalizedWhatsappGroupUrl;
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(EventsHelpers.ToEventContactsDto(entity));
+    }
+
     internal static async Task<IResult> GetEventDays(
         string eventId,
         HttpContext httpContext,

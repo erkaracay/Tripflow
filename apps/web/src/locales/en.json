@@ -1024,6 +1024,7 @@
       "title": "Portal Content",
       "subtitle": "Participant view",
       "docsTabs": "Document tabs",
+      "contacts": "Contacts",
       "meeting": {
         "title": "Meeting",
         "time": "Time",
@@ -1059,6 +1060,22 @@
         "placeholder": "Bring a reusable water bottle."
       },
       "save": "Save portal"
+    },
+    "contacts": {
+      "title": "Contacts and Links",
+      "subtitle": "Manage portal contact details for {event}.",
+      "guideName": "Guide name",
+      "guidePhone": "Guide phone",
+      "leaderName": "Leader name",
+      "leaderPhone": "Leader phone",
+      "emergencyPhone": "Emergency phone",
+      "whatsappGroupUrl": "WhatsApp group link",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "errors": {
+        "invalidWhatsappGroupUrl": "WhatsApp group link must be a valid absolute https URL."
+      }
     },
     "organizations": {
       "title": "Select organization",
@@ -1303,6 +1320,12 @@
     },
     "info": {
       "meetingTitle": "Meeting point",
+      "contactsTitle": "Contacts",
+      "guide": "Guide",
+      "leader": "Leader",
+      "emergency": "Emergency",
+      "messageOnWhatsapp": "Message on WhatsApp",
+      "joinWhatsappGroup": "Join WhatsApp group",
       "time": "Time",
       "place": "Place",
       "maps": "Maps",

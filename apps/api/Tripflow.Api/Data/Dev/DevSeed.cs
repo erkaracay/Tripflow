@@ -295,11 +295,19 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
+        const string defaultGuideName = "Etkinlik Rehberi";
+        const string defaultGuidePhone = "+905551112233";
+        const string defaultLeaderName = "Grup Lideri";
+        const string defaultLeaderPhone = "+905551112244";
+        const string defaultEmergencyPhone = "+905551112255";
+        const string defaultWhatsappGroupUrl = "https://chat.whatsapp.com/tripflow-demo";
+
         var eventEntity = await db.Events
             .Include(x => x.EventGuides)
             .FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Name == name, ct);
         if (eventEntity is not null)
         {
+            var updated = false;
             var hasGuide = eventEntity.EventGuides.Any(g => g.GuideUserId == guideUserId);
             if (!hasGuide)
             {
@@ -308,12 +316,46 @@ public static class DevSeed
                     EventId = eventEntity.Id,
                     GuideUserId = guideUserId
                 });
-                db.Events.Update(eventEntity);
-                state.Seeded = true;
+                updated = true;
             }
             if (string.IsNullOrWhiteSpace(eventEntity.EventAccessCode))
             {
                 eventEntity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.GuideName))
+            {
+                eventEntity.GuideName = defaultGuideName;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.GuidePhone))
+            {
+                eventEntity.GuidePhone = defaultGuidePhone;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.LeaderName))
+            {
+                eventEntity.LeaderName = defaultLeaderName;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.LeaderPhone))
+            {
+                eventEntity.LeaderPhone = defaultLeaderPhone;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.EmergencyPhone))
+            {
+                eventEntity.EmergencyPhone = defaultEmergencyPhone;
+                updated = true;
+            }
+            if (string.IsNullOrWhiteSpace(eventEntity.WhatsappGroupUrl))
+            {
+                eventEntity.WhatsappGroupUrl = defaultWhatsappGroupUrl;
+                updated = true;
+            }
+
+            if (updated)
+            {
                 db.Events.Update(eventEntity);
                 state.Seeded = true;
             }
@@ -328,6 +370,12 @@ public static class DevSeed
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
+            GuideName = defaultGuideName,
+            GuidePhone = defaultGuidePhone,
+            LeaderName = defaultLeaderName,
+            LeaderPhone = defaultLeaderPhone,
+            EmergencyPhone = defaultEmergencyPhone,
+            WhatsappGroupUrl = defaultWhatsappGroupUrl,
             EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
             CreatedAt = now,
             EventGuides = new List<EventGuideEntity>

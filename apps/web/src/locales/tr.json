@@ -1011,6 +1011,7 @@
       "title": "Portal İçeriği",
       "subtitle": "Katılımcı görünümü",
       "docsTabs": "Belge sekmeleri",
+      "contacts": "İletişim",
       "meeting": {
         "title": "Buluşma",
         "time": "Saat",
@@ -1046,6 +1047,22 @@
         "placeholder": "Yeniden kullanılabilir şişe getirin."
       },
       "save": "Portalı kaydet"
+    },
+    "contacts": {
+      "title": "İletişim ve Linkler",
+      "subtitle": "{event} için portal iletişim bilgilerini yönetin.",
+      "guideName": "Rehber adı",
+      "guidePhone": "Rehber telefonu",
+      "leaderName": "Lider adı",
+      "leaderPhone": "Lider telefonu",
+      "emergencyPhone": "Acil durum telefonu",
+      "whatsappGroupUrl": "WhatsApp grup linki",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "saved": "Kaydedildi",
+      "errors": {
+        "invalidWhatsappGroupUrl": "WhatsApp grup linki geçerli bir https URL olmalıdır."
+      }
     },
     "organizations": {
       "title": "Organizasyon seç",
@@ -1290,6 +1307,12 @@
     },
     "info": {
       "meetingTitle": "Buluşma noktası",
+      "contactsTitle": "İletişim",
+      "guide": "Rehber",
+      "leader": "Lider",
+      "emergency": "Acil durum",
+      "messageOnWhatsapp": "WhatsApp'tan yaz",
+      "joinWhatsappGroup": "WhatsApp grubuna katıl",
       "time": "Saat",
       "place": "Yer",
       "maps": "Harita",

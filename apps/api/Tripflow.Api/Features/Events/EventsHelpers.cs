@@ -189,6 +189,67 @@ internal static class EventsHelpers
             entity.IsDeleted,
             entity.EventAccessCode);
 
+    internal static EventContactsDto ToEventContactsDto(EventEntity entity)
+        => new(
+            NormalizeContactText(entity.GuideName),
+            NormalizeContactPhone(entity.GuidePhone),
+            NormalizeContactText(entity.LeaderName),
+            NormalizeContactPhone(entity.LeaderPhone),
+            NormalizeContactPhone(entity.EmergencyPhone),
+            NormalizeContactText(entity.WhatsappGroupUrl));
+
+    internal static string? NormalizeContactText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    internal static string? NormalizeContactPhone(string? value)
+    {
+        var trimmed = NormalizeContactText(value);
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return null;
+        }
+
+        var hasPlus = trimmed.StartsWith("+", StringComparison.Ordinal);
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            return trimmed;
+        }
+
+        return hasPlus ? $"+{digits}" : digits;
+    }
+
+    internal static bool TryNormalizeHttpsAbsoluteUrl(string? value, out string? normalizedUrl)
+    {
+        normalizedUrl = NormalizeContactText(value);
+        if (string.IsNullOrWhiteSpace(normalizedUrl))
+        {
+            normalizedUrl = null;
+            return true;
+        }
+
+        if (!Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        normalizedUrl = uri.ToString();
+        return true;
+    }
+
     internal static EventPortalInfo? TryDeserializePortal(string json)
     {
         try

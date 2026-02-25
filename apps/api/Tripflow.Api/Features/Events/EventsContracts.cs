@@ -17,10 +17,29 @@ public sealed record EventListItemDto(
     bool IsDeleted,
     string EventAccessCode);
 
-public sealed record EventPortalInfo(MeetingInfo Meeting, LinkInfo[] Links, DayPlan[] Days, string[] Notes);
+public sealed record EventPortalInfo(
+    MeetingInfo Meeting,
+    LinkInfo[] Links,
+    DayPlan[] Days,
+    string[] Notes,
+    EventContactsDto? EventContacts = null);
 public sealed record MeetingInfo(string Time, string Place, string MapsUrl, string Note);
 public sealed record LinkInfo(string Label, string Url);
 public sealed record DayPlan(int Day, string Title, string[] Items);
+public sealed record EventContactsDto(
+    string? GuideName,
+    string? GuidePhone,
+    string? LeaderName,
+    string? LeaderPhone,
+    string? EmergencyPhone,
+    string? WhatsappGroupUrl);
+public sealed record UpdateEventContactsRequest(
+    string? GuideName,
+    string? GuidePhone,
+    string? LeaderName,
+    string? LeaderPhone,
+    string? EmergencyPhone,
+    string? WhatsappGroupUrl);
 
 public sealed record EventDayDto(
     Guid Id,

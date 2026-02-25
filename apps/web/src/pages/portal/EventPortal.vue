@@ -12,6 +12,8 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
+import { formatPhoneDisplay } from '../../lib/normalize'
+import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
@@ -104,6 +106,97 @@ const formatPortalDate = (value?: string | null) => {
 
   return trimmed
 }
+
+const normalizeContactText = (value?: string | null) => {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : ''
+}
+
+const sanitizePhoneForHref = (value?: string | null) => {
+  const raw = normalizeContactText(value)
+  if (!raw) {
+    return ''
+  }
+
+  return raw.replace(/\D/g, '')
+}
+
+const toTelHref = (value?: string | null) => {
+  const digits = sanitizePhoneForHref(value)
+  if (!digits) {
+    return ''
+  }
+  return `tel:+${digits}`
+}
+
+const toPhoneDisplay = (value?: string | null) => {
+  const raw = normalizeContactText(value)
+  if (!raw) {
+    return ''
+  }
+  return formatPhoneDisplay(raw) || raw
+}
+
+const toWhatsappHref = (value?: string | null) => {
+  const digits = sanitizePhoneForHref(value)
+  if (!digits) {
+    return ''
+  }
+
+  const eventTitle = normalizeContactText(event.value?.name)
+  const message = eventTitle
+    ? `${eventTitle} - Merhaba, bir konuda yardımcı olabilir misiniz?`
+    : 'Merhaba, bir konuda yardımcı olabilir misiniz?'
+  return buildWhatsAppUrl(digits, message)
+}
+
+type ContactRowRole = 'guide' | 'leader' | 'emergency'
+
+type ContactRow = {
+  role: ContactRowRole
+  name: string
+  phoneDisplay: string
+  telHref: string
+  whatsappHref: string
+}
+
+const contactRows = computed<ContactRow[]>(() => {
+  const contacts = portal.value?.eventContacts
+  if (!contacts) {
+    return []
+  }
+
+  const rows: ContactRow[] = []
+  const pushRow = (
+    role: ContactRowRole,
+    nameValue: string | null | undefined,
+    phoneValue: string | null | undefined,
+    allowWhatsapp: boolean
+  ) => {
+    const name = normalizeContactText(nameValue)
+    const phone = normalizeContactText(phoneValue)
+    if (!name && !phone) {
+      return
+    }
+
+    rows.push({
+      role,
+      name,
+      phoneDisplay: toPhoneDisplay(phone),
+      telHref: toTelHref(phone),
+      whatsappHref: allowWhatsapp ? toWhatsappHref(phone) : '',
+    })
+  }
+
+  pushRow('guide', contacts.guideName, contacts.guidePhone, true)
+  pushRow('leader', contacts.leaderName, contacts.leaderPhone, true)
+  pushRow('emergency', '', contacts.emergencyPhone, false)
+
+  return rows
+})
+
+const whatsappGroupUrl = computed(() => normalizeContactText(portal.value?.eventContacts?.whatsappGroupUrl))
+const hasContactsBlock = computed(() => contactRows.value.length > 0 || Boolean(whatsappGroupUrl.value))
 
 const buildGuideLink = (code: string) => {
   const base = resolvePublicBase()
@@ -736,6 +829,57 @@ onUnmounted(() => {
                   <div class="text-xs uppercase text-slate-400">{{ t('portal.info.note') }}</div>
                   <div class="mt-1 text-sm text-slate-600">{{ portal?.meeting.note || '-' }}</div>
                 </div>
+              </div>
+            </div>
+
+            <div v-if="hasContactsBlock" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 class="text-lg font-semibold">{{ t('portal.info.contactsTitle') }}</h2>
+              <div class="mt-4 space-y-3 text-sm text-slate-600">
+                <div
+                  v-for="row in contactRows"
+                  :key="row.role"
+                  class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3"
+                >
+                  <div class="text-xs uppercase text-slate-400">
+                    {{
+                      row.role === 'guide'
+                        ? t('portal.info.guide')
+                        : row.role === 'leader'
+                          ? t('portal.info.leader')
+                          : t('portal.info.emergency')
+                    }}
+                  </div>
+                  <div v-if="row.name" class="mt-1 font-medium text-slate-800">{{ row.name }}</div>
+                  <div v-if="row.phoneDisplay" class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <a
+                      v-if="row.telHref"
+                      :href="row.telHref"
+                      class="font-medium text-slate-800 underline"
+                    >
+                      {{ row.phoneDisplay }}
+                    </a>
+                    <span v-else class="font-medium text-slate-800">{{ row.phoneDisplay }}</span>
+                    <a
+                      v-if="row.whatsappHref"
+                      :href="row.whatsappHref"
+                      class="text-sm font-medium text-emerald-700 underline"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {{ t('portal.info.messageOnWhatsapp') }}
+                    </a>
+                  </div>
+                </div>
+
+                <a
+                  v-if="whatsappGroupUrl"
+                  :href="whatsappGroupUrl"
+                  class="inline-flex text-sm font-medium text-emerald-700 underline"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {{ t('portal.info.joinWhatsappGroup') }}
+                </a>
               </div>
             </div>
 

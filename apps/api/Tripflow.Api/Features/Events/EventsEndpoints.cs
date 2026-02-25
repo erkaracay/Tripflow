@@ -64,6 +64,19 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/contacts", EventsHandlers.GetEventContacts)
+            .WithSummary("Get event contacts")
+            .WithDescription("Returns editable portal contact details for an event.")
+            .Produces<EventContactsDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/contacts", EventsHandlers.UpdateEventContacts)
+            .WithSummary("Update event contacts")
+            .WithDescription("Updates portal contact details for an event.")
+            .Produces<EventContactsDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{eventId}/archive", EventsHandlers.ArchiveEvent)
             .WithSummary("Archive event")
             .WithDescription("Archives an event (soft delete).")
