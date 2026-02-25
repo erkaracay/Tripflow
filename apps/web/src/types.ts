@@ -140,6 +140,22 @@ export type ParticipantDetails = {
   returnTransferNote?: string | null
 }
 
+export type FlightSegment = {
+  segmentIndex: number
+  airline?: string | null
+  departureAirport?: string | null
+  arrivalAirport?: string | null
+  flightCode?: string | null
+  departureDate?: string | null
+  departureTime?: string | null
+  arrivalDate?: string | null
+  arrivalTime?: string | null
+  pnr?: string | null
+  ticketNo?: string | null
+  baggagePieces?: number | null
+  baggageTotalKg?: number | null
+}
+
 export type ParticipantTableItem = {
   id: string
   fullName: string
@@ -174,6 +190,8 @@ export type ParticipantProfile = {
   arrivedAt?: string | null
   tcNoDuplicate: boolean
   details?: ParticipantDetails | null
+  arrivalSegments?: FlightSegment[]
+  returnSegments?: FlightSegment[]
 }
 
 export type MeetingInfo = {
@@ -471,6 +489,8 @@ export type PortalParticipantTravel = {
   ticketNo?: string | null
   arrivalBaggageAllowance?: string | null
   returnBaggageAllowance?: string | null
+  arrivalSegments?: FlightSegment[] | null
+  returnSegments?: FlightSegment[] | null
   arrival?: PortalFlightInfo | null
   return?: PortalFlightInfo | null
   transferOutbound?: PortalTransferInfo | null
@@ -557,6 +577,16 @@ export type ParticipantImportPreviewRow = {
   arrivalBaggageTotalKg?: number | null
   returnBaggagePieces?: number | null
   returnBaggageTotalKg?: number | null
+  recordType?: string | null
+  direction?: string | null
+  segmentIndex?: number | null
+  departureAirport?: string | null
+  arrivalAirport?: string | null
+  flightCode?: string | null
+  departureDate?: string | null
+  departureTime?: string | null
+  arrivalDate?: string | null
+  arrivalTime?: string | null
 }
 
 export type ParticipantImportReport = {
