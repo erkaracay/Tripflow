@@ -1,7 +1,22 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
+
+type ScannerControls = {
+  stop: () => void
+}
+
+type ScanResult = {
+  getText: () => string
+}
+
+type BrowserQrReader = {
+  decodeFromVideoDevice: (
+    deviceId: string | undefined,
+    video: HTMLVideoElement,
+    callback: (result: ScanResult | undefined) => void
+  ) => Promise<ScannerControls>
+}
 
 type Props = {
   open: boolean
@@ -18,8 +33,13 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const errorKey = ref<string | null>(null)
 const isStarting = ref(false)
 const isScanning = ref(false)
-let controls: IScannerControls | null = null
-let reader: BrowserQRCodeReader | null = null
+let controls: ScannerControls | null = null
+let reader: BrowserQrReader | null = null
+
+const createReader = async (): Promise<BrowserQrReader> => {
+  const module = await import('@zxing/browser')
+  return new module.BrowserQRCodeReader() as BrowserQrReader
+}
 
 const stopScanner = () => {
   try {
@@ -83,7 +103,7 @@ const startScanner = async () => {
   }
 
   try {
-    reader = new BrowserQRCodeReader()
+    reader = await createReader()
     controls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
       if (!result) {
         return

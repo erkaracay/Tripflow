@@ -596,34 +596,32 @@ watch(selectedActivityId, () => {
         </form>
       </div>
 
-      <div v-if="selectedActivityId && table" class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-            <div>
-              <h2 class="text-lg font-semibold text-slate-900">{{ selectedActivity?.title ?? t('activityCheckIn.title') }}</h2>
-            </div>
+      <div v-if="selectedActivityId && table" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-2xl font-semibold text-slate-900">
+            {{ selectedActivity?.title ?? t('activityCheckIn.title') }}
+          </h2>
+        </div>
+        <div class="min-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.arrivedLabel') }}</div>
+          <div class="mt-1 text-xl font-semibold text-slate-800">
+            {{ activitySummary.checkedInCount }} / {{ activitySummary.effectiveTotal }}
           </div>
-          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-            <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('common.arrivedLabel') }}</div>
-            <div class="mt-1 text-xl font-semibold text-slate-800">
-              {{ activitySummary.checkedInCount }} / {{ activitySummary.effectiveTotal }}
-            </div>
-            <div class="mt-2 flex flex-col gap-1">
-              <button
-                class="block text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
-                type="button"
-                @click="setActivityFilter(tableStatus === 'not_checked_in' ? 'all' : 'not_checked_in')"
-              >
-                {{ t('activityCheckIn.filterNotCheckedIn') }}: {{ activitySummary.notCheckedInCount }}
-              </button>
-              <button
-                class="block text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
-                type="button"
-                @click="setActivityFilter(tableStatus === 'will_not_attend' ? 'all' : 'will_not_attend')"
-              >
-                {{ t('common.willNotAttend') }}: {{ activitySummary.willNotAttendCount }}
-              </button>
-            </div>
+          <div class="mt-2 flex flex-col gap-1">
+            <button
+              class="block text-left text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setActivityFilter(tableStatus === 'not_checked_in' ? 'all' : 'not_checked_in')"
+            >
+              {{ t('activityCheckIn.filterNotCheckedIn') }}: {{ activitySummary.notCheckedInCount }}
+            </button>
+            <button
+              class="block text-left text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+              type="button"
+              @click="setActivityFilter(tableStatus === 'will_not_attend' ? 'all' : 'will_not_attend')"
+            >
+              {{ t('common.willNotAttend') }}: {{ activitySummary.willNotAttendCount }}
+            </button>
           </div>
         </div>
       </div>

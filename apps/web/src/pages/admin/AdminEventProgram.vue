@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
@@ -7,8 +7,11 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
-import RichTextEditor from '../../components/editor/RichTextEditor.vue'
 import type { Event as EventDto, EventActivity, EventDay } from '../../types'
+
+const RichTextEditor = defineAsyncComponent(
+  () => import('../../components/editor/RichTextEditor.vue')
+)
 
 const props = defineProps<{ eventId?: string }>()
 const route = useRoute()

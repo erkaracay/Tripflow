@@ -678,11 +678,13 @@ watch(selectedItemId, () => {
         </form>
       </div>
 
-      <div v-if="selectedItemId && table" class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">{{ selectedItem?.name ?? t('equipment.title') }}</h2>
+      <div v-if="selectedItemId && table" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-2xl font-semibold text-slate-900">
+            {{ selectedItem?.name ?? t('equipment.title') }}
+          </h2>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+        <div class="min-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
           <div class="text-xs uppercase tracking-wide text-slate-400">{{ t('equipment.givenLabel') }}</div>
           <div class="mt-1 text-xl font-semibold text-slate-800">
             {{ equipmentSummary.givenCount }} / {{ equipmentSummary.totalCount }}

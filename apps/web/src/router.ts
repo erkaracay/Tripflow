@@ -3,137 +3,113 @@ import { i18n } from './i18n'
 import { checkAuth, checkPortalSession } from './lib/api'
 import { clearToken, getSelectedOrgId, setAuthState } from './lib/auth'
 import { resetViewportZoom } from './lib/viewport'
-import AdminEvents from './pages/admin/AdminEvents.vue'
-import AdminEventDetail from './pages/admin/AdminEventDetail.vue'
-import AdminEventCheckIn from './pages/admin/AdminEventCheckIn.vue'
-import AdminEventLogs from './pages/admin/AdminEventLogs.vue'
-import AdminParticipantsImport from './pages/admin/AdminParticipantsImport.vue'
-import AdminParticipantProfile from './pages/admin/AdminParticipantProfile.vue'
-import AdminParticipantsTable from './pages/admin/AdminParticipantsTable.vue'
-import AdminEventProgram from './pages/admin/AdminEventProgram.vue'
-import AdminActivityCheckIn from '@/pages/admin/AdminActivityCheckIn.vue'
-import AdminEquipment from '@/pages/admin/AdminEquipment.vue'
-import AdminEventDocsTabs from './pages/admin/AdminEventDocsTabs.vue'
-import AdminOrganizations from './pages/admin/AdminOrganizations.vue'
-import AdminUsers from './pages/admin/AdminUsers.vue'
-import AdminGuides from './pages/admin/AdminGuides.vue'
-import GuideEvents from './pages/guide/GuideEvents.vue'
-import GuideEventCheckIn from './pages/guide/GuideEventCheckIn.vue'
-import GuideActivityCheckIn from '@/pages/guide/GuideActivityCheckIn.vue'
-import GuideEquipment from '@/pages/guide/GuideEquipment.vue'
-import Login from './pages/Login.vue'
-import Forbidden from './pages/Forbidden.vue'
-import EventPortal from './pages/portal/EventPortal.vue'
-import PortalDocsPrint from './pages/portal/PortalDocsPrint.vue'
-import PortalLogin from './pages/portal/PortalLogin.vue'
 import type { UserRole } from './types'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/e/login' },
-    { path: '/login', component: Login },
-    { path: '/forbidden', component: Forbidden },
+    { path: '/login', component: () => import('./pages/Login.vue') },
+    { path: '/forbidden', component: () => import('./pages/Forbidden.vue') },
     {
       path: '/admin/events',
-      component: AdminEvents,
+      component: () => import('./pages/admin/AdminEvents.vue'),
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId',
-      component: AdminEventDetail,
+      component: () => import('./pages/admin/AdminEventDetail.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/checkin',
-      component: AdminEventCheckIn,
-      props: true,
+      component: () => import('./pages/admin/AdminEventCheckIn.vue'),
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/logs',
-      component: AdminEventLogs,
+      component: () => import('./pages/admin/AdminEventLogs.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/program',
-      component: AdminEventProgram,
+      component: () => import('./pages/admin/AdminEventProgram.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/activities/checkin',
-      component: AdminActivityCheckIn,
+      component: () => import('./pages/admin/AdminActivityCheckIn.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/equipment',
-      component: AdminEquipment,
+      component: () => import('./pages/admin/AdminEquipment.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/docs/tabs',
-      component: AdminEventDocsTabs,
+      component: () => import('./pages/admin/AdminEventDocsTabs.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/participants/import',
-      component: AdminParticipantsImport,
+      component: () => import('./pages/admin/AdminParticipantsImport.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/participants/table',
-      component: AdminParticipantsTable,
+      component: () => import('./pages/admin/AdminParticipantsTable.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/events/:eventId/participants/:participantId',
-      component: AdminParticipantProfile,
+      component: () => import('./pages/admin/AdminParticipantProfile.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/admin/orgs',
-      component: AdminOrganizations,
+      component: () => import('./pages/admin/AdminOrganizations.vue'),
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {
       path: '/admin/users',
-      component: AdminUsers,
+      component: () => import('./pages/admin/AdminUsers.vue'),
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {
       path: '/admin/guides',
-      component: AdminGuides,
+      component: () => import('./pages/admin/AdminGuides.vue'),
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
       path: '/guide/events',
-      component: GuideEvents,
+      component: () => import('./pages/guide/GuideEvents.vue'),
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     {
       path: '/guide/events/:eventId/checkin',
-      component: GuideEventCheckIn,
+      component: () => import('./pages/guide/GuideEventCheckIn.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     {
       path: '/guide/events/:eventId/activities/checkin',
-      component: GuideActivityCheckIn,
+      component: () => import('./pages/guide/GuideActivityCheckIn.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     {
       path: '/guide/events/:eventId/equipment',
-      component: GuideEquipment,
+      component: () => import('./pages/guide/GuideEquipment.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
@@ -145,13 +121,13 @@ const router = createRouter({
     },
     {
       path: '/guide/events/:eventId/program/edit',
-      component: AdminEventProgram,
+      component: () => import('./pages/admin/AdminEventProgram.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
-    { path: '/e/login', component: PortalLogin },
-    { path: '/e/:eventId/docs/print', component: PortalDocsPrint, props: true },
-    { path: '/e/:eventId', component: EventPortal, props: true },
+    { path: '/e/login', component: () => import('./pages/portal/PortalLogin.vue') },
+    { path: '/e/:eventId/docs/print', component: () => import('./pages/portal/PortalDocsPrint.vue'), props: true },
+    { path: '/e/:eventId', component: () => import('./pages/portal/EventPortal.vue'), props: true },
   ],
 })
 

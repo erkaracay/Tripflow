@@ -27,10 +27,11 @@ import type {
 type CheckInDirection = 'Entry' | 'Exit'
 type CheckInMethod = 'Manual' | 'QrScan'
 
+const props = defineProps<{ eventId?: string }>()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const eventId = computed(() => route.params.eventId as string)
+const eventId = computed(() => (props.eventId ?? route.params.eventId) as string)
 
 const event = ref<EventDto | null>(null)
 const participants = ref<Participant[]>([])
@@ -706,7 +707,6 @@ onMounted(() => {
           <input
             v-model.trim="checkInCode"
             ref="codeInput"
-            autofocus
             class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase tracking-wide focus:border-slate-400 focus:outline-none"
             :placeholder="t('admin.checkIn.codePlaceholder')"
             type="text"
@@ -929,16 +929,15 @@ onMounted(() => {
       </section>
       </template>
     </template>
+    <QrScannerModal :open="scannerOpen" @close="scannerOpen = false" @result="handleScanResult" />
+
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      :title="t('common.confirm')"
+      :message="confirmMessageKey ? t(confirmMessageKey) : ''"
+      :confirm-label="t('common.confirm')"
+      :cancel-label="t('common.cancel')"
+      @confirm="handleConfirm"
+    />
   </div>
-
-  <QrScannerModal :open="scannerOpen" @close="scannerOpen = false" @result="handleScanResult" />
-
-  <ConfirmDialog
-    v-model:open="confirmOpen"
-    :title="t('common.confirm')"
-    :message="confirmMessageKey ? t(confirmMessageKey) : ''"
-    :confirm-label="t('common.confirm')"
-    :cancel-label="t('common.cancel')"
-    @confirm="handleConfirm"
-  />
 </template>
