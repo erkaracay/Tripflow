@@ -7,6 +7,7 @@ import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import ImportTemplateHelpModal from '../../components/admin/ImportTemplateHelpModal.vue'
 import type {
   Event as EventDto,
   ParticipantImportError,
@@ -19,6 +20,8 @@ type ImportFormat = 'xlsx' | 'csv'
 type HeaderLanguage = 'auto' | 'tr' | 'en'
 type IssueFilter = 'all' | 'errors' | 'warnings'
 type RowStatus = 'ok' | 'warn' | 'error'
+type PreviewTypeFilter = 'all' | 'participant' | 'segment'
+type PreviewDirectionFilter = 'all' | 'arrival' | 'return'
 
 type ImportIssueRow = {
   row: number
@@ -45,6 +48,7 @@ const event = ref<EventDto | null>(null)
 
 const selectedFormat = ref<ImportFormat>('xlsx')
 const headerLanguage = ref<HeaderLanguage>('auto')
+const templateHelpOpen = ref(false)
 const selectedFile = ref<File | null>(null)
 const fileError = ref<string | null>(null)
 const dragActive = ref(false)
@@ -56,6 +60,9 @@ const finalReport = ref<ParticipantImportReport | null>(null)
 const reportError = ref<string | null>(null)
 const issueFilter = ref<IssueFilter>('all')
 const search = ref('')
+const previewTypeFilter = ref<PreviewTypeFilter>('all')
+const previewDirectionFilter = ref<PreviewDirectionFilter>('all')
+const previewSearch = ref('')
 
 const retryAfterSeconds = ref(0)
 let retryTimer: ReturnType<typeof setInterval> | null = null
@@ -113,6 +120,173 @@ const previewTruncated = computed(() => {
   const current = finalReport.value ?? report.value
   return current?.previewTruncated ?? false
 })
+
+const isSegmentPreviewRow = (row: ParticipantImportPreviewRow) => row.recordType === 'flight_segment'
+
+const mapDirectionLabel = (direction?: string | null) => {
+  const normalized = (direction ?? '').trim().toLowerCase()
+  if (normalized === 'arrival') return t('admin.participant.flights.tabs.arrival')
+  if (normalized === 'return') return t('admin.participant.flights.tabs.return')
+  return t('common.noData')
+}
+
+const toVisibleDate = (value?: string | null) => {
+  const formatted = formatDate(value)
+  return formatted !== '—' ? formatted : null
+}
+
+const toVisibleTime = (value?: string | null) => {
+  const formatted = formatTime(value)
+  return formatted !== '—' ? formatted : null
+}
+
+const buildDateTime = (date?: string | null, time?: string | null) => {
+  const parts = [toVisibleDate(date), toVisibleTime(time)].filter((part): part is string => Boolean(part))
+  return parts.join(' ')
+}
+
+const buildTimeRange = (start?: string | null, end?: string | null) => {
+  const from = toVisibleTime(start)
+  const to = toVisibleTime(end)
+  if (!from && !to) {
+    return null
+  }
+  return `${from ?? t('common.noData')} → ${to ?? t('common.noData')}`
+}
+
+const previewTypeLabel = (row: ParticipantImportPreviewRow) =>
+  isSegmentPreviewRow(row)
+    ? t('admin.import.previewTable.typeFlightSegment')
+    : t('admin.import.previewTable.typeParticipant')
+
+const previewMainText = (row: ParticipantImportPreviewRow) => {
+  if (!isSegmentPreviewRow(row)) {
+    return row.fullName ?? t('common.noData')
+  }
+
+  const direction = mapDirectionLabel(row.direction)
+  const segment = row.segmentIndex ? `#${row.segmentIndex}` : ''
+  const flightCode = row.flightCode?.trim()
+
+  if (flightCode) {
+    return `${direction} ${segment} - ${flightCode}`.trim()
+  }
+
+  const fallback = `${direction} ${segment}`.trim()
+  return fallback || t('common.noData')
+}
+
+const previewRouteText = (row: ParticipantImportPreviewRow) => {
+  if (!isSegmentPreviewRow(row)) {
+    return t('common.noData')
+  }
+
+  const route = [row.departureAirport, row.arrivalAirport]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item))
+
+  return route.length > 0 ? route.join(' → ') : t('common.noData')
+}
+
+const previewScheduleText = (row: ParticipantImportPreviewRow) => {
+  if (isSegmentPreviewRow(row)) {
+    const departure = buildDateTime(row.departureDate, row.departureTime)
+    const arrival = buildDateTime(row.arrivalDate, row.arrivalTime)
+    if (!departure && !arrival) {
+      return t('common.noData')
+    }
+    return `${departure || t('common.noData')} → ${arrival || t('common.noData')}`
+  }
+
+  const arrivalRange = buildTimeRange(row.arrivalDepartureTime, row.arrivalArrivalTime)
+  const returnRange = buildTimeRange(row.returnDepartureTime, row.returnArrivalTime)
+  const parts: string[] = []
+  if (arrivalRange) {
+    parts.push(`${t('admin.participant.flights.tabs.arrival')}: ${arrivalRange}`)
+  }
+  if (returnRange) {
+    parts.push(`${t('admin.participant.flights.tabs.return')}: ${returnRange}`)
+  }
+  return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+}
+
+const previewBaggageText = (row: ParticipantImportPreviewRow) => {
+  if (isSegmentPreviewRow(row)) {
+    const pieces = row.arrivalBaggagePieces ?? row.returnBaggagePieces ?? null
+    const totalKg = row.arrivalBaggageTotalKg ?? row.returnBaggageTotalKg ?? null
+    const value = formatBaggage(pieces, totalKg)
+    return value !== '—' ? value : t('common.noData')
+  }
+
+  const arrival = formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg)
+  const ret = formatBaggage(row.returnBaggagePieces, row.returnBaggageTotalKg)
+  const parts: string[] = []
+  if (arrival !== '—') {
+    parts.push(`${t('admin.participant.flights.tabs.arrival')}: ${arrival}`)
+  }
+  if (ret !== '—') {
+    parts.push(`${t('admin.participant.flights.tabs.return')}: ${ret}`)
+  }
+  return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+}
+
+const normalizeDirectionFilter = (direction?: string | null): PreviewDirectionFilter => {
+  const normalized = (direction ?? '').trim().toLowerCase()
+  if (normalized === 'arrival') return 'arrival'
+  if (normalized === 'return') return 'return'
+  return 'all'
+}
+
+const filteredPreviewRows = computed(() => {
+  const term = previewSearch.value.trim().toLowerCase()
+
+  return previewRows.value.filter((row) => {
+    const isSegment = isSegmentPreviewRow(row)
+    const typeMatches =
+      previewTypeFilter.value === 'all'
+      || (previewTypeFilter.value === 'participant' && !isSegment)
+      || (previewTypeFilter.value === 'segment' && isSegment)
+
+    if (!typeMatches) {
+      return false
+    }
+
+    if (previewTypeFilter.value === 'segment' && previewDirectionFilter.value !== 'all') {
+      if (!isSegment || normalizeDirectionFilter(row.direction) !== previewDirectionFilter.value) {
+        return false
+      }
+    }
+
+    if (!term) {
+      return true
+    }
+
+    const searchableParts = [
+      row.tcNo,
+      row.fullName,
+      row.direction,
+      row.segmentIndex ? String(row.segmentIndex) : null,
+      row.flightCode,
+      row.departureAirport,
+      row.arrivalAirport,
+      row.departureDate,
+      row.departureTime,
+      row.arrivalDate,
+      row.arrivalTime,
+      previewMainText(row),
+      previewRouteText(row),
+      previewScheduleText(row),
+      previewBaggageText(row),
+    ]
+
+    return searchableParts.some((part) => (part ?? '').toLowerCase().includes(term))
+  })
+})
+
+const previewStats = computed(() => ({
+  shown: filteredPreviewRows.value.length,
+  total: previewRows.value.length,
+}))
 
 const filteredIssueRows = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -418,6 +592,29 @@ const mapErrorRow = (error: ParticipantImportError): ImportIssueRow => ({
   message: translateImportError(error),
 })
 
+const translateDateFieldError = (field?: string | null) => {
+  if (field === 'birth_date') return t('admin.import.messages.birthDateInvalid')
+  if (field === 'hotel_check_in_date') return t('admin.import.messages.hotelCheckInInvalid')
+  if (field === 'hotel_check_out_date') return t('admin.import.messages.hotelCheckOutInvalid')
+  if (field === 'departure_date') return t('admin.import.messages.departureDateInvalid')
+  if (field === 'arrival_date') return t('admin.import.messages.arrivalDateInvalid')
+  if (field === 'insurance_start_date') return t('admin.import.messages.insuranceStartDateInvalid')
+  if (field === 'insurance_end_date') return t('admin.import.messages.insuranceEndDateInvalid')
+  return t('admin.import.messages.dateInvalid')
+}
+
+const translateTimeFieldError = (field?: string | null) => {
+  if (field === 'arrival_departure_time') return t('admin.import.messages.arrivalDepartureInvalid')
+  if (field === 'arrival_arrival_time') return t('admin.import.messages.arrivalArrivalInvalid')
+  if (field === 'return_departure_time') return t('admin.import.messages.returnDepartureInvalid')
+  if (field === 'return_arrival_time') return t('admin.import.messages.returnArrivalInvalid')
+  if (field === 'departure_time') return t('admin.import.messages.departureTimeInvalid')
+  if (field === 'arrival_time') return t('admin.import.messages.arrivalTimeInvalid')
+  if (field === 'arrival_transfer_pickup_time') return t('admin.import.messages.arrivalTransferPickupInvalid')
+  if (field === 'return_transfer_pickup_time') return t('admin.import.messages.returnTransferPickupInvalid')
+  return t('admin.import.messages.timeInvalid')
+}
+
 const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'duplicate_tcno') {
     return t('admin.import.messages.duplicateTcNo')
@@ -425,14 +622,45 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'legacy_template_detected') {
     return t('admin.import.messages.legacyTemplateDetected')
   }
+  if (warning.code === 'participants_flight_columns_ignored_due_segments_sheet') {
+    return t('admin.import.messages.participantsFlightColumnsIgnoredDueSegments')
+  }
+  if (warning.code === 'baggage_pieces_decimal_not_allowed') {
+    return t('admin.import.messages.baggagePiecesWholeNumber')
+  }
+  if (warning.code === 'invalid_baggage_pieces') {
+    return t('admin.import.messages.baggagePiecesInvalid')
+  }
+  if (warning.code === 'invalid_baggage_total_kg') {
+    return t('admin.import.messages.baggageTotalKgInvalid')
+  }
+  if (warning.code === 'baggage_total_kg_rounded') {
+    return t('admin.import.messages.baggageTotalKgRounded')
+  }
+  if (warning.code === 'invalid_date') {
+    return translateDateFieldError(warning.field)
+  }
+  if (warning.code === 'invalid_time') {
+    return translateTimeFieldError(warning.field)
+  }
 
   return warning.message
 }
 
 const translateImportError = (error: ParticipantImportError) => {
+  if (error.code === 'tcno_ambiguous') return t('admin.import.messages.tcNoAmbiguous')
+  if (error.code === 'tcno_not_found') return t('admin.import.messages.tcNoNotFoundInEvent')
+  if (error.code === 'invalid_direction') return t('admin.import.messages.directionInvalid')
+  if (error.code === 'invalid_departure_date') return t('admin.import.messages.departureDateInvalid')
+  if (error.code === 'invalid_arrival_date') return t('admin.import.messages.arrivalDateInvalid')
+  if (error.code === 'invalid_departure_time') return t('admin.import.messages.departureTimeInvalid')
+  if (error.code === 'invalid_arrival_time') return t('admin.import.messages.arrivalTimeInvalid')
+
   const message = error.message.toLowerCase()
   if (message.includes('duplicate tcno in file')) return t('admin.import.messages.duplicateTcNo')
   if (message.includes('matches multiple existing participants')) return t('admin.import.messages.tcNoAmbiguous')
+  if (message.includes('tc_no not found in this event')) return t('admin.import.messages.tcNoNotFoundInEvent')
+  if (message.includes('direction must be arrival, return')) return t('admin.import.messages.directionInvalid')
   if (message.includes('full_name required')) return t('admin.import.messages.fullNameRequired')
   if (message.includes('phone required')) return t('admin.import.messages.phoneRequired')
   if (message.includes('tc_no must be 11 digits')) return t('admin.import.messages.tcNoInvalid')
@@ -512,6 +740,13 @@ onBeforeUnmount(() => {
             @click="downloadTemplate"
           >
             {{ t('admin.import.downloadTemplate') }}
+          </button>
+          <button
+            class="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+            type="button"
+            @click="templateHelpOpen = true"
+          >
+            {{ t('admin.import.helper.openButton') }}
           </button>
           <span class="text-xs text-slate-500">
             {{ t('admin.import.autoDetectRecommended', { language: t(`admin.import.headerLang${headerLanguage.charAt(0).toUpperCase()}${headerLanguage.slice(1)}`) }) }}
@@ -620,7 +855,7 @@ onBeforeUnmount(() => {
                   <tr>
                     <th class="px-3 py-2">{{ t('admin.import.table.row') }}</th>
                     <th class="px-3 py-2">{{ t('admin.import.table.status') }}</th>
-                    <th class="px-3 py-2">{{ t('admin.import.table.participant') }}</th>
+                    <th class="min-w-[180px] px-3 py-2">{{ t('admin.import.table.participant') }}</th>
                     <th class="px-3 py-2">{{ t('admin.import.table.message') }}</th>
                   </tr>
                 </thead>
@@ -645,7 +880,7 @@ onBeforeUnmount(() => {
                         {{ t(`admin.import.table.status${row.status.charAt(0).toUpperCase()}${row.status.slice(1)}`) }}
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-xs text-slate-700">{{ row.participant }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-xs text-slate-700">{{ row.participant }}</td>
                     <td class="px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap">{{ row.message }}</td>
                   </tr>
                   <tr v-if="filteredIssueRows.length === 0">
@@ -659,47 +894,107 @@ onBeforeUnmount(() => {
           <div v-if="previewRows.length > 0" class="mt-6 space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-sm font-semibold text-slate-900">{{ t('admin.import.previewTitle') }}</h3>
-              <span v-if="previewTruncated && previewLimit" class="text-xs text-slate-500">
-                {{ t('admin.import.previewTruncated', { count: previewLimit }) }}
-              </span>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>{{ t('admin.import.previewFilters.shown', { shown: previewStats.shown, total: previewStats.total }) }}</span>
+                <span v-if="previewTruncated && previewLimit">
+                  {{ t('admin.import.previewTruncated', { count: previewLimit }) }}
+                </span>
+              </div>
             </div>
+
+            <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <label class="text-xs text-slate-600">{{ t('admin.import.previewFilters.typeLabel') }}</label>
+              <button
+                class="rounded border px-2.5 py-1 text-xs"
+                :class="previewTypeFilter === 'all' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                type="button"
+                @click="previewTypeFilter = 'all'"
+              >
+                {{ t('admin.import.previewFilters.typeAll') }}
+              </button>
+              <button
+                class="rounded border px-2.5 py-1 text-xs"
+                :class="previewTypeFilter === 'participant' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                type="button"
+                @click="previewTypeFilter = 'participant'"
+              >
+                {{ t('admin.import.previewFilters.typeParticipant') }}
+              </button>
+              <button
+                class="rounded border px-2.5 py-1 text-xs"
+                :class="previewTypeFilter === 'segment' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                type="button"
+                @click="previewTypeFilter = 'segment'"
+              >
+                {{ t('admin.import.previewFilters.typeSegment') }}
+              </button>
+
+              <template v-if="previewTypeFilter === 'segment'">
+                <label class="ml-2 text-xs text-slate-600">{{ t('admin.import.previewFilters.directionLabel') }}</label>
+                <button
+                  class="rounded border px-2.5 py-1 text-xs"
+                  :class="previewDirectionFilter === 'all' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                  type="button"
+                  @click="previewDirectionFilter = 'all'"
+                >
+                  {{ t('admin.import.previewFilters.directionAll') }}
+                </button>
+                <button
+                  class="rounded border px-2.5 py-1 text-xs"
+                  :class="previewDirectionFilter === 'arrival' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                  type="button"
+                  @click="previewDirectionFilter = 'arrival'"
+                >
+                  {{ t('admin.participant.flights.tabs.arrival') }}
+                </button>
+                <button
+                  class="rounded border px-2.5 py-1 text-xs"
+                  :class="previewDirectionFilter === 'return' ? 'border-slate-900 text-slate-900' : 'border-slate-200 bg-white text-slate-600'"
+                  type="button"
+                  @click="previewDirectionFilter = 'return'"
+                >
+                  {{ t('admin.participant.flights.tabs.return') }}
+                </button>
+              </template>
+
+              <input
+                v-model.trim="previewSearch"
+                class="ml-auto w-full max-w-xs rounded border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
+                :placeholder="t('admin.import.previewFilters.searchPlaceholder')"
+                type="text"
+              />
+            </div>
+
             <div class="overflow-hidden rounded-xl border border-slate-200">
               <div class="max-h-96 overflow-auto">
                 <table class="min-w-full text-sm">
                   <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
                     <tr>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.row') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.name') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.type') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.tcNo') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.birthDate') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.arrivalTime') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.returnTime') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.arrivalBaggage') }}</th>
-                      <th class="px-3 py-2">{{ t('admin.import.previewTable.returnBaggage') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
+                      <th class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
-                      v-for="row in previewRows"
-                      :key="`preview-${row.rowIndex}`"
+                      v-for="(row, index) in filteredPreviewRows"
+                      :key="`preview-${row.recordType ?? 'participant'}-${row.rowIndex}-${index}`"
                       class="odd:bg-white even:bg-slate-50"
                     >
                       <td class="px-3 py-2 font-mono text-xs">{{ row.rowIndex }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ row.fullName ?? t('common.noData') }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewTypeLabel(row) }}</td>
                       <td class="px-3 py-2 text-xs text-slate-700">{{ row.tcNo ?? t('common.noData') }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.birthDate) }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">
-                        {{ formatTime(row.arrivalDepartureTime) }} → {{ formatTime(row.arrivalArrivalTime) }}
-                      </td>
-                      <td class="px-3 py-2 text-xs text-slate-700">
-                        {{ formatTime(row.returnDepartureTime) }} → {{ formatTime(row.returnArrivalTime) }}
-                      </td>
-                      <td class="px-3 py-2 text-xs text-slate-700">
-                        {{ formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg) }}
-                      </td>
-                      <td class="px-3 py-2 text-xs text-slate-700">
-                        {{ formatBaggage(row.returnBaggagePieces, row.returnBaggageTotalKg) }}
-                      </td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewBaggageText(row) }}</td>
+                    </tr>
+                    <tr v-if="filteredPreviewRows.length === 0">
+                      <td class="px-3 py-4 text-xs text-slate-500" colspan="7">{{ t('admin.import.noRows') }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -738,6 +1033,11 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </section>
+
+      <ImportTemplateHelpModal
+        :open="templateHelpOpen"
+        @close="templateHelpOpen = false"
+      />
     </template>
   </div>
 </template>
