@@ -51,4 +51,14 @@ public sealed record ParticipantImportPreviewRow(
     int? ArrivalBaggagePieces,
     int? ArrivalBaggageTotalKg,
     int? ReturnBaggagePieces,
-    int? ReturnBaggageTotalKg);
+    int? ReturnBaggageTotalKg,
+    string? RecordType = null,
+    string? Direction = null,
+    int? SegmentIndex = null,
+    string? DepartureAirport = null,
+    string? ArrivalAirport = null,
+    string? FlightCode = null,
+    string? DepartureDate = null,
+    string? DepartureTime = null,
+    string? ArrivalDate = null,
+    string? ArrivalTime = null);
