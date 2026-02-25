@@ -241,6 +241,29 @@ public sealed record ParticipantDetailsDto(
     string? ReturnTransferDriverInfo,
     string? ReturnTransferNote);
 
+public sealed record FlightSegmentDto(
+    int SegmentIndex,
+    string? Airline,
+    string? DepartureAirport,
+    string? ArrivalAirport,
+    string? FlightCode,
+    string? DepartureDate,
+    string? DepartureTime,
+    string? ArrivalDate,
+    string? ArrivalTime,
+    string? Pnr,
+    string? TicketNo,
+    int? BaggagePieces,
+    int? BaggageTotalKg);
+
+public sealed record ReplaceParticipantFlightsRequest(
+    FlightSegmentDto[]? ArrivalSegments,
+    FlightSegmentDto[]? ReturnSegments);
+
+public sealed record ParticipantFlightsResponse(
+    FlightSegmentDto[] ArrivalSegments,
+    FlightSegmentDto[] ReturnSegments);
+
 public sealed record ParticipantDto(
     Guid Id,
     string FullName,
@@ -303,7 +326,9 @@ public sealed record ParticipantProfileDto(
     bool Arrived,
     string? ArrivedAt,
     bool TcNoDuplicate,
-    ParticipantDetailsDto? Details);
+    ParticipantDetailsDto? Details,
+    FlightSegmentDto[] ArrivalSegments,
+    FlightSegmentDto[] ReturnSegments);
 
 public sealed record ParticipantTableItemDto(
     Guid Id,

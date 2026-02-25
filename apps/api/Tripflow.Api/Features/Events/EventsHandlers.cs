@@ -1844,6 +1844,7 @@ internal static class EventsHandlers
 
         var participant = await db.Participants.AsNoTracking()
             .Include(x => x.Details)
+            .Include(x => x.FlightSegments)
             .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
 
         if (participant is null)
@@ -1874,7 +1875,9 @@ internal static class EventsHandlers
             arrivedAt.HasValue,
             arrivedAt?.ToString("yyyy-MM-dd HH:mm"),
             tcNoDuplicate,
-            MapDetails(participant.Details));
+            MapDetails(participant.Details),
+            MapFlightSegments(participant.FlightSegments, ParticipantFlightSegmentDirection.Arrival),
+            MapFlightSegments(participant.FlightSegments, ParticipantFlightSegmentDirection.Return));
 
         return Results.Ok(dto);
     }
@@ -2110,6 +2113,85 @@ internal static class EventsHandlers
             arrived,
             entity.WillNotAttend,
             MapDetails(entity.Details)));
+    }
+
+    internal static async Task<IResult> ReplaceParticipantFlights(
+        string eventId,
+        string participantId,
+        ReplaceParticipantFlightsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var participant = await db.Participants
+            .Include(x => x.FlightSegments)
+            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (participant is null)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var arrivalRequest = request.ArrivalSegments ?? Array.Empty<FlightSegmentDto>();
+        var returnRequest = request.ReturnSegments ?? Array.Empty<FlightSegmentDto>();
+
+        if (!TryNormalizeFlightSegments(orgId, id, participant.Id, arrivalRequest, ParticipantFlightSegmentDirection.Arrival,
+                out var arrivalSegments, out var arrivalError))
+        {
+            return EventsHelpers.BadRequest(arrivalError);
+        }
+
+        if (!TryNormalizeFlightSegments(orgId, id, participant.Id, returnRequest, ParticipantFlightSegmentDirection.Return,
+                out var returnSegments, out var returnError))
+        {
+            return EventsHelpers.BadRequest(returnError);
+        }
+
+        if (participant.FlightSegments.Count > 0)
+        {
+            db.ParticipantFlightSegments.RemoveRange(participant.FlightSegments);
+        }
+
+        var replacement = new List<ParticipantFlightSegmentEntity>(arrivalSegments.Count + returnSegments.Count);
+        replacement.AddRange(arrivalSegments);
+        replacement.AddRange(returnSegments);
+
+        if (replacement.Count > 0)
+        {
+            db.ParticipantFlightSegments.AddRange(replacement);
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new ParticipantFlightsResponse(
+            MapFlightSegments(replacement, ParticipantFlightSegmentDirection.Arrival),
+            MapFlightSegments(replacement, ParticipantFlightSegmentDirection.Return)));
     }
 
     internal static async Task<IResult> SetParticipantWillNotAttend(
@@ -3437,6 +3519,191 @@ internal static class EventsHandlers
             details.ReturnTransferPlate,
             details.ReturnTransferDriverInfo,
             details.ReturnTransferNote);
+    }
+
+    private static FlightSegmentDto[] MapFlightSegments(
+        IEnumerable<ParticipantFlightSegmentEntity>? segments,
+        ParticipantFlightSegmentDirection direction)
+    {
+        if (segments is null)
+        {
+            return [];
+        }
+
+        return segments
+            .Where(x => x.Direction == direction)
+            .OrderBy(x => x.SegmentIndex)
+            .Select(x => new FlightSegmentDto(
+                x.SegmentIndex,
+                x.Airline,
+                x.DepartureAirport,
+                x.ArrivalAirport,
+                x.FlightCode,
+                x.DepartureDate?.ToString("yyyy-MM-dd"),
+                x.DepartureTime?.ToString("HH:mm"),
+                x.ArrivalDate?.ToString("yyyy-MM-dd"),
+                x.ArrivalTime?.ToString("HH:mm"),
+                x.Pnr,
+                x.TicketNo,
+                x.BaggagePieces,
+                x.BaggageTotalKg))
+            .ToArray();
+    }
+
+    private static bool TryNormalizeFlightSegments(
+        Guid orgId,
+        Guid eventId,
+        Guid participantId,
+        FlightSegmentDto[] source,
+        ParticipantFlightSegmentDirection direction,
+        out List<ParticipantFlightSegmentEntity> normalized,
+        out string error)
+    {
+        normalized = [];
+        error = string.Empty;
+
+        if (source.Length == 0)
+        {
+            return true;
+        }
+
+        var prepared = new List<(FlightSegmentDto Segment, int Order, string? Airline, string? DepartureAirport,
+            string? ArrivalAirport, string? FlightCode, DateOnly? DepartureDate, TimeOnly? DepartureTime,
+            DateOnly? ArrivalDate, TimeOnly? ArrivalTime, string? Pnr, string? TicketNo, int? BaggagePieces,
+            int? BaggageTotalKg)>();
+
+        for (var i = 0; i < source.Length; i++)
+        {
+            var segment = source[i];
+            if (segment is null)
+            {
+                continue;
+            }
+
+            if (!TryParseDateOnly(segment.DepartureDate, out var departureDate))
+            {
+                error = $"{direction} segment {i + 1}: departureDate must be in YYYY-MM-DD format.";
+                return false;
+            }
+
+            if (!TryParseTimeOnly(segment.DepartureTime, out var departureTime))
+            {
+                error = $"{direction} segment {i + 1}: departureTime must be in HH:mm format.";
+                return false;
+            }
+
+            if (!TryParseDateOnly(segment.ArrivalDate, out var arrivalDate))
+            {
+                error = $"{direction} segment {i + 1}: arrivalDate must be in YYYY-MM-DD format.";
+                return false;
+            }
+
+            if (!TryParseTimeOnly(segment.ArrivalTime, out var arrivalTime))
+            {
+                error = $"{direction} segment {i + 1}: arrivalTime must be in HH:mm format.";
+                return false;
+            }
+
+            if (segment.BaggagePieces.HasValue && segment.BaggagePieces.Value <= 0)
+            {
+                error = $"{direction} segment {i + 1}: baggagePieces must be greater than zero.";
+                return false;
+            }
+
+            if (segment.BaggageTotalKg.HasValue && segment.BaggageTotalKg.Value <= 0)
+            {
+                error = $"{direction} segment {i + 1}: baggageTotalKg must be greater than zero.";
+                return false;
+            }
+
+            var airline = NormalizeOptionalText(segment.Airline);
+            var departureAirport = NormalizeOptionalText(segment.DepartureAirport);
+            var arrivalAirport = NormalizeOptionalText(segment.ArrivalAirport);
+            var flightCode = NormalizeOptionalText(segment.FlightCode);
+            var pnr = NormalizeOptionalText(segment.Pnr);
+            var ticketNo = NormalizeOptionalText(segment.TicketNo);
+
+            if (!HasAnyFlightSegmentValue(
+                    airline,
+                    departureAirport,
+                    arrivalAirport,
+                    flightCode,
+                    departureDate,
+                    departureTime,
+                    arrivalDate,
+                    arrivalTime,
+                    pnr,
+                    ticketNo,
+                    segment.BaggagePieces,
+                    segment.BaggageTotalKg))
+            {
+                continue;
+            }
+
+            prepared.Add((segment, i, airline, departureAirport, arrivalAirport, flightCode, departureDate, departureTime,
+                arrivalDate, arrivalTime, pnr, ticketNo, segment.BaggagePieces, segment.BaggageTotalKg));
+        }
+
+        var ordered = prepared
+            .OrderBy(x => x.Segment.SegmentIndex > 0 ? x.Segment.SegmentIndex : int.MaxValue)
+            .ThenBy(x => x.Order)
+            .ToList();
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var row = ordered[i];
+            normalized.Add(new ParticipantFlightSegmentEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = orgId,
+                EventId = eventId,
+                ParticipantId = participantId,
+                Direction = direction,
+                SegmentIndex = i + 1,
+                Airline = row.Airline,
+                DepartureAirport = row.DepartureAirport,
+                ArrivalAirport = row.ArrivalAirport,
+                FlightCode = row.FlightCode,
+                DepartureDate = row.DepartureDate,
+                DepartureTime = row.DepartureTime,
+                ArrivalDate = row.ArrivalDate,
+                ArrivalTime = row.ArrivalTime,
+                Pnr = row.Pnr,
+                TicketNo = row.TicketNo,
+                BaggagePieces = row.BaggagePieces,
+                BaggageTotalKg = row.BaggageTotalKg
+            });
+        }
+
+        return true;
+    }
+
+    private static bool HasAnyFlightSegmentValue(
+        string? airline,
+        string? departureAirport,
+        string? arrivalAirport,
+        string? flightCode,
+        DateOnly? departureDate,
+        TimeOnly? departureTime,
+        DateOnly? arrivalDate,
+        TimeOnly? arrivalTime,
+        string? pnr,
+        string? ticketNo,
+        int? baggagePieces,
+        int? baggageTotalKg)
+    {
+        return !string.IsNullOrWhiteSpace(airline)
+               || !string.IsNullOrWhiteSpace(departureAirport)
+               || !string.IsNullOrWhiteSpace(arrivalAirport)
+               || !string.IsNullOrWhiteSpace(flightCode)
+               || departureDate is not null
+               || departureTime is not null
+               || arrivalDate is not null
+               || arrivalTime is not null
+               || !string.IsNullOrWhiteSpace(pnr)
+               || !string.IsNullOrWhiteSpace(ticketNo)
+               || baggagePieces is not null
+               || baggageTotalKg is not null;
     }
 
     private static bool TryApplyDetails(

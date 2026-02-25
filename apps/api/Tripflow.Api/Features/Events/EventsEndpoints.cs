@@ -410,6 +410,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPut("/{eventId}/participants/{participantId}/flights", EventsHandlers.ReplaceParticipantFlights)
+            .WithSummary("Replace participant flights")
+            .WithDescription("Replaces all arrival/return flight segments for the participant.")
+            .Produces<ParticipantFlightsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPatch("/{eventId}/participants/{participantId}/will-not-attend", EventsHandlers.SetParticipantWillNotAttend)
             .WithSummary("Set participant will-not-attend")
             .WithDescription("Marks a participant as will-not-attend (excluded from check-in totals).")

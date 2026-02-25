@@ -57,11 +57,28 @@ public sealed record PortalParticipantTravel(
     string? TicketNo,
     string? ArrivalBaggageAllowance,
     string? ReturnBaggageAllowance,
+    PortalFlightSegment[] ArrivalSegments,
+    PortalFlightSegment[] ReturnSegments,
     PortalFlightInfo? Arrival,
     PortalFlightInfo? Return,
     PortalTransferInfo? TransferOutbound,
     PortalTransferInfo? TransferReturn,
     PortalInsuranceInfo? Insurance);
+
+public sealed record PortalFlightSegment(
+    int SegmentIndex,
+    string? Airline,
+    string? DepartureAirport,
+    string? ArrivalAirport,
+    string? FlightCode,
+    string? DepartureDate,
+    string? DepartureTime,
+    string? ArrivalDate,
+    string? ArrivalTime,
+    string? Pnr,
+    string? TicketNo,
+    int? BaggagePieces,
+    int? BaggageTotalKg);
 
 public sealed record PortalFlightInfo(
     string? Airline,

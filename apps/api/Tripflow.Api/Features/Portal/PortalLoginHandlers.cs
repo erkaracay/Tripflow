@@ -226,6 +226,14 @@ internal static class PortalLoginHandlers
         var details = await db.ParticipantDetails.AsNoTracking()
             .FirstOrDefaultAsync(x => x.ParticipantId == participant.Id, ct);
 
+        var flightSegments = await db.ParticipantFlightSegments.AsNoTracking()
+            .Where(x => x.OrganizationId == eventEntity.OrganizationId
+                        && x.EventId == eventEntity.Id
+                        && x.ParticipantId == participant.Id)
+            .OrderBy(x => x.Direction)
+            .ThenBy(x => x.SegmentIndex)
+            .ToListAsync(ct);
+
         var allTabs = await db.EventDocTabs.AsNoTracking()
             .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId)
             .OrderBy(x => x.SortOrder)
@@ -261,6 +269,8 @@ internal static class PortalLoginHandlers
             details?.ArrivalTicketNo ?? details?.TicketNo,
             details?.ArrivalBaggageAllowance,
             details?.ReturnBaggageAllowance,
+            MapPortalFlightSegments(flightSegments, ParticipantFlightSegmentDirection.Arrival),
+            MapPortalFlightSegments(flightSegments, ParticipantFlightSegmentDirection.Return),
             details is null
                 ? null
                 : new PortalFlightInfo(
@@ -306,6 +316,30 @@ internal static class PortalLoginHandlers
             .ToArray();
 
         return new PortalDocsResponse(tabDtos, travel);
+    }
+
+    private static PortalFlightSegment[] MapPortalFlightSegments(
+        IEnumerable<ParticipantFlightSegmentEntity> segments,
+        ParticipantFlightSegmentDirection direction)
+    {
+        return segments
+            .Where(x => x.Direction == direction)
+            .OrderBy(x => x.SegmentIndex)
+            .Select(x => new PortalFlightSegment(
+                x.SegmentIndex,
+                x.Airline,
+                x.DepartureAirport,
+                x.ArrivalAirport,
+                x.FlightCode,
+                x.DepartureDate?.ToString("yyyy-MM-dd"),
+                x.DepartureTime?.ToString("HH:mm"),
+                x.ArrivalDate?.ToString("yyyy-MM-dd"),
+                x.ArrivalTime?.ToString("HH:mm"),
+                x.Pnr,
+                x.TicketNo,
+                x.BaggagePieces,
+                x.BaggageTotalKg))
+            .ToArray();
     }
 
     private static PortalInsuranceInfo? BuildInsuranceInfo(string? contentJson, ParticipantDetailsEntity? details)
