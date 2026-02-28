@@ -164,6 +164,7 @@ export type ParticipantTableItem = {
   id: string
   firstName: string
   lastName: string
+  cabinBaggage?: string | null
   fullName: string
   phone: string
   email?: string | null
@@ -587,6 +588,7 @@ export type ParticipantImportPreviewRow = {
   gender?: string | null
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
+  participantNameReference?: string | null
   arrivalDepartureTime?: string | null
   arrivalArrivalTime?: string | null
   returnDepartureTime?: string | null
@@ -611,6 +613,7 @@ export type ParticipantImportReport = {
   totalRows: number
   validRows?: number
   imported: number
+  cabinBaggage?: string | null
   created: number
   updated: number
   failed: number

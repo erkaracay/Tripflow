@@ -34,4 +34,5 @@ public sealed class ParticipantFlightSegmentEntity
     public string? TicketNo { get; set; }
     public int? BaggagePieces { get; set; }
     public int? BaggageTotalKg { get; set; }
+    public string? CabinBaggage { get; set; }
 }

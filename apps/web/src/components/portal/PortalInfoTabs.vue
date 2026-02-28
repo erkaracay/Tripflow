@@ -188,7 +188,8 @@ const hasSegmentValue = (segment?: FlightSegment | null) => {
       segment.arrivalTime?.trim() ||
       segment.pnr?.trim() ||
       (typeof segment.baggagePieces === 'number' && segment.baggagePieces > 0) ||
-      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0)
+      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0) ||
+      segment.cabinBaggage?.trim()
   )
 }
 
@@ -525,6 +526,10 @@ const formatCustomValue = (value: unknown): string => {
                   <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
                   <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
                 </div>
+                <div v-if="formatCabinBaggage(segment.cabinBaggage) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatCabinBaggage(segment.cabinBaggage) }}</span>
+                </div>
               </div>
               <div
                 v-if="index < arrivalSegments.length - 1"
@@ -642,6 +647,10 @@ const formatCustomValue = (value: unknown): string => {
                 <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
                   <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
                   <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+                </div>
+                <div v-if="formatCabinBaggage(segment.cabinBaggage) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatCabinBaggage(segment.cabinBaggage) }}</span>
                 </div>
               </div>
               <div
@@ -995,6 +1004,10 @@ const formatCustomValue = (value: unknown): string => {
                 <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
                 <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
               </div>
+              <div v-if="formatCabinBaggage(segment.cabinBaggage) !== '—'" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatCabinBaggage(segment.cabinBaggage) }}</span>
+              </div>
             </div>
             <div
               v-if="index < arrivalSegments.length - 1"
@@ -1138,6 +1151,10 @@ const formatCustomValue = (value: unknown): string => {
                 <div v-if="formatBaggage(segment.baggagePieces, segment.baggageTotalKg) !== '—'" class="flex items-start justify-between gap-3">
                   <span class="text-slate-500">{{ t('portal.docs.baggage') }}</span>
                   <span class="text-right font-medium text-slate-800">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
+                </div>
+                <div v-if="formatCabinBaggage(segment.cabinBaggage) !== '—'" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.cabinBaggage') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatCabinBaggage(segment.cabinBaggage) }}</span>
                 </div>
               </div>
               <div

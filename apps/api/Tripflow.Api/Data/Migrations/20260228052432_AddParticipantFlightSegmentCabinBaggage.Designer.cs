@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tripflow.Api.Data;
@@ -11,9 +12,11 @@ using Tripflow.Api.Data;
 namespace Tripflow.Api.Data.Migrations
 {
     [DbContext(typeof(TripflowDbContext))]
-    partial class TripflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260228052432_AddParticipantFlightSegmentCabinBaggage")]
+    partial class AddParticipantFlightSegmentCabinBaggage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -911,6 +914,10 @@ namespace Tripflow.Api.Data.Migrations
                     b.Property<int?>("BaggageTotalKg")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CabinBaggage")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("DepartureAirport")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -931,10 +938,6 @@ namespace Tripflow.Api.Data.Migrations
 
                     b.Property<string>("FlightCode")
                         .HasMaxLength(50)
-                    b.Property<string>("CabinBaggage")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                         .HasColumnType("character varying(50)");
 
                     b.Property<Guid>("OrganizationId")

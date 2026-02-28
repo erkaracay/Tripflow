@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPut } from '../../lib/api'
-import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
+import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import type { FlightSegment, ParticipantDetails, ParticipantProfile } from '../../types'
@@ -65,7 +65,8 @@ const segmentHasValue = (segment?: FlightSegment | null) => {
       segment.pnr?.trim() ||
       segment.ticketNo?.trim() ||
       (typeof segment.baggagePieces === 'number' && segment.baggagePieces > 0) ||
-      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0)
+      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0) ||
+      segment.cabinBaggage?.trim()
   )
 }
 
@@ -89,6 +90,7 @@ const cloneSegments = (segments: FlightSegment[]) =>
     ticketNo: segment.ticketNo ?? '',
     baggagePieces: segment.baggagePieces ?? null,
     baggageTotalKg: segment.baggageTotalKg ?? null,
+    cabinBaggage: segment.cabinBaggage ?? '',
   }))
 
 const buttonText = computed(() => props.buttonLabel || t('admin.participant.flights.editButton'))
@@ -273,6 +275,7 @@ const addSegment = () => {
     ticketNo: '',
     baggagePieces: null,
     baggageTotalKg: null,
+    cabinBaggage: '',
   })
 }
 
@@ -312,6 +315,7 @@ const buildPayloadSegments = (segments: FlightSegment[], direction: FlightTab) =
       ticketNo: trimOptional(segment.ticketNo),
       baggagePieces: normalizeNumber(segment.baggagePieces),
       baggageTotalKg: normalizeNumber(segment.baggageTotalKg),
+      cabinBaggage: trimOptional(segment.cabinBaggage),
     }
 
     if (!segmentHasValue(candidate)) {
@@ -547,6 +551,10 @@ onUnmounted(() => {
                     <span class="text-slate-500">{{ t('admin.participant.flights.fields.baggage') }}:</span>
                     <span class="ml-1 text-slate-900">{{ formatBaggage(segment.baggagePieces, segment.baggageTotalKg) }}</span>
                   </div>
+                  <div v-if="formatCabinBaggage(segment.cabinBaggage) !== '—'">
+                    <span class="text-slate-500">{{ t('admin.participant.flights.fields.cabinBaggage') }}:</span>
+                    <span class="ml-1 text-slate-900">{{ formatCabinBaggage(segment.cabinBaggage) }}</span>
+                  </div>
                 </div>
               </div>
 
@@ -630,6 +638,10 @@ onUnmounted(() => {
                 <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participant.flights.fields.baggageTotalKg') }}</span>
                   <input v-model.number="segment.baggageTotalKg" type="number" min="1" step="1" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving" />
+                </label>
+                <label class="grid gap-1 text-sm sm:col-span-2">
+                  <span class="text-slate-600">{{ t('admin.participant.flights.fields.cabinBaggage') }}</span>
+                  <input v-model.trim="segment.cabinBaggage" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving" />
                 </label>
               </div>
             </div>

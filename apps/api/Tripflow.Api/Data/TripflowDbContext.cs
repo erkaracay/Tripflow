@@ -363,6 +363,7 @@ public sealed class TripflowDbContext : DbContext
 
             b.HasOne(x => x.Organization)
                 .WithMany(x => x.DocTabs)
+            b.Property(x => x.CabinBaggage).HasMaxLength(100);
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
 

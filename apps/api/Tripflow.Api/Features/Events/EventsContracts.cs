@@ -277,7 +277,8 @@ public sealed record FlightSegmentDto(
     string? Pnr,
     string? TicketNo,
     int? BaggagePieces,
-    int? BaggageTotalKg);
+    int? BaggageTotalKg,
+    string? CabinBaggage);
 
 public sealed record ReplaceParticipantFlightsRequest(
     FlightSegmentDto[]? ArrivalSegments,

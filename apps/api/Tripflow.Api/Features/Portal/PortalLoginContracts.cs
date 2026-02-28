@@ -78,7 +78,8 @@ public sealed record PortalFlightSegment(
     string? Pnr,
     string? TicketNo,
     int? BaggagePieces,
-    int? BaggageTotalKg);
+    int? BaggageTotalKg,
+    string? CabinBaggage);
 
 public sealed record PortalFlightInfo(
     string? Airline,

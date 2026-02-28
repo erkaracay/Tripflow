@@ -339,7 +339,8 @@ internal static class PortalLoginHandlers
                 x.Pnr,
                 x.TicketNo,
                 x.BaggagePieces,
-                x.BaggageTotalKg))
+                x.BaggageTotalKg,
+                x.CabinBaggage))
             .ToArray();
     }
 

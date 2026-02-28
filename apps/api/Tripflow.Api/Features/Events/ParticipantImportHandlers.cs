@@ -172,13 +172,15 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] FlightSegmentOptionalHeaders =
     [
+        "participant_name",
         "airline",
         "arrival_date",
         "arrival_time",
         "pnr",
         "ticket_no",
         "baggage_pieces",
-        "baggage_total_kg"
+        "baggage_total_kg",
+        "cabin_baggage"
     ];
 
     private static readonly string[] FlightSegmentCanonicalHeaders =
@@ -227,13 +229,15 @@ internal static class ParticipantImportHandlers
         "TK2304",
         "2026-03-10",
         "08:15",
+        "Ayse Demir",
         "Turkish Airlines",
         "2026-03-10",
         "09:35",
         "PNR-ARR-1",
         "TK-123-OUT",
         "1",
-        "23"
+        "23",
+        "8 kg + personal item"
     ];
 
     private static readonly string[] FlightSegmentExampleRows2 =
@@ -246,13 +250,15 @@ internal static class ParticipantImportHandlers
         "TK2378",
         "2026-03-10",
         "11:20",
+        "Ayse Demir",
         "Turkish Airlines",
         "2026-03-10",
         "12:35",
         "PNR-ARR-2",
         "TK-123-OUT",
         "1",
-        "23"
+        "23",
+        "1 cabin suitcase"
     ];
 
     private static readonly string[] FlightSegmentExampleRows3 =
@@ -265,13 +271,15 @@ internal static class ParticipantImportHandlers
         "TK2379",
         "2026-03-14",
         "16:10",
+        "Ayse Demir",
         "Turkish Airlines",
         "2026-03-14",
         "17:25",
         "PNR-RET-1",
         "TK-456-RET",
         "1",
-        "23"
+        "23",
+        "8 kg"
     ];
 
     private static readonly string[] FlightSegmentExampleRows4 =
@@ -284,13 +292,15 @@ internal static class ParticipantImportHandlers
         "TK2305",
         "2026-03-14",
         "19:05",
+        "Ayse Demir",
         "Turkish Airlines",
         "2026-03-14",
         "20:20",
         "PNR-RET-2",
         "TK-456-RET",
         "1",
-        "23"
+        "23",
+        "8 kg + backpack"
     ];
 
     private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd.MM.yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yy"];
@@ -1010,6 +1020,7 @@ internal static class ParticipantImportHandlers
                     previewRows.Add(new ParticipantImportPreviewRow(
                         row.RowNumber,
                         string.IsNullOrWhiteSpace(fullName) ? null : fullName,
+                        null,
                         string.IsNullOrWhiteSpace(phone) ? null : phone,
                         string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
                         birthDateValid ? birthDate.ToString("yyyy-MM-dd") : null,
@@ -1163,6 +1174,7 @@ internal static class ParticipantImportHandlers
             {
                 var tcNo = NormalizeTcNo(row.GetValue("tc_no"));
                 var tcNoForIssues = string.IsNullOrWhiteSpace(tcNo) ? null : tcNo;
+                var participantNameReference = NormalizeOptionalText(row.GetValue("participant_name"));
                 var rowErrors = new List<string>();
                 var rowFields = new List<string>();
 
@@ -1321,6 +1333,21 @@ internal static class ParticipantImportHandlers
                     continue;
                 }
 
+                var matchedFullName = string.IsNullOrWhiteSpace(matches[0].FullName) ? null : matches[0].FullName;
+                if (!string.IsNullOrWhiteSpace(participantNameReference)
+                    && !NamesMatchForReference(participantNameReference, matchedFullName))
+                {
+                    warnings.Add(new ParticipantImportWarning(
+                        row.RowNumber,
+                        tcNo,
+                        "participant_name does not match the participant resolved by tc_no.",
+                        "participant_name_mismatch_for_tc_no")
+                    {
+                        Field = "participant_name"
+                    });
+                }
+
+                var cabinBaggage = NormalizeOptionalText(row.GetValue("cabin_baggage"));
                 var participantId = matches[0].Id;
                 parsedFlightSegmentRows.Add(new ParsedFlightSegmentRow(
                     row.RowNumber,
@@ -1339,13 +1366,16 @@ internal static class ParticipantImportHandlers
                     NormalizeOptionalText(row.GetValue("ticket_no")),
                     baggagePieces,
                     baggageTotalKg,
+                    cabinBaggage,
+                    participantNameReference,
                     tcNo));
 
                 if (previewRows.Count < PreviewRowLimit)
                 {
                     previewRows.Add(new ParticipantImportPreviewRow(
                         row.RowNumber,
-                        string.IsNullOrWhiteSpace(matches[0].FullName) ? null : matches[0].FullName,
+                        matchedFullName,
+                        participantNameReference,
                         null,
                         tcNo,
                         null,
@@ -1369,7 +1399,8 @@ internal static class ParticipantImportHandlers
                         departureDate?.ToString("yyyy-MM-dd"),
                         departureTime?.ToString("HH:mm"),
                         arrivalDate?.ToString("yyyy-MM-dd"),
-                        arrivalTime?.ToString("HH:mm")));
+                        arrivalTime?.ToString("HH:mm"),
+                        cabinBaggage));
                 }
             }
 
@@ -1414,6 +1445,7 @@ internal static class ParticipantImportHandlers
                     entity.TicketNo = row.TicketNo;
                     entity.BaggagePieces = row.BaggagePieces;
                     entity.BaggageTotalKg = row.BaggageTotalKg;
+                    entity.CabinBaggage = row.CabinBaggage;
                 }
             }
 
@@ -2025,6 +2057,9 @@ internal static class ParticipantImportHandlers
         }
 
         map[NormalizeHeader("tc kimlik no")] = "tc_no";
+        map[NormalizeHeader("full_name")] = "participant_name";
+        map[NormalizeHeader("ad soyad")] = "participant_name";
+        map[NormalizeHeader("adsoyad")] = "participant_name";
         map[NormalizeHeader("yon")] = "direction";
         map[NormalizeHeader("yön")] = "direction";
         map[NormalizeHeader("segment no")] = "segment_index";
@@ -2047,6 +2082,9 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("bagaj parcasi")] = "baggage_pieces";
         map[NormalizeHeader("bagaj parçası")] = "baggage_pieces";
         map[NormalizeHeader("bagaj toplam kg")] = "baggage_total_kg";
+        map[NormalizeHeader("cabin baggage")] = "cabin_baggage";
+        map[NormalizeHeader("kabin bagaji")] = "cabin_baggage";
+        map[NormalizeHeader("kabin bagajı")] = "cabin_baggage";
 
         return map;
     }
@@ -2073,6 +2111,45 @@ internal static class ParticipantImportHandlers
             }
         }
         return sb.ToString();
+    }
+
+    private static bool NamesMatchForReference(string? source, string? target)
+        => NormalizeReferenceName(source) == NormalizeReferenceName(target);
+
+    private static string NormalizeReferenceName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        var lastWasWhitespace = false;
+
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch))
+            {
+                if (sb.Length > 0 && !lastWasWhitespace)
+                {
+                    sb.Append(' ');
+                }
+                lastWasWhitespace = true;
+                continue;
+            }
+
+            sb.Append(char.ToLowerInvariant(ch));
+            lastWasWhitespace = false;
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static string NormalizePhone(string? value)
@@ -2702,6 +2779,8 @@ internal static class ParticipantImportHandlers
         string? TicketNo,
         int? BaggagePieces,
         int? BaggageTotalKg,
+        string? CabinBaggage,
+        string? ParticipantNameReference,
         string TcNo);
 
     private sealed record ParticipantSheetData(List<ImportRow> Rows, HeaderMap HeaderMap);

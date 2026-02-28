@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDownload, apiGet, apiPostForm } from '../../lib/api'
-import { formatBaggage, formatDate, formatTime } from '../../lib/formatters'
+import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -160,6 +160,8 @@ const previewTypeLabel = (row: ParticipantImportPreviewRow) =>
     : t('admin.import.previewTable.typeParticipant')
 
 const previewParticipantText = (row: ParticipantImportPreviewRow) => row.fullName?.trim() || t('common.noData')
+const previewParticipantReferenceText = (row: ParticipantImportPreviewRow) =>
+  row.participantNameReference?.trim() || null
 
 const previewMainText = (row: ParticipantImportPreviewRow) => {
   if (!isSegmentPreviewRow(row)) {
@@ -216,8 +218,16 @@ const previewBaggageText = (row: ParticipantImportPreviewRow) => {
   if (isSegmentPreviewRow(row)) {
     const pieces = row.arrivalBaggagePieces ?? row.returnBaggagePieces ?? null
     const totalKg = row.arrivalBaggageTotalKg ?? row.returnBaggageTotalKg ?? null
-    const value = formatBaggage(pieces, totalKg)
-    return value !== '—' ? value : t('common.noData')
+    const checked = formatBaggage(pieces, totalKg)
+    const cabin = formatCabinBaggage(row.cabinBaggage)
+    const parts: string[] = []
+    if (checked !== '—') {
+      parts.push(checked)
+    }
+    if (cabin !== '—') {
+      parts.push(cabin)
+    }
+    return parts.length > 0 ? parts.join(' | ') : t('common.noData')
   }
 
   const arrival = formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg)
@@ -266,6 +276,7 @@ const filteredPreviewRows = computed(() => {
     const searchableParts = [
       row.tcNo,
       row.fullName,
+      row.participantNameReference,
       previewParticipantText(row),
       row.direction,
       row.segmentIndex ? String(row.segmentIndex) : null,
@@ -649,6 +660,9 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'invalid_time') {
     return translateTimeFieldError(warning.field)
   }
+  if (warning.code === 'participant_name_mismatch_for_tc_no') {
+    return t('admin.import.messages.participantNameMismatchForTcNo')
+  }
 
   return warning.message
 }
@@ -998,7 +1012,15 @@ onBeforeUnmount(() => {
                       <td class="px-3 py-2 font-mono text-xs">{{ row.rowIndex }}</td>
                       <td class="px-3 py-2 text-xs text-slate-700">{{ previewTypeLabel(row) }}</td>
                       <td class="px-3 py-2 text-xs text-slate-700">{{ row.tcNo ?? t('common.noData') }}</td>
-                      <td class="px-3 py-2 text-xs text-slate-700">{{ previewParticipantText(row) }}</td>
+                      <td class="px-3 py-2 text-xs text-slate-700">
+                        <div>{{ previewParticipantText(row) }}</div>
+                        <div
+                          v-if="isSegmentPreviewRow(row) && previewParticipantReferenceText(row)"
+                          class="mt-0.5 text-[11px] text-slate-500"
+                        >
+                          {{ t('admin.import.previewTable.sheetParticipantName', { name: previewParticipantReferenceText(row) }) }}
+                        </div>
+                      </td>
                       <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
                       <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
                       <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>

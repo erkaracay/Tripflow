@@ -30,15 +30,18 @@ const participantItems = [
 
 const segmentItems = [
   'admin.import.helper.segmentsRequiredRule',
+  'admin.import.helper.segmentsParticipantNameRule',
   'admin.import.helper.segmentsDirectionRule',
   'admin.import.helper.segmentsIndexRule',
   'admin.import.helper.segmentsDateTimeRule',
   'admin.import.helper.segmentsBaggageRule',
+  'admin.import.helper.segmentsCabinBaggageRule',
 ] as const
 
 const commonIssueItems = [
   'admin.import.helper.issueDirectionRule',
   'admin.import.helper.issueNotFoundRule',
+  'admin.import.helper.issueParticipantNameMismatchRule',
   'admin.import.helper.issueLegacyIgnoredRule',
   'admin.import.helper.issuePreviewLimitRule',
 ] as const

@@ -38,6 +38,7 @@ public sealed record ParticipantImportWarning(int Row, string? TcNo, string Mess
 public sealed record ParticipantImportPreviewRow(
     int RowIndex,
     string? FullName,
+    string? ParticipantNameReference,
     string? Phone,
     string? TcNo,
     string? BirthDate,
@@ -61,4 +62,5 @@ public sealed record ParticipantImportPreviewRow(
     string? DepartureDate = null,
     string? DepartureTime = null,
     string? ArrivalDate = null,
-    string? ArrivalTime = null);
+    string? ArrivalTime = null,
+    string? CabinBaggage = null);

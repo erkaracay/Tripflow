@@ -3658,7 +3658,8 @@ internal static class EventsHandlers
                 x.Pnr,
                 x.TicketNo,
                 x.BaggagePieces,
-                x.BaggageTotalKg))
+                x.BaggageTotalKg,
+                x.CabinBaggage))
             .ToArray();
     }
 
@@ -3682,7 +3683,7 @@ internal static class EventsHandlers
         var prepared = new List<(FlightSegmentDto Segment, int Order, string? Airline, string? DepartureAirport,
             string? ArrivalAirport, string? FlightCode, DateOnly? DepartureDate, TimeOnly? DepartureTime,
             DateOnly? ArrivalDate, TimeOnly? ArrivalTime, string? Pnr, string? TicketNo, int? BaggagePieces,
-            int? BaggageTotalKg)>();
+            int? BaggageTotalKg, string? CabinBaggage)>();
 
         for (var i = 0; i < source.Length; i++)
         {
@@ -3740,6 +3741,7 @@ internal static class EventsHandlers
                     departureAirport,
                     arrivalAirport,
                     flightCode,
+            var cabinBaggage = NormalizeOptionalText(segment.CabinBaggage);
                     departureDate,
                     departureTime,
                     arrivalDate,
@@ -3747,13 +3749,14 @@ internal static class EventsHandlers
                     pnr,
                     ticketNo,
                     segment.BaggagePieces,
-                    segment.BaggageTotalKg))
+                    segment.BaggageTotalKg,
+                    cabinBaggage))
             {
                 continue;
             }
 
             prepared.Add((segment, i, airline, departureAirport, arrivalAirport, flightCode, departureDate, departureTime,
-                arrivalDate, arrivalTime, pnr, ticketNo, segment.BaggagePieces, segment.BaggageTotalKg));
+                arrivalDate, arrivalTime, pnr, ticketNo, segment.BaggagePieces, segment.BaggageTotalKg, cabinBaggage));
         }
 
         var ordered = prepared
@@ -3783,7 +3786,8 @@ internal static class EventsHandlers
                 Pnr = row.Pnr,
                 TicketNo = row.TicketNo,
                 BaggagePieces = row.BaggagePieces,
-                BaggageTotalKg = row.BaggageTotalKg
+                BaggageTotalKg = row.BaggageTotalKg,
+                CabinBaggage = row.CabinBaggage
             });
         }
 
@@ -3802,7 +3806,8 @@ internal static class EventsHandlers
         string? pnr,
         string? ticketNo,
         int? baggagePieces,
-        int? baggageTotalKg)
+        int? baggageTotalKg,
+        string? cabinBaggage)
     {
         return !string.IsNullOrWhiteSpace(airline)
                || !string.IsNullOrWhiteSpace(departureAirport)
@@ -3815,7 +3820,8 @@ internal static class EventsHandlers
                || !string.IsNullOrWhiteSpace(pnr)
                || !string.IsNullOrWhiteSpace(ticketNo)
                || baggagePieces is not null
-               || baggageTotalKg is not null;
+               || baggageTotalKg is not null
+               || !string.IsNullOrWhiteSpace(cabinBaggage);
     }
 
     private static bool TryApplyDetails(

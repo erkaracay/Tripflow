@@ -838,7 +838,8 @@
           "arrivalDate": "Varış tarihi",
           "arrivalTime": "Varış saati",
           "baggagePieces": "Bagaj parçası",
-          "baggageTotalKg": "Toplam bagaj kg"
+          "baggageTotalKg": "Toplam bagaj kg",
+          "cabinBaggage": "Kabin bagajı"
         }
       }
     },
@@ -915,6 +916,7 @@
         "participantsFlightColumnsIgnoredDueSegments": "Flight_segments sayfasında veri olduğu için participants sayfasındaki eski uçuş kolonları yok sayıldı.",
         "tcNoAmbiguous": "Kimlik numarası etkinlikte birden fazla katılımcıyla eşleşiyor.",
         "tcNoNotFoundInEvent": "Kimlik numarası bu etkinlikte bulunamadı.",
+        "sheetParticipantName": "Sheet: {name}",
         "firstLastNameRequired": "Ad ve soyad zorunludur.",
         "fullNameRequired": "Ad soyad zorunludur.",
         "phoneRequired": "Telefon zorunludur.",
@@ -951,6 +953,7 @@
         "typeAll": "Tümü",
         "typeParticipant": "Katılımcı",
         "typeSegment": "Segment",
+        "participantNameMismatchForTcNo": "Referans katılımcı adı, TC ile bulunan katılımcıyla uyuşmuyor.",
         "directionLabel": "Yön",
         "directionAll": "Tümü",
         "searchPlaceholder": "TC, ad, uçuş kodu veya hat ara"
@@ -984,14 +987,17 @@
         "issueLegacyIgnoredRule": "flight_segments doluysa participants içindeki legacy uçuş alanları yok sayılır (warning).",
         "issuePreviewLimitRule": "Önizlemede ilk 200 satır gösterilir; dosyanın tamamı apply aşamasında işlenir.",
         "tipTwoByTwoRule": "Aktarmalı örnek için aynı TC'ye 2 geliş (segment 1-2) ve 2 dönüş (segment 1-2) satırı ekleyin.",
+        "segmentsParticipantNameRule": "participant_name opsiyoneldir; sadece operatör referansı içindir, eşleşmede kullanılmaz.",
         "tipGroupByTcRule": "Okunabilirlik için aynı tc_no satırlarını birlikte gruplamanız önerilir."
       }
     },
     "eventAccess": {
+        "segmentsCabinBaggageRule": "cabin_baggage serbest metindir; örn. 8 kg, 1 küçük valiz, laptop çantası.",
       "title": "Etkinlik erişimi",
       "subtitle": "Katılımcılar erişim kodu ve TC kimlik no ile giriş yapar.",
       "codeLabel": "Erişim kodu",
       "codeMissing": "Mevcut değil",
+        "issueParticipantNameMismatchRule": "participant_name, kontrol için vardır. Uyuşmazsa warning gelir ama eşleşme yine tc_no ile yapılır.",
       "copyCode": "Kodu kopyala",
       "copyLoginLink": "Giriş linkini kopyala",
       "regenerate": "Kodu yenile",

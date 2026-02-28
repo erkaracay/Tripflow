@@ -35,7 +35,8 @@ const segmentHasValue = (segment?: FlightSegment | null) => {
       toText(segment.pnr) ||
       toText(segment.ticketNo) ||
       (typeof segment.baggagePieces === 'number' && segment.baggagePieces > 0) ||
-      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0)
+      (typeof segment.baggageTotalKg === 'number' && segment.baggageTotalKg > 0) ||
+      toText(segment.cabinBaggage)
   )
 }
 
@@ -57,7 +58,8 @@ const hasLegacyDirectionValue = (details: ParticipantDetails, direction: Directi
         toText(details.arrivalPnr) ||
         toText(details.arrivalTicketNo ?? details.ticketNo) ||
         (typeof details.arrivalBaggagePieces === 'number' && details.arrivalBaggagePieces > 0) ||
-        (typeof details.arrivalBaggageTotalKg === 'number' && details.arrivalBaggageTotalKg > 0)
+        (typeof details.arrivalBaggageTotalKg === 'number' && details.arrivalBaggageTotalKg > 0) ||
+        toText(details.arrivalCabinBaggage)
     )
   }
 
@@ -72,12 +74,21 @@ const hasLegacyDirectionValue = (details: ParticipantDetails, direction: Directi
       toText(details.returnPnr) ||
       toText(details.returnTicketNo) ||
       (typeof details.returnBaggagePieces === 'number' && details.returnBaggagePieces > 0) ||
-      (typeof details.returnBaggageTotalKg === 'number' && details.returnBaggageTotalKg > 0)
+      (typeof details.returnBaggageTotalKg === 'number' && details.returnBaggageTotalKg > 0) ||
+      toText(details.returnCabinBaggage)
   )
 }
 
-const toSegmentRow = (tcNo: string, direction: Direction, segment: FlightSegment, fallbackIndex: number) => [
-  toText(tcNo),
+const buildParticipantName = (participant: ParticipantExportSource) =>
+  toText(participant.fullName) || [toText(participant.firstName), toText(participant.lastName)].filter(Boolean).join(' ')
+
+const toSegmentRow = (
+  participant: ParticipantExportSource,
+  direction: Direction,
+  segment: FlightSegment,
+  fallbackIndex: number
+) => [
+  toText(participant.tcNo),
   direction,
   segment.segmentIndex && segment.segmentIndex > 0 ? segment.segmentIndex : fallbackIndex,
   toText(segment.departureAirport),
@@ -85,6 +96,7 @@ const toSegmentRow = (tcNo: string, direction: Direction, segment: FlightSegment
   toText(segment.flightCode),
   toText(segment.departureDate),
   toText(segment.departureTime),
+  buildParticipantName(participant),
   toText(segment.airline),
   toText(segment.arrivalDate),
   toText(segment.arrivalTime),
@@ -92,16 +104,21 @@ const toSegmentRow = (tcNo: string, direction: Direction, segment: FlightSegment
   toText(segment.ticketNo),
   toIntOrEmpty(segment.baggagePieces),
   toIntOrEmpty(segment.baggageTotalKg),
+  toText(segment.cabinBaggage),
 ]
 
-const toLegacySegmentRow = (tcNo: string, direction: Direction, details: ParticipantDetails) => {
+const toLegacySegmentRow = (
+  participant: ParticipantExportSource,
+  direction: Direction,
+  details: ParticipantDetails
+) => {
   if (!hasLegacyDirectionValue(details, direction)) {
     return null
   }
 
   if (direction === 'Arrival') {
     return [
-      toText(tcNo),
+      toText(participant.tcNo),
       'Arrival',
       1,
       toText(details.arrivalDepartureAirport),
@@ -109,6 +126,7 @@ const toLegacySegmentRow = (tcNo: string, direction: Direction, details: Partici
       toText(details.arrivalFlightCode),
       toText(details.arrivalFlightDate),
       toText(details.arrivalDepartureTime),
+      buildParticipantName(participant),
       toText(details.arrivalAirline),
       toText(details.arrivalFlightDate),
       toText(details.arrivalArrivalTime),
@@ -116,11 +134,12 @@ const toLegacySegmentRow = (tcNo: string, direction: Direction, details: Partici
       toText(details.arrivalTicketNo ?? details.ticketNo),
       toIntOrEmpty(details.arrivalBaggagePieces),
       toIntOrEmpty(details.arrivalBaggageTotalKg),
+      toText(details.arrivalCabinBaggage),
     ]
   }
 
   return [
-    toText(tcNo),
+    toText(participant.tcNo),
     'Return',
     1,
     toText(details.returnDepartureAirport),
@@ -128,6 +147,7 @@ const toLegacySegmentRow = (tcNo: string, direction: Direction, details: Partici
     toText(details.returnFlightCode),
     toText(details.returnFlightDate),
     toText(details.returnDepartureTime),
+    buildParticipantName(participant),
     toText(details.returnAirline),
     toText(details.returnFlightDate),
     toText(details.returnArrivalTime),
@@ -135,12 +155,13 @@ const toLegacySegmentRow = (tcNo: string, direction: Direction, details: Partici
     toText(details.returnTicketNo),
     toIntOrEmpty(details.returnBaggagePieces),
     toIntOrEmpty(details.returnBaggageTotalKg),
+    toText(details.returnCabinBaggage),
   ]
 }
 
 const pushDirectionRows = (
   rows: Array<Array<string | number>>,
-  tcNo: string,
+  participant: ParticipantExportSource,
   direction: Direction,
   segments?: FlightSegment[] | null,
   details?: ParticipantDetails | null
@@ -148,7 +169,7 @@ const pushDirectionRows = (
   const normalized = normalizeSegments(segments)
   if (normalized.length > 0) {
     normalized.forEach((segment, index) => {
-      rows.push(toSegmentRow(tcNo, direction, segment, index + 1))
+      rows.push(toSegmentRow(participant, direction, segment, index + 1))
     })
     return
   }
@@ -157,7 +178,7 @@ const pushDirectionRows = (
     return
   }
 
-  const legacyRow = toLegacySegmentRow(tcNo, direction, details)
+  const legacyRow = toLegacySegmentRow(participant, direction, details)
   if (legacyRow) {
     rows.push(legacyRow)
   }
@@ -209,6 +230,7 @@ export const FLIGHT_SEGMENTS_SHEET_HEADERS = [
   'flight_code',
   'departure_date',
   'departure_time',
+  'participant_name',
   'airline',
   'arrival_date',
   'arrival_time',
@@ -216,6 +238,7 @@ export const FLIGHT_SEGMENTS_SHEET_HEADERS = [
   'ticket_no',
   'baggage_pieces',
   'baggage_total_kg',
+  'cabin_baggage',
 ]
 
 export const buildParticipantsSheetRows = (participants: ParticipantExportSource[]) =>
@@ -270,8 +293,8 @@ export const buildFlightSegmentsSheetRows = (
     const profile = profilesByParticipantId.get(participant.id)
     const details = profile?.details ?? participant.details ?? null
 
-    pushDirectionRows(rows, participant.tcNo, 'Arrival', profile?.arrivalSegments, details)
-    pushDirectionRows(rows, participant.tcNo, 'Return', profile?.returnSegments, details)
+    pushDirectionRows(rows, participant, 'Arrival', profile?.arrivalSegments, details)
+    pushDirectionRows(rows, participant, 'Return', profile?.returnSegments, details)
   })
 
   return rows
