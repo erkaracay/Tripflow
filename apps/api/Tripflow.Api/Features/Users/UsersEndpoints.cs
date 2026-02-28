@@ -21,8 +21,9 @@ public static class UsersEndpoints
 
         group.MapPost("", UsersHandlers.CreateUser)
             .WithSummary("Create user (SuperAdmin)")
-            .WithDescription("Creates an Admin or Guide with an explicit organizationId.")
-            .Produces<UserListItemDto>(StatusCodes.Status201Created)
+            .WithDescription("Creates an Admin or creates/attaches a Guide with an explicit organizationId.")
+            .Produces<UserUpsertResponseDto>(StatusCodes.Status201Created)
+            .Produces<UserUpsertResponseDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status409Conflict)
             .RequireAuthorization("SuperAdminOnly")
@@ -49,9 +50,10 @@ public static class UsersEndpoints
             });
 
         group.MapPost("/guides", UsersHandlers.CreateGuide)
-            .WithSummary("Create guide (Admin)")
-            .WithDescription("Creates a Guide in the caller's organization.")
-            .Produces<UserListItemDto>(StatusCodes.Status201Created)
+            .WithSummary("Create or attach guide (Admin)")
+            .WithDescription("Creates a Guide in the caller's organization or attaches an existing global guide account by email.")
+            .Produces<UserUpsertResponseDto>(StatusCodes.Status201Created)
+            .Produces<UserUpsertResponseDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status409Conflict)
             .WithOpenApi(op =>
@@ -76,7 +78,7 @@ public static class UsersEndpoints
 
         group.MapPost("/{userId:guid}/password", UsersHandlers.ChangePassword)
             .WithSummary("Change user password")
-            .WithDescription("SuperAdmin can change any user password. Admin can change guide passwords within their organization.")
+            .WithDescription("SuperAdmin can change any user password. Admin can change admin passwords within their organization, but guide passwords are managed globally.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden)

@@ -10,4 +10,7 @@ public sealed class UserEntity
     public string PasswordHash { get; set; } = default!;
     public string Role { get; set; } = default!;
     public DateTime CreatedAt { get; set; }
+
+    public List<OrganizationGuideEntity> OrganizationGuideMemberships { get; set; } = new();
+    public List<EventGuideEntity> GuidedEvents { get; set; } = new();
 }

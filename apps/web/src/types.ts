@@ -19,6 +19,7 @@ export type EventListItem = {
   guideUserIds: string[]
   isDeleted: boolean
   eventAccessCode: string
+  organizationName?: string | null
 }
 
 export type UserListItem = {
@@ -26,6 +27,11 @@ export type UserListItem = {
   email: string
   fullName?: string | null
   role: string
+}
+
+export type UserUpsertResponse = {
+  user: UserListItem
+  action: 'created' | 'attached' | 'already_attached'
 }
 
 export type Organization = {
@@ -158,13 +164,13 @@ export type FlightSegment = {
   ticketNo?: string | null
   baggagePieces?: number | null
   baggageTotalKg?: number | null
+  cabinBaggage?: string | null
 }
 
 export type ParticipantTableItem = {
   id: string
   firstName: string
   lastName: string
-  cabinBaggage?: string | null
   fullName: string
   phone: string
   email?: string | null
@@ -582,13 +588,13 @@ export type ParticipantImportWarning = {
 export type ParticipantImportPreviewRow = {
   rowIndex: number
   fullName?: string | null
+  participantNameReference?: string | null
   phone?: string | null
   tcNo?: string | null
   birthDate?: string | null
   gender?: string | null
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
-  participantNameReference?: string | null
   arrivalDepartureTime?: string | null
   arrivalArrivalTime?: string | null
   returnDepartureTime?: string | null
@@ -607,13 +613,13 @@ export type ParticipantImportPreviewRow = {
   departureTime?: string | null
   arrivalDate?: string | null
   arrivalTime?: string | null
+  cabinBaggage?: string | null
 }
 
 export type ParticipantImportReport = {
   totalRows: number
   validRows?: number
   imported: number
-  cabinBaggage?: string | null
   created: number
   updated: number
   failed: number

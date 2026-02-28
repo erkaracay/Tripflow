@@ -65,9 +65,12 @@ onMounted(loadEvents)
         v-for="event in events"
         :key="event.id"
         class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-      >
+        >
         <div>
           <div class="text-base font-medium">{{ event.name }}</div>
+          <div v-if="event.organizationName" class="mt-1 text-xs font-medium text-slate-600">
+            {{ t('guide.events.organizationLabel', { name: event.organizationName }) }}
+          </div>
           <div class="text-xs text-slate-500">
             {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
           </div>

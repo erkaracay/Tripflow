@@ -236,6 +236,8 @@ public static class DevSeed
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await db.Users.FirstOrDefaultAsync(x => x.Email == normalizedEmail, ct);
+        var isGuide = string.Equals(role, "Guide", StringComparison.Ordinal);
+        var persistedOrganizationId = isGuide ? null : organizationId;
         if (user is null)
         {
             user = new UserEntity
@@ -244,12 +246,18 @@ public static class DevSeed
                 Email = normalizedEmail,
                 FullName = fullName,
                 Role = role,
-                OrganizationId = organizationId,
+                OrganizationId = persistedOrganizationId,
                 CreatedAt = now
             };
             user.PasswordHash = hasher.HashPassword(user, password);
             db.Users.Add(user);
             state.Seeded = true;
+
+            if (isGuide && organizationId.HasValue)
+            {
+                await EnsureGuideMembership(db, user.Id, organizationId.Value, now, ct, state);
+            }
+
             return user;
         }
 
@@ -266,9 +274,9 @@ public static class DevSeed
             updated = true;
         }
 
-        if (user.OrganizationId != organizationId)
+        if (user.OrganizationId != persistedOrganizationId)
         {
-            user.OrganizationId = organizationId;
+            user.OrganizationId = persistedOrganizationId;
             updated = true;
         }
 
@@ -281,7 +289,36 @@ public static class DevSeed
             state.Seeded = true;
         }
 
+        if (isGuide && organizationId.HasValue)
+        {
+            await EnsureGuideMembership(db, user.Id, organizationId.Value, now, ct, state);
+        }
+
         return user;
+    }
+
+    private static async Task EnsureGuideMembership(
+        TripflowDbContext db,
+        Guid guideUserId,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var exists = await db.OrganizationGuides
+            .AnyAsync(x => x.OrganizationId == organizationId && x.GuideUserId == guideUserId, ct);
+        if (exists)
+        {
+            return;
+        }
+
+        db.OrganizationGuides.Add(new OrganizationGuideEntity
+        {
+            OrganizationId = organizationId,
+            GuideUserId = guideUserId,
+            CreatedAt = now
+        });
+        state.Seeded = true;
     }
 
     private static async Task<EventEntity> GetOrCreateEvent(

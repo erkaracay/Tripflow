@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
@@ -12,6 +13,11 @@ internal static class UsersHandlers
 {
     private const string RoleAdmin = "AgencyAdmin";
     private const string RoleGuide = "Guide";
+    private const string RoleSuperAdmin = "SuperAdmin";
+
+    private const string GuideActionCreated = "created";
+    private const string GuideActionAttached = "attached";
+    private const string GuideActionAlreadyAttached = "already_attached";
 
     internal static async Task<IResult> GetUsers(
         string? role,
@@ -24,13 +30,13 @@ internal static class UsersHandlers
         var roleClaim = user.FindFirstValue("role") ?? string.Empty;
         Guid resolvedOrgId;
 
-        if (string.Equals(roleClaim, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(roleClaim, RoleSuperAdmin, StringComparison.OrdinalIgnoreCase))
         {
             if (!string.IsNullOrWhiteSpace(orgId) && Guid.TryParse(orgId, out resolvedOrgId))
             {
                 // ok
             }
-            else if (OrganizationHelpers.TryResolveOrganizationId(httpContext, out resolvedOrgId, out var orgError))
+            else if (OrganizationHelpers.TryResolveOrganizationId(httpContext, out resolvedOrgId, out _))
             {
                 // ok
             }
@@ -47,16 +53,14 @@ internal static class UsersHandlers
             }
         }
 
-        var query = db.Users.AsNoTracking()
-            .Where(x => x.OrganizationId == resolvedOrgId);
-
         var roleFilter = role?.Trim();
-        if (!string.IsNullOrWhiteSpace(roleFilter))
+        var normalizedRole = NormalizeRole(roleFilter);
+        if (!string.IsNullOrWhiteSpace(roleFilter) && normalizedRole is null)
         {
-            query = query.Where(x => x.Role.ToLower() == roleFilter.ToLower());
+            return Results.BadRequest(new { code = "invalid_role", message = "Role filter is invalid." });
         }
 
-        var users = await query
+        var users = await BuildUsersQuery(db, resolvedOrgId, normalizedRole)
             .OrderBy(x => x.FullName ?? x.Email)
             .Select(x => new UserListItemDto(x.Id, x.Email, x.FullName, x.Role))
             .ToArrayAsync(ct);
@@ -76,21 +80,16 @@ internal static class UsersHandlers
         }
 
         var email = NormalizeEmail(request.Email);
-        var password = request.Password?.Trim() ?? string.Empty;
-        var fullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
+        var fullName = NormalizeFullName(request.FullName);
+        var password = NormalizePassword(request.Password);
 
         if (string.IsNullOrWhiteSpace(email))
         {
             return Results.BadRequest(new { message = "Email is required." });
         }
 
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-        {
-            return Results.BadRequest(new { code = "password_too_short", message = "Password must be at least 8 characters." });
-        }
-
         var normalizedRole = NormalizeRole(request.Role);
-        if (normalizedRole is null || normalizedRole == "SuperAdmin")
+        if (normalizedRole is null || string.Equals(normalizedRole, RoleSuperAdmin, StringComparison.OrdinalIgnoreCase))
         {
             return Results.BadRequest(new { code = "invalid_role", message = "Role must be Admin or Guide." });
         }
@@ -105,6 +104,23 @@ internal static class UsersHandlers
         if (!orgExists)
         {
             return Results.NotFound(new { code = "org_not_found", message = "Organization not found." });
+        }
+
+        if (string.Equals(normalizedRole, RoleGuide, StringComparison.OrdinalIgnoreCase))
+        {
+            return await EnsureGuideForOrganization(
+                email,
+                fullName,
+                password,
+                request.OrganizationId,
+                db,
+                hasher,
+                ct);
+        }
+
+        if (!TryValidatePassword(password, out var passwordError))
+        {
+            return passwordError!;
         }
 
         var emailExists = await db.Users.AsNoTracking()
@@ -123,12 +139,14 @@ internal static class UsersHandlers
             OrganizationId = request.OrganizationId,
             CreatedAt = DateTime.UtcNow
         };
-        user.PasswordHash = hasher.HashPassword(user, password);
+        user.PasswordHash = hasher.HashPassword(user, password!);
 
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/users/{user.Id}", new UserListItemDto(user.Id, user.Email, user.FullName, user.Role));
+        return Results.Created(
+            $"/api/users/{user.Id}",
+            new UserUpsertResponseDto(ToListItem(user), GuideActionCreated));
     }
 
     internal static async Task<IResult> CreateGuide(
@@ -144,17 +162,12 @@ internal static class UsersHandlers
         }
 
         var email = NormalizeEmail(request.Email);
-        var password = request.Password?.Trim() ?? string.Empty;
-        var fullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
+        var fullName = NormalizeFullName(request.FullName);
+        var password = NormalizePassword(request.Password);
 
         if (string.IsNullOrWhiteSpace(email))
         {
             return Results.BadRequest(new { message = "Email is required." });
-        }
-
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-        {
-            return Results.BadRequest(new { code = "password_too_short", message = "Password must be at least 8 characters." });
         }
 
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out _))
@@ -162,28 +175,7 @@ internal static class UsersHandlers
             return Results.BadRequest(new { code = "org_required", message = "OrganizationId required." });
         }
 
-        var emailExists = await db.Users.AsNoTracking()
-            .AnyAsync(x => x.Email == email, ct);
-        if (emailExists)
-        {
-            return Results.Conflict(new { code = "email_already_exists", message = "Email already exists." });
-        }
-
-        var user = new UserEntity
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            FullName = fullName,
-            Role = RoleGuide,
-            OrganizationId = orgId,
-            CreatedAt = DateTime.UtcNow
-        };
-        user.PasswordHash = hasher.HashPassword(user, password);
-
-        db.Users.Add(user);
-        await db.SaveChangesAsync(ct);
-
-        return Results.Created($"/api/users/{user.Id}", new UserListItemDto(user.Id, user.Email, user.FullName, user.Role));
+        return await EnsureGuideForOrganization(email, fullName, password, orgId, db, hasher, ct);
     }
 
     internal static async Task<IResult> ChangePassword(
@@ -200,10 +192,10 @@ internal static class UsersHandlers
             return Results.BadRequest(new { message = "Request body is required." });
         }
 
-        var password = request.NewPassword?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+        var password = NormalizePassword(request.NewPassword);
+        if (!TryValidatePassword(password, out var passwordError))
         {
-            return Results.BadRequest(new { code = "password_too_short", message = "Password must be at least 8 characters." });
+            return passwordError!;
         }
 
         var targetUser = await db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
@@ -213,23 +205,25 @@ internal static class UsersHandlers
         }
 
         var roleClaim = user.FindFirstValue("role") ?? string.Empty;
-        if (string.Equals(roleClaim, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(roleClaim, RoleSuperAdmin, StringComparison.OrdinalIgnoreCase))
         {
-            // SuperAdmin can change any user's password (including other SuperAdmins).
+            // SuperAdmin can change any password.
         }
         else if (string.Equals(roleClaim, RoleAdmin, StringComparison.OrdinalIgnoreCase))
         {
-            if (!string.Equals(targetUser.Role, RoleGuide, StringComparison.OrdinalIgnoreCase))
-            {
-                return Results.BadRequest(new { code = "invalid_role_target", message = "Only guide passwords can be changed." });
-            }
-
             if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out _))
             {
                 return Results.BadRequest(new { code = "org_required", message = "OrganizationId required." });
             }
 
-            if (targetUser.OrganizationId != orgId)
+            if (string.Equals(targetUser.Role, RoleGuide, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Json(
+                    new { code = "guide_password_managed_globally", message = "Guide passwords are managed globally." },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            if (targetUser.OrganizationId != orgId || string.Equals(targetUser.Role, RoleSuperAdmin, StringComparison.OrdinalIgnoreCase))
             {
                 return Results.Json(new { code = "forbidden", message = "Forbidden." }, statusCode: StatusCodes.Status403Forbidden);
             }
@@ -239,14 +233,176 @@ internal static class UsersHandlers
             return Results.Json(new { code = "forbidden", message = "Forbidden." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        targetUser.PasswordHash = hasher.HashPassword(targetUser, password);
+        targetUser.PasswordHash = hasher.HashPassword(targetUser, password!);
         await db.SaveChangesAsync(ct);
 
         return Results.NoContent();
     }
 
+    private static IQueryable<UserEntity> BuildUsersQuery(TripflowDbContext db, Guid organizationId, string? normalizedRole)
+    {
+        var query = db.Users.AsNoTracking();
+
+        if (string.Equals(normalizedRole, RoleGuide, StringComparison.OrdinalIgnoreCase))
+        {
+            return query.Where(x =>
+                x.Role == RoleGuide &&
+                x.OrganizationGuideMemberships.Any(m => m.OrganizationId == organizationId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedRole))
+        {
+            return query.Where(x => x.Role == normalizedRole && x.OrganizationId == organizationId);
+        }
+
+        return query.Where(x =>
+            (x.Role == RoleGuide && x.OrganizationGuideMemberships.Any(m => m.OrganizationId == organizationId))
+            || (x.Role != RoleGuide && x.OrganizationId == organizationId));
+    }
+
+    private static async Task<IResult> EnsureGuideForOrganization(
+        string email,
+        string? fullName,
+        string? password,
+        Guid organizationId,
+        TripflowDbContext db,
+        IPasswordHasher<UserEntity> hasher,
+        CancellationToken ct)
+    {
+        var user = await db.Users
+            .Include(x => x.OrganizationGuideMemberships)
+            .SingleOrDefaultAsync(x => x.Email == email, ct);
+
+        if (user is null)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                return Results.BadRequest(new
+                {
+                    code = "password_required_for_new_guide",
+                    message = "Password is required when creating a new guide."
+                });
+            }
+
+            if (!TryValidatePassword(password, out var passwordError))
+            {
+                return passwordError!;
+            }
+
+            user = new UserEntity
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                FullName = fullName,
+                PasswordHash = string.Empty,
+                Role = RoleGuide,
+                OrganizationId = null,
+                CreatedAt = DateTime.UtcNow
+            };
+            user.PasswordHash = hasher.HashPassword(user, password);
+            user.OrganizationGuideMemberships.Add(new OrganizationGuideEntity
+            {
+                OrganizationId = organizationId,
+                GuideUserId = user.Id,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            db.Users.Add(user);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                db.ChangeTracker.Clear();
+                return await EnsureGuideForOrganization(email, fullName, null, organizationId, db, hasher, ct);
+            }
+
+            return Results.Created(
+                $"/api/users/{user.Id}",
+                new UserUpsertResponseDto(ToListItem(user), GuideActionCreated));
+        }
+
+        if (!string.Equals(user.Role, RoleGuide, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Conflict(new
+            {
+                code = "email_belongs_to_non_guide",
+                message = "Email already exists for a non-guide account."
+            });
+        }
+
+        var updated = false;
+        if (!string.IsNullOrWhiteSpace(fullName) && string.IsNullOrWhiteSpace(user.FullName))
+        {
+            user.FullName = fullName;
+            updated = true;
+        }
+
+        if (user.OrganizationId.HasValue)
+        {
+            user.OrganizationId = null;
+            updated = true;
+        }
+
+        var membershipExists = user.OrganizationGuideMemberships.Any(x => x.OrganizationId == organizationId);
+        if (!membershipExists)
+        {
+            user.OrganizationGuideMemberships.Add(new OrganizationGuideEntity
+            {
+                OrganizationId = organizationId,
+                GuideUserId = user.Id,
+                CreatedAt = DateTime.UtcNow
+            });
+            updated = true;
+        }
+
+        if (updated)
+        {
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                db.ChangeTracker.Clear();
+                var attachedUser = await db.Users.AsNoTracking()
+                    .SingleAsync(x => x.Email == email, ct);
+                return Results.Ok(new UserUpsertResponseDto(ToListItem(attachedUser), GuideActionAlreadyAttached));
+            }
+        }
+
+        var action = membershipExists ? GuideActionAlreadyAttached : GuideActionAttached;
+        return Results.Ok(new UserUpsertResponseDto(ToListItem(user), action));
+    }
+
+    private static bool TryValidatePassword(string? password, out IResult? error)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+        {
+            error = Results.BadRequest(new
+            {
+                code = "password_too_short",
+                message = "Password must be at least 8 characters."
+            });
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static UserListItemDto ToListItem(UserEntity user)
+        => new(user.Id, user.Email, user.FullName, user.Role);
+
     private static string NormalizeEmail(string? value)
         => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+
+    private static string? NormalizeFullName(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizePassword(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string? NormalizeRole(string? value)
     {
@@ -267,11 +423,15 @@ internal static class UsersHandlers
             return RoleGuide;
         }
 
-        if (string.Equals(normalized, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalized, RoleSuperAdmin, StringComparison.OrdinalIgnoreCase))
         {
-            return "SuperAdmin";
+            return RoleSuperAdmin;
         }
 
         return null;
     }
+
+    private static bool IsUniqueViolation(DbUpdateException exception)
+        => exception.InnerException is PostgresException postgres
+           && string.Equals(postgres.SqlState, PostgresErrorCodes.UniqueViolation, StringComparison.Ordinal);
 }

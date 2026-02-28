@@ -39,7 +39,8 @@ internal static class EventsHandlers
                 db.Participants.Count(p => p.EventId == x.Id),
                 x.EventGuides.Select(g => g.GuideUserId).ToArray(),
                 x.IsDeleted,
-                x.EventAccessCode))
+                x.EventAccessCode,
+                null))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -886,43 +887,46 @@ internal static class EventsHandlers
             return error!;
         }
 
-        var session = await PortalSessionHelpers.GetValidSessionAsync(httpContext, db, ct);
-        EventEntity? entity = null;
-        if (session is not null && session.EventId == id)
-        {
-            entity = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        }
-        else
-        {
-            var role = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
-            var isAdmin = string.Equals(role, "AgencyAdmin", StringComparison.OrdinalIgnoreCase) ||
-                          string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
-            var isGuide = string.Equals(role, "Guide", StringComparison.OrdinalIgnoreCase);
+        var role = httpContext.User.FindFirstValue("role") ?? httpContext.User.FindFirstValue(ClaimTypes.Role);
+        var isAdmin = string.Equals(role, "AgencyAdmin", StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(role, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+        var isGuide = string.Equals(role, "Guide", StringComparison.OrdinalIgnoreCase);
 
+        EventEntity? entity = null;
+
+        if (isAdmin)
+        {
             if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
             {
                 return orgError!;
             }
 
-            if (isAdmin)
+            entity = await db.Events.AsNoTracking()
+                .Include(x => x.EventGuides)
+                .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        }
+        else if (isGuide)
+        {
+            var userId = httpContext.User.FindFirstValue("sub");
+            if (!Guid.TryParse(userId, out var guideId))
             {
-                entity = await db.Events.AsNoTracking()
-                    .Include(x => x.EventGuides)
-                    .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+                return Results.Unauthorized();
             }
-            else if (isGuide)
-            {
-                var userId = httpContext.User.FindFirstValue("sub");
-                if (!Guid.TryParse(userId, out var guideId))
-                {
-                    return Results.Unauthorized();
-                }
 
+            entity = await db.Events.AsNoTracking()
+                .Include(x => x.EventGuides)
+                .FirstOrDefaultAsync(
+                    x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == guideId) && !x.IsDeleted,
+                    ct);
+        }
+        else
+        {
+            var session = await PortalSessionHelpers.GetValidSessionAsync(httpContext, db, ct);
+            if (session is not null && session.EventId == id)
+            {
                 entity = await db.Events.AsNoTracking()
                     .Include(x => x.EventGuides)
-                    .FirstOrDefaultAsync(
-                        x => x.Id == id && x.OrganizationId == orgId && x.EventGuides.Any(g => g.GuideUserId == guideId),
-                        ct);
+                    .FirstOrDefaultAsync(x => x.Id == id, ct);
             }
             else
             {
@@ -1570,12 +1574,14 @@ internal static class EventsHandlers
 
         var guideIds = request.GuideUserIds.Where(g => g != Guid.Empty).Distinct().ToArray();
 
-        // Validate all guides exist and belong to the organization
+        // Validate all guides exist and belong to the organization through organization guide memberships.
         if (guideIds.Length > 0)
         {
-            var validGuides = await db.Users.AsNoTracking()
-                .Where(x => guideIds.Contains(x.Id) && x.Role == "Guide" && x.OrganizationId == orgId)
-                .Select(x => x.Id)
+            var validGuides = await db.OrganizationGuides.AsNoTracking()
+                .Where(x => x.OrganizationId == orgId
+                    && guideIds.Contains(x.GuideUserId)
+                    && x.GuideUser.Role == "Guide")
+                .Select(x => x.GuideUserId)
                 .ToArrayAsync(ct);
 
             if (validGuides.Length != guideIds.Length)
@@ -3735,13 +3741,13 @@ internal static class EventsHandlers
             var flightCode = NormalizeOptionalText(segment.FlightCode);
             var pnr = NormalizeOptionalText(segment.Pnr);
             var ticketNo = NormalizeOptionalText(segment.TicketNo);
+            var cabinBaggage = NormalizeOptionalText(segment.CabinBaggage);
 
             if (!HasAnyFlightSegmentValue(
                     airline,
                     departureAirport,
                     arrivalAirport,
                     flightCode,
-            var cabinBaggage = NormalizeOptionalText(segment.CabinBaggage);
                     departureDate,
                     departureTime,
                     arrivalDate,

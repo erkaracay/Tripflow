@@ -7,7 +7,7 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import PasswordModal from '../../components/ui/PasswordModal.vue'
-import type { UserListItem } from '../../types'
+import type { UserListItem, UserUpsertResponse } from '../../types'
 
 type CreateRole = 'Admin' | 'Guide'
 
@@ -81,18 +81,21 @@ const createUser = async () => {
     return
   }
 
-  if (!createForm.email.trim() || !createForm.password.trim()) {
-    formErrorKey.value = 'validation.userEmailPasswordRequired'
+  if (!createForm.email.trim()) {
+    formErrorKey.value = 'validation.emailRequired'
     await nextTick()
-    if (!createForm.email.trim()) {
-      emailInput.value?.focus()
-    } else {
-      passwordInput.value?.focus()
-    }
+    emailInput.value?.focus()
     return
   }
 
-  if (createForm.password.trim().length < 8) {
+  if (createForm.role === 'Admin' && !createForm.password.trim()) {
+    formErrorKey.value = 'validation.userEmailPasswordRequired'
+    await nextTick()
+    passwordInput.value?.focus()
+    return
+  }
+
+  if (createForm.password.trim() && createForm.password.trim().length < 8) {
     formErrorKey.value = 'validation.passwordMin'
     await nextTick()
     passwordInput.value?.focus()
@@ -103,24 +106,41 @@ const createUser = async () => {
   try {
     const payload = {
       email: createForm.email.trim(),
-      password: createForm.password.trim(),
+      password: createForm.password.trim() || undefined,
       role: createForm.role,
       organizationId: selectedOrgId.value,
       fullName: createForm.fullName.trim() || undefined,
     }
-    const created = await apiPost<UserListItem>('/api/users', payload)
-    users.value = [created, ...users.value]
+    const result = await apiPost<UserUpsertResponse>('/api/users', payload)
+    await loadUsers()
     createForm.email = ''
     createForm.password = ''
     createForm.fullName = ''
     createForm.role = 'Admin'
-    pushToast({ key: 'toast.userCreated', tone: 'success' })
+    if (result.user.role === 'Guide' && result.action === 'attached') {
+      pushToast({ key: 'toast.guideAttached', tone: 'success' })
+    } else if (result.user.role === 'Guide' && result.action === 'already_attached') {
+      pushToast({ key: 'toast.guideAlreadyAttached', tone: 'success' })
+    } else if (result.user.role === 'Guide') {
+      pushToast({ key: 'toast.guideCreated', tone: 'success' })
+    } else {
+      pushToast({ key: 'toast.userCreated', tone: 'success' })
+    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : ''
-    if (message.toLowerCase().includes('email')) {
+    const payloadError = err as { payload?: unknown }
+    const code =
+      payloadError?.payload && typeof payloadError.payload === 'object' && 'code' in payloadError.payload
+        ? String((payloadError.payload as { code?: string }).code ?? '')
+        : ''
+
+    if (code === 'password_required_for_new_guide') {
+      formErrorKey.value = 'errors.guides.passwordRequiredForNewGuide'
+    } else if (code === 'email_belongs_to_non_guide') {
+      formErrorKey.value = 'errors.guides.emailBelongsToNonGuide'
+    } else if (code === 'email_already_exists') {
       formErrorKey.value = 'errors.users.emailExists'
     } else {
-      formErrorMessage.value = message || t('errors.users.create')
+      formErrorMessage.value = err instanceof Error ? err.message : t('errors.users.create')
     }
     pushToast({ key: 'toast.userCreateFailed', tone: 'error' })
   } finally {
@@ -208,7 +228,8 @@ onMounted(loadUsers)
     </section>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold">{{ t('admin.users.createTitle') }}</h2>
+        <h2 class="text-lg font-semibold">{{ t('admin.users.createTitle') }}</h2>
+      <p class="mt-2 text-sm text-slate-500">{{ t('admin.users.createHelp') }}</p>
       <form class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2" @submit.prevent="createUser">
         <label class="grid min-w-0 gap-1 text-sm">
           <span class="text-slate-600">{{ t('admin.users.form.roleLabel') }}</span>
@@ -259,6 +280,12 @@ onMounted(loadUsers)
             name="fullName"
           />
         </label>
+        <p
+          v-if="createForm.role === 'Guide'"
+          class="md:col-span-2 text-xs text-slate-500"
+        >
+          {{ t('admin.guides.passwordHint') }}
+        </p>
         <div class="md:col-span-2 flex flex-wrap items-center gap-3">
           <button
             class="inline-flex items-center gap-2 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"

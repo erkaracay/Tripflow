@@ -63,7 +63,7 @@ internal static class AuthHandlers
             new("role", user.Role)
         };
 
-        if (user.OrganizationId.HasValue)
+        if (user.OrganizationId.HasValue && !string.Equals(user.Role, "Guide", StringComparison.OrdinalIgnoreCase))
         {
             claims.Add(new Claim("orgId", user.OrganizationId.Value.ToString()));
         }

@@ -11,6 +11,7 @@ public sealed class OrganizationEntity
     public DateTime UpdatedAt { get; set; }
 
     public List<UserEntity> Users { get; set; } = new();
+    public List<OrganizationGuideEntity> OrganizationGuides { get; set; } = new();
     public List<EventEntity> Events { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
     public List<ParticipantFlightSegmentEntity> ParticipantFlightSegments { get; set; } = new();

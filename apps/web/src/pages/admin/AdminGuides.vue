@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost, apiPostWithPayload } from '../../lib/api'
+import { getAuthRole } from '../../lib/auth'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import PasswordModal from '../../components/ui/PasswordModal.vue'
-import type { UserListItem } from '../../types'
+import type { UserListItem, UserUpsertResponse } from '../../types'
 
 const { t } = useI18n()
 const { pushToast } = useToast()
+const isSuperAdmin = computed(() => getAuthRole() === 'SuperAdmin')
 
 const guides = ref<UserListItem[]>([])
 const loading = ref(true)
@@ -55,18 +57,14 @@ const createGuide = async () => {
   formErrorKey.value = null
   formErrorMessage.value = null
 
-  if (!createForm.email.trim() || !createForm.password.trim()) {
-    formErrorKey.value = 'validation.userEmailPasswordRequired'
+  if (!createForm.email.trim()) {
+    formErrorKey.value = 'validation.emailRequired'
     await nextTick()
-    if (!createForm.email.trim()) {
-      emailInput.value?.focus()
-    } else {
-      passwordInput.value?.focus()
-    }
+    emailInput.value?.focus()
     return
   }
 
-  if (createForm.password.trim().length < 8) {
+  if (createForm.password.trim() && createForm.password.trim().length < 8) {
     formErrorKey.value = 'validation.passwordMin'
     await nextTick()
     passwordInput.value?.focus()
@@ -77,21 +75,37 @@ const createGuide = async () => {
   try {
     const payload = {
       email: createForm.email.trim(),
-      password: createForm.password.trim(),
+      password: createForm.password.trim() || undefined,
       fullName: createForm.fullName.trim() || undefined,
     }
-    const created = await apiPost<UserListItem>('/api/users/guides', payload)
-    guides.value = [created, ...guides.value]
+    const result = await apiPost<UserUpsertResponse>('/api/users/guides', payload)
+    await loadGuides()
     createForm.email = ''
     createForm.password = ''
     createForm.fullName = ''
-    pushToast({ key: 'toast.guideCreated', tone: 'success' })
+    if (result.action === 'attached') {
+      pushToast({ key: 'toast.guideAttached', tone: 'success' })
+    } else if (result.action === 'already_attached') {
+      pushToast({ key: 'toast.guideAlreadyAttached', tone: 'success' })
+    } else {
+      pushToast({ key: 'toast.guideCreated', tone: 'success' })
+    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : ''
-    if (message.toLowerCase().includes('email')) {
+    const payloadError = err as { payload?: unknown }
+    const code =
+      payloadError?.payload && typeof payloadError.payload === 'object' && 'code' in payloadError.payload
+        ? String((payloadError.payload as { code?: string }).code ?? '')
+        : ''
+    if (code === 'password_required_for_new_guide') {
+      formErrorKey.value = 'errors.guides.passwordRequiredForNewGuide'
+    } else if (code === 'password_too_short') {
+      formErrorKey.value = 'validation.passwordMin'
+    } else if (code === 'email_belongs_to_non_guide') {
+      formErrorKey.value = 'errors.guides.emailBelongsToNonGuide'
+    } else if (code === 'email_already_exists') {
       formErrorKey.value = 'errors.users.emailExists'
     } else {
-      formErrorMessage.value = message || t('errors.guides.create')
+      formErrorMessage.value = err instanceof Error ? err.message : t('errors.guides.create')
     }
     pushToast({ key: 'toast.guideCreateFailed', tone: 'error' })
   } finally {
@@ -148,7 +162,9 @@ const submitPassword = async (payload: { password: string; confirm: string }) =>
         ? String((payloadError.payload as { code?: string }).code ?? '')
         : ''
 
-    if (code === 'password_too_short') {
+    if (code === 'guide_password_managed_globally') {
+      passwordErrorKey.value = 'errors.users.password.guideManagedGlobally'
+    } else if (code === 'password_too_short') {
       passwordErrorKey.value = 'errors.users.password.tooShort'
     } else if (code === 'invalid_role_target') {
       passwordErrorKey.value = 'errors.users.password.invalidRole'
@@ -176,7 +192,8 @@ onMounted(loadGuides)
     </section>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold">{{ t('admin.guides.createTitle') }}</h2>
+        <h2 class="text-lg font-semibold">{{ t('admin.guides.createTitle') }}</h2>
+      <p class="mt-2 text-sm text-slate-500">{{ t('admin.guides.createHelp') }}</p>
       <form class="mt-4 grid gap-4 gap-y-4 md:grid-cols-3 md:gap-x-4" @submit.prevent="createGuide">
         <label class="grid min-w-0 gap-1 text-sm">
           <span class="text-slate-600">{{ t('admin.guides.form.emailLabel') }}</span>
@@ -227,6 +244,9 @@ onMounted(loadGuides)
           <span v-if="formErrorKey" class="text-xs text-rose-600">{{ t(formErrorKey) }}</span>
           <span v-else-if="formErrorMessage" class="text-xs text-rose-600">{{ formErrorMessage }}</span>
         </div>
+        <p class="md:col-span-3 text-xs text-slate-500">
+          {{ t('admin.guides.passwordHint') }}
+        </p>
       </form>
     </section>
 
@@ -258,12 +278,19 @@ onMounted(loadGuides)
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <button
+              v-if="isSuperAdmin"
               class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               type="button"
               @click="openPasswordModal(guide)"
             >
               {{ t('admin.guides.actions.changePassword') }}
             </button>
+            <span
+              v-else
+              class="rounded border border-dashed border-slate-200 px-3 py-1 text-xs text-slate-500"
+            >
+              {{ t('admin.guides.actions.passwordManagedGlobally') }}
+            </span>
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
               {{ t('admin.users.roles.guide') }}
             </span>

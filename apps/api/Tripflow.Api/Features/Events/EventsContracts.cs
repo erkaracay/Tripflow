@@ -15,7 +15,8 @@ public sealed record EventListItemDto(
     int TotalCount,
     Guid[] GuideUserIds,
     bool IsDeleted,
-    string EventAccessCode);
+    string EventAccessCode,
+    string? OrganizationName = null);
 
 public sealed record EventPortalInfo(
     MeetingInfo Meeting,

@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
-using Tripflow.Api.Features.Organizations;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -21,14 +20,9 @@ internal static class GuideHandlers
             return error!;
         }
 
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
         var events = await db.Events.AsNoTracking()
             .Include(x => x.EventGuides)
-            .Where(x => x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted)
+            .Where(x => x.EventGuides.Any(g => g.GuideUserId == userId) && !x.IsDeleted)
             .OrderBy(x => x.StartDate).ThenBy(x => x.Name)
             .Select(x => new EventListItemDto(
                 x.Id,
@@ -39,7 +33,8 @@ internal static class GuideHandlers
                 db.Participants.Count(p => p.EventId == x.Id),
                 x.EventGuides.Select(g => g.GuideUserId).ToArray(),
                 x.IsDeleted,
-                x.EventAccessCode))
+                x.EventAccessCode,
+                x.Organization.Name))
             .ToArrayAsync(ct);
 
         return Results.Ok(events);
@@ -53,27 +48,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         var participantsQuery = db.Participants.AsNoTracking()
@@ -165,19 +143,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
+            return eventError;
         }
 
         if (!Guid.TryParse(participantId, out var participantGuid))
@@ -188,14 +157,6 @@ internal static class GuideHandlers
         if (request is null || !request.WillNotAttend.HasValue)
         {
             return EventsHelpers.BadRequest("willNotAttend is required.");
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
         }
 
         var participant = await db.Participants
@@ -240,27 +201,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         var normalized = NormalizeCheckInCode(code);
@@ -295,27 +239,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         var totalCount = await db.Participants.AsNoTracking()
@@ -334,27 +261,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         var schedule = await EventsHandlers.BuildScheduleAsync(id, orgId, db, ct);
@@ -374,22 +284,10 @@ internal static class GuideHandlers
             return error!;
         }
 
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        var (eventError, _, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         var actorRole = user.FindFirstValue("role") ?? user.FindFirstValue(ClaimTypes.Role);
@@ -411,27 +309,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, _, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         return await EventsHandlers.UndoCheckInForOrg(orgId, eventId, request, db, ct);
@@ -444,27 +325,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, _, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
+            return eventError;
         }
 
         return await EventsHandlers.ResetAllCheckInsForOrg(orgId, eventId, db, ct);
@@ -567,13 +431,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventsHandlers.GetActivitiesForCheckIn(eventId, httpContext, db, ct);
     }
 
@@ -586,13 +445,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await ActivityCheckInHandlers.PostCheckIn(eventId, activityId, request, httpContext, db, ct);
     }
 
@@ -610,13 +464,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await ActivityCheckInHandlers.GetParticipantsTable(eventId, activityId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
     }
 
@@ -628,18 +477,9 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
-            return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-            return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-            return parseError!;
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-            return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
+            return eventError;
 
         return await ActivityCheckInHandlers.ResetAllActivityCheckIns(eventId, activityId, httpContext, db, ct);
     }
@@ -654,19 +494,10 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error))
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
         {
-            return error!;
-        }
-
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
-        {
-            return orgError!;
-        }
-
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError))
-        {
-            return parseError!;
+            return eventError;
         }
 
         if (!Guid.TryParse(activityId, out var activityGuid))
@@ -682,14 +513,6 @@ internal static class GuideHandlers
         if (request is null || !request.WillNotAttend.HasValue)
         {
             return EventsHelpers.BadRequest("willNotAttend is required.");
-        }
-
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess)
-        {
-            return Results.NotFound(new { message = "Event not found." });
         }
 
         var activityExists = await db.EventActivities.AsNoTracking()
@@ -757,13 +580,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.GetItems(eventId, includeInactive, httpContext, db, ct);
     }
 
@@ -775,13 +593,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.CreateItem(eventId, request, httpContext, db, ct);
     }
 
@@ -794,13 +607,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.UpdateItem(eventId, itemId, request, httpContext, db, ct);
     }
 
@@ -812,13 +620,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.DeleteItem(eventId, itemId, httpContext, db, ct);
     }
 
@@ -831,13 +634,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.PostAction(eventId, itemId, request, httpContext, db, ct);
     }
 
@@ -855,13 +653,8 @@ internal static class GuideHandlers
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!TryGetUserId(user, out var userId, out var error)) return error!;
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return orgError!;
-        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var parseError)) return parseError!;
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == id && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return Results.NotFound(new { message = "Event not found." });
+        var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null) return eventError;
         return await EventItemsHandlers.GetParticipantsTable(eventId, itemId, query, status, page, pageSize, sort, dir, httpContext, db, ct);
     }
 
@@ -873,13 +666,35 @@ internal static class GuideHandlers
         CancellationToken ct)
     {
         if (!TryGetUserId(user, out var userId, out var error)) return (error, default, default);
-        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError)) return (orgError, default, default);
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var parseError)) return (parseError, default, default);
-        var hasAccess = await db.Events.AsNoTracking()
-            .Include(x => x.EventGuides)
-            .AnyAsync(x => x.Id == eventGuid && x.EventGuides.Any(g => g.GuideUserId == userId) && x.OrganizationId == orgId && !x.IsDeleted, ct);
-        if (!hasAccess) return (Results.NotFound(new { message = "Event not found." }), default, default);
-        return (null, eventGuid, orgId);
+        var eventContext = await db.Events.AsNoTracking()
+            .Where(x => x.Id == eventGuid && !x.IsDeleted && x.EventGuides.Any(g => g.GuideUserId == userId))
+            .Select(x => new { x.Id, x.OrganizationId })
+            .FirstOrDefaultAsync(ct);
+        if (eventContext is null) return (Results.NotFound(new { message = "Event not found." }), default, default);
+
+        httpContext.Request.Headers["X-Org-Id"] = eventContext.OrganizationId.ToString();
+        EnsureOrganizationClaim(httpContext, eventContext.OrganizationId);
+        return (null, eventContext.Id, eventContext.OrganizationId);
+    }
+
+    private static void EnsureOrganizationClaim(HttpContext httpContext, Guid organizationId)
+    {
+        if (httpContext.User.FindFirst("orgId")?.Value == organizationId.ToString())
+        {
+            return;
+        }
+
+        var claims = httpContext.User.Claims
+            .Where(x => !string.Equals(x.Type, "orgId", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        claims.Add(new Claim("orgId", organizationId.ToString()));
+
+        var identity = new ClaimsIdentity(
+            claims,
+            authenticationType: httpContext.User.Identity?.AuthenticationType ?? "GuideEventAccess");
+
+        httpContext.User = new ClaimsPrincipal(identity);
     }
 
     internal static async Task<IResult> GetEvent(

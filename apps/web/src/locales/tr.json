@@ -143,6 +143,7 @@
         "mismatch": "Parolalar eşleşmiyor.",
         "tooShort": "Parola en az 8 karakter olmalı.",
         "invalidRole": "Bu rol için parola değiştirilemez.",
+        "guideManagedGlobally": "Rehber parolaları global olarak yalnızca SuperAdmin tarafından yönetilir.",
         "forbidden": "Bu parolayı değiştirme yetkin yok.",
         "notFound": "Kullanıcı bulunamadı.",
         "failed": "Parola güncellenemedi."
@@ -172,7 +173,9 @@
     },
     "guides": {
       "load": "Rehberler yüklenemedi.",
-      "create": "Rehber oluşturulamadı."
+      "create": "Rehber oluşturulamadı.",
+      "passwordRequiredForNewGuide": "Yeni rehber oluşturmak için parola girin. Mevcut bir rehberi e-posta ile bağlarken boş bırakabilirsiniz.",
+      "emailBelongsToNonGuide": "Bu e-posta rehber olmayan bir hesaba ait."
     },
     "organizations": {
       "load": "Organizasyonlar yüklenemedi.",
@@ -191,6 +194,7 @@
     "copyFailed": "Kopyalanamadı."
   },
   "validation": {
+    "emailRequired": "E-posta gerekli.",
     "eventNameRequired": "Etkinlik adı gerekli.",
     "startEndRequired": "Başlangıç ve bitiş tarihleri gerekli.",
     "endAfterStart": "Bitiş tarihi başlangıçtan önce olamaz.",
@@ -278,6 +282,8 @@
     "userCreated": "Kullanıcı oluşturuldu.",
     "userCreateFailed": "Kullanıcı oluşturulamadı.",
     "guideCreated": "Rehber oluşturuldu.",
+    "guideAttached": "Mevcut rehber bu organizasyona bağlandı.",
+    "guideAlreadyAttached": "Rehber zaten bu organizasyona bağlı.",
     "guideCreateFailed": "Rehber oluşturulamadı.",
     "passwordUpdated": "Parola güncellendi.",
     "passwordUpdateFailed": "Parola güncellenemedi.",
@@ -292,6 +298,7 @@
     "users": {
       "title": "Kullanıcı yönetimi",
       "subtitle": "Seçili organizasyon için admin ve rehber oluşturun.",
+      "createHelp": "Admin kullanıcılar organizasyona özeldir. Rehber kullanıcılar burada oluşturulabilir veya e-posta ile seçili organizasyona bağlanabilir.",
       "orgRequired": "Kullanıcı yönetimi için önce organizasyon seçin.",
       "loading": "Kullanıcılar yükleniyor...",
       "empty": "Kullanıcı bulunamadı.",
@@ -322,14 +329,17 @@
     "guides": {
       "title": "Rehberler",
       "subtitle": "Organizasyonundaki rehberleri yönet.",
+      "createHelp": "Bu ekran organizasyon kapsamındadır. E-posta zaten bir rehbere aitse yeni hesap açılmaz; mevcut global rehber bu organizasyona bağlanır. Bu durumda isim ve şifre alanları mevcut hesabı ezmez.",
       "loading": "Rehberler yükleniyor...",
       "empty": "Rehber bulunamadı.",
       "createTitle": "Rehber oluştur",
       "creating": "Oluşturuluyor...",
       "create": "Rehber oluştur",
+      "passwordHint": "İsim ve parola sadece yeni bir rehber oluştururken kullanılır. E-posta zaten bir rehbere aitse yazdığınız isim mevcut hesabı değiştirmez, parola da uygulanmaz; rehber yalnızca bu organizasyona bağlanır. İsim sadece mevcut rehber kaydında boşsa tamamlayıcı olarak kullanılabilir.",
       "listTitle": "Rehberler",
       "actions": {
-        "changePassword": "Parola değiştir"
+        "changePassword": "Parola değiştir",
+        "passwordManagedGlobally": "Parola global yönetilir"
       },
       "password": {
         "title": "Parola değiştir"
@@ -394,6 +404,7 @@
       "guide": {
         "title": "Rehber Atama",
         "subtitle": "Bu etkinlik için yoklama alacak rehberleri seç.",
+        "helper": "Aynı rehber birden fazla organizasyon ve etkinlikte çalışabilir. Bu liste yalnızca mevcut organizasyona bağlı rehberleri gösterir.",
         "loading": "Rehberler yükleniyor...",
         "empty": "Rehber bulunamadı.",
         "selectPlaceholder": "Rehber seç",
@@ -905,6 +916,7 @@
         "typeFlightSegment": "Uçuş segmenti",
         "tcNo": "Kimlik No",
         "participant": "Katılımcı",
+        "sheetParticipantName": "Sheet: {name}",
         "main": "Ana bilgi",
         "route": "Güzergah",
         "schedule": "Zaman",
@@ -916,7 +928,6 @@
         "participantsFlightColumnsIgnoredDueSegments": "Flight_segments sayfasında veri olduğu için participants sayfasındaki eski uçuş kolonları yok sayıldı.",
         "tcNoAmbiguous": "Kimlik numarası etkinlikte birden fazla katılımcıyla eşleşiyor.",
         "tcNoNotFoundInEvent": "Kimlik numarası bu etkinlikte bulunamadı.",
-        "sheetParticipantName": "Sheet: {name}",
         "firstLastNameRequired": "Ad ve soyad zorunludur.",
         "fullNameRequired": "Ad soyad zorunludur.",
         "phoneRequired": "Telefon zorunludur.",
@@ -942,6 +953,7 @@
         "baggagePiecesInvalid": "Bagaj parça sayısı geçersiz.",
         "baggageTotalKgInvalid": "Toplam bagaj ağırlığı geçersiz.",
         "baggageTotalKgRounded": "Toplam bagaj ağırlığı en yakın tam sayıya yuvarlandı.",
+        "participantNameMismatchForTcNo": "Referans katılımcı adı, TC ile bulunan katılımcıyla uyuşmuyor.",
         "dateInvalid": "Tarih formatı geçersiz.",
         "timeInvalid": "Saat formatı geçersiz."
       },
@@ -953,7 +965,6 @@
         "typeAll": "Tümü",
         "typeParticipant": "Katılımcı",
         "typeSegment": "Segment",
-        "participantNameMismatchForTcNo": "Referans katılımcı adı, TC ile bulunan katılımcıyla uyuşmuyor.",
         "directionLabel": "Yön",
         "directionAll": "Tümü",
         "searchPlaceholder": "TC, ad, uçuş kodu veya hat ara"
@@ -976,28 +987,28 @@
         "participantsNoFlightRule": "Yeni yapıda uçuş kolonlarını participants sheet'e yazmayın; uçuşları flight_segments sheet'e yazın.",
         "participantsUpdateRule": "Aynı etkinlikte aynı tc_no varsa mevcut kayıt güncellenir.",
         "segmentsRequiredRule": "Her segment satırı bir uçuş bacağını temsil eder.",
+        "segmentsParticipantNameRule": "participant_name opsiyoneldir; sadece operatör referansı içindir, eşleşmede kullanılmaz.",
         "segmentsDirectionRule": "direction: Arrival/Return veya Gidiş/Dönüş yazılabilir.",
         "segmentsIndexRule": "segment_index, her yön için 1..N olacak şekilde sıralı olmalıdır.",
         "segmentsDateTimeRule": "Tarih/saat için önerilen format: yyyy-MM-dd ve HH:mm.",
         "segmentsBaggageRule": "baggage_pieces tam sayı olmalı; baggage_total_kg decimal gelirse en yakın tam sayıya yuvarlanır.",
+        "segmentsCabinBaggageRule": "cabin_baggage serbest metindir; örn. 8 kg, 1 küçük valiz, laptop çantası.",
         "requiredColumnsLabel": "Zorunlu kolonlar",
         "requiredColumnsValue": "tc_no, direction, segment_index, departure_airport, arrival_airport, flight_code, departure_date, departure_time",
         "issueDirectionRule": "Direction hatası alırsanız değerleri Arrival/Return (veya Gidiş/Dönüş) olarak düzeltin.",
         "issueNotFoundRule": "tc_no not found hatası, ilgili TC'nin bu etkinlikte kayıtlı olmadığını gösterir.",
+        "issueParticipantNameMismatchRule": "participant_name, kontrol için vardır. Uyuşmazsa warning gelir ama eşleşme yine tc_no ile yapılır.",
         "issueLegacyIgnoredRule": "flight_segments doluysa participants içindeki legacy uçuş alanları yok sayılır (warning).",
         "issuePreviewLimitRule": "Önizlemede ilk 200 satır gösterilir; dosyanın tamamı apply aşamasında işlenir.",
         "tipTwoByTwoRule": "Aktarmalı örnek için aynı TC'ye 2 geliş (segment 1-2) ve 2 dönüş (segment 1-2) satırı ekleyin.",
-        "segmentsParticipantNameRule": "participant_name opsiyoneldir; sadece operatör referansı içindir, eşleşmede kullanılmaz.",
         "tipGroupByTcRule": "Okunabilirlik için aynı tc_no satırlarını birlikte gruplamanız önerilir."
       }
     },
     "eventAccess": {
-        "segmentsCabinBaggageRule": "cabin_baggage serbest metindir; örn. 8 kg, 1 küçük valiz, laptop çantası.",
       "title": "Etkinlik erişimi",
       "subtitle": "Katılımcılar erişim kodu ve TC kimlik no ile giriş yapar.",
       "codeLabel": "Erişim kodu",
       "codeMissing": "Mevcut değil",
-        "issueParticipantNameMismatchRule": "participant_name, kontrol için vardır. Uyuşmazsa warning gelir ama eşleşme yine tc_no ile yapılır.",
       "copyCode": "Kodu kopyala",
       "copyLoginLink": "Giriş linkini kopyala",
       "regenerate": "Kodu yenile",
@@ -1110,6 +1121,7 @@
       "subtitle": "Atandığın etkinliklerde yoklama al.",
       "loading": "Etkinlikler yükleniyor...",
       "empty": "Henüz atanmış etkinlik yok.",
+      "organizationLabel": "Organizasyon: {name}",
       "openCheckIn": "Yoklama al",
       "openActivityCheckIn": "Aktivite yoklaması",
       "openProgram": "Programı gör"

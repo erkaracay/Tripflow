@@ -1629,6 +1629,7 @@ onMounted(loadEvent)
           <div>
             <h2 class="text-lg font-semibold">{{ t('admin.eventDetail.guide.title') }}</h2>
             <p class="text-sm text-slate-500">{{ t('admin.eventDetail.guide.subtitle') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ t('admin.eventDetail.guide.helper') }}</p>
           </div>
         </div>
 
