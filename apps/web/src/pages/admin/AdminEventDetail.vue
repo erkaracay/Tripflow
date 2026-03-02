@@ -24,6 +24,7 @@ import {
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import AppModalShell from '../../components/ui/AppModalShell.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
@@ -2480,55 +2481,51 @@ onMounted(loadEvent)
     </template>
   </div>
 
-  <Teleport to="body">
-    <div
-      v-if="editCodeModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      @click.self="closeEditCodeModal"
-    >
+  <AppModalShell :open="editCodeModalOpen" overlay-class="bg-black/40" content-class="p-4" @close="closeEditCodeModal">
+    <template #default="{ panelClass }">
       <div
-        class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-lg"
-        role="dialog"
-        aria-labelledby="edit-code-title"
-      >
-        <h2 id="edit-code-title" class="text-lg font-semibold text-slate-900">{{ t('admin.eventAccess.editCodeModalTitle') }}</h2>
-        <p class="mt-2 text-sm text-amber-700">{{ t('admin.eventAccess.editCodeWarning') }}</p>
-        <label class="mt-4 grid gap-1 text-sm">
-          <span class="text-slate-600">{{ t('admin.eventAccess.editCodeLabel') }}</span>
-          <input
-            v-model="editCodeValue"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none"
-            :class="editCodeErrorKey ? 'border-rose-400' : ''"
-            :placeholder="t('admin.eventAccess.editCodePlaceholder')"
-            maxlength="10"
-            autocomplete="off"
-            autocapitalize="characters"
-            :disabled="editCodeSaving"
-            @input="editCodeValue = sanitizeEventAccessCode(editCodeValue); editCodeErrorKey = null"
-          />
-        </label>
-        <p v-if="editCodeErrorKey" class="mt-2 text-sm text-rose-600">{{ t(editCodeErrorKey) }}</p>
-        <div class="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
-            :disabled="editCodeSaving"
-            @click="closeEditCodeModal"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            :disabled="editCodeSaving"
-            @click="saveEditCode"
-          >
-            {{ editCodeSaving ? t('common.saving') : t('admin.eventAccess.editCodeSave') }}
-          </button>
-        </div>
+          :class="[panelClass, 'max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-lg']"
+          role="dialog"
+          aria-labelledby="edit-code-title"
+        >
+          <h2 id="edit-code-title" class="text-lg font-semibold text-slate-900">{{ t('admin.eventAccess.editCodeModalTitle') }}</h2>
+          <p class="mt-2 text-sm text-amber-700">{{ t('admin.eventAccess.editCodeWarning') }}</p>
+          <label class="mt-4 grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.eventAccess.editCodeLabel') }}</span>
+            <input
+              v-model="editCodeValue"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none"
+              :class="editCodeErrorKey ? 'border-rose-400' : ''"
+              :placeholder="t('admin.eventAccess.editCodePlaceholder')"
+              maxlength="10"
+              autocomplete="off"
+              autocapitalize="characters"
+              :disabled="editCodeSaving"
+              @input="editCodeValue = sanitizeEventAccessCode(editCodeValue); editCodeErrorKey = null"
+            />
+          </label>
+          <p v-if="editCodeErrorKey" class="mt-2 text-sm text-rose-600">{{ t(editCodeErrorKey) }}</p>
+          <div class="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+              :disabled="editCodeSaving"
+              @click="closeEditCodeModal"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              :disabled="editCodeSaving"
+              @click="saveEditCode"
+            >
+              {{ editCodeSaving ? t('common.saving') : t('admin.eventAccess.editCodeSave') }}
+            </button>
+          </div>
       </div>
-    </div>
-  </Teleport>
+    </template>
+  </AppModalShell>
 
   <ConfirmDialog
     v-model:open="confirmOpen"

@@ -545,19 +545,23 @@ watch(selectedActivityId, () => {
                 <option v-if="activities.length === 0" value="" disabled>{{ t('activityCheckIn.noActivities') }}</option>
               </select>
             </label>
-            <div class="flex items-center gap-2">
+            <div
+              class="app-segmented w-full max-w-[240px] grid-cols-2 sm:w-auto"
+              :style="{ '--segment-count': 2, '--segment-index': direction === 'Entry' ? 0 : 1 }"
+            >
+              <span class="app-segmented-indicator" aria-hidden="true" />
               <button
                 type="button"
-                :class="direction === 'Entry' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-                class="rounded px-3 py-2 text-sm font-medium"
+                class="app-segmented-button px-3 py-2 text-sm font-medium"
+                :class="direction === 'Entry' ? 'app-segmented-button-active' : ''"
                 @click="direction = 'Entry'"
               >
                 {{ t('common.entry') }}
               </button>
               <button
                 type="button"
-                :class="direction === 'Exit' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-                class="rounded px-3 py-2 text-sm font-medium"
+                class="app-segmented-button px-3 py-2 text-sm font-medium"
+                :class="direction === 'Exit' ? 'app-segmented-button-active' : ''"
                 @click="direction = 'Exit'"
               >
                 {{ t('common.exit') }}

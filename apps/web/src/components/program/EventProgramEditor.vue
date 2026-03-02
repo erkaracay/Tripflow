@@ -5,6 +5,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import ErrorState from '../ui/ErrorState.vue'
+import AppModalShell from '../ui/AppModalShell.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import ActivityMealConfigEditor from './ActivityMealConfigEditor.vue'
 import MealReportView from '../meal/MealReportView.vue'
@@ -710,19 +711,16 @@ onMounted(loadAll)
     @close="closeMealReport"
   />
 
-  <teleport to="body">
-    <div
-      v-if="dayModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-    >
+  <AppModalShell :open="dayModalOpen" :close-on-overlay="false">
+    <template #default="{ panelClass }">
       <form
-        ref="dayModalRef"
-        class="flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="dayModalTitleId"
-        @submit.prevent="saveDay"
-      >
+          ref="dayModalRef"
+          :class="[panelClass, 'flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl']"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="dayModalTitleId"
+          @submit.prevent="saveDay"
+        >
         <h3 :id="dayModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingDayId ? t('admin.program.days.edit') : t('admin.program.days.add') }}
         </h3>
@@ -826,22 +824,19 @@ onMounted(loadAll)
           </button>
         </div>
       </form>
-    </div>
-  </teleport>
+    </template>
+  </AppModalShell>
 
-  <teleport to="body">
-    <div
-      v-if="activityModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-    >
+  <AppModalShell :open="activityModalOpen" :close-on-overlay="false">
+    <template #default="{ panelClass }">
       <form
-        ref="activityModalRef"
-        class="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="activityModalTitleId"
-        @submit.prevent="saveActivity"
-      >
+          ref="activityModalRef"
+          :class="[panelClass, 'flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl']"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="activityModalTitleId"
+          @submit.prevent="saveActivity"
+        >
         <h3 :id="activityModalTitleId" class="text-lg font-semibold text-slate-900">
           {{ editingActivityId ? t('admin.program.activities.edit') : t('admin.program.activities.add') }}
         </h3>
@@ -1003,6 +998,6 @@ onMounted(loadAll)
           </button>
         </div>
       </form>
-    </div>
-  </teleport>
+    </template>
+  </AppModalShell>
 </template>

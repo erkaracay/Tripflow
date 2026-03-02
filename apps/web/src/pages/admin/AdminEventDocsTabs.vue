@@ -4,6 +4,8 @@ import { useRoute, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
+import AppModalShell from '../../components/ui/AppModalShell.vue'
+import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Event as TripEvent, EventDocTabDto } from '../../types'
@@ -62,6 +64,10 @@ const showAdvanced = ref(false)
 const rawJson = ref('')
 const rawJsonError = ref<string | null>(null)
 let fieldCounter = 0
+const customEditorModeOptions = computed(() => [
+  { value: 'form', label: t('admin.docs.customText') },
+  { value: 'advanced', label: t('admin.docs.advancedJson') },
+])
 
 const resolvedType = computed(() => {
   if (form.type === 'Custom') {
@@ -341,12 +347,10 @@ const syncRawJson = () => {
   rawJson.value = JSON.stringify(buildCustomContent(), null, 2)
 }
 
-const handleAdvancedToggle = (event: Event) => {
-  const target = event.target as HTMLDetailsElement | null
-  const isOpen = Boolean(target?.open)
-  showAdvanced.value = isOpen
+const setCustomEditorMode = (mode: string) => {
+  showAdvanced.value = mode === 'advanced'
   rawJsonError.value = null
-  if (isOpen) {
+  if (showAdvanced.value) {
     syncRawJson()
   }
 }
@@ -629,10 +633,10 @@ onMounted(() => {
     </div>
   </div>
 
-  <teleport to="body">
-    <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+  <AppModalShell :open="modalOpen" @close="modalOpen = false">
+    <template #default="{ panelClass }">
       <form
-        class="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl"
+        :class="[panelClass, 'flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-xl']"
         @submit.prevent="saveTab"
       >
         <h3 class="text-lg font-semibold text-slate-900">
@@ -793,73 +797,80 @@ onMounted(() => {
           </div>
 
           <div v-if="form.type === 'Custom'" class="md:col-span-2 grid gap-4">
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {{ t('admin.docs.customText') }}
-              </div>
-              <textarea
-                v-model.trim="form.customText"
-                rows="4"
-                class="mt-2 rounded border border-slate-200 px-3 py-2 text-sm"
-                :placeholder="t('admin.docs.customTextPlaceholder')"
-              ></textarea>
-            </div>
+            <AppSegmentedControl
+              :model-value="showAdvanced ? 'advanced' : 'form'"
+              :options="customEditorModeOptions"
+              size="sm"
+              :aria-label="t('admin.docs.advancedJson')"
+              class-name="w-full sm:w-auto"
+              @update:model-value="setCustomEditorMode"
+            />
 
-            <div>
-              <div class="flex items-center justify-between">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {{ t('admin.docs.customFields') }}
+            <Transition name="app-section-reveal" mode="out-in">
+              <div v-if="!showAdvanced" key="custom-form" class="grid gap-4">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {{ t('admin.docs.customText') }}
+                  </div>
+                  <textarea
+                    v-model.trim="form.customText"
+                    rows="4"
+                    class="mt-2 rounded border border-slate-200 px-3 py-2 text-sm"
+                    :placeholder="t('admin.docs.customTextPlaceholder')"
+                  ></textarea>
                 </div>
-                <button
-                  type="button"
-                  class="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-                  @click="addCustomField"
-                >
-                  {{ t('admin.docs.addField') }}
-                </button>
-              </div>
-              <div class="mt-2 space-y-2">
-                <div
-                  v-for="field in form.customFields"
-                  :key="field.id"
-                  class="grid gap-2 md:grid-cols-[1fr,1fr,auto]"
-                >
-                  <input
-                    v-model.trim="field.label"
-                    type="text"
-                    class="rounded border border-slate-200 px-3 py-2 text-sm"
-                    :placeholder="t('admin.docs.fieldLabel')"
-                  />
-                  <input
-                    v-model.trim="field.value"
-                    type="text"
-                    class="rounded border border-slate-200 px-3 py-2 text-sm"
-                    :placeholder="t('admin.docs.fieldValue')"
-                  />
-                  <button
-                    type="button"
-                    class="rounded border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
-                    @click="removeCustomField(field.id)"
-                  >
-                    {{ t('admin.docs.removeField') }}
-                  </button>
-                </div>
-              </div>
-            </div>
 
-            <details class="rounded border border-slate-200 bg-slate-50 p-3" @toggle="handleAdvancedToggle">
-              <summary class="cursor-pointer text-xs font-semibold text-slate-600">
-                {{ t('admin.docs.advancedJson') }}
-              </summary>
-              <div class="mt-3 space-y-2">
+                <div>
+                  <div class="flex items-center justify-between">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {{ t('admin.docs.customFields') }}
+                    </div>
+                    <button
+                      type="button"
+                      class="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                      @click="addCustomField"
+                    >
+                      {{ t('admin.docs.addField') }}
+                    </button>
+                  </div>
+                  <div class="mt-2 space-y-2">
+                    <div
+                      v-for="field in form.customFields"
+                      :key="field.id"
+                      class="grid gap-2 md:grid-cols-[1fr,1fr,auto]"
+                    >
+                      <input
+                        v-model.trim="field.label"
+                        type="text"
+                        class="rounded border border-slate-200 px-3 py-2 text-sm"
+                        :placeholder="t('admin.docs.fieldLabel')"
+                      />
+                      <input
+                        v-model.trim="field.value"
+                        type="text"
+                        class="rounded border border-slate-200 px-3 py-2 text-sm"
+                        :placeholder="t('admin.docs.fieldValue')"
+                      />
+                      <button
+                        type="button"
+                        class="rounded border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
+                        @click="removeCustomField(field.id)"
+                      >
+                        {{ t('admin.docs.removeField') }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else key="custom-advanced" class="rounded border border-slate-200 bg-slate-50 p-3">
                 <p class="text-xs text-slate-500">{{ t('admin.docs.advancedHint') }}</p>
                 <textarea
                   v-model.trim="rawJson"
                   rows="6"
-                  class="rounded border border-slate-200 px-3 py-2 text-xs font-mono"
-                  @focus="showAdvanced = true"
+                  class="mt-3 rounded border border-slate-200 px-3 py-2 text-xs font-mono"
                 ></textarea>
-                <div class="flex items-center gap-2">
+                <div class="mt-3 flex items-center gap-2">
                   <button
                     type="button"
                     class="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
@@ -870,7 +881,7 @@ onMounted(() => {
                   <span v-if="rawJsonError" class="text-xs text-rose-600">{{ rawJsonError }}</span>
                 </div>
               </div>
-            </details>
+            </Transition>
           </div>
         </div>
 
@@ -894,6 +905,6 @@ onMounted(() => {
           </button>
         </div>
       </form>
-    </div>
-  </teleport>
+    </template>
+  </AppModalShell>
 </template>

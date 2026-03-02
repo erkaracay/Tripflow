@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import AppModalShell from './ui/AppModalShell.vue'
 
 type ScannerControls = {
   stop: () => void
@@ -147,51 +148,56 @@ const handleClose = () => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div class="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
-        <div class="flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-900">{{ t('guide.checkIn.scanQr') }}</h3>
-          <button
-            class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-            type="button"
-            @click="handleClose"
-          >
-            {{ t('common.dismiss') }}
-          </button>
-        </div>
+  <AppModalShell
+    :open="open"
+    :close-on-overlay="false"
+    content-class="p-4"
+    overlay-class="bg-black/70"
+  >
+    <template #default="{ panelClass }">
+      <div :class="[panelClass, 'w-full max-w-md rounded-2xl bg-white p-4 shadow-xl']">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-900">{{ t('guide.checkIn.scanQr') }}</h3>
+            <button
+              class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+              type="button"
+              @click="handleClose"
+            >
+              {{ t('common.dismiss') }}
+            </button>
+          </div>
 
-        <div class="mt-4 overflow-hidden rounded-2xl bg-black">
-          <video ref="videoRef" class="h-64 w-full object-cover" playsinline muted></video>
-        </div>
+          <div class="mt-4 overflow-hidden rounded-2xl bg-black">
+            <video ref="videoRef" class="h-64 w-full object-cover" playsinline muted></video>
+          </div>
 
-        <p class="mt-3 text-sm text-slate-600">
-          {{
-            errorKey
-              ? t(errorKey)
-              : isScanning
-                ? t('guide.checkIn.scanningActive')
-                : t('guide.checkIn.scanning')
-          }}
-        </p>
+          <p class="mt-3 text-sm text-slate-600">
+            {{
+              errorKey
+                ? t(errorKey)
+                : isScanning
+                  ? t('guide.checkIn.scanningActive')
+                  : t('guide.checkIn.scanning')
+            }}
+          </p>
 
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
-            type="button"
-            @click="startScanner"
-          >
-            {{ t('common.retry') }}
-          </button>
-          <button
-            class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
-            type="button"
-            @click="handleClose"
-          >
-            {{ t('guide.checkIn.useManualCode') }}
-          </button>
-        </div>
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="startScanner"
+            >
+              {{ t('common.retry') }}
+            </button>
+            <button
+              class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="handleClose"
+            >
+              {{ t('guide.checkIn.useManualCode') }}
+            </button>
+          </div>
       </div>
-    </div>
-  </Teleport>
+    </template>
+  </AppModalShell>
 </template>

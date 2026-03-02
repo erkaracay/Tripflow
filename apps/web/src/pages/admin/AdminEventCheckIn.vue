@@ -659,15 +659,15 @@ onMounted(() => {
         <h2 class="text-lg font-semibold">{{ t('common.checkIn') }}</h2>
         <div class="mt-3 flex flex-wrap items-center gap-3 text-xs">
           <span class="font-medium text-slate-500">{{ t('common.mode') }}</span>
-          <div class="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <div
+            class="app-segmented w-full max-w-[240px] grid-cols-2 sm:w-auto"
+            :style="{ '--segment-count': 2, '--segment-index': checkInDirection === 'Entry' ? 0 : 1 }"
+          >
+            <span class="app-segmented-indicator" aria-hidden="true" />
             <button
               type="button"
-              class="rounded-lg px-3 py-1.5 font-semibold"
-              :class="
-                checkInDirection === 'Entry'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              "
+              class="app-segmented-button px-3 py-1.5 text-sm font-semibold"
+              :class="checkInDirection === 'Entry' ? 'app-segmented-button-active' : ''"
               :aria-pressed="checkInDirection === 'Entry'"
               @click="checkInDirection = 'Entry'"
             >
@@ -675,12 +675,8 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="rounded-lg px-3 py-1.5 font-semibold"
-              :class="
-                checkInDirection === 'Exit'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              "
+              class="app-segmented-button px-3 py-1.5 text-sm font-semibold"
+              :class="checkInDirection === 'Exit' ? 'app-segmented-button-active' : ''"
               :aria-pressed="checkInDirection === 'Exit'"
               @click="checkInDirection = 'Exit'"
             >

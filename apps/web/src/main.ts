@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router'
 import { i18n, initLocale } from './i18n'
 import './assets/tailwind.css'
+import './style.css'
 
 const app = createApp(App)
 app.use(router)

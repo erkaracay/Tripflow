@@ -93,6 +93,26 @@ const tabs = computed<TabItem[]>(() => [
 ])
 
 const activeTabId = ref('flight')
+const previousActiveTabId = ref('flight')
+
+const getTabIndex = (tabId: string) => {
+  const index = tabs.value.findIndex((tab) => tab.id === tabId)
+  return index >= 0 ? index : 0
+}
+
+const tabTransitionName = computed(() =>
+  getTabIndex(activeTabId.value) >= getTabIndex(previousActiveTabId.value)
+    ? 'app-tab-slide-forward'
+    : 'app-tab-slide-backward'
+)
+
+const selectTab = (tabId: string) => {
+  if (tabId === activeTabId.value) {
+    return
+  }
+  previousActiveTabId.value = activeTabId.value
+  activeTabId.value = tabId
+}
 
 watch(
   tabs,
@@ -387,20 +407,20 @@ const formatCustomValue = (value: unknown): string => {
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        class="whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+        class="whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background-color,border-color,color,box-shadow] duration-200 ease-out"
         :class="
           activeTabId === tab.id
-            ? 'border-slate-900 bg-slate-900 text-white'
-            : 'border-slate-200 text-slate-600 hover:border-slate-300'
+            ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+            : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
         "
         type="button"
-        @click="activeTabId = tab.id"
+        @click="selectTab(tab.id)"
       >
         <span class="inline-flex items-center gap-1.5">
           <span v-if="tab.kind === 'flight'" class="inline-flex h-4 w-4 items-center justify-center">
             <svg
               viewBox="-2.5 0 19 19"
-              class="h-3.5 w-3.5 text-slate-900"
+              class="h-3.5 w-3.5"
               fill="white"
               stroke="currentColor"
               stroke-width="1.2"
@@ -416,7 +436,7 @@ const formatCustomValue = (value: unknown): string => {
           <span v-else-if="tab.kind === 'hotel'" class="inline-flex h-4 w-4 items-center justify-center">
             <svg
               viewBox="0 0 380 380"
-              class="h-3.5 w-3.5 text-slate-900"
+              class="h-3.5 w-3.5"
               fill="white"
               stroke="currentColor"
               stroke-width="12"
@@ -450,7 +470,7 @@ const formatCustomValue = (value: unknown): string => {
           <span v-else-if="tab.kind === 'transfer'" class="inline-flex h-4 w-4 items-center justify-center">
             <svg
               viewBox="0 0 50 50"
-              class="h-3.5 w-3.5 text-slate-900"
+              class="h-3.5 w-3.5"
               fill="white"
               stroke="currentColor"
               stroke-width="1.2"
@@ -937,6 +957,8 @@ const formatCustomValue = (value: unknown): string => {
     </div>
 
     <template v-else>
+    <Transition :name="tabTransitionName" mode="out-in">
+    <div :key="activeTab?.id ?? 'empty'">
     <div v-if="activeTab?.kind === 'flight'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.flightOutboundTitle') }}</div>
       <div class="mt-3 space-y-2 text-sm">
@@ -1451,6 +1473,19 @@ const formatCustomValue = (value: unknown): string => {
         </div>
       </div>
     </div>
+    </div>
+    </Transition>
     </template>
   </div>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: reduce) {
+  :deep(.app-tab-slide-forward-enter-active),
+  :deep(.app-tab-slide-forward-leave-active),
+  :deep(.app-tab-slide-backward-enter-active),
+  :deep(.app-tab-slide-backward-leave-active) {
+    transition-duration: 1ms !important;
+  }
+}
+</style>

@@ -613,19 +613,23 @@ watch(selectedItemId, () => {
                 <option v-if="activeItems.length === 0" value="" disabled>{{ t('equipment.noItems') }}</option>
               </select>
             </label>
-            <div class="flex items-center gap-2">
+            <div
+              class="app-segmented w-full max-w-[240px] grid-cols-2 sm:w-auto"
+              :style="{ '--segment-count': 2, '--segment-index': action === 'Give' ? 0 : 1 }"
+            >
+              <span class="app-segmented-indicator" aria-hidden="true" />
               <button
                 type="button"
-                :class="action === 'Give' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-                class="rounded px-3 py-2 text-sm font-medium"
+                class="app-segmented-button px-3 py-2 text-sm font-medium"
+                :class="action === 'Give' ? 'app-segmented-button-active' : ''"
                 @click="action = 'Give'"
               >
                 {{ t('equipment.give') }}
               </button>
               <button
                 type="button"
-                :class="action === 'Return' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'"
-                class="rounded px-3 py-2 text-sm font-medium"
+                class="app-segmented-button px-3 py-2 text-sm font-medium"
+                :class="action === 'Return' ? 'app-segmented-button-active' : ''"
                 @click="action = 'Return'"
               >
                 {{ t('equipment.return') }}

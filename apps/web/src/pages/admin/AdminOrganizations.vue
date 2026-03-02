@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { clearSelectedOrgId, getSelectedOrgId, setSelectedOrgId } from '../../lib/auth'
 import { useToast } from '../../lib/toast'
+import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Organization } from '../../types'
@@ -41,6 +42,21 @@ const restoringOrgId = ref<string | null>(null)
 const purgingOrgId = ref<string | null>(null)
 const purgeConfirm = reactive<Record<string, string>>({})
 const purgeErrorKey = ref<string | null>(null)
+const archivedFilter = computed({
+  get: () => (showArchived.value ? 'archived' : 'active'),
+  set: (value: string) => {
+    showArchived.value = value === 'archived'
+    void loadOrgs()
+  },
+})
+const archivedFilterOptions = computed(() => [
+  { value: 'active', label: t('common.active') },
+  { value: 'archived', label: t('common.archived') },
+])
+const editStatusOptions = computed(() => [
+  { value: 'active', label: t('admin.organizations.manage.activeLabel') },
+  { value: 'inactive', label: t('admin.organizations.manage.inactive') },
+])
 
 const loadOrgs = async () => {
   loading.value = true
@@ -228,10 +244,16 @@ onMounted(loadOrgs)
           <h1 class="text-2xl font-semibold">{{ t('admin.organizations.manage.title') }}</h1>
           <p class="mt-2 text-sm text-slate-600">{{ t('admin.organizations.manage.subtitle') }}</p>
         </div>
-        <label class="flex items-center gap-2 text-sm text-slate-600">
-          <input v-model="showArchived" type="checkbox" class="rounded border-slate-300" @change="loadOrgs" />
-          {{ t('admin.organizations.manage.showArchived') }}
-        </label>
+        <div class="grid gap-1 text-sm text-slate-600">
+          <span>{{ t('admin.organizations.manage.showArchived') }}</span>
+          <AppSegmentedControl
+            v-model="archivedFilter"
+            :options="archivedFilterOptions"
+            size="sm"
+            :aria-label="t('admin.organizations.manage.showArchived')"
+            class-name="w-full min-w-[180px]"
+          />
+        </div>
       </div>
     </section>
 
@@ -350,6 +372,7 @@ onMounted(loadOrgs)
           </div>
         </div>
 
+        <Transition name="app-section-reveal" mode="out-in">
         <div v-if="editingOrgId === org.id" class="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-3">
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.organizations.manage.nameLabel') }}</span>
@@ -367,10 +390,16 @@ onMounted(loadOrgs)
               type="text"
             />
           </label>
-          <label class="flex items-center gap-2 text-sm text-slate-600">
-            <input v-model="editForm.isActive" type="checkbox" class="rounded border-slate-300" />
-            {{ t('admin.organizations.manage.activeLabel') }}
-          </label>
+          <div class="grid gap-1 text-sm text-slate-600">
+            <span>{{ t('admin.organizations.manage.activeLabel') }}</span>
+            <AppSegmentedControl
+              :model-value="editForm.isActive ? 'active' : 'inactive'"
+              :options="editStatusOptions"
+              size="sm"
+              :aria-label="t('admin.organizations.manage.activeLabel')"
+              @update:model-value="editForm.isActive = $event === 'active'"
+            />
+          </div>
 
           <div class="md:col-span-3 flex flex-wrap gap-2">
             <button
@@ -416,6 +445,7 @@ onMounted(loadOrgs)
             </button>
           </div>
         </div>
+        </Transition>
       </div>
     </div>
   </div>

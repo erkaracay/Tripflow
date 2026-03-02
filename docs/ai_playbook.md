@@ -67,6 +67,32 @@ This document explains how we implement features in Infora, what patterns we fol
 - Modals should not close by outside click when data loss is possible.
 - Modals must scroll on small screens (max-height like 90vh).
 
+### Motion
+
+- Motion should explain state change, not decorate the screen.
+- Preferred motion targets:
+  - modal / drawer open-close
+  - tab content switches
+  - accordion / collapsible sections
+  - segmented controls and active pills
+- Shared primitives are preferred:
+  - `AppModalShell` for modal shell markup + shared motion
+  - `AppSegmentedControl` for binary / ternary choice controls
+- Avoid motion on:
+  - large data tables
+  - row-heavy operational lists
+  - rapidly refreshing check-in/equipment tables
+- Timing defaults:
+  - modal/drawer: 180-200ms
+  - tab/accordion: 120-180ms
+  - easing: ease-out
+- Prefer animating the changed panel/content area, not the whole page.
+- Always support reduced motion (`prefers-reduced-motion`).
+- Swipe gestures are high-risk and should be narrowly scoped:
+  - allow only on clearly tabbed, mobile-first surfaces
+  - vertical scroll must win unless horizontal intent is obvious
+  - disable swipe on interactive children and dense form blocks
+
 ### Print/PDF
 
 - Use print CSS:

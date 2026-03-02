@@ -5,6 +5,7 @@ import { apiGet, apiPut } from '../../lib/api'
 import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
+import AppModalShell from '../ui/AppModalShell.vue'
 import type { FlightSegment, ParticipantDetails, ParticipantProfile } from '../../types'
 
 type FlightTab = 'arrival' | 'return'
@@ -404,62 +405,66 @@ onUnmounted(() => {
     {{ buttonText }}
   </button>
 
-  <teleport to="body">
-    <div
-      v-if="modalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-5"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="t('admin.participant.flights.modalTitle')"
-    >
-      <div class="flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+  <AppModalShell
+    :open="modalOpen"
+    content-class="py-5"
+    overlay-class="bg-slate-900/50"
+    @close="closeModal"
+  >
+    <template #default="{ panelClass }">
+      <div
+        :class="[panelClass, 'flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl']"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('admin.participant.flights.modalTitle')"
+      >
         <div class="border-b border-slate-200 px-5 py-4">
           <h3 class="text-lg font-semibold text-slate-900">{{ t('admin.participant.flights.modalTitle') }}</h3>
           <p class="mt-1 text-sm text-slate-500">{{ t('admin.participant.flights.modalSubtitle') }}</p>
           <p v-if="props.participantName" class="mt-1 text-xs text-slate-500">{{ props.participantName }}</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
-          <button
-            type="button"
-            class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-            :class="activeTab === 'arrival' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-            :disabled="saving || loading"
-            @click="activeTab = 'arrival'"
-          >
-            {{ t('admin.participant.flights.tabs.arrival') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-            :class="activeTab === 'return' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-            :disabled="saving || loading"
-            @click="activeTab = 'return'"
-          >
-            {{ t('admin.participant.flights.tabs.return') }}
-          </button>
+          <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+              :class="activeTab === 'arrival' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+              :disabled="saving || loading"
+              @click="activeTab = 'arrival'"
+            >
+              {{ t('admin.participant.flights.tabs.arrival') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+              :class="activeTab === 'return' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+              :disabled="saving || loading"
+              @click="activeTab = 'return'"
+            >
+              {{ t('admin.participant.flights.tabs.return') }}
+            </button>
 
-          <button
-            v-if="mode === 'view'"
-            type="button"
-            class="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-300"
-            :disabled="saving || loading || !!loadError"
-            @click="startEdit"
-          >
-            {{ t('common.edit') }}
-          </button>
-          <button
-            v-else
-            type="button"
-            class="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-300"
-            :disabled="saving"
-            @click="addSegment"
-          >
-            {{ t('admin.participant.flights.addSegment') }}
-          </button>
-        </div>
+            <button
+              v-if="mode === 'view'"
+              type="button"
+              class="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-300"
+              :disabled="saving || loading || !!loadError"
+              @click="startEdit"
+            >
+              {{ t('common.edit') }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-300"
+              :disabled="saving"
+              @click="addSegment"
+            >
+              {{ t('admin.participant.flights.addSegment') }}
+            </button>
+          </div>
 
-        <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <LoadingState v-if="loading" message-key="common.loading" />
 
           <div v-else-if="loadError" class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -646,30 +651,30 @@ onUnmounted(() => {
               </div>
             </div>
           </template>
-        </div>
-
-        <div class="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-3">
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 disabled:opacity-50"
-              :disabled="saving"
-              @click="closeModal"
-            >
-              {{ t('common.cancel') }}
-            </button>
-            <button
-              v-if="mode === 'edit'"
-              type="button"
-              class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-              :disabled="saving"
-              @click="saveFlights"
-            >
-              {{ saving ? t('common.saving') : t('common.save') }}
-            </button>
           </div>
-        </div>
+
+          <div class="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 disabled:opacity-50"
+                :disabled="saving"
+                @click="closeModal"
+              >
+                {{ t('common.cancel') }}
+              </button>
+              <button
+                v-if="mode === 'edit'"
+                type="button"
+                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                :disabled="saving"
+                @click="saveFlights"
+              >
+                {{ saving ? t('common.saving') : t('common.save') }}
+              </button>
+            </div>
+          </div>
       </div>
-    </div>
-  </teleport>
+    </template>
+  </AppModalShell>
 </template>

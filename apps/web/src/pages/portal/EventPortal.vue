@@ -9,12 +9,14 @@ import { resetViewportZoom } from '../../lib/viewport'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import PortalMealSelectionCard from '../../components/portal/PortalMealSelectionCard.vue'
+import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import { formatPhoneDisplay } from '../../lib/normalize'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
+import { useHorizontalSwipeTabs } from '../../composables/useHorizontalSwipeTabs'
 import type { EventPortalInfo, PortalMeResponse } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
@@ -42,7 +44,9 @@ const retryState = ref<RetryState>('idle')
 const sessionExpired = ref(false)
 
 const activeTab = ref<TabKey>('days')
+const previousActiveTab = ref<TabKey>('days')
 const selectedDayIndex = ref(0)
+const previousSelectedDayIndex = ref(0)
 
 const checkInCode = ref('')
 const qrDataUrl = ref<string | null>(null)
@@ -74,6 +78,26 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'qr', label: t('portal.tabs.qr') },
   { id: 'info', label: t('portal.tabs.info') },
 ])
+const topTabOptions = computed(() => tabs.value.map((tab) => ({ value: tab.id, label: tab.label })))
+
+const tabOrder: TabKey[] = ['days', 'docs', 'qr', 'info']
+
+const getTabIndex = (tab: TabKey) => {
+  const index = tabOrder.indexOf(tab)
+  return index >= 0 ? index : 0
+}
+
+const topTabTransitionName = computed(() =>
+  getTabIndex(activeTab.value) >= getTabIndex(previousActiveTab.value)
+    ? 'app-tab-slide-forward'
+    : 'app-tab-slide-backward'
+)
+
+const dayTransitionName = computed(() =>
+  selectedDayIndex.value >= previousSelectedDayIndex.value
+    ? 'app-tab-slide-forward'
+    : 'app-tab-slide-backward'
+)
 
 const scheduleDays = computed(() => schedule.value?.days ?? [])
 const selectedDay = computed(() => scheduleDays.value[selectedDayIndex.value] ?? null)
@@ -288,6 +312,7 @@ const toDateOnly = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
 const setDefaultDay = () => {
   const dayCount = scheduleDays.value.length
   if (dayCount === 0) {
+    previousSelectedDayIndex.value = 0
     selectedDayIndex.value = 0
     return
   }
@@ -299,16 +324,37 @@ const setDefaultDay = () => {
     return date && toDateOnly(date).getTime() === today.getTime()
   })
 
-  selectedDayIndex.value = index >= 0 ? index : 0
+  const nextIndex = index >= 0 ? index : 0
+  previousSelectedDayIndex.value = nextIndex
+  selectedDayIndex.value = nextIndex
 }
 
 const selectDay = (index: number) => {
+  if (index === selectedDayIndex.value) {
+    return
+  }
+  previousSelectedDayIndex.value = selectedDayIndex.value
   selectedDayIndex.value = index
 }
 
 const setActiveTab = (value: string) => {
-  activeTab.value = value as TabKey
+  const nextTab = value as TabKey
+  if (nextTab === activeTab.value) {
+    return
+  }
+  previousActiveTab.value = activeTab.value
+  activeTab.value = nextTab
 }
+
+const isTopTabSwipeEnabled = () =>
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches && !requiresLogin.value
+
+const { bindSwipeHandlers } = useHorizontalSwipeTabs<TabKey>({
+  orderedIds: tabOrder,
+  activeId: activeTab,
+  setActiveId: (value) => setActiveTab(value),
+  enabled: isTopTabSwipeEnabled,
+})
 
 const switchLocale = (value: Locale) => {
   if (locale.value === value) {
@@ -565,23 +611,19 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="space-y-6">
-        <div class="hidden md:flex gap-4 border-b border-slate-200 text-sm">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            class="-mb-px border-b-2 px-1 pb-2 transition"
-            :class="
-              activeTab === tab.id
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-            "
-            @click="setActiveTab(tab.id)"
-          >
-            {{ tab.label }}
-          </button>
+        <div class="hidden md:flex md:max-w-2xl">
+          <AppSegmentedControl
+            :model-value="activeTab"
+            :options="topTabOptions"
+            full-width
+            class-name="w-full text-sm shadow-sm"
+            :aria-label="t('portal.tabs.days')"
+            @update:model-value="setActiveTab"
+          />
         </div>
 
-        <div class="space-y-6">
+        <Transition :name="topTabTransitionName" mode="out-in">
+        <div :key="activeTab" class="space-y-6">
           <section v-if="activeTab === 'days'" class="space-y-4">
             <p v-if="participant?.fullName" class="text-base font-medium text-slate-700">
               {{ t('portal.greeting', { name: participant.fullName }) }}
@@ -596,11 +638,11 @@ onUnmounted(() => {
                     <button
                       v-for="(day, index) in scheduleDays"
                       :key="day.id"
-                    class="min-w-[120px] rounded-2xl border px-3 py-2 text-left text-xs"
+                    class="min-w-[120px] rounded-2xl border px-3 py-2 text-left text-xs transition-[background-color,color,border-color,box-shadow,transform] duration-200 ease-out"
                     :class="
                       index === selectedDayIndex
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 text-slate-600'
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                     "
                     @click="selectDay(index)"
                   >
@@ -616,7 +658,8 @@ onUnmounted(() => {
                   {{ t('portal.schedule.scrollHint') }}
                 </div>
 
-                <div v-if="selectedDay" class="space-y-4">
+                <Transition :name="dayTransitionName" mode="out-in">
+                <div v-if="selectedDay" :key="selectedDay.id" class="space-y-4">
                   <div>
                     <div class="text-xs text-slate-500">{{ formatPortalDate(selectedDay.date) }}</div>
                     <div v-if="selectedDay.placesToVisit" class="mt-2 flex items-start gap-2">
@@ -756,6 +799,7 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
+                </Transition>
               </div>
             </div>
           </section>
@@ -974,6 +1018,7 @@ onUnmounted(() => {
             </div>
           </section>
         </div>
+        </Transition>
       </div>
     </section>
 
@@ -984,7 +1029,7 @@ onUnmounted(() => {
     class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
     style="padding-bottom: env(safe-area-inset-bottom)"
   >
-    <PortalTabBar :tabs="tabs" :active="activeTab" @select="setActiveTab" />
+    <PortalTabBar :tabs="tabs" :active="activeTab" :swipe-handlers="bindSwipeHandlers" @select="setActiveTab" />
   </div>
 </template>
 

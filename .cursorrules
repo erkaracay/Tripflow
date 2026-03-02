@@ -36,6 +36,15 @@ Secondary goal: maximize user experience (QoL) — reduce friction, avoid surpri
 - Make the “right thing” the default: safe defaults, reversible toggles, and clear confirmations.
 - Mobile-first: no button overflow, primary action always visible, secondary actions go to ⋯ menu.
 - Clear feedback: toasts must be specific (NotFound vs InvalidRequest, etc.), no vague “failed” unless unavoidable.
+- Motion should be purposeful, short, and tied to real state changes:
+  - good targets: modals, drawers, tabs, accordions, segmented controls
+  - avoid heavy motion on large tables, row churn, and fast operational lists
+  - prefer 120–200ms ease-out transitions
+  - respect prefers-reduced-motion
+  - use shared primitives where available:
+    - `AppModalShell` for modal overlay/panel scaffolding
+    - `AppSegmentedControl` for 2–3 state choice controls
+  - mobile swipe gestures are opt-in and should be limited to safe surfaces like top-level portal tabs
 
 ## Web UI rules
 
@@ -58,6 +67,11 @@ Secondary goal: maximize user experience (QoL) — reduce friction, avoid surpri
   - Search should be debounced.
   - Pagination should not jump scroll unexpectedly; keep the user context.
   - Empty state should be helpful (what filters are active, how to clear).
+- Tabs / accordions / drawers:
+  - direction-aware content slide + fade is preferred for tab changes
+  - active pill / segmented control transitions are preferred over abrupt state jumps
+  - do not animate entire pages when only a panel/content area changed
+  - swipe-based tab changes must use strict direction lock and must not compete with normal vertical scroll
 - Print/PDF pages:
   - Improve page breaks (avoid cutting cards mid-content).
   - Do not print raw URLs; use print-friendly styling.
