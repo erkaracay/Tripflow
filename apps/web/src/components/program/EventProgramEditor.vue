@@ -748,13 +748,13 @@ onMounted(loadAll)
               :disabled="savingDay"
             />
           </label>
-          <label class="grid gap-1 text-sm">
+          <div class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.days.form.notes') }}</span>
             <RichTextEditor
               v-model="dayForm.notes"
               :disabled="savingDay"
             />
-          </label>
+          </div>
           <div class="grid gap-2">
             <span class="text-sm text-slate-600">{{ t('admin.program.days.form.placesToVisit') }}</span>
             <div class="space-y-2">
@@ -920,21 +920,21 @@ onMounted(loadAll)
               :disabled="savingActivity"
             ></textarea>
           </label>
-          <label class="grid gap-1 text-sm md:col-span-2">
+          <div class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.notes') }}</span>
             <RichTextEditor
               v-model="activityForm.notes"
               :disabled="savingActivity"
             />
-          </label>
-          <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.type === 'Meal'">
+          </div>
+          <div class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.type === 'Meal'">
             <span class="text-slate-600">{{ t('admin.program.activities.form.menuText') }}</span>
             <RichTextEditor
               v-model="activityForm.menuText"
               :disabled="savingActivity"
               min-height="6rem"
             />
-          </label>
+          </div>
           <ActivityMealConfigEditor
             v-if="activityForm.type === 'Meal'"
             :mode="props.mode"
@@ -943,14 +943,14 @@ onMounted(loadAll)
             :activity-type="activityForm.type"
             :disabled="savingActivity"
           />
-          <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.type === 'Program'">
+          <div class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.type === 'Program'">
             <span class="text-slate-600">{{ t('admin.program.activities.form.programContent') }}</span>
             <RichTextEditor
               v-model="activityForm.programContent"
               :disabled="savingActivity"
               min-height="8rem"
             />
-          </label>
+          </div>
           <label class="grid gap-1 text-sm md:col-span-2">
             <span class="text-slate-600">{{ t('admin.program.activities.form.surveyUrl') }}</span>
             <input

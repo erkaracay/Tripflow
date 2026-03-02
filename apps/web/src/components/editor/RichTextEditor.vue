@@ -92,6 +92,9 @@ const HIGHLIGHT_COLORS = [
 
 const showTextColor = ref(false)
 const showHighlight = ref(false)
+
+const toolbarButtonClass = 'rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-200'
+const toolbarButtonActiveClass = 'bg-slate-900 text-white hover:bg-slate-900'
 </script>
 
 <template>
@@ -112,28 +115,25 @@ const showHighlight = ref(false)
     >
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm font-semibold hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('bold') }"
+        :class="[toolbarButtonClass, editor.isActive('bold') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Bold"
         @click="editor.chain().focus().toggleBold().run()"
       >
-        B
+        <span class="font-bold">B</span>
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm italic hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('italic') }"
+        :class="[toolbarButtonClass, editor.isActive('italic') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Italic"
         @click="editor.chain().focus().toggleItalic().run()"
       >
-        I
+        <span class="italic">I</span>
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 font-mono text-sm hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('code') }"
+        :class="[toolbarButtonClass, 'font-mono', editor.isActive('code') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Code"
         @click="editor.chain().focus().toggleCode().run()"
@@ -143,8 +143,7 @@ const showHighlight = ref(false)
       <span class="mx-1 w-px self-stretch bg-slate-200" aria-hidden="true" />
       <button
         type="button"
-        class="rounded px-2 py-1 text-xs hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('paragraph') }"
+        :class="[toolbarButtonClass, 'text-xs', editor.isActive('paragraph') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Paragraph"
         @click="editor.chain().focus().setParagraph().run()"
@@ -153,39 +152,35 @@ const showHighlight = ref(false)
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm font-bold hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('heading', { level: 1 }) }"
+        :class="[toolbarButtonClass, editor.isActive('heading', { level: 1 }) ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Heading 1"
         @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
       >
-        H1
+        <span class="font-bold">H1</span>
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm font-semibold hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('heading', { level: 2 }) }"
+        :class="[toolbarButtonClass, editor.isActive('heading', { level: 2 }) ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Heading 2"
         @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
       >
-        H2
+        <span class="font-semibold">H2</span>
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm font-medium hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('heading', { level: 3 }) }"
+        :class="[toolbarButtonClass, editor.isActive('heading', { level: 3 }) ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Heading 3"
         @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
       >
-        H3
+        <span class="font-medium">H3</span>
       </button>
       <span class="mx-1 w-px self-stretch bg-slate-200" aria-hidden="true" />
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('bulletList') }"
+        :class="[toolbarButtonClass, editor.isActive('bulletList') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Bullet list"
         @click="editor.chain().focus().toggleBulletList().run()"
@@ -194,8 +189,7 @@ const showHighlight = ref(false)
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('orderedList') }"
+        :class="[toolbarButtonClass, editor.isActive('orderedList') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Numbered list"
         @click="editor.chain().focus().toggleOrderedList().run()"
@@ -204,8 +198,7 @@ const showHighlight = ref(false)
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 font-mono text-xs hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('codeBlock') }"
+        :class="[toolbarButtonClass, 'font-mono text-xs', editor.isActive('codeBlock') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Code block"
         @click="editor.chain().focus().toggleCodeBlock().run()"
@@ -214,8 +207,7 @@ const showHighlight = ref(false)
       </button>
       <button
         type="button"
-        class="rounded px-2 py-1 text-sm hover:bg-slate-200"
-        :class="{ 'bg-slate-200': editor.isActive('blockquote') }"
+        :class="[toolbarButtonClass, editor.isActive('blockquote') ? toolbarButtonActiveClass : '']"
         :disabled="disabled"
         title="Blockquote"
         @click="editor.chain().focus().toggleBlockquote().run()"
@@ -226,8 +218,7 @@ const showHighlight = ref(false)
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-slate-200"
-          :class="{ 'bg-slate-200': showTextColor }"
+          :class="[toolbarButtonClass, 'flex items-center gap-1', showTextColor ? toolbarButtonActiveClass : '']"
           :disabled="disabled"
           title="Metin rengi"
           @click="showTextColor = !showTextColor; showHighlight = false"
@@ -254,8 +245,7 @@ const showHighlight = ref(false)
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-slate-200"
-          :class="{ 'bg-slate-200': showHighlight }"
+          :class="[toolbarButtonClass, 'flex items-center gap-1', showHighlight ? toolbarButtonActiveClass : '']"
           :disabled="disabled"
           title="Vurgulama"
           @click="showHighlight = !showHighlight; showTextColor = false"
