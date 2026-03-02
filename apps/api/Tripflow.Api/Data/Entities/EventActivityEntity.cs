@@ -25,4 +25,7 @@ public sealed class EventActivityEntity
     public string? SurveyUrl { get; set; }
     /// <summary>When true, activity appears in activity-scoped check-in dropdown.</summary>
     public bool RequiresCheckIn { get; set; }
+
+    public List<ActivityMealGroupEntity> MealGroups { get; set; } = new();
+    public List<ParticipantMealSelectionEntity> MealSelections { get; set; } = new();
 }

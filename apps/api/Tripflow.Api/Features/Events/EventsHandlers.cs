@@ -710,7 +710,18 @@ internal static class EventsHandlers
 
         if (request.Type is not null)
         {
-            entity.Type = string.IsNullOrWhiteSpace(request.Type) ? "Other" : request.Type.Trim();
+            var normalizedType = string.IsNullOrWhiteSpace(request.Type) ? "Other" : request.Type.Trim();
+            if (MealMenuHelpers.IsMealActivity(entity.Type) && !MealMenuHelpers.IsMealActivity(normalizedType))
+            {
+                var hasMealConfig = await db.ActivityMealGroups.AsNoTracking()
+                    .AnyAsync(x => x.OrganizationId == orgId && x.EventId == eventGuid && x.ActivityId == entity.Id, ct);
+                if (hasMealConfig)
+                {
+                    return Results.Conflict(new { code = "meal_config_exists", message = "Meal groups exist for this activity." });
+                }
+            }
+
+            entity.Type = normalizedType;
         }
 
         if (request.StartTime is not null)

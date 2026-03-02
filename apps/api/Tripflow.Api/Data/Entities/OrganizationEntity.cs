@@ -15,6 +15,9 @@ public sealed class OrganizationEntity
     public List<EventEntity> Events { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
     public List<ParticipantFlightSegmentEntity> ParticipantFlightSegments { get; set; } = new();
+    public List<ActivityMealGroupEntity> ActivityMealGroups { get; set; } = new();
+    public List<ActivityMealOptionEntity> ActivityMealOptions { get; set; } = new();
+    public List<ParticipantMealSelectionEntity> ParticipantMealSelections { get; set; } = new();
     public List<EventDayEntity> EventDays { get; set; } = new();
     public List<EventActivityEntity> EventActivities { get; set; } = new();
     public List<PortalSessionEntity> PortalSessions { get; set; } = new();

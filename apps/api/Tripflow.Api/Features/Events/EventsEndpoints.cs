@@ -137,12 +137,77 @@ public static class EventsEndpoints
             .WithDescription("Updates an activity.")
             .Produces<EventActivityDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status404NotFound);
 
         admin.MapDelete("/{eventId}/activities/{activityId}", EventsHandlers.DeleteEventActivity)
             .WithSummary("Delete activity")
             .WithDescription("Deletes an activity.")
             .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/activities/{activityId}/meal-groups", MealMenuHandlers.GetMealGroups)
+            .WithSummary("List meal groups")
+            .WithDescription("Returns meal choice groups and options for a Meal activity.")
+            .Produces<MealGroupsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/activities/{activityId}/meal-groups", MealMenuHandlers.CreateMealGroup)
+            .WithSummary("Create meal group")
+            .WithDescription("Creates a meal choice group for a Meal activity.")
+            .Produces<MealGroupDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        admin.MapPut("/{eventId}/meal-groups/{groupId}", MealMenuHandlers.UpdateMealGroup)
+            .WithSummary("Update meal group")
+            .WithDescription("Updates a meal choice group.")
+            .Produces<MealGroupDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/meal-groups/{groupId}", MealMenuHandlers.DeleteMealGroup)
+            .WithSummary("Delete meal group")
+            .WithDescription("Deletes a meal choice group if it is not used by participant selections.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        admin.MapPost("/{eventId}/meal-groups/{groupId}/options", MealMenuHandlers.CreateMealOption)
+            .WithSummary("Create meal option")
+            .WithDescription("Creates a selectable option inside a meal choice group.")
+            .Produces<MealOptionDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/meal-options/{optionId}", MealMenuHandlers.UpdateMealOption)
+            .WithSummary("Update meal option")
+            .WithDescription("Updates a meal choice option.")
+            .Produces<MealOptionDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/meal-options/{optionId}", MealMenuHandlers.DeleteMealOption)
+            .WithSummary("Delete meal option")
+            .WithDescription("Deletes a meal choice option if it is not used by participant selections.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        admin.MapGet("/{eventId}/activities/{activityId}/meal/summary", MealMenuHandlers.GetMealSummary)
+            .WithSummary("Meal choice summary")
+            .WithDescription("Returns per-group counts for meal selections.")
+            .Produces<MealSummaryResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/activities/{activityId}/meal/choices", MealMenuHandlers.GetMealChoices)
+            .WithSummary("Meal choice drill-down")
+            .WithDescription("Returns a paginated participant list for a meal option or Other selections.")
+            .Produces<MealChoiceListResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 

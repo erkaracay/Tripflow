@@ -219,5 +219,6 @@ app.MapGuideEndpoints();
 app.MapUsersEndpoints();
 app.MapEventsEndpoints();
 app.MapPortalLoginEndpoints();
+app.MapPortalMealEndpoints();
 
 app.Run();

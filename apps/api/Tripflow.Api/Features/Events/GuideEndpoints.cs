@@ -83,47 +83,56 @@ public static class GuideEndpoints
             .WithSummary("Guide event days")
             .WithDescription("Returns schedule days for the event (same as admin).")
             .Produces<EventDayDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/events/{eventId}/days", GuideHandlers.CreateEventDay)
             .WithSummary("Guide create day")
             .Produces<EventDayDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/events/{eventId}/days/{dayId}", GuideHandlers.UpdateEventDay)
             .WithSummary("Guide update day")
             .Produces<EventDayDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapDelete("/events/{eventId}/days/{dayId}", GuideHandlers.DeleteEventDay)
             .WithSummary("Guide delete day")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/events/{eventId}/days/{dayId}/activities", GuideHandlers.GetEventActivities)
             .WithSummary("Guide day activities")
             .Produces<EventActivityDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/events/{eventId}/days/{dayId}/activities", GuideHandlers.CreateEventActivity)
             .WithSummary("Guide create activity")
             .Produces<EventActivityDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/events/{eventId}/activities/{activityId}", GuideHandlers.UpdateEventActivity)
             .WithSummary("Guide update activity")
             .Produces<EventActivityDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapDelete("/events/{eventId}/activities/{activityId}", GuideHandlers.DeleteEventActivity)
             .WithSummary("Guide delete activity")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/events/{eventId}/activities/for-checkin", GuideHandlers.GetActivitiesForCheckIn)
@@ -141,6 +150,79 @@ public static class GuideEndpoints
         group.MapGet("/events/{eventId}/activities/{activityId}/participants/table", GuideHandlers.GetActivityParticipantsTable)
             .WithSummary("Guide activity participants table")
             .Produces<ActivityParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/activities/{activityId}/meal/summary", GuideHandlers.GetMealSummary)
+            .WithSummary("Guide meal summary")
+            .WithDescription("Returns per-group counts for meal selections in a guide's event.")
+            .Produces<MealSummaryResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/activities/{activityId}/meal-groups", GuideHandlers.GetMealGroups)
+            .WithSummary("Guide meal groups")
+            .WithDescription("Returns meal choice groups and options for a Meal activity in a guide's event.")
+            .Produces<MealGroupsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/events/{eventId}/activities/{activityId}/meal-groups", GuideHandlers.CreateMealGroup)
+            .WithSummary("Guide create meal group")
+            .WithDescription("Creates a meal choice group for a Meal activity in a guide's event.")
+            .Produces<MealGroupDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        group.MapPut("/events/{eventId}/meal-groups/{groupId}", GuideHandlers.UpdateMealGroup)
+            .WithSummary("Guide update meal group")
+            .WithDescription("Updates a meal choice group in a guide's event.")
+            .Produces<MealGroupDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/events/{eventId}/meal-groups/{groupId}", GuideHandlers.DeleteMealGroup)
+            .WithSummary("Guide delete meal group")
+            .WithDescription("Deletes a meal choice group if it is not used by participant selections.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        group.MapPost("/events/{eventId}/meal-groups/{groupId}/options", GuideHandlers.CreateMealOption)
+            .WithSummary("Guide create meal option")
+            .WithDescription("Creates a selectable option inside a meal choice group.")
+            .Produces<MealOptionDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPut("/events/{eventId}/meal-options/{optionId}", GuideHandlers.UpdateMealOption)
+            .WithSummary("Guide update meal option")
+            .WithDescription("Updates a meal choice option in a guide's event.")
+            .Produces<MealOptionDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/events/{eventId}/meal-options/{optionId}", GuideHandlers.DeleteMealOption)
+            .WithSummary("Guide delete meal option")
+            .WithDescription("Deletes a meal choice option if it is not used by participant selections.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        group.MapGet("/events/{eventId}/activities/{activityId}/meal/choices", GuideHandlers.GetMealChoices)
+            .WithSummary("Guide meal drill-down")
+            .WithDescription("Returns a paginated participant list for a meal option or Other selections in a guide's event.")
+            .Produces<MealChoiceListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPatch("/events/{eventId}/activities/{activityId}/participants/{participantId}/will-not-attend", GuideHandlers.SetActivityParticipantWillNotAttend)

@@ -13,6 +13,9 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<ParticipantDetailsEntity> ParticipantDetails => Set<ParticipantDetailsEntity>();
     public DbSet<ParticipantFlightSegmentEntity> ParticipantFlightSegments => Set<ParticipantFlightSegmentEntity>();
+    public DbSet<ActivityMealGroupEntity> ActivityMealGroups => Set<ActivityMealGroupEntity>();
+    public DbSet<ActivityMealOptionEntity> ActivityMealOptions => Set<ActivityMealOptionEntity>();
+    public DbSet<ParticipantMealSelectionEntity> ParticipantMealSelections => Set<ParticipantMealSelectionEntity>();
     public DbSet<EventDocTabEntity> EventDocTabs => Set<EventDocTabEntity>();
     public DbSet<PortalSessionEntity> PortalSessions => Set<PortalSessionEntity>();
     public DbSet<EventPortalEntity> EventPortals => Set<EventPortalEntity>();
@@ -204,6 +207,16 @@ public sealed class TripflowDbContext : DbContext
                 .HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            b.HasMany(x => x.MealGroups)
+                .WithOne(x => x.Activity)
+                .HasForeignKey(x => x.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.MealSelections)
+                .WithOne(x => x.Activity)
+                .HasForeignKey(x => x.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             b.HasOne(x => x.Event)
                 .WithMany()
                 .HasForeignKey(x => x.EventId)
@@ -249,6 +262,11 @@ public sealed class TripflowDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             b.HasMany(x => x.FlightSegments)
+                .WithOne(x => x.Participant)
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.MealSelections)
                 .WithOne(x => x.Participant)
                 .HasForeignKey(x => x.ParticipantId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -377,6 +395,145 @@ public sealed class TripflowDbContext : DbContext
                 .WithMany(x => x.ParticipantFlightSegments)
                 .HasForeignKey(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ActivityMealGroupEntity>(b =>
+        {
+            b.ToTable("activity_meal_groups", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_activity_meal_groups_sort_order",
+                    "\"SortOrder\" >= 1");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ActivityId).IsRequired();
+            b.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            b.Property(x => x.SortOrder).IsRequired().HasDefaultValue(1);
+            b.Property(x => x.AllowOther).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.AllowNote).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+
+            b.HasIndex(x => new { x.OrganizationId, x.ActivityId, x.SortOrder });
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ActivityId });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.ActivityMealGroups)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.ActivityMealGroups)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Activity)
+                .WithMany(x => x.MealGroups)
+                .HasForeignKey(x => x.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.Options)
+                .WithOne(x => x.Group)
+                .HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.Selections)
+                .WithOne(x => x.Group)
+                .HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ActivityMealOptionEntity>(b =>
+        {
+            b.ToTable("activity_meal_options", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_activity_meal_options_sort_order",
+                    "\"SortOrder\" >= 1");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.GroupId).IsRequired();
+            b.Property(x => x.Label).HasMaxLength(200).IsRequired();
+            b.Property(x => x.SortOrder).IsRequired().HasDefaultValue(1);
+            b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+
+            b.HasIndex(x => new { x.OrganizationId, x.GroupId, x.SortOrder });
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.ActivityMealOptions)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Group)
+                .WithMany(x => x.Options)
+                .HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.Selections)
+                .WithOne(x => x.Option)
+                .HasForeignKey(x => x.OptionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ParticipantMealSelectionEntity>(b =>
+        {
+            b.ToTable("participant_meal_selections", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_participant_meal_selections_option_or_other",
+                    "\"OptionId\" IS NOT NULL OR \"OtherText\" IS NOT NULL");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ActivityId).IsRequired();
+            b.Property(x => x.GroupId).IsRequired();
+            b.Property(x => x.ParticipantId).IsRequired();
+            b.Property(x => x.OptionId);
+            b.Property(x => x.OtherText).HasMaxLength(200);
+            b.Property(x => x.Note).HasColumnType("text");
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            b.Property(x => x.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+
+            b.HasIndex(x => new { x.OrganizationId, x.ActivityId, x.GroupId });
+            b.HasIndex(x => new { x.OrganizationId, x.ParticipantId });
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ActivityId });
+            b.HasIndex(x => new { x.OrganizationId, x.ActivityId, x.GroupId, x.ParticipantId }).IsUnique();
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.ParticipantMealSelections)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.ParticipantMealSelections)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Activity)
+                .WithMany(x => x.MealSelections)
+                .HasForeignKey(x => x.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Group)
+                .WithMany(x => x.Selections)
+                .HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(x => x.Participant)
+                .WithMany(x => x.MealSelections)
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Option)
+                .WithMany(x => x.Selections)
+                .HasForeignKey(x => x.OptionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<EventDocTabEntity>(b =>

@@ -22,6 +22,8 @@ public sealed class EventEntity
     public List<EventGuideEntity> EventGuides { get; set; } = new();
     public List<ParticipantEntity> Participants { get; set; } = new();
     public List<ParticipantFlightSegmentEntity> ParticipantFlightSegments { get; set; } = new();
+    public List<ActivityMealGroupEntity> ActivityMealGroups { get; set; } = new();
+    public List<ParticipantMealSelectionEntity> ParticipantMealSelections { get; set; } = new();
     public EventPortalEntity? Portal { get; set; }
     public List<EventDayEntity> Days { get; set; } = new();
     public List<EventDocTabEntity> DocTabs { get; set; } = new();
