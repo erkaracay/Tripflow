@@ -1,6 +1,13 @@
 import { clearToken, getAuthRole, getSelectedOrgId } from './auth'
 import { pushToast } from './toast'
-import type { AuthMeResponse, PortalLoginResponse, PortalMeResponse, PortalResolveEventResponse } from '../types'
+import type {
+  AuthMeResponse,
+  PortalLoginResponse,
+  PortalMealResponse,
+  PortalMealSelectionsUpsertRequest,
+  PortalMeResponse,
+  PortalResolveEventResponse,
+} from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
@@ -293,6 +300,17 @@ const portalGet = async <T>(path: string, headers?: Record<string, string>): Pro
   return handlePortalResponse<T>(response)
 }
 
+const portalPut = async <T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> => {
+  const response = await fetch(buildUrl(path), {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  })
+
+  return handlePortalResponse<T>(response)
+}
+
 export const portalLogin = async (
   eventAccessCode: string,
   tcNo: string
@@ -303,6 +321,20 @@ export const portalLogin = async (
 export const portalGetMe = async (sessionToken?: string): Promise<PortalMeResponse> => {
   const headers = sessionToken ? { 'X-Portal-Session': sessionToken } : undefined
   return portalGet<PortalMeResponse>('/api/portal/me', headers)
+}
+
+export const portalGetMeal = async (activityId: string, sessionToken?: string): Promise<PortalMealResponse> => {
+  const headers = sessionToken ? { 'X-Portal-Session': sessionToken } : undefined
+  return portalGet<PortalMealResponse>(`/api/portal/activities/${activityId}/meal`, headers)
+}
+
+export const portalSaveMealSelections = async (
+  activityId: string,
+  payload: PortalMealSelectionsUpsertRequest,
+  sessionToken?: string
+): Promise<PortalMealResponse> => {
+  const headers = sessionToken ? { 'X-Portal-Session': sessionToken } : undefined
+  return portalPut<PortalMealResponse>(`/api/portal/activities/${activityId}/meal`, payload, headers)
 }
 
 export const checkPortalSession = async (): Promise<PortalMeResponse | null> => {

@@ -452,6 +452,7 @@
         "typeMeal": "Yemek",
         "typeProgram": "Program",
         "typeOther": "Diğer",
+        "openMealReport": "Menü",
         "edit": "Düzenle",
         "duplicate": "Kopyala",
         "delete": "Sil",
@@ -477,6 +478,36 @@
         },
         "checkInModeEntry": "Giriş",
         "checkInModeEntryExit": "Giriş + çıkış"
+      },
+      "meal": {
+        "title": "Menü Seçimleri",
+        "helper": "Yemek aktiviteleri için grup ve seçenekleri burada yönetin.",
+        "unsavedHelper": "Önce aktiviteyi kaydedin, ardından Menü Seçimleri düzenlenebilir.",
+        "loading": "Menü seçimleri yükleniyor...",
+        "empty": "Henüz menü grubu yok. İlk grubu ekleyin.",
+        "groupTitle": "Grup başlığı",
+        "optionLabel": "Seçenek etiketi",
+        "optionsTitle": "Seçenekler",
+        "sortOrder": "Sıra",
+        "allowOther": "Diğer seçeneğine izin ver",
+        "allowNote": "Nota izin ver",
+        "active": "Aktif",
+        "addGroup": "Grup ekle",
+        "addOption": "Seçenek ekle",
+        "savedInstantly": "Bu bölümdeki değişiklikler ayrı kaydedilir.",
+        "deleteGroupTitle": "Menü grubu sil",
+        "deleteGroupConfirm": "{title} grubunu silmek istiyor musunuz?",
+        "deleteOptionTitle": "Seçeneği sil",
+        "deleteOptionConfirm": "{label} seçeneğini silmek istiyor musunuz?",
+        "errors": {
+          "notMealActivity": "Bu aktivite yemek tipi olmadığı için menü seçimleri düzenlenemiyor.",
+          "groupInUse": "Bu grup katılımcı seçimlerinde kullanıldığı için silinemez.",
+          "optionInUse": "Bu seçenek katılımcı seçimlerinde kullanıldığı için silinemez.",
+          "invalidSortOrder": "Sıra değeri 1 veya daha büyük olmalı.",
+          "groupTitleRequired": "Grup başlığı gerekli.",
+          "optionLabelRequired": "Seçenek etiketi gerekli.",
+          "mealConfigExists": "Bu aktivitede menü grupları varken tip yemek dışına çevrilemez."
+        }
       }
     },
     "checkIn": {
@@ -1161,8 +1192,34 @@
       "loading": "Program yükleniyor...",
       "empty": "Program bilgisi bulunamadı.",
       "edit": "Programı düzenle",
-      "checkInEnabled": "Check-in açık"
+      "checkInEnabled": "Check-in açık",
+      "openMealReport": "Menü"
     }
+  },
+  "mealReport": {
+    "title": "Menü seçimleri",
+    "subtitle": "Katılımcı tercihlerini ve seçim detaylarını görüntüleyin.",
+    "back": "Programa dön",
+    "copySummary": "Özeti kopyala",
+    "copySuccess": "Menü özeti kopyalandı.",
+    "copyError": "Menü özeti kopyalanamadı.",
+    "empty": "Henüz seçim yok.",
+    "loading": "Menü seçimleri yükleniyor...",
+    "searchPlaceholder": "Ad, oda veya telefon ara",
+    "onlyNotes": "Sadece notlar",
+    "onlyOther": "Sadece diğer",
+    "participantPhone": "Telefon",
+    "participantRoom": "Oda {room}",
+    "other": "Diğer",
+    "note": "Not",
+    "noteCount": "Not: {count}",
+    "more": "Devamını gör",
+    "less": "Kısalt",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "results": "{count} sonuç",
+    "panelTitle": "Menü raporu",
+    "openButton": "Menü"
   },
   "portal": {
     "greeting": "Hoş geldiniz, {name}",
@@ -1191,6 +1248,23 @@
       "empty": "Program henüz hazır değil.",
       "dayLabel": "Gün {day}",
       "dayTitle": "Gün {day} - {title}"
+    },
+    "meal": {
+      "title": "Menü seçimi",
+      "helper": "Seçim yaptıktan sonra Kaydet ile gönderin.",
+      "loading": "Menü seçenekleri yükleniyor...",
+      "empty": "Bu aktivite için seçim grubu yayınlanmadı.",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "saved": "Kaydedildi.",
+      "other": "Diğer",
+      "otherPlaceholder": "Tercihinizi yazın",
+      "note": "Not",
+      "notePlaceholder": "İsteğe bağlı not",
+      "loadError": "Menü seçenekleri yüklenemedi.",
+      "saveError": "Menü seçimi kaydedilemedi.",
+      "selectionRequired": "Not eklemek için önce bir seçim yapın.",
+      "otherRequired": "Diğer seçeneği için açıklama yazın."
     },
     "docs": {
       "title": "Belgeler",

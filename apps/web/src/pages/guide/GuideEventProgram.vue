@@ -6,7 +6,8 @@ import { apiGet } from '../../lib/api'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
-import type { EventListItem, EventSchedule, EventScheduleDay } from '../../types'
+import MealReportView from '../../components/meal/MealReportView.vue'
+import type { EventActivity, EventListItem, EventSchedule, EventScheduleDay } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -87,6 +88,16 @@ const programExpanded = ref<Record<string, boolean>>({})
 const toggleProgram = (activityId: string) => {
   programExpanded.value[activityId] = !programExpanded.value[activityId]
   programExpanded.value = { ...programExpanded.value }
+}
+
+const mealReportActivity = ref<EventActivity | null>(null)
+
+const openMealReport = (activity: EventActivity) => {
+  mealReportActivity.value = activity
+}
+
+const closeMealReport = () => {
+  mealReportActivity.value = null
 }
 
 const loadData = async () => {
@@ -260,6 +271,14 @@ onMounted(loadData)
                     >
                       {{ t('guide.program.checkInEnabled') }}
                     </span>
+                    <button
+                      v-if="activity.type === 'Meal'"
+                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      type="button"
+                      @click="openMealReport(activity)"
+                    >
+                      {{ t('guide.program.openMealReport') }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -345,6 +364,16 @@ onMounted(loadData)
       </template>
     </section>
   </div>
+
+  <MealReportView
+    v-if="mealReportActivity"
+    :activity-id="mealReportActivity.id"
+    :activity-title="mealReportActivity.title"
+    :event-id="eventId"
+    mode="guide"
+    panel
+    @close="closeMealReport"
+  />
 </template>
 
 <style scoped>

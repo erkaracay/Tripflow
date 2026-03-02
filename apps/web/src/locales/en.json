@@ -452,6 +452,7 @@
         "typeMeal": "Meal",
         "typeProgram": "Program",
         "typeOther": "Other",
+        "openMealReport": "Menu",
         "edit": "Edit",
         "duplicate": "Duplicate",
         "delete": "Delete",
@@ -477,6 +478,36 @@
         },
         "checkInModeEntry": "Entry only",
         "checkInModeEntryExit": "Entry + exit"
+      },
+      "meal": {
+        "title": "Menu Choices",
+        "helper": "Manage groups and options here for Meal activities.",
+        "unsavedHelper": "Save the activity first, then Menu Choices can be edited.",
+        "loading": "Loading menu choices...",
+        "empty": "No menu groups yet. Add the first group.",
+        "groupTitle": "Group title",
+        "optionLabel": "Option label",
+        "optionsTitle": "Options",
+        "sortOrder": "Sort order",
+        "allowOther": "Allow Other choice",
+        "allowNote": "Allow note",
+        "active": "Active",
+        "addGroup": "Add group",
+        "addOption": "Add option",
+        "savedInstantly": "Changes in this section are saved separately.",
+        "deleteGroupTitle": "Delete menu group",
+        "deleteGroupConfirm": "Delete group {title}?",
+        "deleteOptionTitle": "Delete option",
+        "deleteOptionConfirm": "Delete option {label}?",
+        "errors": {
+          "notMealActivity": "Menu choices cannot be edited because this activity is not a Meal.",
+          "groupInUse": "This group cannot be deleted because participant selections use it.",
+          "optionInUse": "This option cannot be deleted because participant selections use it.",
+          "invalidSortOrder": "Sort order must be 1 or greater.",
+          "groupTitleRequired": "Group title is required.",
+          "optionLabelRequired": "Option label is required.",
+          "mealConfigExists": "This activity cannot be changed away from Meal while menu groups exist."
+        }
       }
     },
     "checkIn": {
@@ -1174,8 +1205,34 @@
       "loading": "Loading program...",
       "empty": "Program information not found.",
       "edit": "Edit program",
-      "checkInEnabled": "Check-in enabled"
+      "checkInEnabled": "Check-in enabled",
+      "openMealReport": "Menu"
     }
+  },
+  "mealReport": {
+    "title": "Menu choices",
+    "subtitle": "Review participant preferences and selection details.",
+    "back": "Back to program",
+    "copySummary": "Copy summary",
+    "copySuccess": "Menu summary copied.",
+    "copyError": "Menu summary could not be copied.",
+    "empty": "No selections yet.",
+    "loading": "Loading menu choices...",
+    "searchPlaceholder": "Search by name, room, or phone",
+    "onlyNotes": "Only notes",
+    "onlyOther": "Only other",
+    "participantPhone": "Phone",
+    "participantRoom": "Room {room}",
+    "other": "Other",
+    "note": "Note",
+    "noteCount": "Notes: {count}",
+    "more": "More",
+    "less": "Less",
+    "previous": "Previous",
+    "next": "Next",
+    "results": "{count} results",
+    "panelTitle": "Menu report",
+    "openButton": "Menu"
   },
   "portal": {
     "greeting": "Welcome, {name}",
@@ -1204,6 +1261,23 @@
       "empty": "Itinerary is not available yet.",
       "dayLabel": "Day {day}",
       "dayTitle": "Day {day} - {title}"
+    },
+    "meal": {
+      "title": "Menu selection",
+      "helper": "Submit your choices with Save after reviewing them.",
+      "loading": "Loading menu options...",
+      "empty": "No choice groups have been published for this activity.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved.",
+      "other": "Other",
+      "otherPlaceholder": "Write your choice",
+      "note": "Note",
+      "notePlaceholder": "Optional note",
+      "loadError": "Menu options could not be loaded.",
+      "saveError": "Menu selection could not be saved.",
+      "selectionRequired": "Choose an option before adding a note.",
+      "otherRequired": "Enter a value for the Other option."
     },
     "docs": {
       "title": "Documents",

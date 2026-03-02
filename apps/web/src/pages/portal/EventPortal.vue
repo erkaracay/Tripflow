@@ -8,6 +8,7 @@ import { portalGetMe, portalLogout } from '../../lib/api'
 import { resetViewportZoom } from '../../lib/viewport'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
+import PortalMealSelectionCard from '../../components/portal/PortalMealSelectionCard.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
@@ -431,6 +432,11 @@ const openDocsPdf = () => {
   }
 }
 
+const handleMealSessionExpired = () => {
+  hasValidSession.value = false
+  sessionExpired.value = true
+}
+
 watch(checkInCode, () => {
   void generateQr()
 })
@@ -640,10 +646,10 @@ onUnmounted(() => {
                         {{ activity.directions }}
                       </div>
 
-                      <div
-                        v-if="activity.menuText"
-                        class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-                      >
+              <div
+                v-if="activity.menuText"
+                class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              >
                         <button
                           type="button"
                           class="flex w-full list-none cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
@@ -695,12 +701,20 @@ onUnmounted(() => {
                           >
                             <RichTextContent :content="activity.programContent" />
                           </div>
-                        </Transition>
-                      </div>
+                </Transition>
+              </div>
 
-                      <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
-                        <RichTextContent :content="activity.notes" />
-                      </div>
+              <PortalMealSelectionCard
+                v-if="activity.type === 'Meal'"
+                :activity="activity"
+                :event-title="event?.name"
+                :session-expired="sessionExpired"
+                @session-expired="handleMealSessionExpired"
+              />
+
+              <div v-if="activity.notes" class="mt-3 text-sm text-slate-600">
+                <RichTextContent :content="activity.notes" />
+              </div>
 
                       <a
                         v-if="activity.surveyUrl"

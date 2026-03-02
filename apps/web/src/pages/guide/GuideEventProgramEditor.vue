@@ -9,5 +9,5 @@ const eventId = computed(() => (props.eventId ?? route.params.eventId) as string
 </script>
 
 <template>
-  <EventProgramEditor :event-id="eventId" mode="admin" />
+  <EventProgramEditor :event-id="eventId" mode="guide" />
 </template>

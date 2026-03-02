@@ -46,6 +46,12 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
+      path: '/admin/events/:eventId/activities/:activityId/meal',
+      component: () => import('./pages/admin/AdminMealReportPage.vue'),
+      props: true,
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
       path: '/admin/events/:eventId/activities/checkin',
       component: () => import('./pages/admin/AdminActivityCheckIn.vue'),
       props: true,
@@ -127,7 +133,13 @@ const router = createRouter({
     },
     {
       path: '/guide/events/:eventId/program/edit',
-      component: () => import('./pages/admin/AdminEventProgram.vue'),
+      component: () => import('./pages/guide/GuideEventProgramEditor.vue'),
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
+      path: '/guide/events/:eventId/activities/:activityId/meal',
+      component: () => import('./pages/guide/GuideMealReportPage.vue'),
       props: true,
       meta: { requiresAuth: true, roles: ['Guide'] },
     },

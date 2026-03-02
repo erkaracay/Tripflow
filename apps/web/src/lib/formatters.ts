@@ -104,6 +104,19 @@ export const formatTime = (value?: string | null) => {
   return trimmed.length >= 5 ? trimmed.slice(0, 5) : trimmed
 }
 
+const formatDateParts = (date: Date) => {
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear().toString()
+  return { day, month, year }
+}
+
+const formatTimeParts = (date: Date) => {
+  const hour = date.getHours().toString().padStart(2, '0')
+  const minute = date.getMinutes().toString().padStart(2, '0')
+  return { hour, minute }
+}
+
 /**
  * Parse a UTC timestamp string and format in the device's local timezone.
  * Use only for API values that are UTC (e.g. log CreatedAt, LoggedAt).
@@ -124,20 +137,15 @@ export function formatUtcToLocal(
   if (Number.isNaN(date.getTime())) {
     return value
   }
+  const { day, month, year } = formatDateParts(date)
+  const { hour, minute } = formatTimeParts(date)
   if (options?.dateOnly) {
-    return date.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return `${day}.${month}.${year}`
   }
   if (options?.timeOnly) {
-    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+    return `${hour}:${minute}`
   }
-  return date.toLocaleString(undefined, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return `${day}.${month}.${year} ${hour}:${minute}`
 }
 
 /** UTC timestamp to local "dd.MM.yyyy HH:mm" for log tables. */
@@ -153,10 +161,7 @@ export function formatUtcDateTimeLocal(value: string | null | undefined): string
   if (Number.isNaN(date.getTime())) {
     return value
   }
-  const d = date.getDate().toString().padStart(2, '0')
-  const m = (date.getMonth() + 1).toString().padStart(2, '0')
-  const y = date.getFullYear()
-  const h = date.getHours().toString().padStart(2, '0')
-  const min = date.getMinutes().toString().padStart(2, '0')
-  return `${d}.${m}.${y} ${h}:${min}`
+  const { day, month, year } = formatDateParts(date)
+  const { hour, minute } = formatTimeParts(date)
+  return `${day}.${month}.${year} ${hour}:${minute}`
 }

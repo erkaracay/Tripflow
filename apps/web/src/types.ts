@@ -274,6 +274,147 @@ export type EventActivity = {
   surveyUrl?: string | null
 }
 
+export type MealOption = {
+  id: string
+  label: string
+  sortOrder: number
+  isActive: boolean
+}
+
+export type MealGroup = {
+  id: string
+  activityId: string
+  title: string
+  sortOrder: number
+  allowOther: boolean
+  allowNote: boolean
+  isActive: boolean
+  options: MealOption[]
+}
+
+export type MealGroupsResponse = {
+  activityId: string
+  groups: MealGroup[]
+}
+
+export type CreateMealGroupPayload = {
+  title: string
+  sortOrder?: number
+  allowOther?: boolean
+  allowNote?: boolean
+  isActive?: boolean
+}
+
+export type UpdateMealGroupPayload = Partial<CreateMealGroupPayload>
+
+export type CreateMealOptionPayload = {
+  label: string
+  sortOrder?: number
+  isActive?: boolean
+}
+
+export type UpdateMealOptionPayload = Partial<CreateMealOptionPayload>
+
+export type PortalMealOption = {
+  id: string
+  label: string
+  sortOrder: number
+}
+
+export type PortalMealSelection = {
+  groupId: string
+  optionId?: string | null
+  otherText?: string | null
+  note?: string | null
+}
+
+export type PortalMealGroup = {
+  groupId: string
+  title: string
+  sortOrder: number
+  allowOther: boolean
+  allowNote: boolean
+  options: PortalMealOption[]
+  selection?: PortalMealSelection | null
+}
+
+export type PortalMealResponse = {
+  activityId: string
+  groups: PortalMealGroup[]
+}
+
+export type PortalMealSelectionUpsertItem = {
+  groupId: string
+  optionId?: string | null
+  otherText?: string | null
+  note?: string | null
+}
+
+export type PortalMealSelectionsUpsertRequest = {
+  selections: PortalMealSelectionUpsertItem[]
+}
+
+export type MealSummaryCount = {
+  optionId?: string | null
+  label: string
+  count: number
+}
+
+export type MealSummaryGroup = {
+  groupId: string
+  title: string
+  allowOther: boolean
+  allowNote: boolean
+  counts: MealSummaryCount[]
+  noteCount: number
+}
+
+export type MealSummaryResponse = {
+  activityId: string
+  groups: MealSummaryGroup[]
+}
+
+export type MealChoiceParticipant = {
+  id: string
+  fullName: string
+  roomNo?: string | null
+  phone: string
+}
+
+export type MealChoiceListItem = {
+  participant: MealChoiceParticipant
+  optionId?: string | null
+  optionLabel?: string | null
+  otherText?: string | null
+  note?: string | null
+  updatedAt: string
+}
+
+export type MealChoiceListResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: MealChoiceListItem[]
+}
+
+export type MealReportMode = 'admin' | 'guide'
+
+export type MealReportFilterState = {
+  q: string
+  onlyNotes: boolean
+  onlyOther: boolean
+  page: number
+  pageSize: number
+}
+
+export type MealSelectionDraft = {
+  selectedKind: 'option' | 'other' | null
+  optionId: string | null
+  otherText: string
+  note: string
+  errorKey: string | null
+}
+
 export type ActivityCheckInResponse = {
   participantId: string
   participantName: string
