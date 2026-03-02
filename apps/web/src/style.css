@@ -54,6 +54,53 @@
   transform: translateY(-8px);
 }
 
+.app-drawer-enter-active,
+.app-drawer-leave-active {
+  transition: opacity 190ms ease-out;
+}
+
+.app-drawer-enter-active .app-drawer-overlay,
+.app-drawer-leave-active .app-drawer-overlay {
+  transition: opacity 190ms ease-out;
+}
+
+.app-drawer-enter-active .app-drawer-panel,
+.app-drawer-leave-active .app-drawer-panel {
+  transition: opacity 190ms ease-out, transform 190ms ease-out;
+}
+
+.app-drawer-leave-active .app-drawer-overlay,
+.app-drawer-leave-active .app-drawer-panel {
+  transition-duration: 155ms;
+}
+
+.app-drawer-enter-from,
+.app-drawer-leave-to,
+.app-drawer-enter-from .app-drawer-overlay,
+.app-drawer-leave-to .app-drawer-overlay {
+  opacity: 0;
+}
+
+.app-drawer-enter-from .app-drawer-panel,
+.app-drawer-leave-to .app-drawer-panel {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+@media (min-width: 1024px) {
+  .app-drawer-enter-from .app-drawer-panel.app-drawer-breakpoint-lg,
+  .app-drawer-leave-to .app-drawer-panel.app-drawer-breakpoint-lg {
+    transform: translateX(20px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-drawer-enter-from .app-drawer-panel.app-drawer-breakpoint-xl,
+  .app-drawer-leave-to .app-drawer-panel.app-drawer-breakpoint-xl {
+    transform: translateX(20px);
+  }
+}
+
 .app-tab-slide-forward-enter-active,
 .app-tab-slide-forward-leave-active,
 .app-tab-slide-backward-enter-active,
@@ -148,6 +195,12 @@
   .app-modal-leave-active .app-modal-panel,
   .app-menu-enter-active,
   .app-menu-leave-active,
+  .app-drawer-enter-active,
+  .app-drawer-leave-active,
+  .app-drawer-enter-active .app-drawer-overlay,
+  .app-drawer-leave-active .app-drawer-overlay,
+  .app-drawer-enter-active .app-drawer-panel,
+  .app-drawer-leave-active .app-drawer-panel,
   .app-segmented-indicator,
   .app-segmented-button,
   .app-tab-slide-forward-enter-active,
@@ -161,6 +214,8 @@
 
   .app-modal-enter-from .app-modal-panel,
   .app-modal-leave-to .app-modal-panel,
+  .app-drawer-enter-from .app-drawer-panel,
+  .app-drawer-leave-to .app-drawer-panel,
   .app-menu-enter-from,
   .app-menu-leave-to,
   .app-tab-slide-forward-enter-from,

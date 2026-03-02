@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
+import EventDocPreviewDrawer from '../../components/docs/EventDocPreviewDrawer.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { Event as TripEvent, EventDocTabDto } from '../../types'
@@ -29,6 +30,8 @@ const modalOpen = ref(false)
 const saving = ref(false)
 const editingTab = ref<EventDocTabDto | null>(null)
 const updatingId = ref<string | null>(null)
+const previewOpen = ref(false)
+const previewTab = ref<EventDocTabDto | null>(null)
 
 const form = reactive({
   title: '',
@@ -239,6 +242,16 @@ const openCreate = () => {
   editingTab.value = null
   resetForm()
   modalOpen.value = true
+}
+
+const openPreview = (tab: EventDocTabDto) => {
+  previewTab.value = tab
+  previewOpen.value = true
+}
+
+const closePreview = () => {
+  previewOpen.value = false
+  previewTab.value = null
 }
 
 const openEdit = (tab: EventDocTabDto) => {
@@ -613,6 +626,13 @@ onMounted(() => {
                   <button
                     class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
                     type="button"
+                    @click="openPreview(tab)"
+                  >
+                    {{ t('admin.docs.preview') }}
+                  </button>
+                  <button
+                    class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
+                    type="button"
                     @click="openEdit(tab)"
                   >
                     {{ t('common.edit') }}
@@ -907,4 +927,11 @@ onMounted(() => {
       </form>
     </template>
   </AppModalShell>
+
+  <EventDocPreviewDrawer
+    :open="previewOpen"
+    :tab="previewTab"
+    :event-title="event?.name ?? null"
+    @close="closePreview"
+  />
 </template>

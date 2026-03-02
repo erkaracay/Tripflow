@@ -24,6 +24,13 @@ const showOrgLink = computed(() => userRole.value === 'SuperAdmin')
 const showAuthActions = computed(() => Boolean(userRole.value))
 const showUsersLink = computed(() => userRole.value === 'SuperAdmin')
 const showGuidesLink = computed(() => userRole.value === 'AgencyAdmin')
+const shellMaxWidthClass = computed(() => {
+  if (route.path.startsWith('/admin') || route.path.startsWith('/guide')) {
+    return 'max-w-5xl'
+  }
+
+  return 'max-w-3xl'
+})
 const eventsPath = computed(() => {
   if (userRole.value === 'Guide') {
     return '/guide/events'
@@ -97,7 +104,7 @@ watch(
     <div class="min-h-screen bg-slate-50 text-slate-900">
       <!-- Header -->
         <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div class="mx-auto max-w-3xl px-4 py-3 sm:px-6">
+            <div :class="['mx-auto px-4 py-3 sm:px-6', shellMaxWidthClass]">
                 <div class="flex items-center justify-between gap-3">
                     <div class="leading-tight">
                         <div v-if="isPortalRoute" class="flex items-center gap-3">
@@ -271,7 +278,7 @@ watch(
         </header>
 
         <!-- Content -->
-        <main class="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
+        <main :class="['mx-auto w-full px-4 py-4 sm:px-6 sm:py-6', shellMaxWidthClass]">
             <RouterView />
         </main>
     </div>

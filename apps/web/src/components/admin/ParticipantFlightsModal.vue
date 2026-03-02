@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPut } from '../../lib/api'
 import { formatBaggage, formatCabinBaggage, formatDate, formatTime } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import AppModalShell from '../ui/AppModalShell.vue'
+import AppDrawerShell from '../ui/AppDrawerShell.vue'
 import type { FlightSegment, ParticipantDetails, ParticipantProfile } from '../../types'
 
 type FlightTab = 'arrival' | 'return'
@@ -49,8 +50,6 @@ const returnSegments = ref<FlightSegment[]>([])
 const draftArrivalSegments = ref<FlightSegment[]>([])
 const draftReturnSegments = ref<FlightSegment[]>([])
 const participantDetails = ref<ParticipantDetails | null>(null)
-
-const previousBodyOverflow = ref<string | null>(null)
 
 const segmentHasValue = (segment?: FlightSegment | null) => {
   if (!segment) return false
@@ -381,22 +380,24 @@ const saveFlights = async () => {
   }
 }
 
-watch(modalOpen, (open) => {
-  if (open) {
-    if (previousBodyOverflow.value === null) {
-      previousBodyOverflow.value = document.body.style.overflow
+const activeShell = computed(() => (mode.value === 'view' ? AppDrawerShell : AppModalShell))
+const shellBindings = computed(() => {
+  if (mode.value === 'view') {
+    return {
+      open: modalOpen.value,
+      closeOnOverlay: true,
+      contentClass: 'z-50',
+      overlayClass: 'bg-slate-900/30',
+      desktopWidth: 'xl' as const,
     }
-    document.body.style.overflow = 'hidden'
-    return
   }
 
-  document.body.style.overflow = previousBodyOverflow.value ?? ''
-  previousBodyOverflow.value = null
-})
-
-onUnmounted(() => {
-  document.body.style.overflow = previousBodyOverflow.value ?? ''
-  previousBodyOverflow.value = null
+  return {
+    open: modalOpen.value,
+    closeOnOverlay: false,
+    contentClass: 'py-5',
+    overlayClass: 'bg-slate-900/50',
+  }
 })
 </script>
 
@@ -405,15 +406,19 @@ onUnmounted(() => {
     {{ buttonText }}
   </button>
 
-  <AppModalShell
-    :open="modalOpen"
-    content-class="py-5"
-    overlay-class="bg-slate-900/50"
+  <component
+    :is="activeShell"
+    v-bind="shellBindings"
     @close="closeModal"
   >
     <template #default="{ panelClass }">
       <div
-        :class="[panelClass, 'flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl']"
+        :class="[
+          panelClass,
+          mode === 'view'
+            ? 'flex h-full w-full flex-col overflow-hidden bg-white shadow-xl'
+            : 'flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl',
+        ]"
         role="dialog"
         aria-modal="true"
         :aria-label="t('admin.participant.flights.modalTitle')"
@@ -676,5 +681,5 @@ onUnmounted(() => {
           </div>
       </div>
     </template>
-  </AppModalShell>
+  </component>
 </template>
