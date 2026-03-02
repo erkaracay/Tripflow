@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders, buildUrl } from '../../lib/api'
@@ -35,6 +35,10 @@ import type {
   EventPortalInfo,
   UserListItem,
 } from '../../types'
+
+const RichTextEditor = defineAsyncComponent(
+  () => import('../../components/editor/RichTextEditor.vue')
+)
 
 const props = defineProps<{ eventId: string }>()
 const route = useRoute()
@@ -426,6 +430,33 @@ const portalForm = reactive({
   links: [] as LinkInfo[],
 })
 
+const looksLikeHtml = (value?: string | null) => !!value && /<\/?[a-z][\s\S]*>/i.test(value)
+
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const portalNotesToEditorContent = (notes: string[]) => {
+  if (notes.length === 0) {
+    return ''
+  }
+
+  if (notes.length === 1 && looksLikeHtml(notes[0])) {
+    return notes[0] ?? ''
+  }
+
+  const items = notes
+    .map((note) => note.trim())
+    .filter(Boolean)
+    .map((note) => `<li>${escapeHtml(note)}</li>`)
+    .join('')
+
+  return items ? `<ul>${items}</ul>` : ''
+}
+
 const setEventForm = (data: EventDto) => {
   eventForm.name = data.name
   eventForm.startDate = data.startDate
@@ -437,7 +468,7 @@ const setPortalForm = (data: EventPortalInfo) => {
   portalForm.meetingPlace = data.meeting.place
   portalForm.meetingMapsUrl = data.meeting.mapsUrl
   portalForm.meetingNote = data.meeting.note
-  portalForm.notesText = data.notes.join('\n')
+  portalForm.notesText = portalNotesToEditorContent(data.notes)
 
   const normalizedLinks = data.links.length > 0 ? data.links : [{ label: '', url: '' }]
   portalForm.links.splice(0, portalForm.links.length, ...normalizedLinks)
@@ -1305,10 +1336,8 @@ const savePortal = async () => {
     return
   }
 
-  const notes = portalForm.notesText
-    .split('\n')
-    .map((note) => note.trim())
-    .filter(Boolean)
+  const notesContent = portalForm.notesText.trim()
+  const notes = notesContent ? [notesContent] : []
 
   const links = portalForm.links
     .map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
@@ -1904,14 +1933,14 @@ onMounted(loadEvent)
 
             <div class="space-y-3">
               <h3 class="text-sm font-semibold text-slate-700">{{ t('admin.portal.notes.title') }}</h3>
-              <label class="grid gap-1 text-sm">
+              <div class="grid gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.portal.notes.label') }}</span>
-                <textarea
+                <RichTextEditor
                   v-model="portalForm.notesText"
-                  class="min-h-30 rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                   :placeholder="t('admin.portal.notes.placeholder')"
-                ></textarea>
-              </label>
+                  min-height="10rem"
+                />
+              </div>
             </div>
           </fieldset>
 

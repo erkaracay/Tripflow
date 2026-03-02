@@ -196,6 +196,34 @@ const contactRows = computed<ContactRow[]>(() => {
   return rows
 })
 
+const looksLikeHtml = (value?: string | null) => !!value && /<\/?[a-z][\s\S]*>/i.test(value)
+
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const portalNotesContent = computed(() => {
+  const notes = portal.value?.notes ?? []
+  if (notes.length === 0) {
+    return ''
+  }
+
+  if (notes.length === 1 && looksLikeHtml(notes[0])) {
+    return notes[0] ?? ''
+  }
+
+  const items = notes
+    .map((note) => note.trim())
+    .filter(Boolean)
+    .map((note) => `<li>${escapeHtml(note)}</li>`)
+    .join('')
+
+  return items ? `<ul>${items}</ul>` : ''
+})
+
 const whatsappGroupUrl = computed(() => normalizeContactText(portal.value?.eventContacts?.whatsappGroupUrl))
 const hasContactsBlock = computed(() => contactRows.value.length > 0 || Boolean(whatsappGroupUrl.value))
 
@@ -902,9 +930,9 @@ onUnmounted(() => {
               <p v-if="portal?.notes.length === 0" class="mt-2 text-sm text-slate-500">
                 {{ t('portal.info.notesEmpty') }}
               </p>
-              <ul v-else class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
-                <li v-for="note in portal?.notes" :key="note">{{ note }}</li>
-              </ul>
+              <div v-else class="mt-3 text-sm text-slate-600">
+                <RichTextContent :content="portalNotesContent" />
+              </div>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

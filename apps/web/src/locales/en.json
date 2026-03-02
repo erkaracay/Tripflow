@@ -1104,8 +1104,8 @@
       },
       "notes": {
         "title": "Notes",
-        "label": "One note per line",
-        "placeholder": "Bring a reusable water bottle."
+        "label": "Note content",
+        "placeholder": "Write important notes for participants here."
       },
       "save": "Save portal"
     },

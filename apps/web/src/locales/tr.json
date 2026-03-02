@@ -1091,8 +1091,8 @@
       },
       "notes": {
         "title": "Notlar",
-        "label": "Her satır bir not",
-        "placeholder": "Yeniden kullanılabilir şişe getirin."
+        "label": "Not içeriği",
+        "placeholder": "Katılımcılar için önemli notları buraya yazın."
       },
       "save": "Portalı kaydet"
     },
