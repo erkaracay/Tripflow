@@ -18,6 +18,7 @@ const eventId = computed(() => route.params.eventId as string)
 const event = ref<EventListItem | null>(null)
 const schedule = ref<EventSchedule | null>(null)
 const selectedDayIndex = ref(0)
+const previousSelectedDayIndex = ref(0)
 
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
@@ -25,6 +26,11 @@ const errorMessage = ref<string | null>(null)
 
 const scheduleDays = computed<EventScheduleDay[]>(() => schedule.value?.days ?? [])
 const selectedDay = computed(() => scheduleDays.value[selectedDayIndex.value] ?? null)
+const dayTransitionName = computed(() =>
+  selectedDayIndex.value >= previousSelectedDayIndex.value
+    ? 'app-tab-slide-forward'
+    : 'app-tab-slide-backward'
+)
 
 const parseDate = (value?: string | null) => {
   if (!value) return null
@@ -85,6 +91,12 @@ const formatActivityType = (type?: string | null) => {
   return t('portal.schedule.typeOther')
 }
 
+const menuExpanded = ref<Record<string, boolean>>({})
+const toggleMenu = (activityId: string) => {
+  menuExpanded.value[activityId] = !menuExpanded.value[activityId]
+  menuExpanded.value = { ...menuExpanded.value }
+}
+
 const programExpanded = ref<Record<string, boolean>>({})
 const toggleProgram = (activityId: string) => {
   programExpanded.value[activityId] = !programExpanded.value[activityId]
@@ -125,6 +137,10 @@ const loadData = async () => {
 }
 
 const selectDay = (index: number) => {
+  if (index === selectedDayIndex.value) {
+    return
+  }
+  previousSelectedDayIndex.value = selectedDayIndex.value
   selectedDayIndex.value = index
 }
 
@@ -225,26 +241,27 @@ onMounted(loadData)
           </button>
         </div>
 
-        <div v-if="selectedDay" class="mt-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-lg font-semibold">
-                {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
-              </h3>
-              <p class="text-sm text-slate-500">{{ formatDate(selectedDay.date) }}</p>
+        <Transition :name="dayTransitionName" mode="out-in">
+          <div v-if="selectedDay" :key="selectedDay.id" class="mt-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-semibold">
+                  {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
+                </h3>
+                <p class="text-sm text-slate-500">{{ formatDate(selectedDay.date) }}</p>
+              </div>
             </div>
-          </div>
 
-          <p v-if="selectedDay.activities.length === 0" class="mt-3 text-sm text-slate-500">
-            {{ t('portal.schedule.noActivities') }}
-          </p>
+            <p v-if="selectedDay.activities.length === 0" class="mt-3 text-sm text-slate-500">
+              {{ t('portal.schedule.noActivities') }}
+            </p>
 
-          <div v-else class="mt-4 space-y-4">
-            <article
-              v-for="activity in selectedDay.activities"
-              :key="activity.id"
-              class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-            >
+            <div v-else class="mt-4 space-y-4">
+              <article
+                v-for="activity in selectedDay.activities"
+                :key="activity.id"
+                class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -308,10 +325,26 @@ onMounted(loadData)
                 v-if="activity.menuText"
                 class="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800"
               >
-                <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                  {{ t('portal.schedule.menuLabel') }}
-                </div>
-                <RichTextContent :content="activity.menuText" class="mt-1" />
+                <button
+                  type="button"
+                  class="flex w-full list-none cursor-pointer items-center justify-between gap-2 border-0 bg-transparent p-0 text-left"
+                  @click="toggleMenu(activity.id)"
+                >
+                  <span class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+                    {{ t('portal.schedule.menuLabel') }}
+                  </span>
+                  <span class="text-xs font-semibold text-amber-700 underline">
+                    {{ menuExpanded[activity.id] ? t('portal.schedule.menuHide') : t('portal.schedule.menuView') }}
+                  </span>
+                </button>
+                <Transition name="menu-expand">
+                  <div
+                    v-if="menuExpanded[activity.id]"
+                    class="mt-2 overflow-hidden border-t border-amber-200/50 pt-2 text-amber-800"
+                  >
+                    <RichTextContent :content="activity.menuText" />
+                  </div>
+                </Transition>
               </div>
 
               <div
@@ -359,9 +392,10 @@ onMounted(loadData)
               >
                 {{ t('portal.schedule.openSurvey') }}
               </a>
-            </article>
+              </article>
+            </div>
           </div>
-        </div>
+        </Transition>
       </template>
     </section>
   </div>
@@ -378,6 +412,21 @@ onMounted(loadData)
 </template>
 
 <style scoped>
+.menu-expand-enter-active,
+.menu-expand-leave-active {
+  transition: opacity 0.3s ease-out, max-height 0.3s ease-out;
+}
+.menu-expand-enter-from,
+.menu-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.menu-expand-enter-to,
+.menu-expand-leave-from {
+  opacity: 1;
+  max-height: 500px;
+}
+
 .program-expand-enter-active,
 .program-expand-leave-active {
   transition: opacity 0.3s ease-out, max-height 0.3s ease-out;
