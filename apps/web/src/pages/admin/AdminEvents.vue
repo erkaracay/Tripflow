@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost } from '../../lib/api'
 import { getAuthRole } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
+import { formatDateRange } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -22,6 +23,9 @@ const formErrorKey = ref<string | null>(null)
 const formErrorMessage = ref<string | null>(null)
 const dateHintKey = ref<string | null>(null)
 const showArchived = ref(false)
+const createOpen = ref(true)
+const createOpenInitialized = ref(false)
+const createTransitionReady = ref(false)
 
 const EVENT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -54,6 +58,10 @@ const loadEvents = async () => {
   try {
     const query = showArchived.value ? '?includeArchived=true' : ''
     events.value = await apiGet<EventListItem[]>(`/api/events${query}`)
+    if (!createOpenInitialized.value) {
+      createOpen.value = events.value.length === 0
+      createOpenInitialized.value = true
+    }
   } catch (err) {
     listErrorMessage.value = err instanceof Error ? err.message : null
     if (!listErrorMessage.value) {
@@ -61,6 +69,10 @@ const loadEvents = async () => {
     }
   } finally {
     loading.value = false
+    if (!createTransitionReady.value) {
+      await nextTick()
+      createTransitionReady.value = true
+    }
   }
 }
 
@@ -82,22 +94,26 @@ const createEvent = async () => {
 
   if (!form.name.trim()) {
     formErrorKey.value = 'validation.eventNameRequired'
+    createOpen.value = true
     return
   }
 
   if (!form.startDate || !form.endDate) {
     formErrorKey.value = 'validation.startEndRequired'
+    createOpen.value = true
     return
   }
 
   if (form.endDate < form.startDate) {
     formErrorKey.value = 'validation.endAfterStart'
+    createOpen.value = true
     return
   }
 
   const code = sanitizeEventAccessCode(form.eventCode)
   if (code && !isValidEventCodeLength(code)) {
     eventCodeErrorKey.value = 'admin.events.form.eventCodeInvalid'
+    createOpen.value = true
     return
   }
 
@@ -120,12 +136,14 @@ const createEvent = async () => {
       formErrorKey.value = null
       formErrorMessage.value = null
       eventCodeErrorKey.value = 'admin.events.form.eventCodeTaken'
+      createOpen.value = true
       return
     }
     formErrorMessage.value = err instanceof Error ? err.message : null
     if (!formErrorMessage.value) {
       formErrorKey.value = 'errors.events.create'
     }
+    createOpen.value = true
   } finally {
     submitting.value = false
   }
@@ -200,85 +218,103 @@ onMounted(loadEvents)
         </div>
       </div>
 
-      <form class="mt-5 grid gap-4 md:grid-cols-3" @submit.prevent="createEvent">
-        <label class="grid gap-1 text-sm">
-          <span class="text-slate-600">{{ t('admin.events.form.nameLabel') }}</span>
-          <input
-            v-model.trim="form.name"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            :placeholder="t('admin.events.form.namePlaceholder')"
-            type="text"
-          />
-        </label>
-
-        <label class="grid gap-1 text-sm">
-          <span class="text-slate-600">{{ t('admin.events.form.startDateLabel') }}</span>
-          <input
-            v-model="form.startDate"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            type="date"
-          />
-        </label>
-
-        <label class="grid gap-1 text-sm">
-          <span class="text-slate-600">{{ t('admin.events.form.endDateLabel') }}</span>
-          <input
-            v-model="form.endDate"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            type="date"
-            :min="form.startDate || undefined"
-          />
-        </label>
-
-        <label class="grid gap-1 text-sm md:col-span-3">
-          <span class="text-slate-600">{{ t('admin.events.form.eventCodeLabel') }}</span>
-          <div class="flex flex-wrap items-center gap-2">
-            <input
-              v-model="form.eventCode"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none max-w-48"
-              :class="eventCodeErrorKey ? 'border-rose-400' : ''"
-              :placeholder="t('admin.events.form.eventCodePlaceholder')"
-              maxlength="10"
-              autocomplete="off"
-              autocapitalize="characters"
-              :disabled="submitting"
-              @input="form.eventCode = sanitizeEventAccessCode(form.eventCode); eventCodeErrorKey = null"
-            />
-            <button
-              type="button"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:border-slate-300"
-              :disabled="submitting"
-              @click="generateRandomEventCode"
-            >
-              {{ t('admin.events.form.eventCodeGenerate') }}
-            </button>
-          </div>
-          <p class="text-xs text-slate-500">{{ t('admin.events.form.eventCodeHint') }}</p>
-          <p v-if="eventCodeErrorKey" class="text-xs text-rose-600">{{ t(eventCodeErrorKey) }}</p>
-        </label>
-
-        <div class="md:col-span-3 flex flex-wrap items-center gap-3">
-          <button
-            class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            :disabled="submitting"
-            type="submit"
-          >
-            {{ submitting ? t('admin.events.form.creating') : t('admin.events.form.create') }}
-          </button>
-          <button
-            class="text-sm text-slate-600 underline"
-            type="button"
-            @click="loadEvents"
-          >
-            {{ t('common.refreshList') }}
-          </button>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.events.createTitle') }}</h2>
+          <p class="text-xs text-slate-500">{{ t('admin.events.createSubtitle') }}</p>
         </div>
-      </form>
+        <button
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+          type="button"
+          @click="createOpen = !createOpen"
+        >
+          {{ createOpen ? t('admin.events.hideCreate') : t('admin.events.showCreate') }}
+        </button>
+      </div>
 
-      <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
-        {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
-      </p>
-      <p v-else-if="dateHintKey" class="mt-3 text-sm text-slate-500">{{ t(dateHintKey) }}</p>
+      <Transition name="app-section-reveal" mode="out-in" :css="createTransitionReady">
+        <div v-if="createOpen" class="mt-4">
+          <form class="grid gap-4 md:grid-cols-3" @submit.prevent="createEvent">
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.events.form.nameLabel') }}</span>
+              <input
+                v-model.trim="form.name"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                :placeholder="t('admin.events.form.namePlaceholder')"
+                type="text"
+              />
+            </label>
+
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.events.form.startDateLabel') }}</span>
+              <input
+                v-model="form.startDate"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                type="date"
+              />
+            </label>
+
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.events.form.endDateLabel') }}</span>
+              <input
+                v-model="form.endDate"
+                class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                type="date"
+                :min="form.startDate || undefined"
+              />
+            </label>
+
+            <label class="grid gap-1 text-sm md:col-span-3">
+              <span class="text-slate-600">{{ t('admin.events.form.eventCodeLabel') }}</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <input
+                  v-model="form.eventCode"
+                  class="max-w-48 rounded border border-slate-200 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider focus:border-slate-400 focus:outline-none"
+                  :class="eventCodeErrorKey ? 'border-rose-400' : ''"
+                  :placeholder="t('admin.events.form.eventCodePlaceholder')"
+                  maxlength="10"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  :disabled="submitting"
+                  @input="form.eventCode = sanitizeEventAccessCode(form.eventCode); eventCodeErrorKey = null"
+                />
+                <button
+                  type="button"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:border-slate-300"
+                  :disabled="submitting"
+                  @click="generateRandomEventCode"
+                >
+                  {{ t('admin.events.form.eventCodeGenerate') }}
+                </button>
+              </div>
+              <p class="text-xs text-slate-500">{{ t('admin.events.form.eventCodeHint') }}</p>
+              <p v-if="eventCodeErrorKey" class="text-xs text-rose-600">{{ t(eventCodeErrorKey) }}</p>
+            </label>
+
+            <div class="md:col-span-3 flex flex-wrap items-center gap-3">
+              <button
+                class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                :disabled="submitting"
+                type="submit"
+              >
+                {{ submitting ? t('admin.events.form.creating') : t('admin.events.form.create') }}
+              </button>
+              <button
+                class="text-sm text-slate-600 underline"
+                type="button"
+                @click="loadEvents"
+              >
+                {{ t('common.refreshList') }}
+              </button>
+            </div>
+          </form>
+
+          <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
+            {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
+          </p>
+          <p v-else-if="dateHintKey" class="mt-3 text-sm text-slate-500">{{ t(dateHintKey) }}</p>
+        </div>
+      </Transition>
     </section>
 
     <section class="space-y-4">
@@ -326,7 +362,7 @@ onMounted(loadEvents)
               </span>
             </div>
             <div class="text-xs text-slate-500">
-              {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+              {{ formatDateRange(event.startDate, event.endDate) }}
             </div>
             <div class="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
               {{ t('common.arrivedSummary', { arrived: event.arrivedCount, total: event.totalCount }) }}

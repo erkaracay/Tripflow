@@ -104,6 +104,25 @@ export const formatTime = (value?: string | null) => {
   return trimmed.length >= 5 ? trimmed.slice(0, 5) : trimmed
 }
 
+export const formatDateRange = (start?: string | null, end?: string | null) => {
+  const startText = formatDate(start)
+  const endText = formatDate(end)
+
+  if (startText === '—' && endText === '—') {
+    return '—'
+  }
+
+  if (startText === '—') {
+    return endText
+  }
+
+  if (endText === '—') {
+    return startText
+  }
+
+  return `${startText} - ${endText}`
+}
+
 const formatDateParts = (date: Date) => {
   const day = date.getDate().toString().padStart(2, '0')
   const month = (date.getMonth() + 1).toString().padStart(2, '0')

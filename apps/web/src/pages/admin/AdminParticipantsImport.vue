@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiDownload, apiGet, apiPostForm } from '../../lib/api'
@@ -64,9 +64,12 @@ const search = ref('')
 const previewTypeFilter = ref<PreviewTypeFilter>('all')
 const previewDirectionFilter = ref<PreviewDirectionFilter>('all')
 const previewSearch = ref('')
+const summarySectionRef = ref<HTMLElement | null>(null)
+const stickyControlsVisible = ref(false)
 
 const retryAfterSeconds = ref(0)
 let retryTimer: ReturnType<typeof setInterval> | null = null
+let summaryObserver: IntersectionObserver | null = null
 
 const summary = computed(() => {
   const current = finalReport.value ?? report.value
@@ -357,6 +360,50 @@ const previewDirectionOptions = computed(() => [
   { value: 'arrival', label: t('admin.participant.flights.tabs.arrival') },
   { value: 'return', label: t('admin.participant.flights.tabs.return') },
 ])
+
+const compactSummaryItems = computed(() => {
+  const current = finalReport.value ?? report.value
+  if (!summary.value || !current) {
+    return []
+  }
+
+  return [
+    { key: 'rows', label: t('admin.import.summary.totalRows'), value: summary.value.totalRows },
+    { key: 'valid', label: t('admin.import.summary.validRows'), value: summary.value.validRows },
+    { key: 'errors', label: t('admin.import.summary.errorRows'), value: summary.value.errorRows },
+    { key: 'warnings', label: t('admin.import.filters.warnings'), value: current.warnings.length },
+  ]
+})
+
+const syncStickyObserver = async () => {
+  summaryObserver?.disconnect()
+  summaryObserver = null
+  stickyControlsVisible.value = false
+
+  if (!summary.value) {
+    return
+  }
+
+  await nextTick()
+
+  if (!summarySectionRef.value || typeof IntersectionObserver === 'undefined') {
+    return
+  }
+
+  summaryObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0]
+      stickyControlsVisible.value = Boolean(entry) && !entry?.isIntersecting
+    },
+    {
+      root: null,
+      threshold: 0.1,
+      rootMargin: '-90px 0px 0px 0px',
+    }
+  )
+
+  summaryObserver.observe(summarySectionRef.value)
+}
 
 const formatBytes = (size: number) => {
   if (size < 1024) {
@@ -723,11 +770,88 @@ void loadEvent()
 
 onBeforeUnmount(() => {
   clearRetryTimer()
+  summaryObserver?.disconnect()
 })
+
+watch(summary, () => {
+  void syncStickyObserver()
+}, { immediate: true })
 </script>
 
 <template>
   <div class="mx-auto max-w-6xl space-y-6">
+    <Transition name="app-section-reveal">
+      <div
+        v-if="stickyControlsVisible && summary"
+        class="sticky top-20 z-30 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span
+              v-for="item in compactSummaryItems"
+              :key="item.key"
+              class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600"
+            >
+              <span>{{ item.label }}</span>
+              <span class="font-semibold text-slate-900">{{ item.value }}</span>
+            </span>
+          </div>
+
+          <div class="ml-auto flex flex-wrap items-center gap-2">
+            <AppSegmentedControl
+              v-model="issueFilter"
+              :options="issueFilterOptions"
+              size="sm"
+              :aria-label="t('admin.import.filters.all')"
+              class-name="w-full sm:w-auto"
+            />
+            <AppSegmentedControl
+              v-model="previewTypeFilter"
+              :options="previewTypeOptions"
+              size="sm"
+              :aria-label="t('admin.import.previewFilters.typeLabel')"
+              class-name="w-full sm:w-auto"
+            />
+            <AppSegmentedControl
+              v-if="previewTypeFilter === 'segment'"
+              v-model="previewDirectionFilter"
+              :options="previewDirectionOptions"
+              size="sm"
+              :aria-label="t('admin.import.previewFilters.directionLabel')"
+              class-name="w-full sm:w-auto"
+            />
+            <input
+              v-model.trim="search"
+              class="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-slate-400 focus:outline-none sm:w-44"
+              :placeholder="t('admin.import.searchPlaceholder')"
+              type="text"
+            />
+            <input
+              v-model.trim="previewSearch"
+              class="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-slate-400 focus:outline-none sm:w-44"
+              :placeholder="t('admin.import.previewFilters.searchPlaceholder')"
+              type="text"
+            />
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="downloadReportCsv"
+            >
+              {{ t('admin.import.downloadReport') }}
+            </button>
+            <button
+              class="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="!canApply"
+              type="button"
+              @click="applyImport"
+            >
+              {{ applyLoading ? t('common.saving') : t('admin.import.applyImport') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <RouterLink
@@ -845,7 +969,7 @@ onBeforeUnmount(() => {
         <p v-if="reportError" class="mt-3 text-sm text-rose-600">{{ reportError }}</p>
 
         <Transition name="app-section-reveal" mode="out-in">
-          <div v-if="summary" class="mt-4 space-y-4">
+          <div v-if="summary" ref="summarySectionRef" class="mt-4 space-y-4">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div class="text-xs text-slate-500">{{ t('admin.import.summary.totalRows') }}</div>

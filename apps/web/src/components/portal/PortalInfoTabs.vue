@@ -992,7 +992,7 @@ const formatCustomValue = (value: unknown): string => {
                 <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
                 <button
                   type="button"
-                  class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                  class="portal-copy-action text-slate-800 focus:outline-none"
                   @click="copyToClipboard(segment.ticketNo ?? '')"
                 >
                   {{ valueOrDash(segment.ticketNo) }}
@@ -1015,7 +1015,7 @@ const formatCustomValue = (value: unknown): string => {
                 <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
                 <button
                   type="button"
-                  class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                  class="portal-copy-action text-slate-800 focus:outline-none"
                   @click="copyToClipboard(segment.pnr ?? '')"
                 >
                   {{ valueOrDash(segment.pnr) }}
@@ -1062,7 +1062,7 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.ticketNoOutbound') }}</span>
             <button
               type="button"
-              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+              class="portal-copy-action text-slate-800 focus:outline-none"
               @click="copyToClipboard((travel?.arrival?.ticketNo ?? travel?.ticketNo) ?? '')"
             >
               {{ valueOrDash(travel?.arrival?.ticketNo ?? travel?.ticketNo) }}
@@ -1085,7 +1085,7 @@ const formatCustomValue = (value: unknown): string => {
             <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
             <button
               type="button"
-              class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+              class="portal-copy-action text-slate-800 focus:outline-none"
               @click="copyToClipboard(travel?.arrival?.pnr ?? '')"
             >
               {{ valueOrDash(travel?.arrival?.pnr) }}
@@ -1140,7 +1140,7 @@ const formatCustomValue = (value: unknown): string => {
                   <span class="text-slate-500">{{ t('portal.docs.ticketNo') }}</span>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                    class="portal-copy-action text-slate-800 focus:outline-none"
                     @click="copyToClipboard(segment.ticketNo ?? '')"
                   >
                     {{ valueOrDash(segment.ticketNo) }}
@@ -1163,7 +1163,7 @@ const formatCustomValue = (value: unknown): string => {
                   <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                    class="portal-copy-action text-slate-800 focus:outline-none"
                     @click="copyToClipboard(segment.pnr ?? '')"
                   >
                     {{ valueOrDash(segment.pnr) }}
@@ -1210,7 +1210,7 @@ const formatCustomValue = (value: unknown): string => {
               <span class="text-slate-500">{{ t('portal.docs.ticketNoReturn') }}</span>
               <button
                 type="button"
-                class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                class="portal-copy-action text-slate-800 focus:outline-none"
                 @click="copyToClipboard(travel?.return?.ticketNo ?? '')"
               >
                 {{ valueOrDash(travel?.return?.ticketNo) }}
@@ -1233,7 +1233,7 @@ const formatCustomValue = (value: unknown): string => {
               <span class="text-slate-500">{{ t('portal.docs.pnr') }}</span>
               <button
                 type="button"
-                class="inline-flex items-center justify-end gap-1.5 font-medium text-slate-800 cursor-pointer hover:underline focus:outline-none focus:underline"
+                class="portal-copy-action text-slate-800 focus:outline-none"
                 @click="copyToClipboard(travel?.return?.pnr ?? '')"
               >
                 {{ valueOrDash(travel?.return?.pnr) }}
@@ -1278,7 +1278,7 @@ const formatCustomValue = (value: unknown): string => {
               :href="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
               target="_blank"
               rel="noreferrer"
-              class="underline"
+              class="portal-inline-action text-slate-800"
             >
               {{ readContentString(hotelTab?.content, 'address') }}
             </a>
@@ -1291,7 +1291,7 @@ const formatCustomValue = (value: unknown): string => {
             <a
               v-if="contentPhone(hotelTab?.content).link"
               :href="contentPhone(hotelTab?.content).link"
-              class="underline"
+              class="portal-inline-action text-slate-800"
             >
               {{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}
             </a>
@@ -1448,7 +1448,7 @@ const formatCustomValue = (value: unknown): string => {
               <a
                 v-if="isPhoneField(field.label, field.value) && buildTelLink(field.value)"
                 :href="buildTelLink(field.value)"
-                class="underline"
+                class="portal-inline-action text-slate-800"
               >
                 {{ formatPhoneDisplay(field.value) || field.value }}
               </a>
@@ -1457,7 +1457,7 @@ const formatCustomValue = (value: unknown): string => {
                 :href="buildMapsLink(field.value)"
                 target="_blank"
                 rel="noreferrer"
-                class="underline"
+                class="portal-inline-action text-slate-800"
               >
                 {{ field.value }}
               </a>

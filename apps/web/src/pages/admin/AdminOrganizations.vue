@@ -40,6 +40,7 @@ const savingOrgId = ref<string | null>(null)
 const archivingOrgId = ref<string | null>(null)
 const restoringOrgId = ref<string | null>(null)
 const purgingOrgId = ref<string | null>(null)
+const purgeOpenOrgId = ref<string | null>(null)
 const purgeConfirm = reactive<Record<string, string>>({})
 const purgeErrorKey = ref<string | null>(null)
 const archivedFilter = computed({
@@ -141,12 +142,18 @@ const purgeOrg = async (org: Organization) => {
       clearSelectedOrgId()
       selectedOrgId.value = null
     }
+    purgeOpenOrgId.value = null
     pushToast({ key: 'toast.orgPurged', tone: 'success' })
   } catch {
     pushToast({ key: 'toast.orgPurgeFailed', tone: 'error' })
   } finally {
     purgingOrgId.value = null
   }
+}
+
+const togglePurgePanel = (orgId: string) => {
+  purgeErrorKey.value = null
+  purgeOpenOrgId.value = purgeOpenOrgId.value === orgId ? null : orgId
 }
 const createOrg = async () => {
   createErrorKey.value = null
@@ -181,6 +188,8 @@ const createOrg = async () => {
 
 const startEdit = (org: Organization) => {
   editingOrgId.value = org.id
+  purgeOpenOrgId.value = null
+  purgeErrorKey.value = null
   editForm.name = org.name
   editForm.slug = org.slug
   editForm.isActive = org.isActive
@@ -188,6 +197,8 @@ const startEdit = (org: Organization) => {
 
 const cancelEdit = () => {
   editingOrgId.value = null
+  purgeOpenOrgId.value = null
+  purgeErrorKey.value = null
 }
 
 const saveEdit = async (org: Organization) => {
@@ -215,6 +226,7 @@ const saveEdit = async (org: Organization) => {
       selectedOrgId.value = null
     }
     editingOrgId.value = null
+    purgeOpenOrgId.value = null
     pushToast({ key: 'toast.orgUpdated', tone: 'success' })
   } catch (err) {
     pushToast({ key: 'toast.orgUpdateFailed', tone: 'error' })
@@ -420,29 +432,68 @@ onMounted(loadOrgs)
           </div>
 
           <div class="md:col-span-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
-            <div class="text-sm font-semibold text-rose-800">{{ t('common.dangerZone') }}</div>
-            <p class="mt-1 text-xs text-rose-700">{{ t('admin.organizations.manage.purgeWarning') }}</p>
-            <p v-if="!org.isDeleted" class="mt-2 text-xs text-rose-700">
-              {{ t('admin.organizations.manage.purgeRequiresArchive') }}
-            </p>
-            <label class="mt-3 grid gap-1 text-xs text-rose-800">
-              <span>{{ t('admin.organizations.manage.purgeConfirmLabel') }}</span>
-              <input
-                v-model.trim="purgeConfirm[org.id]"
-                class="rounded border border-rose-200 bg-white px-3 py-2 text-xs focus:border-rose-400 focus:outline-none"
-                :placeholder="t('admin.organizations.manage.purgeConfirmPlaceholder')"
-                type="text"
-              />
-            </label>
-            <p v-if="purgeErrorKey" class="mt-2 text-xs text-rose-700">{{ t(purgeErrorKey) }}</p>
-            <button
-              class="mt-3 rounded border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="purgingOrgId === org.id || !org.isDeleted"
-              type="button"
-              @click="purgeOrg(org)"
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="text-sm font-semibold text-rose-800">{{ t('common.dangerZone') }}</div>
+                <p class="mt-1 text-xs text-rose-700">{{ t('admin.organizations.manage.purgeWarning') }}</p>
+              </div>
+              <span
+                v-if="org.isDeleted"
+                class="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-medium text-rose-700"
+              >
+                {{ t('common.archived') }}
+              </span>
+            </div>
+
+            <div
+              v-if="!org.isDeleted"
+              class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
             >
-              {{ purgingOrgId === org.id ? t('common.saving') : t('common.purge') }}
-            </button>
+              {{ t('admin.organizations.manage.purgeRequiresArchive') }}
+            </div>
+
+            <div v-else class="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p class="text-xs text-rose-700">{{ t('admin.organizations.manage.purgeRevealHelp') }}</p>
+              <button
+                class="rounded border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:border-rose-300"
+                type="button"
+                @click="togglePurgePanel(org.id)"
+              >
+                {{ purgeOpenOrgId === org.id ? t('admin.organizations.manage.hidePurge') : t('admin.organizations.manage.showPurge') }}
+              </button>
+            </div>
+
+            <Transition name="app-section-reveal" mode="out-in">
+              <div v-if="purgeOpenOrgId === org.id" class="mt-4 rounded-lg border border-rose-200 bg-white p-4">
+                <label class="grid gap-1 text-xs text-rose-800">
+                  <span>{{ t('admin.organizations.manage.purgeConfirmLabel') }}</span>
+                  <input
+                    v-model.trim="purgeConfirm[org.id]"
+                    class="rounded border border-rose-200 bg-white px-3 py-2 text-xs focus:border-rose-400 focus:outline-none"
+                    :placeholder="t('admin.organizations.manage.purgeConfirmPlaceholder')"
+                    type="text"
+                  />
+                </label>
+                <p v-if="purgeErrorKey" class="mt-2 text-xs text-rose-700">{{ t(purgeErrorKey) }}</p>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    class="rounded border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="purgingOrgId === org.id || !isPurgeConfirmValid(org)"
+                    type="button"
+                    @click="purgeOrg(org)"
+                  >
+                    {{ purgingOrgId === org.id ? t('common.saving') : t('common.purge') }}
+                  </button>
+                  <button
+                    class="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+                    type="button"
+                    @click="togglePurgePanel(org.id)"
+                  >
+                    {{ t('common.cancel') }}
+                  </button>
+                </div>
+              </div>
+            </Transition>
           </div>
         </div>
         </Transition>

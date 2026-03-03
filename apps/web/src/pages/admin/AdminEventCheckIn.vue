@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { apiGet, apiPatchWithPayload, apiPost, apiPostWithPayload } from '../../lib/api'
 import { getAuthRole } from '../../lib/auth'
 import { normalizeQrCode } from '../../lib/qr'
-import { formatUtcToLocal } from '../../lib/formatters'
+import { formatDateRange, formatUtcToLocal } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizeCheckInCode, normalizePhone } from '../../lib/normalize'
 import { useToast } from '../../lib/toast'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
@@ -610,7 +610,7 @@ onMounted(() => {
           </div>
           <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('admin.checkIn.title') }}</h1>
           <p class="text-sm text-slate-500" v-if="event">
-            {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+            {{ formatDateRange(event.startDate, event.endDate) }}
           </p>
         </div>
         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">

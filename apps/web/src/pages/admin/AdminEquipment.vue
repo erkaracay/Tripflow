@@ -11,7 +11,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import CopyIcon from '../../components/icons/CopyIcon.vue'
-import { formatUtcToLocal } from '../../lib/formatters'
+import { formatDateRange, formatUtcToLocal } from '../../lib/formatters'
 import type {
   Event as EventDto,
   EventItem,
@@ -421,7 +421,7 @@ watch(selectedItemId, () => {
       </div>
       <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('equipment.title') }}</h1>
       <p v-if="event" class="text-sm text-slate-500">
-        {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+        {{ formatDateRange(event.startDate, event.endDate) }}
       </p>
     </div>
 

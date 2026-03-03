@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
+import { formatDate, formatDateRange } from '../../lib/formatters'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import ErrorState from '../ui/ErrorState.vue'
@@ -513,7 +514,7 @@ onMounted(loadAll)
         </RouterLink>
         <h1 class="mt-2 text-2xl font-semibold">{{ event?.name ?? t('common.event') }}</h1>
         <p class="text-sm text-slate-500" v-if="event">
-          {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+          {{ formatDateRange(event.startDate, event.endDate) }}
         </p>
       </div>
       <div class="text-sm text-slate-600">
@@ -529,7 +530,7 @@ onMounted(loadAll)
       @retry="loadAll"
     />
 
-    <div v-else class="grid gap-6 lg:grid-cols-[280px_1fr]">
+    <div v-else class="grid gap-6 lg:grid-cols-[340px_1fr]">
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.program.days.title') }}</h2>
@@ -553,41 +554,53 @@ onMounted(loadAll)
           >
             <button class="w-full text-left" type="button" @click="selectedDayId = day.id">
               <div class="font-semibold">{{ day.title || t('admin.program.days.fallback', { day: index + 1 }) }}</div>
-              <div class="text-[11px] opacity-70">{{ day.date }}</div>
+              <div class="text-[11px] opacity-70">{{ formatDate(day.date) }}</div>
               <div class="mt-1 text-[11px] opacity-70">
                 {{ t('admin.program.days.count', { count: day.activityCount }) }}
               </div>
             </button>
-            <div class="mt-2 flex flex-wrap gap-1">
+            <div class="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               <button
-                class="rounded border border-white/30 px-2 py-1 text-[10px]"
+                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
                 type="button"
                 :disabled="index === 0"
                 @click="moveDay(index, -1)"
               >
-                {{ t('admin.program.days.up') }}
+                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
+                  <path d="M8 3.2 3.5 7.7l1 1L7.25 6v6.8h1.5V6l2.75 2.7 1-1L8 3.2Z" />
+                </svg>
+                {{ t('common.moveUp') }}
               </button>
               <button
-                class="rounded border border-white/30 px-2 py-1 text-[10px]"
+                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
                 type="button"
                 :disabled="index === days.length - 1"
                 @click="moveDay(index, 1)"
               >
-                {{ t('admin.program.days.down') }}
+                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
+                  <path d="M7.25 3.2V10l-2.75-2.7-1 1L8 12.8l4.5-4.5-1-1L8.75 10V3.2h-1.5Z" />
+                </svg>
+                {{ t('common.moveDown') }}
               </button>
               <button
-                class="rounded border border-white/30 px-2 py-1 text-[10px]"
+                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium"
                 type="button"
                 @click="openEditDay(day, $event)"
               >
-                {{ t('admin.program.days.edit') }}
+                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
+                  <path d="m11.9 2.2 1.9 1.9a1.2 1.2 0 0 1 0 1.7L6.2 13.4 3 14l.6-3.2 7.6-7.6a1.2 1.2 0 0 1 1.7 0Zm-7.3 9.2-.2 1.1 1.1-.2 7.1-7.1-1-1-7.1 7.2Z" />
+                </svg>
+                {{ t('common.edit') }}
               </button>
               <button
-                class="rounded border border-white/30 px-2 py-1 text-[10px]"
+                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium"
                 type="button"
                 @click="confirmDeleteDay(day)"
               >
-                {{ t('admin.program.days.delete') }}
+                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
+                  <path d="M6.5 2h3l.5 1H13v1.4H3V3h2.5l.5-1Zm-1 3h1.4v6.2H5.5V5Zm3 0h1.4v6.2H8.5V5Zm3 0h-1.4v6.2h1.4V5ZM4.2 12.6h7.6V14H4.2v-1.4Z" />
+                </svg>
+                {{ t('common.delete') }}
               </button>
             </div>
           </li>

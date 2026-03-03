@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
+import { formatDate, formatDateRange } from '../../lib/formatters'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
@@ -173,7 +174,7 @@ onMounted(loadData)
         <div>
           <h1 class="text-2xl font-semibold text-slate-900">{{ event?.name ?? t('common.event') }}</h1>
           <p v-if="event" class="mt-1 text-sm text-slate-500">
-            {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+            {{ formatDateRange(event.startDate, event.endDate) }}
           </p>
           <p class="mt-2 text-sm text-slate-500">{{ t('guide.program.subtitle') }}</p>
         </div>
@@ -217,7 +218,7 @@ onMounted(loadData)
             type="button"
             @click="selectDay(index)"
           >
-            <div class="text-xs uppercase tracking-wide opacity-80">{{ day.date }}</div>
+            <div class="text-xs uppercase tracking-wide opacity-80">{{ formatDate(day.date) }}</div>
             <div class="font-medium">
               {{ day.title || t('portal.schedule.dayFallback', { day: index + 1 }) }}
             </div>
@@ -230,7 +231,7 @@ onMounted(loadData)
               <h3 class="text-lg font-semibold">
                 {{ selectedDay.title || t('portal.schedule.dayFallback', { day: selectedDayIndex + 1 }) }}
               </h3>
-              <p class="text-sm text-slate-500">{{ selectedDay.date }}</p>
+              <p class="text-sm text-slate-500">{{ formatDate(selectedDay.date) }}</p>
             </div>
           </div>
 

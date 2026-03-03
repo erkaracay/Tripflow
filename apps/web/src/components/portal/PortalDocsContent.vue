@@ -548,7 +548,7 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
                       :href="buildMapsLink(readContentString(activeTab.content, 'address'))"
                       target="_blank"
                       rel="noreferrer"
-                      class="underline"
+                      class="portal-inline-action text-slate-800"
                     >
                       {{ readContentString(activeTab.content, 'address') }}
                     </a>
@@ -561,7 +561,7 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
                     <a
                       v-if="contentPhone(activeTab.content).link"
                       :href="contentPhone(activeTab.content).link"
-                      class="underline"
+                      class="portal-inline-action text-slate-800"
                     >
                       {{ contentPhone(activeTab.content).display || contentPhone(activeTab.content).raw }}
                     </a>
@@ -631,7 +631,7 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
                     <a
                       v-if="isPhoneField(field.label, field.value) && buildTelLink(field.value)"
                       :href="buildTelLink(field.value)"
-                      class="underline"
+                      class="portal-inline-action text-slate-800"
                     >
                       {{ formatPhoneDisplay(field.value) || field.value }}
                     </a>
@@ -640,7 +640,7 @@ const isInsuranceTab = (tab: PortalDocTabDto) => normalizeType(tab.type) === 'in
                       :href="buildMapsLink(field.value)"
                       target="_blank"
                       rel="noreferrer"
-                      class="underline"
+                      class="portal-inline-action text-slate-800"
                     >
                       {{ field.value }}
                     </a>

@@ -357,6 +357,10 @@
     "events": {
       "title": "Events",
       "subtitle": "Create an event, add participants, and open the portal.",
+      "createTitle": "New event",
+      "createSubtitle": "Create a new event without overwhelming the list.",
+      "showCreate": "Add new event",
+      "hideCreate": "Hide form",
       "form": {
         "nameLabel": "Event name",
         "namePlaceholder": "Cappadocia Spring 2025",
@@ -552,6 +556,9 @@
       "resetAllActivityConfirm": "Are you sure you want to reset all activity check-ins?",
       "deleteAllConfirm": "Delete all participants in this event?",
       "addTitle": "Add participant",
+      "addSubtitle": "Add a new participant without overwhelming the list.",
+      "showAdd": "Add new participant",
+      "hideAdd": "Hide form",
       "detailsButton": "Details",
       "exportExcel": "Download Excel",
       "exportSegmentsPartial": "Flight segments could not be loaded for {count} participants. Legacy flight fields were used as fallback for those rows.",
@@ -747,6 +754,7 @@
       "newTab": "New Tab",
       "editTab": "Edit tab",
       "preview": "Preview",
+      "participantView": "Participant view",
       "previewTitle": "Participant preview",
       "previewFallbackTitle": "Tab preview",
       "tabTitle": "Title",
@@ -1157,6 +1165,9 @@
         "confirmDelete": "Delete {name}?",
         "purgeWarning": "Permanent deletion removes the organization and all related data.",
         "purgeRequiresArchive": "Archive the organization before permanent deletion.",
+        "purgeRevealHelp": "Open permanent deletion only if you are completely sure.",
+        "showPurge": "Show permanent delete",
+        "hidePurge": "Hide permanent delete",
         "purgeConfirmLabel": "Type SIL or the org slug to confirm",
         "purgeConfirmPlaceholder": "SIL or org slug",
         "purgeConfirmMismatch": "Confirmation text does not match."

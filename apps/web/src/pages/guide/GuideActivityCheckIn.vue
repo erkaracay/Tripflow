@@ -12,7 +12,7 @@ import QrScannerModal from '../../components/QrScannerModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
-import { formatTime, formatUtcToLocal } from '../../lib/formatters'
+import { formatDateRange, formatTime, formatUtcToLocal } from '../../lib/formatters'
 import type {
   Event as EventDto,
   EventActivity,
@@ -518,7 +518,7 @@ watch(selectedActivityId, () => {
         {{ selectedActivity?.title ?? event?.name ?? t('activityCheckIn.title') }}
       </h1>
       <p v-if="event" class="mt-1 text-sm text-slate-500">
-        {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+        {{ formatDateRange(event.startDate, event.endDate) }}
       </p>
     </div>
 

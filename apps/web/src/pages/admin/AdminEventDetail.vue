@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPostWithHeaders, apiPut, apiPutWithHeaders, buildUrl } from '../../lib/api'
 import { getAuthRole, getSelectedOrgId } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
-import { formatBaggage } from '../../lib/formatters'
+import { formatBaggage, formatDateRange } from '../../lib/formatters'
 import {
   formatPhoneDisplay,
   normalizeEmail,
@@ -57,6 +57,9 @@ const eventForm = reactive({
 })
 const loading = ref(true)
 const submitting = ref(false)
+const participantAddOpen = ref(true)
+const participantAddInitialized = ref(false)
+const participantAddTransitionReady = ref(false)
 const loadErrorKey = ref<string | null>(null)
 const loadErrorMessage = ref<string | null>(null)
 const formErrorKey = ref<string | null>(null)
@@ -115,6 +118,7 @@ const { pushToast } = useToast()
 const isSuperAdmin = computed(() => {
   return getAuthRole() === 'SuperAdmin'
 })
+const participantAddStorageKey = computed(() => `tripflow:event:${eventId.value}:participant-add-open`)
 
 const purgeConfirmValid = computed(() => {
   if (!event.value) {
@@ -630,6 +634,11 @@ const loadEvent = async () => {
     portal.value = portalData
     guideIds.value = eventData.guideUserIds ?? []
     setPortalForm(portalData)
+    if (!participantAddInitialized.value) {
+      const stored = globalThis.localStorage?.getItem(participantAddStorageKey.value)
+      participantAddOpen.value = stored === null ? participantsData.length === 0 : stored === 'true'
+      participantAddInitialized.value = true
+    }
   } catch (err) {
     loadErrorMessage.value = err instanceof Error ? err.message : null
     if (!loadErrorMessage.value) {
@@ -638,6 +647,10 @@ const loadEvent = async () => {
     return
   } finally {
     loading.value = false
+    if (!participantAddTransitionReady.value) {
+      await nextTick()
+      participantAddTransitionReady.value = true
+    }
   }
 
   try {
@@ -705,32 +718,38 @@ const addParticipant = async () => {
   const lastName = normalizeName(form.lastName)
   if (firstName.length < 1 || lastName.length < 1) {
     formErrorKey.value = 'validation.firstLastNameRequired'
+    participantAddOpen.value = true
     return
   }
 
   const { normalized: normalizedPhone, errorKey } = normalizePhone(form.phone)
   if (errorKey) {
     phoneErrorKey.value = errorKey
+    participantAddOpen.value = true
     return
   }
   if (!normalizedPhone) {
     phoneErrorKey.value = 'validation.phone.required'
+    participantAddOpen.value = true
     return
   }
 
   const tcNo = form.tcNo.trim()
   if (!tcNo) {
     tcNoErrorKey.value = 'validation.tcNoRequired'
+    participantAddOpen.value = true
     return
   }
 
   if (!form.birthDate) {
     formErrorKey.value = 'validation.birthDateRequired'
+    participantAddOpen.value = true
     return
   }
 
   if (!form.gender) {
     formErrorKey.value = 'validation.genderRequired'
+    participantAddOpen.value = true
     return
   }
 
@@ -769,6 +788,7 @@ const addParticipant = async () => {
     if (!formErrorMessage.value) {
       formErrorKey.value = 'errors.participant.create'
     }
+    participantAddOpen.value = true
     pushToast({ key: 'toast.participantAddFailed', tone: 'error' })
   } finally {
     submitting.value = false
@@ -1451,6 +1471,17 @@ watch(
   }
 )
 
+watch(
+  [participantAddOpen, participantAddInitialized, participantAddStorageKey],
+  ([open, initialized, storageKey]) => {
+    if (!initialized) {
+      return
+    }
+
+    globalThis.localStorage?.setItem(storageKey, String(open))
+  }
+)
+
 onMounted(loadEvent)
 </script>
 
@@ -1482,7 +1513,7 @@ onMounted(loadEvent)
         </span>
       </div>
       <p v-if="event" class="whitespace-nowrap text-sm text-slate-500">
-        {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+        {{ formatDateRange(event.startDate, event.endDate) }}
       </p>
       <nav class="flex flex-wrap items-center gap-2" aria-label="Event sections">
         <RouterLink
@@ -1720,97 +1751,114 @@ onMounted(loadEvent)
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 class="text-lg font-semibold">{{ t('admin.participants.addTitle') }}</h2>
-        <form class="mt-4 grid gap-4 md:grid-cols-3" @submit.prevent="addParticipant">
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.firstName') }}</span>
-            <input
-              v-model.trim="form.firstName"
-              ref="nameInput"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :placeholder="t('admin.participants.form.firstNamePlaceholder')"
-              type="text"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.lastName') }}</span>
-            <input
-              v-model.trim="form.lastName"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :placeholder="t('admin.participants.form.lastNamePlaceholder')"
-              type="text"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.tcNo') }}</span>
-            <input
-              v-model.trim="form.tcNo"
-              class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="tcNoErrorKey ? 'border-rose-300' : 'border-slate-200'"
-              :placeholder="t('admin.participants.form.tcNoPlaceholder')"
-              inputmode="numeric"
-              type="text"
-              @input="handleTcNoInput"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.birthDate') }}</span>
-            <input
-              v-model="form.birthDate"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              type="date"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.email') }}</span>
-            <input
-              v-model.trim="form.email"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :placeholder="t('admin.participants.form.emailPlaceholder')"
-              type="email"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.phone') }}</span>
-            <input
-              v-model.trim="form.phone"
-              class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="phoneErrorKey ? 'border-rose-300' : 'border-slate-200'"
-              :placeholder="t('admin.participants.form.phonePlaceholder')"
-              inputmode="tel"
-              maxlength="15"
-              type="tel"
-              @input="handlePhoneInput"
-              @blur="handlePhoneBlur"
-            />
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
-            <select
-              v-model="form.gender"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            >
-              <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
-              <option v-for="option in genderOptions" :key="option.value" :value="option.value">
-                {{ t(option.label) }}
-              </option>
-            </select>
-          </label>
-          <div class="md:col-span-3">
-            <button
-              class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              :disabled="submitting"
-              type="submit"
-            >
-              {{ submitting ? t('admin.participants.form.adding') : t('admin.participants.form.add') }}
-            </button>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.participants.addTitle') }}</h2>
+            <p class="text-xs text-slate-500">{{ t('admin.participants.addSubtitle') }}</p>
           </div>
-        </form>
-        <p v-if="phoneErrorKey" class="mt-2 text-sm text-rose-600">{{ t(phoneErrorKey) }}</p>
-        <p v-if="tcNoErrorKey" class="mt-2 text-sm text-rose-600">{{ t(tcNoErrorKey) }}</p>
-        <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
-          {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
-        </p>
+          <button
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+            type="button"
+            @click="participantAddOpen = !participantAddOpen"
+          >
+            {{ participantAddOpen ? t('admin.participants.hideAdd') : t('admin.participants.showAdd') }}
+          </button>
+        </div>
+
+        <Transition name="app-section-reveal" mode="out-in" :css="participantAddTransitionReady">
+          <div v-if="participantAddOpen" class="mt-4">
+            <form class="grid gap-4 md:grid-cols-3" @submit.prevent="addParticipant">
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.firstName') }}</span>
+                <input
+                  v-model.trim="form.firstName"
+                  ref="nameInput"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :placeholder="t('admin.participants.form.firstNamePlaceholder')"
+                  type="text"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.lastName') }}</span>
+                <input
+                  v-model.trim="form.lastName"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :placeholder="t('admin.participants.form.lastNamePlaceholder')"
+                  type="text"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.tcNo') }}</span>
+                <input
+                  v-model.trim="form.tcNo"
+                  class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :class="tcNoErrorKey ? 'border-rose-300' : 'border-slate-200'"
+                  :placeholder="t('admin.participants.form.tcNoPlaceholder')"
+                  inputmode="numeric"
+                  type="text"
+                  @input="handleTcNoInput"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.birthDate') }}</span>
+                <input
+                  v-model="form.birthDate"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  type="date"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.email') }}</span>
+                <input
+                  v-model.trim="form.email"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :placeholder="t('admin.participants.form.emailPlaceholder')"
+                  type="email"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.phone') }}</span>
+                <input
+                  v-model.trim="form.phone"
+                  class="rounded border bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  :class="phoneErrorKey ? 'border-rose-300' : 'border-slate-200'"
+                  :placeholder="t('admin.participants.form.phonePlaceholder')"
+                  inputmode="tel"
+                  maxlength="15"
+                  type="tel"
+                  @input="handlePhoneInput"
+                  @blur="handlePhoneBlur"
+                />
+              </label>
+              <label class="grid gap-1 text-sm">
+                <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
+                <select
+                  v-model="form.gender"
+                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                >
+                  <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
+                  <option v-for="option in genderOptions" :key="option.value" :value="option.value">
+                    {{ t(option.label) }}
+                  </option>
+                </select>
+              </label>
+              <div class="md:col-span-3">
+                <button
+                  class="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                  :disabled="submitting"
+                  type="submit"
+                >
+                  {{ submitting ? t('admin.participants.form.adding') : t('admin.participants.form.add') }}
+                </button>
+              </div>
+            </form>
+            <p v-if="phoneErrorKey" class="mt-2 text-sm text-rose-600">{{ t(phoneErrorKey) }}</p>
+            <p v-if="tcNoErrorKey" class="mt-2 text-sm text-rose-600">{{ t(tcNoErrorKey) }}</p>
+            <p v-if="formErrorKey || formErrorMessage" class="mt-3 text-sm text-rose-600">
+              {{ formErrorKey ? t(formErrorKey) : formErrorMessage }}
+            </p>
+          </div>
+        </Transition>
       </section>
 
       <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

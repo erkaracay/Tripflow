@@ -357,6 +357,10 @@
     "events": {
       "title": "Etkinlikler",
       "subtitle": "Etkinlik oluştur, katılımcı ekle ve portalı aç.",
+      "createTitle": "Yeni etkinlik",
+      "createSubtitle": "Listeyi dağıtmadan yeni etkinlik oluştur.",
+      "showCreate": "Yeni etkinlik ekle",
+      "hideCreate": "Formu kapat",
       "form": {
         "nameLabel": "Etkinlik adı",
         "namePlaceholder": "Kapadokya Bahar 2025",
@@ -537,6 +541,9 @@
       "resetAllActivityConfirm": "Tüm aktivite yoklamalarını sıfırlamak istediğinizden emin misiniz?",
       "deleteAllConfirm": "Bu etkinlikteki tüm katılımcılar silinsin mi?",
       "addTitle": "Katılımcı ekle",
+      "addSubtitle": "Listeyi dağıtmadan yeni katılımcı ekleyin.",
+      "showAdd": "Yeni katılımcı ekle",
+      "hideAdd": "Formu kapat",
       "detailsButton": "Bilgiler",
       "exportExcel": "Excel indir",
       "exportSegmentsPartial": "{count} katılımcının uçuş segmentleri alınamadı. Bu satırlarda eski alanlardan geri dönüş kullanıldı.",
@@ -739,6 +746,7 @@
       "newTab": "Yeni Sekme",
       "editTab": "Sekmeyi düzenle",
       "preview": "Önizle",
+      "participantView": "Katılımcı görünümü",
       "previewTitle": "Katılımcı önizlemesi",
       "previewFallbackTitle": "Sekme önizlemesi",
       "tabTitle": "Başlık",
@@ -1144,6 +1152,9 @@
         "confirmDelete": "{name} silinsin mi?",
         "purgeWarning": "Kalıcı silme, organizasyon ve bağlı tüm verileri kaldırır.",
         "purgeRequiresArchive": "Kalıcı silme için önce organizasyonu arşivleyin.",
+        "purgeRevealHelp": "Kalıcı silme alanını yalnız kesin eminsen aç.",
+        "showPurge": "Kalıcı silme alanını aç",
+        "hidePurge": "Kalıcı silmeyi gizle",
         "purgeConfirmLabel": "Onay için SIL veya slug yazın",
         "purgeConfirmPlaceholder": "SIL veya slug",
         "purgeConfirmMismatch": "Onay metni eşleşmiyor."

@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
+import { formatDateRange } from '../../lib/formatters'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import type { EventListItem } from '../../types'
@@ -72,7 +73,7 @@ onMounted(loadEvents)
             {{ t('guide.events.organizationLabel', { name: event.organizationName }) }}
           </div>
           <div class="text-xs text-slate-500">
-            {{ t('common.dateRange', { start: event.startDate, end: event.endDate }) }}
+            {{ formatDateRange(event.startDate, event.endDate) }}
           </div>
           <div class="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
             {{ t('common.arrivedSummary', { arrived: event.arrivedCount, total: event.totalCount }) }}
@@ -92,7 +93,7 @@ onMounted(loadEvents)
             {{ t('guide.events.openActivityCheckIn') }}
           </RouterLink>
           <RouterLink
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:border-slate-300 sm:w-auto"
+            class="w-full px-2 py-2 text-center text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-slate-900 hover:underline sm:w-auto"
             :to="`/guide/events/${event.id}/program`"
           >
             {{ t('guide.events.openProgram') }}

@@ -606,7 +606,14 @@ onMounted(() => {
           <tbody class="divide-y divide-slate-200">
             <tr v-for="tab in sortedTabs" :key="tab.id" class="text-slate-700">
               <td class="px-4 py-3">{{ tab.sortOrder }}</td>
-              <td class="px-4 py-3 font-medium text-slate-900">{{ tab.title }}</td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium text-slate-900">{{ tab.title }}</span>
+                  <span class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                    {{ t('admin.docs.participantView') }}
+                  </span>
+                </div>
+              </td>
               <td class="px-4 py-3">{{ formatType(tab.type) }}</td>
               <td class="px-4 py-3">
                 <label class="inline-flex items-center gap-2 text-xs">
@@ -624,14 +631,18 @@ onMounted(() => {
               <td class="px-4 py-3 text-right">
                 <div class="flex justify-end gap-2">
                   <button
-                    class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
+                    class="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
                     type="button"
                     @click="openPreview(tab)"
                   >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M1.75 10s2.75-5 8.25-5 8.25 5 8.25 5-2.75 5-8.25 5-8.25-5-8.25-5Z" />
+                      <circle cx="10" cy="10" r="2.5" />
+                    </svg>
                     {{ t('admin.docs.preview') }}
                   </button>
                   <button
-                    class="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
+                    class="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-900 hover:border-slate-400"
                     type="button"
                     @click="openEdit(tab)"
                   >
