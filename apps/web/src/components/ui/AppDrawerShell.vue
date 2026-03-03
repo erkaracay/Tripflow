@@ -9,8 +9,8 @@ const props = withDefaults(
     overlayClass?: string
     contentClass?: string
     labelledBy?: string
-    desktopWidth?: 'md' | 'lg' | 'xl'
-    desktopBreakpoint?: 'lg' | 'xl'
+    desktopWidth?: 'sm' | 'md' | 'lg' | 'xl'
+    desktopBreakpoint?: 'md' | 'lg' | 'xl'
   }>(),
   {
     closeOnOverlay: true,
@@ -41,29 +41,50 @@ const getScrollLockState = () => {
 }
 
 const desktopPanelClass = computed(() => {
-  const widthClass =
-    props.desktopWidth === 'md'
-      ? 'max-w-md'
-      : props.desktopWidth === 'xl'
-        ? 'max-w-2xl'
-        : 'max-w-xl'
-
   if (props.desktopBreakpoint === 'xl') {
-    return `xl:h-full xl:${widthClass} xl:rounded-none xl:rounded-l-3xl`
+    return props.desktopWidth === 'sm'
+      ? 'xl:h-full xl:max-w-sm xl:rounded-none xl:rounded-l-3xl'
+      : props.desktopWidth === 'md'
+        ? 'xl:h-full xl:max-w-md xl:rounded-none xl:rounded-l-3xl'
+        : props.desktopWidth === 'xl'
+          ? 'xl:h-full xl:max-w-2xl xl:rounded-none xl:rounded-l-3xl'
+          : 'xl:h-full xl:max-w-xl xl:rounded-none xl:rounded-l-3xl'
   }
 
-  return `lg:h-full lg:${widthClass} lg:rounded-none lg:rounded-l-3xl`
+  if (props.desktopBreakpoint === 'md') {
+    return props.desktopWidth === 'sm'
+      ? 'md:h-full md:max-w-sm md:rounded-none md:rounded-l-3xl'
+      : props.desktopWidth === 'md'
+        ? 'md:h-full md:max-w-md md:rounded-none md:rounded-l-3xl'
+        : props.desktopWidth === 'xl'
+          ? 'md:h-full md:max-w-2xl md:rounded-none md:rounded-l-3xl'
+          : 'md:h-full md:max-w-xl md:rounded-none md:rounded-l-3xl'
+  }
+
+  return props.desktopWidth === 'sm'
+    ? 'lg:h-full lg:max-w-sm lg:rounded-none lg:rounded-l-3xl'
+    : props.desktopWidth === 'md'
+      ? 'lg:h-full lg:max-w-md lg:rounded-none lg:rounded-l-3xl'
+      : props.desktopWidth === 'xl'
+        ? 'lg:h-full lg:max-w-2xl lg:rounded-none lg:rounded-l-3xl'
+        : 'lg:h-full lg:max-w-xl lg:rounded-none lg:rounded-l-3xl'
 })
 
 const desktopContainerClass = computed(() =>
   props.desktopBreakpoint === 'xl'
     ? 'xl:items-stretch xl:justify-end'
-    : 'lg:items-stretch lg:justify-end'
+    : props.desktopBreakpoint === 'md'
+      ? 'md:items-stretch md:justify-end'
+      : 'lg:items-stretch lg:justify-end'
 )
 
 const panelClassName = computed(() => [
   'app-drawer-panel relative z-10 flex h-[90vh] w-full flex-col rounded-t-3xl bg-white shadow-2xl',
-  props.desktopBreakpoint === 'xl' ? 'app-drawer-breakpoint-xl' : 'app-drawer-breakpoint-lg',
+  props.desktopBreakpoint === 'xl'
+    ? 'app-drawer-breakpoint-xl'
+    : props.desktopBreakpoint === 'md'
+      ? 'app-drawer-breakpoint-md'
+      : 'app-drawer-breakpoint-lg',
   desktopPanelClass.value,
   props.panelClass,
 ])

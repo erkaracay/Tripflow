@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
+import FlightPanelHelperModal from '../../components/admin/FlightPanelHelperModal.vue'
 import { formatDate } from '../../lib/formatters'
 import {
   buildFlightSegmentsSheetRows,
@@ -243,13 +244,21 @@ onMounted(loadEvent)
           {{ eventError }}
         </p>
       </div>
-      <button
-        class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
-        type="button"
-        @click="exportExcel"
-      >
-        {{ t('admin.participantsTable.exportExcel') }}
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <FlightPanelHelperModal
+          :event-id="eventId"
+          :initial-query="searchQuery"
+          :initial-status="status"
+          @applied="fetchTable"
+        />
+        <button
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+          type="button"
+          @click="exportExcel"
+        >
+          {{ t('admin.participantsTable.exportExcel') }}
+        </button>
+      </div>
     </div>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

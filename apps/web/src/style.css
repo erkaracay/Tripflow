@@ -87,6 +87,13 @@
   transform: translateY(16px);
 }
 
+@media (min-width: 768px) {
+  .app-drawer-enter-from .app-drawer-panel.app-drawer-breakpoint-md,
+  .app-drawer-leave-to .app-drawer-panel.app-drawer-breakpoint-md {
+    transform: translateX(20px);
+  }
+}
+
 @media (min-width: 1024px) {
   .app-drawer-enter-from .app-drawer-panel.app-drawer-breakpoint-lg,
   .app-drawer-leave-to .app-drawer-panel.app-drawer-breakpoint-lg {

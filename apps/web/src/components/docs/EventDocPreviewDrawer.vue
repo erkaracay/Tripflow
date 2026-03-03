@@ -192,7 +192,8 @@ const hasVisibleContent = computed(() => {
 <template>
   <AppDrawerShell
     :open="open"
-    desktop-width="xl"
+    desktop-width="md"
+    desktop-breakpoint="md"
     content-class="z-[60]"
     labelled-by="event-doc-preview-title"
     @close="emit('close')"

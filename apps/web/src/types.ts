@@ -167,6 +167,28 @@ export type FlightSegment = {
   cabinBaggage?: string | null
 }
 
+export type BulkApplyFlightSegmentsSegments = {
+  Arrival?: FlightSegment[] | null
+  Return?: FlightSegment[] | null
+}
+
+export type BulkApplyFlightSegmentsRequest = {
+  participantIds: string[]
+  applyDirections: Array<'Arrival' | 'Return'>
+  segments: BulkApplyFlightSegmentsSegments
+  replaceMode: 'ReplaceDirection'
+}
+
+export type BulkApplyFlightSegmentsResponse = {
+  affectedCount: number
+  applied: {
+    Arrival?: number | null
+    Return?: number | null
+  }
+}
+
+export type FlightPanelHelperDirection = 'Arrival' | 'Return'
+
 export type ParticipantTableItem = {
   id: string
   firstName: string
@@ -180,6 +202,8 @@ export type ParticipantTableItem = {
   checkInCode: string
   arrived: boolean
   arrivedAt?: string | null
+  hasArrivalSegments?: boolean
+  hasReturnSegments?: boolean
   details?: ParticipantDetails | null
 }
 

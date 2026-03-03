@@ -1727,6 +1727,7 @@ internal static class EventsHandlers
         string eventId,
         string? query,
         string? status,
+        string? flightFilter,
         int? page,
         int? pageSize,
         string? sort,
@@ -1806,6 +1807,84 @@ internal static class EventsHandlers
                     c.EventId == id && c.OrganizationId == orgId && c.ParticipantId == x.Id));
         }
 
+        var flightFilterValue = (flightFilter ?? "all").Trim().ToLowerInvariant();
+        if (flightFilterValue is "no_flights" or "no_arrival" or "no_return")
+        {
+            participantsQuery = flightFilterValue switch
+            {
+                "no_flights" => participantsQuery.Where(x =>
+                    !db.ParticipantFlightSegments.Any(segment =>
+                        segment.EventId == id
+                        && segment.OrganizationId == orgId
+                        && segment.ParticipantId == x.Id)
+                    && (x.Details == null || (
+                        x.Details.ArrivalAirline == null
+                        && x.Details.ArrivalDepartureAirport == null
+                        && x.Details.ArrivalArrivalAirport == null
+                        && x.Details.ArrivalFlightCode == null
+                        && x.Details.ArrivalFlightDate == null
+                        && x.Details.ArrivalDepartureTime == null
+                        && x.Details.ArrivalArrivalTime == null
+                        && x.Details.ArrivalPnr == null
+                        && x.Details.ArrivalTicketNo == null
+                        && x.Details.ArrivalBaggagePieces == null
+                        && x.Details.ArrivalBaggageTotalKg == null
+                        && x.Details.ArrivalCabinBaggage == null
+                        && x.Details.ReturnAirline == null
+                        && x.Details.ReturnDepartureAirport == null
+                        && x.Details.ReturnArrivalAirport == null
+                        && x.Details.ReturnFlightCode == null
+                        && x.Details.ReturnFlightDate == null
+                        && x.Details.ReturnDepartureTime == null
+                        && x.Details.ReturnArrivalTime == null
+                        && x.Details.ReturnPnr == null
+                        && x.Details.ReturnTicketNo == null
+                        && x.Details.ReturnBaggagePieces == null
+                        && x.Details.ReturnBaggageTotalKg == null
+                        && x.Details.ReturnCabinBaggage == null)))
+                ,
+                "no_arrival" => participantsQuery.Where(x =>
+                    !db.ParticipantFlightSegments.Any(segment =>
+                        segment.EventId == id
+                        && segment.OrganizationId == orgId
+                        && segment.ParticipantId == x.Id
+                        && segment.Direction == ParticipantFlightSegmentDirection.Arrival)
+                    && (x.Details == null || (
+                        x.Details.ArrivalAirline == null
+                        && x.Details.ArrivalDepartureAirport == null
+                        && x.Details.ArrivalArrivalAirport == null
+                        && x.Details.ArrivalFlightCode == null
+                        && x.Details.ArrivalFlightDate == null
+                        && x.Details.ArrivalDepartureTime == null
+                        && x.Details.ArrivalArrivalTime == null
+                        && x.Details.ArrivalPnr == null
+                        && x.Details.ArrivalTicketNo == null
+                        && x.Details.ArrivalBaggagePieces == null
+                        && x.Details.ArrivalBaggageTotalKg == null
+                        && x.Details.ArrivalCabinBaggage == null)))
+                ,
+                _ => participantsQuery.Where(x =>
+                    !db.ParticipantFlightSegments.Any(segment =>
+                        segment.EventId == id
+                        && segment.OrganizationId == orgId
+                        && segment.ParticipantId == x.Id
+                        && segment.Direction == ParticipantFlightSegmentDirection.Return)
+                    && (x.Details == null || (
+                        x.Details.ReturnAirline == null
+                        && x.Details.ReturnDepartureAirport == null
+                        && x.Details.ReturnArrivalAirport == null
+                        && x.Details.ReturnFlightCode == null
+                        && x.Details.ReturnFlightDate == null
+                        && x.Details.ReturnDepartureTime == null
+                        && x.Details.ReturnArrivalTime == null
+                        && x.Details.ReturnPnr == null
+                        && x.Details.ReturnTicketNo == null
+                        && x.Details.ReturnBaggagePieces == null
+                        && x.Details.ReturnBaggageTotalKg == null
+                        && x.Details.ReturnCabinBaggage == null)))
+            };
+        }
+
         var total = await participantsQuery.CountAsync(ct);
 
         var baseQuery =
@@ -1843,6 +1922,29 @@ internal static class EventsHandlers
             .Take(resolvedPageSize)
             .ToListAsync(ct);
 
+        var pageParticipantIds = pageItems.Select(x => x.participant.Id).ToArray();
+        var pageFlightDirections = await db.ParticipantFlightSegments.AsNoTracking()
+            .Where(segment =>
+                segment.EventId == id
+                && segment.OrganizationId == orgId
+                && pageParticipantIds.Contains(segment.ParticipantId))
+            .Select(segment => new
+            {
+                segment.ParticipantId,
+                segment.Direction
+            })
+            .Distinct()
+            .ToListAsync(ct);
+
+        var arrivalParticipantIds = pageFlightDirections
+            .Where(x => x.Direction == ParticipantFlightSegmentDirection.Arrival)
+            .Select(x => x.ParticipantId)
+            .ToHashSet();
+        var returnParticipantIds = pageFlightDirections
+            .Where(x => x.Direction == ParticipantFlightSegmentDirection.Return)
+            .Select(x => x.ParticipantId)
+            .ToHashSet();
+
         var items = pageItems.Select(row => new ParticipantTableItemDto(
             row.participant.Id,
             row.participant.FirstName,
@@ -1856,6 +1958,32 @@ internal static class EventsHandlers
             row.participant.CheckInCode,
             row.arrivedAt.HasValue,
             row.arrivedAt?.ToString("yyyy-MM-dd HH:mm"),
+            arrivalParticipantIds.Contains(row.participant.Id) || (row.details != null && (
+                row.details.ArrivalAirline != null
+                || row.details.ArrivalDepartureAirport != null
+                || row.details.ArrivalArrivalAirport != null
+                || row.details.ArrivalFlightCode != null
+                || row.details.ArrivalFlightDate != null
+                || row.details.ArrivalDepartureTime != null
+                || row.details.ArrivalArrivalTime != null
+                || row.details.ArrivalPnr != null
+                || row.details.ArrivalTicketNo != null
+                || row.details.ArrivalBaggagePieces != null
+                || row.details.ArrivalBaggageTotalKg != null
+                || row.details.ArrivalCabinBaggage != null)),
+            returnParticipantIds.Contains(row.participant.Id) || (row.details != null && (
+                row.details.ReturnAirline != null
+                || row.details.ReturnDepartureAirport != null
+                || row.details.ReturnArrivalAirport != null
+                || row.details.ReturnFlightCode != null
+                || row.details.ReturnFlightDate != null
+                || row.details.ReturnDepartureTime != null
+                || row.details.ReturnArrivalTime != null
+                || row.details.ReturnPnr != null
+                || row.details.ReturnTicketNo != null
+                || row.details.ReturnBaggagePieces != null
+                || row.details.ReturnBaggageTotalKg != null
+                || row.details.ReturnCabinBaggage != null)),
             row.details is null ? null : new ParticipantDetailsDto(
                 row.details.RoomNo,
                 row.details.RoomType,
@@ -2288,14 +2416,26 @@ internal static class EventsHandlers
         var arrivalRequest = request.ArrivalSegments ?? Array.Empty<FlightSegmentDto>();
         var returnRequest = request.ReturnSegments ?? Array.Empty<FlightSegmentDto>();
 
-        if (!TryNormalizeFlightSegments(orgId, id, participant.Id, arrivalRequest, ParticipantFlightSegmentDirection.Arrival,
-                out var arrivalSegments, out var arrivalError))
+        if (!TryNormalizeFlightSegments(
+                orgId,
+                id,
+                participant.Id,
+                arrivalRequest,
+                ParticipantFlightSegmentDirection.Arrival,
+                out var arrivalSegments,
+                out var arrivalError))
         {
             return EventsHelpers.BadRequest(arrivalError);
         }
 
-        if (!TryNormalizeFlightSegments(orgId, id, participant.Id, returnRequest, ParticipantFlightSegmentDirection.Return,
-                out var returnSegments, out var returnError))
+        if (!TryNormalizeFlightSegments(
+                orgId,
+                id,
+                participant.Id,
+                returnRequest,
+                ParticipantFlightSegmentDirection.Return,
+                out var returnSegments,
+                out var returnError))
         {
             return EventsHelpers.BadRequest(returnError);
         }
@@ -2319,6 +2459,214 @@ internal static class EventsHandlers
         return Results.Ok(new ParticipantFlightsResponse(
             MapFlightSegments(replacement, ParticipantFlightSegmentDirection.Arrival),
             MapFlightSegments(replacement, ParticipantFlightSegmentDirection.Return)));
+    }
+
+    internal static async Task<IResult> BulkApplyFlightSegments(
+        string eventId,
+        BulkApplyFlightSegmentsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var participantIds = (request.ParticipantIds ?? Array.Empty<Guid>())
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (participantIds.Length == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "participant_ids_required",
+                "participantIds",
+                "At least one participant must be selected.");
+        }
+
+        var participantCount = await db.Participants.AsNoTracking()
+            .CountAsync(x => x.OrganizationId == orgId && x.EventId == id && participantIds.Contains(x.Id), ct);
+        if (participantCount != participantIds.Length)
+        {
+            return EventsHelpers.BadRequest(
+                "participants_not_in_event",
+                "participantIds",
+                "One or more participants were not found in this event.");
+        }
+
+        var requestedDirections = request.ApplyDirections ?? Array.Empty<string>();
+        if (requestedDirections.Length == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "apply_directions_required",
+                "applyDirections",
+                "At least one direction must be selected.");
+        }
+
+        var directions = new List<ParticipantFlightSegmentDirection>();
+        for (var i = 0; i < requestedDirections.Length; i++)
+        {
+            var value = requestedDirections[i]?.Trim();
+            if (!TryParseFlightSegmentDirection(value, out var parsedDirection))
+            {
+                return EventsHelpers.BadRequest(
+                    "invalid_apply_direction",
+                    $"applyDirections[{i}]",
+                    "Direction must be Arrival or Return.");
+            }
+
+            if (!directions.Contains(parsedDirection))
+            {
+                directions.Add(parsedDirection);
+            }
+        }
+
+        if (!string.Equals(request.ReplaceMode?.Trim(), "ReplaceDirection", StringComparison.OrdinalIgnoreCase))
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_replace_mode",
+                "replaceMode",
+                "replaceMode must be ReplaceDirection.");
+        }
+
+        var segmentRoot = request.Segments;
+        if (segmentRoot is null)
+        {
+            return EventsHelpers.BadRequest(
+                "segments_required_for_direction",
+                "segments",
+                "Segments are required for the requested directions.");
+        }
+
+        var normalizedByDirection = new Dictionary<ParticipantFlightSegmentDirection, List<ParticipantFlightSegmentEntity>>();
+        foreach (var direction in directions)
+        {
+            var source = direction == ParticipantFlightSegmentDirection.Arrival
+                ? segmentRoot.Arrival ?? Array.Empty<FlightSegmentDto>()
+                : segmentRoot.Return ?? Array.Empty<FlightSegmentDto>();
+
+            if (source.Length == 0)
+            {
+                return EventsHelpers.BadRequest(
+                    "segments_required_for_direction",
+                    $"segments.{direction}",
+                    $"At least one segment is required for {direction}.");
+            }
+
+            if (!TryNormalizeFlightSegments(
+                    orgId,
+                    id,
+                    Guid.Empty,
+                    source,
+                    direction,
+                    out var normalized,
+                    out _,
+                    out var validationError,
+                    uppercaseAirports: true,
+                    fieldPrefix: $"segments.{direction}"))
+            {
+                return EventsHelpers.BadRequest(
+                    validationError!.Code,
+                    validationError.Field,
+                    validationError.Message);
+            }
+
+            if (normalized.Count == 0)
+            {
+                return EventsHelpers.BadRequest(
+                    "segments_required_for_direction",
+                    $"segments.{direction}",
+                    $"At least one segment is required for {direction}.");
+            }
+
+            normalizedByDirection[direction] = normalized;
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        var existingSegments = await db.ParticipantFlightSegments
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && participantIds.Contains(x.ParticipantId)
+                        && directions.Contains(x.Direction))
+            .ToListAsync(ct);
+
+        if (existingSegments.Count > 0)
+        {
+            db.ParticipantFlightSegments.RemoveRange(existingSegments);
+        }
+
+        var replacements = new List<ParticipantFlightSegmentEntity>();
+        foreach (var participantIdValue in participantIds)
+        {
+            foreach (var direction in directions)
+            {
+                var template = normalizedByDirection[direction];
+                for (var i = 0; i < template.Count; i++)
+                {
+                    var row = template[i];
+                    replacements.Add(new ParticipantFlightSegmentEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganizationId = orgId,
+                        EventId = id,
+                        ParticipantId = participantIdValue,
+                        Direction = direction,
+                        SegmentIndex = i + 1,
+                        Airline = row.Airline,
+                        DepartureAirport = row.DepartureAirport,
+                        ArrivalAirport = row.ArrivalAirport,
+                        FlightCode = row.FlightCode,
+                        DepartureDate = row.DepartureDate,
+                        DepartureTime = row.DepartureTime,
+                        ArrivalDate = row.ArrivalDate,
+                        ArrivalTime = row.ArrivalTime,
+                        Pnr = row.Pnr,
+                        TicketNo = row.TicketNo,
+                        BaggagePieces = row.BaggagePieces,
+                        BaggageTotalKg = row.BaggageTotalKg,
+                        CabinBaggage = row.CabinBaggage,
+                    });
+                }
+            }
+        }
+
+        if (replacements.Count > 0)
+        {
+            db.ParticipantFlightSegments.AddRange(replacements);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return Results.Ok(new BulkApplyFlightSegmentsResponse(
+            participantIds.Length,
+            new BulkApplyFlightSegmentsAppliedDto(
+                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Arrival, out var arrivalApplied)
+                    ? arrivalApplied.Count
+                    : null,
+                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Return, out var returnApplied)
+                    ? returnApplied.Count
+                    : null)));
     }
 
     internal static async Task<IResult> SetParticipantWillNotAttend(
@@ -3680,6 +4028,25 @@ internal static class EventsHandlers
             .ToArray();
     }
 
+    private sealed record FlightSegmentValidationError(
+        string Code,
+        string Field,
+        string Message);
+
+    private static bool TryParseFlightSegmentDirection(
+        string? value,
+        out ParticipantFlightSegmentDirection direction)
+    {
+        if (Enum.TryParse<ParticipantFlightSegmentDirection>(value, true, out direction)
+            && direction is ParticipantFlightSegmentDirection.Arrival or ParticipantFlightSegmentDirection.Return)
+        {
+            return true;
+        }
+
+        direction = default;
+        return false;
+    }
+
     private static bool TryNormalizeFlightSegments(
         Guid orgId,
         Guid eventId,
@@ -3689,8 +4056,36 @@ internal static class EventsHandlers
         out List<ParticipantFlightSegmentEntity> normalized,
         out string error)
     {
+        var success = TryNormalizeFlightSegments(
+            orgId,
+            eventId,
+            participantId,
+            source,
+            direction,
+            out normalized,
+            out error,
+            out _,
+            uppercaseAirports: false,
+            fieldPrefix: direction.ToString());
+
+        return success;
+    }
+
+    private static bool TryNormalizeFlightSegments(
+        Guid orgId,
+        Guid eventId,
+        Guid participantId,
+        FlightSegmentDto[] source,
+        ParticipantFlightSegmentDirection direction,
+        out List<ParticipantFlightSegmentEntity> normalized,
+        out string error,
+        out FlightSegmentValidationError? validationError,
+        bool uppercaseAirports,
+        string fieldPrefix)
+    {
         normalized = [];
         error = string.Empty;
+        validationError = null;
 
         if (source.Length == 0)
         {
@@ -3713,42 +4108,66 @@ internal static class EventsHandlers
             if (!TryParseDateOnly(segment.DepartureDate, out var departureDate))
             {
                 error = $"{direction} segment {i + 1}: departureDate must be in YYYY-MM-DD format.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].departureDate",
+                    "Departure date must be in YYYY-MM-DD format.");
                 return false;
             }
 
             if (!TryParseTimeOnly(segment.DepartureTime, out var departureTime))
             {
                 error = $"{direction} segment {i + 1}: departureTime must be in HH:mm format.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].departureTime",
+                    "Departure time must be in HH:mm format.");
                 return false;
             }
 
             if (!TryParseDateOnly(segment.ArrivalDate, out var arrivalDate))
             {
                 error = $"{direction} segment {i + 1}: arrivalDate must be in YYYY-MM-DD format.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].arrivalDate",
+                    "Arrival date must be in YYYY-MM-DD format.");
                 return false;
             }
 
             if (!TryParseTimeOnly(segment.ArrivalTime, out var arrivalTime))
             {
                 error = $"{direction} segment {i + 1}: arrivalTime must be in HH:mm format.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].arrivalTime",
+                    "Arrival time must be in HH:mm format.");
                 return false;
             }
 
             if (segment.BaggagePieces.HasValue && segment.BaggagePieces.Value <= 0)
             {
                 error = $"{direction} segment {i + 1}: baggagePieces must be greater than zero.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].baggagePieces",
+                    "Baggage pieces must be greater than zero.");
                 return false;
             }
 
             if (segment.BaggageTotalKg.HasValue && segment.BaggageTotalKg.Value <= 0)
             {
                 error = $"{direction} segment {i + 1}: baggageTotalKg must be greater than zero.";
+                validationError = new FlightSegmentValidationError(
+                    "invalid_flight_segment_field",
+                    $"{fieldPrefix}[{i}].baggageTotalKg",
+                    "Baggage total kg must be greater than zero.");
                 return false;
             }
 
             var airline = NormalizeOptionalText(segment.Airline);
-            var departureAirport = NormalizeOptionalText(segment.DepartureAirport);
-            var arrivalAirport = NormalizeOptionalText(segment.ArrivalAirport);
+            var departureAirport = NormalizeAirportCode(segment.DepartureAirport, uppercaseAirports);
+            var arrivalAirport = NormalizeAirportCode(segment.ArrivalAirport, uppercaseAirports);
             var flightCode = NormalizeOptionalText(segment.FlightCode);
             var pnr = NormalizeOptionalText(segment.Pnr);
             var ticketNo = NormalizeOptionalText(segment.TicketNo);
@@ -3809,6 +4228,17 @@ internal static class EventsHandlers
         }
 
         return true;
+    }
+
+    private static string? NormalizeAirportCode(string? value, bool uppercase)
+    {
+        var normalized = NormalizeOptionalText(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        return uppercase ? normalized.ToUpperInvariant() : normalized;
     }
 
     private static bool HasAnyFlightSegmentValue(

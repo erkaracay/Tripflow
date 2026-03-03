@@ -299,3 +299,45 @@ export const buildFlightSegmentsSheetRows = (
 
   return rows
 }
+
+export const buildBulkFlightTemplateSheetRows = (
+  participants: ParticipantExportSource[],
+  arrivalTemplate?: FlightSegment[] | null,
+  returnTemplate?: FlightSegment[] | null
+) => {
+  const rows: Array<Array<string | number>> = []
+  const normalizedArrival = normalizeSegments(arrivalTemplate)
+  const normalizedReturn = normalizeSegments(returnTemplate)
+
+  participants.forEach((participant) => {
+    normalizedArrival.forEach((segment, index) => {
+      rows.push(
+        toSegmentRow(
+          participant,
+          'Arrival',
+          {
+            ...segment,
+            segmentIndex: index + 1,
+          },
+          index + 1
+        )
+      )
+    })
+
+    normalizedReturn.forEach((segment, index) => {
+      rows.push(
+        toSegmentRow(
+          participant,
+          'Return',
+          {
+            ...segment,
+            segmentIndex: index + 1,
+          },
+          index + 1
+        )
+      )
+    })
+  })
+
+  return rows
+}

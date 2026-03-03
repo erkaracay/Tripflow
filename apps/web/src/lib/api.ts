@@ -2,6 +2,8 @@ import { clearToken, getAuthRole, getSelectedOrgId } from './auth'
 import { pushToast } from './toast'
 import type {
   AuthMeResponse,
+  BulkApplyFlightSegmentsRequest,
+  BulkApplyFlightSegmentsResponse,
   PortalLoginResponse,
   PortalMealResponse,
   PortalMealSelectionsUpsertRequest,
@@ -170,6 +172,12 @@ export const apiPost = async <T>(path: string, body: unknown): Promise<T> => {
 
   return handleResponse<T>(response)
 }
+
+export const bulkApplyFlightSegments = async (
+  eventId: string,
+  payload: BulkApplyFlightSegmentsRequest
+): Promise<BulkApplyFlightSegmentsResponse> =>
+  apiPost<BulkApplyFlightSegmentsResponse>(`/api/events/${eventId}/flight-segments/bulk-apply`, payload)
 
 export const apiPostWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {

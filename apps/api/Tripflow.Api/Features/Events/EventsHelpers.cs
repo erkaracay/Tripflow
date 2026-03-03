@@ -16,6 +16,9 @@ internal static class EventsHelpers
 
     internal static IResult BadRequest(string message) => Results.BadRequest(new { message });
 
+    internal static IResult BadRequest(string code, string field, string message)
+        => Results.BadRequest(new { code, field, message });
+
     internal static bool TryParseDate(string? value, out DateOnly date)
         => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 

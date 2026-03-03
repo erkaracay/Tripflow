@@ -398,6 +398,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPost("/{eventId}/flight-segments/bulk-apply", EventsHandlers.BulkApplyFlightSegments)
+            .WithSummary("Bulk apply flight segments")
+            .WithDescription("Replaces selected participant flight segments for the requested directions using a shared template.")
+            .Produces<BulkApplyFlightSegmentsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/participants/import/template", ParticipantImportHandlers.DownloadImportTemplate)
             .WithSummary("Download participant import template")
             .WithDescription("Downloads a CSV or XLSX import template for participants.")

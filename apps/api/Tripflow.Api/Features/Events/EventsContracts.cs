@@ -285,6 +285,24 @@ public sealed record ReplaceParticipantFlightsRequest(
     FlightSegmentDto[]? ArrivalSegments,
     FlightSegmentDto[]? ReturnSegments);
 
+public sealed record BulkApplyFlightSegmentsSegmentsDto(
+    FlightSegmentDto[]? Arrival,
+    FlightSegmentDto[]? Return);
+
+public sealed record BulkApplyFlightSegmentsRequest(
+    Guid[]? ParticipantIds,
+    string[]? ApplyDirections,
+    BulkApplyFlightSegmentsSegmentsDto? Segments,
+    string? ReplaceMode);
+
+public sealed record BulkApplyFlightSegmentsAppliedDto(
+    int? Arrival,
+    int? Return);
+
+public sealed record BulkApplyFlightSegmentsResponse(
+    int AffectedCount,
+    BulkApplyFlightSegmentsAppliedDto Applied);
+
 public sealed record ParticipantFlightsResponse(
     FlightSegmentDto[] ArrivalSegments,
     FlightSegmentDto[] ReturnSegments);
@@ -372,6 +390,8 @@ public sealed record ParticipantTableItemDto(
     string CheckInCode,
     bool Arrived,
     string? ArrivedAt,
+    bool HasArrivalSegments,
+    bool HasReturnSegments,
     ParticipantDetailsDto? Details);
 
 public sealed record ParticipantTableResponseDto(
