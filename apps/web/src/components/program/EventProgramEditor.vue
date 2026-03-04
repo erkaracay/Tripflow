@@ -561,45 +561,53 @@ onMounted(loadAll)
             </button>
             <div class="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               <button
-                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded border border-white/30 px-2 py-1 text-[10px] font-medium leading-none disabled:cursor-not-allowed disabled:opacity-45"
                 type="button"
                 :disabled="index === 0"
                 @click="moveDay(index, -1)"
               >
-                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
-                  <path d="M8 3.2 3.5 7.7l1 1L7.25 6v6.8h1.5V6l2.75 2.7 1-1L8 3.2Z" />
-                </svg>
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5 fill-current">
+                    <path d="M8 3.2 3.5 7.7l1 1L7.25 6v6.8h1.5V6l2.75 2.7 1-1L8 3.2Z" />
+                  </svg>
+                </span>
                 {{ t('common.moveUp') }}
               </button>
               <button
-                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded border border-white/30 px-2 py-1 text-[10px] font-medium leading-none disabled:cursor-not-allowed disabled:opacity-45"
                 type="button"
                 :disabled="index === days.length - 1"
                 @click="moveDay(index, 1)"
               >
-                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
-                  <path d="M7.25 3.2V10l-2.75-2.7-1 1L8 12.8l4.5-4.5-1-1L8.75 10V3.2h-1.5Z" />
-                </svg>
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5 fill-current">
+                    <path d="M7.25 3.2V10l-2.75-2.7-1 1L8 12.8l4.5-4.5-1-1L8.75 10V3.2h-1.5Z" />
+                  </svg>
+                </span>
                 {{ t('common.moveDown') }}
               </button>
               <button
-                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium"
+                class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded border border-white/30 px-2 py-1 text-[10px] font-medium leading-none"
                 type="button"
                 @click="openEditDay(day, $event)"
               >
-                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
-                  <path d="m11.9 2.2 1.9 1.9a1.2 1.2 0 0 1 0 1.7L6.2 13.4 3 14l.6-3.2 7.6-7.6a1.2 1.2 0 0 1 1.7 0Zm-7.3 9.2-.2 1.1 1.1-.2 7.1-7.1-1-1-7.1 7.2Z" />
-                </svg>
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="h-[15px] w-[15px] fill-current">
+                    <path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24A1 1 0 0 0 16.76 2a1 1 0 0 0-.71.29L13.22 5.12h0L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24A1 1 0 0 0 8 21.71L18.87 10.78h0L21.71 8a1.19 1.19 0 0 0 .22-.33 1 1 0 0 0 0-.24.7.7 0 0 0 0-.14ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83ZM18.17 8.66 15.34 5.83l1.42-1.41 2.82 2.82Z" />
+                  </svg>
+                </span>
                 {{ t('common.edit') }}
               </button>
               <button
-                class="inline-flex items-center justify-center gap-1 rounded border border-white/30 px-2 py-1 text-[10px] font-medium"
+                class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded border border-white/30 px-2 py-1 text-[10px] font-medium leading-none"
                 type="button"
                 @click="confirmDeleteDay(day)"
               >
-                <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3 w-3 fill-current">
-                  <path d="M6.5 2h3l.5 1H13v1.4H3V3h2.5l.5-1Zm-1 3h1.4v6.2H5.5V5Zm3 0h1.4v6.2H8.5V5Zm3 0h-1.4v6.2h1.4V5ZM4.2 12.6h7.6V14H4.2v-1.4Z" />
-                </svg>
+                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" class="h-[15px] w-[15px] fill-current">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M10 3h3v1h-1v9l-1 1H4l-1-1V4H2V3h3V2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zM9 2H6v1h3V2zM4 13h7V4H4v9zm2-8H5v7h1V5zm1 0h1v7H7V5zm2 0h1v7H9V5z" />
+                  </svg>
+                </span>
                 {{ t('common.delete') }}
               </button>
             </div>
