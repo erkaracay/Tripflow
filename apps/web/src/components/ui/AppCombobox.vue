@@ -59,6 +59,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const rootRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
 const desktopPanelRef = ref<HTMLElement | null>(null)
 const mobilePanelRef = ref<HTMLElement | null>(null)
 const desktopSearchRef = ref<HTMLInputElement | null>(null)
@@ -73,6 +74,10 @@ let mediaQueryList: MediaQueryList | null = null
 let mediaQueryListener:
   | ((event: MediaQueryListEvent) => void)
   | null = null
+
+const instanceId = `app-combobox-${Math.random().toString(36).slice(2, 10)}`
+const desktopListId = `${instanceId}-desktop-listbox`
+const mobileListId = `${instanceId}-mobile-listbox`
 
 const breakpointQuery = computed(() =>
   props.mobileBreakpoint === 'lg' ? '(max-width: 1023px)' : '(max-width: 767px)'
@@ -190,9 +195,18 @@ const showAllSection = computed(() => !normalizedSearch.value && showAll.value &
 const desktopOpen = computed(() => open.value && !isMobile.value)
 const mobileOpen = computed(() => open.value && isMobile.value)
 const panelTitle = computed(() => selectedOption.value?.label || props.ariaLabel || props.placeholder || '')
+const activeListId = computed(() => (isMobile.value ? mobileListId : desktopListId))
+const activeOptionId = computed(() => {
+  const option = visibleOptions.value[highlightedIndex.value]
+  if (!option) {
+    return null
+  }
+  return optionDomId(option.value)
+})
 
 const activePanelRef = () => (isMobile.value ? mobilePanelRef.value : desktopPanelRef.value)
 const activeSearchRef = () => (isMobile.value ? mobileSearchRef.value : desktopSearchRef.value)
+const optionDomId = (value: AppComboboxValue) => `${instanceId}-option-${optionKey(value).replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
 const syncMobileMode = () => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -266,7 +280,12 @@ const resetPanelState = () => {
   highlightedIndex.value = -1
 }
 
-const closePanel = () => {
+const focusTrigger = async () => {
+  await nextTick()
+  triggerRef.value?.focus()
+}
+
+const closePanel = (restoreFocus = false) => {
   if (!open.value) {
     return
   }
@@ -274,7 +293,13 @@ const closePanel = () => {
   open.value = false
   resetPanelState()
   emit('close')
+
+  if (restoreFocus) {
+    void focusTrigger()
+  }
 }
+
+const closePanelAndRestoreFocus = () => closePanel(true)
 
 const openPanel = async () => {
   if (props.disabled) {
@@ -328,6 +353,14 @@ const moveHighlight = async (direction: 1 | -1) => {
   await scrollHighlightedIntoView()
 }
 
+const moveHighlightToBoundary = async (boundary: 'start' | 'end') => {
+  if (!visibleOptions.value.length) {
+    return
+  }
+  highlightedIndex.value = boundary === 'start' ? 0 : visibleOptions.value.length - 1
+  await scrollHighlightedIntoView()
+}
+
 const selectHighlighted = () => {
   const option = visibleOptions.value[highlightedIndex.value]
   if (option) {
@@ -346,6 +379,15 @@ const handleTriggerKeydown = async (event: KeyboardEvent) => {
       await openPanel()
     }
     await moveHighlight(event.key === 'ArrowDown' ? 1 : -1)
+    return
+  }
+
+  if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault()
+    if (!open.value) {
+      await openPanel()
+    }
+    await moveHighlightToBoundary(event.key === 'Home' ? 'start' : 'end')
     return
   }
 
@@ -368,6 +410,12 @@ const handleSearchKeydown = async (event: KeyboardEvent) => {
     return
   }
 
+  if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault()
+    await moveHighlightToBoundary(event.key === 'Home' ? 'start' : 'end')
+    return
+  }
+
   if (event.key === 'Enter') {
     event.preventDefault()
     selectHighlighted()
@@ -376,7 +424,7 @@ const handleSearchKeydown = async (event: KeyboardEvent) => {
 
   if (event.key === 'Escape') {
     event.preventDefault()
-    closePanel()
+    closePanel(true)
     return
   }
 
@@ -395,7 +443,7 @@ const handleOutsidePointer = (event: MouseEvent | TouchEvent) => {
     return
   }
 
-  closePanel()
+  closePanel(true)
 }
 
 const handleDocumentKeydown = (event: KeyboardEvent) => {
@@ -403,7 +451,7 @@ const handleDocumentKeydown = (event: KeyboardEvent) => {
     return
   }
 
-  closePanel()
+  closePanel(true)
 }
 
 const revealAllOptions = async () => {
@@ -459,6 +507,7 @@ onUnmounted(() => {
 <template>
   <div ref="rootRef" class="relative">
     <button
+      ref="triggerRef"
       class="app-combobox-trigger"
       :class="{
         'app-combobox-trigger-invalid': invalid,
@@ -467,8 +516,12 @@ onUnmounted(() => {
         'cursor-not-allowed opacity-60': disabled,
       }"
       type="button"
+      role="combobox"
+      aria-haspopup="listbox"
       :aria-label="ariaLabel || placeholder"
       :aria-expanded="open"
+      :aria-controls="open ? activeListId : undefined"
+      :aria-activedescendant="open && activeOptionId ? activeOptionId : undefined"
       :disabled="disabled"
       @click="toggleOpen"
       @keydown="handleTriggerKeydown"
@@ -508,12 +561,22 @@ onUnmounted(() => {
               class="app-combobox-search"
               :placeholder="searchPlaceholder"
               type="text"
+              role="combobox"
+              aria-haspopup="listbox"
+              :aria-label="searchPlaceholder || placeholder"
+              :aria-controls="activeListId"
+              :aria-activedescendant="activeOptionId || undefined"
               @keydown="handleSearchKeydown"
             />
           </label>
         </div>
 
-        <div class="max-h-80 overflow-y-auto px-2 py-2">
+        <div
+          :id="desktopListId"
+          class="max-h-80 overflow-y-auto px-2 py-2"
+          role="listbox"
+          :aria-label="ariaLabel || placeholder"
+        >
           <template v-if="normalizedSearch">
             <div v-if="filteredOptions.length === 0" class="px-3 py-6 text-sm text-slate-500">{{ emptyLabel }}</div>
             <div v-else class="space-y-1">
@@ -530,6 +593,7 @@ onUnmounted(() => {
                   }"
                   type="button"
                   role="option"
+                  :id="optionDomId(entry.option.value)"
                   :aria-selected="entry.option.value === modelValue"
                   :data-option-index="entry.index"
                   @mouseenter="highlightedIndex = entry.index"
@@ -568,6 +632,7 @@ onUnmounted(() => {
                     }"
                     type="button"
                     role="option"
+                    :id="optionDomId(entry.option.value)"
                     :aria-selected="entry.option.value === modelValue"
                     :data-option-index="entry.index"
                     @mouseenter="highlightedIndex = entry.index"
@@ -609,6 +674,7 @@ onUnmounted(() => {
                       }"
                       type="button"
                       role="option"
+                      :id="optionDomId(entry.option.value)"
                       :aria-selected="entry.option.value === modelValue"
                       :data-option-index="entry.index"
                       @mouseenter="highlightedIndex = entry.index"
@@ -636,11 +702,15 @@ onUnmounted(() => {
       desktop-breakpoint="md"
       desktop-width="md"
       labelled-by="app-combobox-mobile-title"
-      @close="closePanel"
+      :swipe-to-close="true"
+      @close="closePanelAndRestoreFocus"
     >
       <template #default="{ panelClass, labelledBy }">
         <section ref="mobilePanelRef" :class="[panelClass, 'overflow-hidden']" role="dialog" aria-modal="true" :aria-labelledby="labelledBy">
           <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
+            <div class="app-drawer-swipe-handle-wrap" data-drawer-swipe-handle>
+              <div class="app-drawer-swipe-handle" />
+            </div>
             <div class="flex items-start justify-between gap-4">
               <div>
                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ ariaLabel }}</div>
@@ -649,7 +719,7 @@ onUnmounted(() => {
               <button
                 class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                 type="button"
-                @click="closePanel"
+                @click="closePanelAndRestoreFocus"
               >
                 {{ t('common.close') }}
               </button>
@@ -667,11 +737,21 @@ onUnmounted(() => {
                 class="app-combobox-search"
                 :placeholder="searchPlaceholder"
                 type="text"
+                role="combobox"
+                aria-haspopup="listbox"
+                :aria-label="searchPlaceholder || placeholder"
+                :aria-controls="activeListId"
+                :aria-activedescendant="activeOptionId || undefined"
                 @keydown="handleSearchKeydown"
               />
             </label>
 
-            <div class="mt-4 space-y-4">
+            <div
+              :id="mobileListId"
+              class="mt-4 space-y-4"
+              role="listbox"
+              :aria-label="ariaLabel || placeholder"
+            >
               <template v-if="normalizedSearch">
                 <div v-if="filteredOptions.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
                   {{ emptyLabel }}
@@ -690,6 +770,7 @@ onUnmounted(() => {
                       }"
                       type="button"
                       role="option"
+                      :id="optionDomId(entry.option.value)"
                       :aria-selected="entry.option.value === modelValue"
                       :data-option-index="entry.index"
                       @click="selectOption(entry.option)"
@@ -728,6 +809,7 @@ onUnmounted(() => {
                           }"
                           type="button"
                           role="option"
+                          :id="optionDomId(entry.option.value)"
                           :aria-selected="entry.option.value === modelValue"
                           :data-option-index="entry.index"
                           @click="selectOption(entry.option)"
@@ -769,6 +851,7 @@ onUnmounted(() => {
                           }"
                           type="button"
                           role="option"
+                          :id="optionDomId(entry.option.value)"
                           :aria-selected="entry.option.value === modelValue"
                           :data-option-index="entry.index"
                           @click="selectOption(entry.option)"

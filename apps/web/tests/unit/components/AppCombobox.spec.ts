@@ -69,6 +69,16 @@ const mockMatchMedia = (matches: boolean) => {
   })) as typeof window.matchMedia
 }
 
+const createPointerEvent = (type: string, clientY: number, pointerId = 1, pointerType = 'touch') => {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent
+  Object.defineProperties(event, {
+    clientY: { value: clientY },
+    pointerId: { value: pointerId },
+    pointerType: { value: pointerType },
+  })
+  return event
+}
+
 describe('AppCombobox', () => {
   beforeEach(() => {
     setLocale('tr')
@@ -208,6 +218,118 @@ describe('AppCombobox', () => {
     await wrapper.get('.app-combobox-search').trigger('keydown', { key: 'Enter' })
 
     expect(wrapper.emitted('update:modelValue')).toEqual([['Europe/London']])
+  })
+
+  it('supports Home and End key navigation while open', async () => {
+    const wrapper = mount(AppCombobox, {
+      props: {
+        modelValue: null,
+        options,
+        placeholder: 'Saat dilimi seçin',
+        recommendedValues: [],
+        emptyLabel: 'Boş',
+        searchPlaceholder: 'Ara',
+      },
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    await wrapper.get('.app-combobox-trigger').trigger('click')
+    const searchInput = wrapper.get('.app-combobox-search')
+
+    await searchInput.trigger('keydown', { key: 'End' })
+    await searchInput.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['Asia/Dubai'])
+
+    await wrapper.setProps({ modelValue: null })
+    await wrapper.get('.app-combobox-trigger').trigger('click')
+    const reopenedSearch = wrapper.get('.app-combobox-search')
+    await reopenedSearch.trigger('keydown', { key: 'End' })
+    await reopenedSearch.trigger('keydown', { key: 'Home' })
+    await reopenedSearch.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[1]).toEqual(['Europe/Istanbul'])
+  })
+
+  it('restores focus to trigger when closed with Escape', async () => {
+    const wrapper = mount(AppCombobox, {
+      props: {
+        modelValue: null,
+        options,
+        placeholder: 'Saat dilimi seçin',
+        searchPlaceholder: 'Ara',
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    const trigger = wrapper.get('.app-combobox-trigger')
+    await trigger.trigger('click')
+    await wrapper.get('.app-combobox-search').trigger('keydown', { key: 'Escape' })
+
+    expect(document.activeElement).toBe(trigger.element)
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('closes mobile drawer after a swipe from the handle', async () => {
+    mockMatchMedia(true)
+
+    const wrapper = mount(AppCombobox, {
+      props: {
+        modelValue: null,
+        options,
+        placeholder: 'Saat dilimi seçin',
+        searchPlaceholder: 'Ara',
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    await wrapper.get('.app-combobox-trigger').trigger('click')
+    const handle = document.querySelector('[data-drawer-swipe-handle]')
+    expect(handle).toBeTruthy()
+
+    handle!.dispatchEvent(createPointerEvent('pointerdown', 0))
+    window.dispatchEvent(createPointerEvent('pointermove', 120))
+    window.dispatchEvent(createPointerEvent('pointerup', 120))
+
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('keeps mobile drawer open when swipe does not meet threshold', async () => {
+    mockMatchMedia(true)
+
+    const wrapper = mount(AppCombobox, {
+      props: {
+        modelValue: null,
+        options,
+        placeholder: 'Saat dilimi seçin',
+        searchPlaceholder: 'Ara',
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    await wrapper.get('.app-combobox-trigger').trigger('click')
+    const handle = document.querySelector('[data-drawer-swipe-handle]')
+    expect(handle).toBeTruthy()
+
+    handle!.dispatchEvent(createPointerEvent('pointerdown', 0))
+    window.dispatchEvent(createPointerEvent('pointermove', 20))
+    window.dispatchEvent(createPointerEvent('pointerup', 20))
+
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(document.body.textContent).toContain('Saat dilimi seçin')
   })
 
   it('marks the trigger as invalid when requested', () => {

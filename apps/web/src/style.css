@@ -87,6 +87,20 @@
   transform: translateY(16px);
 }
 
+.app-drawer-swipe-handle-wrap {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 0.625rem;
+  touch-action: none;
+}
+
+.app-drawer-swipe-handle {
+  width: 2.5rem;
+  height: 0.3rem;
+  border-radius: 9999px;
+  background: rgb(203 213 225);
+}
+
 @media (min-width: 768px) {
   .app-drawer-enter-from .app-drawer-panel.app-drawer-breakpoint-md,
   .app-drawer-leave-to .app-drawer-panel.app-drawer-breakpoint-md {

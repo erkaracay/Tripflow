@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -11,6 +11,10 @@ const props = withDefaults(
     labelledBy?: string
     desktopWidth?: 'sm' | 'md' | 'lg' | 'xl'
     desktopBreakpoint?: 'md' | 'lg' | 'xl'
+    swipeToClose?: boolean
+    swipeThresholdPx?: number
+    swipeVelocityPxMs?: number
+    swipeHandleSelector?: string
   }>(),
   {
     closeOnOverlay: true,
@@ -20,6 +24,10 @@ const props = withDefaults(
     labelledBy: '',
     desktopWidth: 'lg',
     desktopBreakpoint: 'lg',
+    swipeToClose: false,
+    swipeThresholdPx: 88,
+    swipeVelocityPxMs: 0.45,
+    swipeHandleSelector: '[data-drawer-swipe-handle]',
   }
 )
 
@@ -100,6 +108,159 @@ const containerClassName = computed(() => [
   props.contentClass,
 ])
 
+const containerRef = ref<HTMLElement | null>(null)
+const activePointerId = ref<number | null>(null)
+const pointerStartY = ref(0)
+const pointerStartAt = ref(0)
+const currentDeltaY = ref(0)
+const snapBackTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const closingBySwipe = ref(false)
+
+const resolvePanelElement = () => containerRef.value?.querySelector<HTMLElement>('.app-drawer-panel') ?? null
+const resolveOverlayElement = () => containerRef.value?.querySelector<HTMLElement>('.app-drawer-overlay') ?? null
+
+const clearSnapBackTimer = () => {
+  if (snapBackTimer.value) {
+    clearTimeout(snapBackTimer.value)
+    snapBackTimer.value = null
+  }
+}
+
+const clearInlineStyles = () => {
+  const panel = resolvePanelElement()
+  const overlay = resolveOverlayElement()
+  if (panel) {
+    panel.style.opacity = ''
+    panel.style.transform = ''
+    panel.style.transition = ''
+  }
+  if (overlay) {
+    overlay.style.opacity = ''
+    overlay.style.transition = ''
+  }
+}
+
+const applyDragStyles = (deltaY: number) => {
+  const panel = resolvePanelElement()
+  const overlay = resolveOverlayElement()
+  if (!panel || !overlay) {
+    return
+  }
+
+  clearSnapBackTimer()
+  panel.style.transition = 'none'
+  overlay.style.transition = 'none'
+  panel.style.transform = `translateY(${deltaY}px)`
+  const opacity = Math.max(0.4, 1 - deltaY / 220)
+  overlay.style.opacity = `${opacity}`
+}
+
+const animateSnapBack = () => {
+  const panel = resolvePanelElement()
+  const overlay = resolveOverlayElement()
+  if (!panel || !overlay) {
+    clearInlineStyles()
+    return
+  }
+
+  panel.style.transition = 'transform 180ms ease-out'
+  overlay.style.transition = 'opacity 180ms ease-out'
+  panel.style.transform = ''
+  overlay.style.opacity = ''
+
+  clearSnapBackTimer()
+  snapBackTimer.value = setTimeout(() => {
+    clearInlineStyles()
+  }, 200)
+}
+
+const removePointerListeners = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.removeEventListener('pointermove', handlePointerMove)
+  window.removeEventListener('pointerup', handlePointerUp)
+  window.removeEventListener('pointercancel', handlePointerCancel)
+}
+
+const finishGesture = (mode: 'close' | 'snap') => {
+  activePointerId.value = null
+  currentDeltaY.value = 0
+  removePointerListeners()
+
+  if (mode === 'close') {
+    closingBySwipe.value = true
+    emit('close')
+    return
+  }
+
+  animateSnapBack()
+}
+
+function handlePointerMove(event: PointerEvent) {
+  if (activePointerId.value === null || event.pointerId !== activePointerId.value) {
+    return
+  }
+
+  const deltaY = Math.max(0, event.clientY - pointerStartY.value)
+  currentDeltaY.value = deltaY
+  applyDragStyles(deltaY)
+}
+
+function handlePointerUp(event: PointerEvent) {
+  if (activePointerId.value === null || event.pointerId !== activePointerId.value) {
+    return
+  }
+
+  const deltaY = Math.max(0, event.clientY - pointerStartY.value)
+  const elapsedMs = Math.max(1, performance.now() - pointerStartAt.value)
+  const velocity = deltaY / elapsedMs
+  const meetsDistance = deltaY >= props.swipeThresholdPx
+  const meetsVelocity = deltaY >= 24 && velocity >= props.swipeVelocityPxMs
+
+  finishGesture(meetsDistance || meetsVelocity ? 'close' : 'snap')
+}
+
+function handlePointerCancel(event?: PointerEvent) {
+  if (activePointerId.value === null) {
+    return
+  }
+  if (event && event.pointerId !== activePointerId.value) {
+    return
+  }
+  finishGesture('snap')
+}
+
+const handlePointerDown = (event: PointerEvent) => {
+  if (!props.swipeToClose || event.isPrimary === false) {
+    return
+  }
+
+  if (event.pointerType === 'mouse' && event.button !== 0) {
+    return
+  }
+
+  if (!(event.target instanceof Element)) {
+    return
+  }
+
+  if (!event.target.closest(props.swipeHandleSelector)) {
+    return
+  }
+
+  pointerStartY.value = event.clientY
+  pointerStartAt.value = performance.now()
+  currentDeltaY.value = 0
+  activePointerId.value = event.pointerId
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerCancel)
+  }
+}
+
 const lockBodyScroll = () => {
   if (typeof document === 'undefined') {
     return
@@ -142,17 +303,27 @@ watch(
   () => props.open,
   (open, previousOpen) => {
     if (open && !previousOpen) {
+      closingBySwipe.value = false
       lockBodyScroll()
+      clearInlineStyles()
       return
     }
 
     if (!open && previousOpen) {
+      handlePointerCancel()
+      if (!closingBySwipe.value) {
+        clearInlineStyles()
+      }
+      closingBySwipe.value = false
       unlockBodyScroll()
     }
   }
 )
 
 onUnmounted(() => {
+  handlePointerCancel()
+  clearSnapBackTimer()
+  clearInlineStyles()
   if (props.open) {
     unlockBodyScroll()
   }
@@ -162,7 +333,13 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="app-drawer">
-      <div v-if="open" :class="containerClassName" tabindex="-1">
+      <div
+        v-if="open"
+        ref="containerRef"
+        :class="containerClassName"
+        tabindex="-1"
+        @pointerdown.capture="handlePointerDown"
+      >
         <div :class="overlayClassName" @click="handleOverlayClick" />
         <slot :panel-class="panelClassName" :labelled-by="labelledBy" />
       </div>

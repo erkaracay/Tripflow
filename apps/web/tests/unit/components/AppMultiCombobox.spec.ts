@@ -61,16 +61,24 @@ const mockMatchMedia = (matches: boolean) => {
   })) as typeof window.matchMedia
 }
 
+const createPointerEvent = (type: string, clientY: number, pointerId = 1, pointerType = 'touch') => {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent
+  Object.defineProperties(event, {
+    clientY: { value: clientY },
+    pointerId: { value: pointerId },
+    pointerType: { value: pointerType },
+  })
+  return event
+}
+
 describe('AppMultiCombobox', () => {
   beforeEach(() => {
     setLocale('tr')
     mockMatchMedia(false)
-    document.body.innerHTML = ''
   })
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia
-    document.body.innerHTML = ''
   })
 
   it('shows the placeholder while no value is selected', () => {
@@ -198,6 +206,83 @@ describe('AppMultiCombobox', () => {
 
     expect(document.body.textContent).toContain('Rehber seç')
     expect(document.body.textContent).toContain('Ayse Demir')
+  })
+
+  it('supports Home and End key navigation while open', async () => {
+    const wrapper = mount(AppMultiCombobox, {
+      props: {
+        modelValue: [],
+        options,
+        placeholder: 'Rehber seç',
+        searchPlaceholder: 'Ara',
+      },
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    const trigger = wrapper.get('.app-multicombobox-trigger')
+    await trigger.trigger('click')
+    const searchInput = wrapper.get('.app-combobox-search')
+    await searchInput.trigger('keydown', { key: 'End' })
+    await searchInput.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([['guide-3']])
+
+    await wrapper.setProps({ modelValue: [] })
+    await searchInput.trigger('keydown', { key: 'Home' })
+    await searchInput.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[1]).toEqual([['guide-1']])
+  })
+
+  it('restores focus to trigger when closed with Escape', async () => {
+    const wrapper = mount(AppMultiCombobox, {
+      props: {
+        modelValue: [],
+        options,
+        placeholder: 'Rehber seç',
+        searchPlaceholder: 'Ara',
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    const trigger = wrapper.get('.app-multicombobox-trigger')
+    await trigger.trigger('click')
+    await wrapper.get('.app-combobox-search').trigger('keydown', { key: 'Escape' })
+
+    expect((document.activeElement as HTMLElement | null)?.classList.contains('app-multicombobox-trigger')).toBe(true)
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('closes mobile drawer after a swipe from the handle without mutating selection', async () => {
+    mockMatchMedia(true)
+
+    const wrapper = mount(AppMultiCombobox, {
+      props: {
+        modelValue: ['guide-1'],
+        options,
+        placeholder: 'Rehber seç',
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    await wrapper.get('.app-multicombobox-trigger').trigger('click')
+    const handle = document.querySelector('[data-drawer-swipe-handle]')
+    expect(handle).toBeTruthy()
+
+    handle!.dispatchEvent(createPointerEvent('pointerdown', 0))
+    window.dispatchEvent(createPointerEvent('pointermove', 120))
+    window.dispatchEvent(createPointerEvent('pointerup', 120))
+
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('close')).toBeTruthy()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('does not open or remove selections while disabled', async () => {
