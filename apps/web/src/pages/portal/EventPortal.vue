@@ -9,7 +9,6 @@ import { resetViewportZoom } from '../../lib/viewport'
 import PortalTabBar from '../../components/portal/PortalTabBar.vue'
 import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import PortalMealSelectionCard from '../../components/portal/PortalMealSelectionCard.vue'
-import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
@@ -78,7 +77,6 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'qr', label: t('portal.tabs.qr') },
   { id: 'info', label: t('portal.tabs.info') },
 ])
-const topTabOptions = computed(() => tabs.value.map((tab) => ({ value: tab.id, label: tab.label })))
 
 const tabOrder: TabKey[] = ['days', 'docs', 'qr', 'info']
 
@@ -611,16 +609,90 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="space-y-6">
-        <div class="hidden md:flex md:max-w-2xl">
-          <AppSegmentedControl
-            :model-value="activeTab"
-            :options="topTabOptions"
-            full-width
-            class-name="w-full text-sm shadow-sm"
-            :aria-label="t('portal.tabs.days')"
-            @update:model-value="setActiveTab"
-          />
-        </div>
+        <nav class="hidden w-full md:block" :aria-label="t('portal.tabs.days')">
+          <div
+            class="app-segmented w-full shadow-sm"
+            :style="{
+              '--segment-count': String(Math.max(tabs.length, 1)),
+              '--segment-index': String(getTabIndex(activeTab)),
+              gridTemplateColumns: `repeat(${Math.max(tabs.length, 1)}, minmax(0, 1fr))`,
+            }"
+          >
+            <span class="app-segmented-indicator" aria-hidden="true" />
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              class="app-segmented-button flex min-w-0 items-center justify-center gap-2 px-3 py-2 text-sm font-semibold"
+              :class="tab.id === activeTab ? 'app-segmented-button-active' : 'text-slate-600 hover:text-slate-900'"
+              type="button"
+              role="tab"
+              :aria-selected="tab.id === activeTab"
+              @click="setActiveTab(tab.id)"
+            >
+              <span class="flex h-5 w-5 items-center justify-center" aria-hidden="true">
+                <svg
+                  v-if="tab.id === 'days'"
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M7 2v3M17 2v3M3 9h18" />
+                  <path d="M5 6h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+                </svg>
+                <svg
+                  v-else-if="tab.id === 'docs'"
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M7 2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M9 13h6M9 17h6" />
+                </svg>
+                <svg
+                  v-else-if="tab.id === 'qr'"
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="3" width="6" height="6" rx="1" />
+                  <rect x="15" y="3" width="6" height="6" rx="1" />
+                  <rect x="3" y="15" width="6" height="6" rx="1" />
+                  <rect x="13" y="13" width="2" height="2" rx="0.5" />
+                  <rect x="19" y="19" width="2" height="2" rx="0.5" />
+                  <rect x="15" y="17" width="2" height="2" rx="0.5" />
+                </svg>
+                <svg
+                  v-else
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 10v6" />
+                  <path d="M12 7h.01" />
+                </svg>
+              </span>
+              <span class="truncate">{{ tab.label }}</span>
+            </button>
+          </div>
+        </nav>
 
         <Transition :name="topTabTransitionName" mode="out-in">
         <div :key="activeTab" class="space-y-6">
