@@ -5,11 +5,12 @@ import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import EventDocPreviewDrawer from '../../components/docs/EventDocPreviewDrawer.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { Event as TripEvent, EventDocTabDto } from '../../types'
+import type { AppComboboxOption, Event as TripEvent, EventDocTabDto } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -70,6 +71,12 @@ let fieldCounter = 0
 const customEditorModeOptions = computed(() => [
   { value: 'form', label: t('admin.docs.customText') },
   { value: 'advanced', label: t('admin.docs.advancedJson') },
+])
+const docTypeOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'Hotel', label: t('admin.docs.types.hotel') },
+  { value: 'Insurance', label: t('admin.docs.types.insurance') },
+  { value: 'Transfer', label: t('admin.docs.types.transfer') },
+  { value: 'Custom', label: t('admin.docs.types.custom') },
 ])
 
 const resolvedType = computed(() => {
@@ -685,12 +692,14 @@ onMounted(() => {
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.docs.tabType') }}</span>
-            <select v-model="form.type" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving">
-              <option value="Hotel">{{ t('admin.docs.types.hotel') }}</option>
-              <option value="Insurance">{{ t('admin.docs.types.insurance') }}</option>
-              <option value="Transfer">{{ t('admin.docs.types.transfer') }}</option>
-              <option value="Custom">{{ t('admin.docs.types.custom') }}</option>
-            </select>
+            <AppCombobox
+              v-model="form.type"
+              :options="docTypeOptions"
+              :placeholder="t('admin.docs.tabType')"
+              :aria-label="t('admin.docs.tabType')"
+              :disabled="saving"
+              :searchable="false"
+            />
           </label>
           <label v-if="form.type === 'Custom'" class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.docs.customType') }}</span>

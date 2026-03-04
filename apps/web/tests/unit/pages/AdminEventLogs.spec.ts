@@ -2,23 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { i18n } from '../../../src/i18n'
-import AdminEquipment from '../../../src/pages/admin/AdminEquipment.vue'
+import AdminEventLogs from '../../../src/pages/admin/AdminEventLogs.vue'
 
 vi.mock('../../../src/lib/api', () => ({
   apiGet: vi.fn(),
-  apiPostWithPayload: vi.fn(),
-  apiPut: vi.fn(),
-  apiDelete: vi.fn(),
-}))
-
-vi.mock('../../../src/lib/toast', () => ({
-  useToast: vi.fn(() => ({ pushToast: vi.fn(), removeToast: vi.fn() })),
 }))
 
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [
-    { path: '/admin/events/:eventId/equipment', component: AdminEquipment },
+    { path: '/admin/events/:eventId/logs', component: AdminEventLogs },
     { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
   ],
 })
@@ -38,57 +31,48 @@ const mockMatchMedia = () => {
   })) as typeof window.matchMedia
 }
 
-describe('AdminEquipment', () => {
+describe('AdminEventLogs', () => {
   beforeEach(async () => {
     mockMatchMedia()
     const { apiGet } = await import('../../../src/lib/api')
     vi.mocked(apiGet).mockReset()
-    vi.mocked(apiGet)
-      .mockResolvedValueOnce({
-        id: 'ev-1',
-        name: 'Test Event',
-        startDate: '2026-02-08',
-        endDate: '2026-02-09',
-        guideUserIds: [],
-        isDeleted: false,
-      })
-      .mockResolvedValueOnce([
-        {
-          id: 'item-1',
-          type: 'Headset',
-          title: 'Headset',
-          name: 'Headset',
-          isActive: true,
-          sortOrder: 0,
-        },
-      ])
-      .mockResolvedValueOnce({
+    vi.mocked(apiGet).mockImplementation(async (url: string) => {
+      if (url === '/api/events/ev-1') {
+        return {
+          id: 'ev-1',
+          name: 'Test Event',
+          startDate: '2026-02-08',
+          endDate: '2026-02-09',
+          guideUserIds: [],
+          isDeleted: false,
+        }
+      }
+      return {
         page: 1,
         pageSize: 50,
         total: 0,
         items: [],
-      })
+      }
+    })
   })
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia
   })
 
-  it('renders custom comboboxes for item and type selection', async () => {
-    await router.push({ path: '/admin/events/ev-1/equipment' })
-    const wrapper = mount(AdminEquipment, {
+  it('renders compact combobox filters', async () => {
+    await router.push({ path: '/admin/events/ev-1/logs' })
+    const wrapper = mount(AdminEventLogs, {
       global: {
         plugins: [i18n, router],
         stubs: {
-          QrScannerModal: true,
           LoadingState: true,
           ErrorState: true,
-          ConfirmDialog: true,
         },
       },
     })
     await flushPromises()
 
-    expect(wrapper.findAll('.app-combobox-trigger').length).toBeGreaterThan(0)
+    expect(wrapper.findAll('.app-combobox-trigger-compact').length).toBeGreaterThanOrEqual(4)
   })
 })

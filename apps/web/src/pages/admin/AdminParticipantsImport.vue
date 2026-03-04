@@ -8,8 +8,10 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ImportTemplateHelpModal from '../../components/admin/ImportTemplateHelpModal.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import type {
+  AppComboboxOption,
   Event as EventDto,
   ParticipantImportError,
   ParticipantImportPreviewRow,
@@ -70,6 +72,11 @@ const stickyControlsVisible = ref(false)
 const retryAfterSeconds = ref(0)
 let retryTimer: ReturnType<typeof setInterval> | null = null
 let summaryObserver: IntersectionObserver | null = null
+
+const importFormatOptions: AppComboboxOption[] = [
+  { value: 'xlsx', label: 'XLSX' },
+  { value: 'csv', label: 'CSV' },
+]
 
 const summary = computed(() => {
   const current = finalReport.value ?? report.value
@@ -879,13 +886,13 @@ watch(summary, () => {
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.import.fileFormat') }}</span>
-            <select
+            <AppCombobox
               v-model="selectedFormat"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            >
-              <option value="xlsx">XLSX</option>
-              <option value="csv">CSV</option>
-            </select>
+              :options="importFormatOptions"
+              :placeholder="t('admin.import.fileFormat')"
+              :aria-label="t('admin.import.fileFormat')"
+              :searchable="false"
+            />
           </label>
 
           <div class="grid gap-1 text-sm">

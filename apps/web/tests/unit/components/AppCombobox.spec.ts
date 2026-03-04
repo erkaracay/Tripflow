@@ -25,6 +25,35 @@ const options: AppComboboxOption[] = [
   },
 ]
 
+const groupedOptions: AppComboboxOption[] = [
+  {
+    value: 'activity-1',
+    label: '09:00 Welcome',
+    description: 'Day 1',
+    keywords: ['welcome'],
+    groupLabel: 'Day 1',
+  },
+  {
+    value: 'activity-2',
+    label: '11:00 Transfer',
+    description: 'Day 1',
+    keywords: ['transfer'],
+    groupLabel: 'Day 1',
+  },
+  {
+    value: 'activity-3',
+    label: '10:00 Feedback',
+    description: 'Day 2',
+    keywords: ['feedback'],
+    groupLabel: 'Day 2',
+  },
+]
+
+const numericOptions: AppComboboxOption[] = [
+  { value: 25, label: '25' },
+  { value: 50, label: '50' },
+]
+
 const originalMatchMedia = window.matchMedia
 
 const mockMatchMedia = (matches: boolean) => {
@@ -89,42 +118,36 @@ describe('AppCombobox', () => {
     expect(wrapper.text()).toContain('Tüm saat dilimlerinde ara')
   })
 
-  it('emits update:modelValue when an option is selected', async () => {
+  it('hides the search input and applies compact styles when configured', async () => {
     const wrapper = mount(AppCombobox, {
       props: {
-        modelValue: null,
+        modelValue: 'Europe/Istanbul',
         options,
         placeholder: 'Saat dilimi seçin',
-        recommendedValues: ['Europe/Istanbul', 'Europe/London'],
-        recommendedLabel: 'Önerilen',
-        allLabel: 'Tüm saat dilimleri',
-        browseAllLabel: 'Tüm saat dilimlerinde ara',
-        emptyLabel: 'Boş',
-        searchPlaceholder: 'Ara',
+        searchable: false,
+        compact: true,
       },
       global: {
         plugins: [i18n],
       },
     })
 
-    await wrapper.get('.app-combobox-trigger').trigger('click')
-    await wrapper.findAll('.app-combobox-option')[0]?.trigger('click')
+    expect(wrapper.get('.app-combobox-trigger').classes()).toContain('app-combobox-trigger-compact')
 
-    expect(wrapper.emitted('update:modelValue')).toEqual([['Europe/Istanbul']])
+    await wrapper.get('.app-combobox-trigger').trigger('click')
+
+    expect(wrapper.find('.app-combobox-search').exists()).toBe(false)
+    expect(wrapper.find('.app-combobox-option').classes()).toContain('app-combobox-option-compact')
   })
 
-  it('filters options by search value', async () => {
+  it('renders grouped options and preserves matching group labels while searching', async () => {
     const wrapper = mount(AppCombobox, {
       props: {
         modelValue: null,
-        options,
-        placeholder: 'Saat dilimi seçin',
-        recommendedValues: ['Europe/Istanbul'],
-        recommendedLabel: 'Önerilen',
-        allLabel: 'Tüm saat dilimleri',
-        browseAllLabel: 'Tüm saat dilimlerinde ara',
-        emptyLabel: 'Boş',
+        options: groupedOptions,
+        placeholder: 'Aktivite seçin',
         searchPlaceholder: 'Ara',
+        emptyLabel: 'Boş',
       },
       global: {
         plugins: [i18n],
@@ -132,25 +155,24 @@ describe('AppCombobox', () => {
     })
 
     await wrapper.get('.app-combobox-trigger').trigger('click')
-    await wrapper.get('.app-combobox-search').setValue('dubai')
+    expect(wrapper.text()).toContain('Day 1')
+    expect(wrapper.text()).toContain('Day 2')
 
-    const optionTexts = wrapper.findAll('.app-combobox-option').map((option) => option.text())
-    expect(optionTexts).toHaveLength(1)
-    expect(optionTexts[0]).toContain('Dubai')
+    await wrapper.get('.app-combobox-search').setValue('feedback')
+
+    const labels = wrapper.findAll('.app-combobox-section-label').map((node) => node.text())
+    expect(labels).toContain('Day 2')
+    expect(labels).not.toContain('Day 1')
+    expect(wrapper.text()).toContain('10:00 Feedback')
   })
 
-  it('reveals the full list after browse all is clicked', async () => {
+  it('emits numeric values without coercing them to strings', async () => {
     const wrapper = mount(AppCombobox, {
       props: {
         modelValue: null,
-        options,
-        placeholder: 'Saat dilimi seçin',
-        recommendedValues: ['Europe/Istanbul'],
-        recommendedLabel: 'Önerilen',
-        allLabel: 'Tüm saat dilimleri',
-        browseAllLabel: 'Tüm saat dilimlerinde ara',
-        emptyLabel: 'Boş',
-        searchPlaceholder: 'Ara',
+        options: numericOptions,
+        placeholder: 'Sayfa boyutu',
+        searchable: false,
       },
       global: {
         plugins: [i18n],
@@ -158,10 +180,9 @@ describe('AppCombobox', () => {
     })
 
     await wrapper.get('.app-combobox-trigger').trigger('click')
-    await wrapper.get('button[type="button"][class*="border-dashed"]').trigger('click')
+    await wrapper.findAll('.app-combobox-option')[1]?.trigger('click')
 
-    expect(wrapper.text()).toContain('Tüm saat dilimleri')
-    expect(wrapper.text()).toContain('Dubai')
+    expect(wrapper.emitted('update:modelValue')).toEqual([[50]])
   })
 
   it('supports keyboard navigation and selection', async () => {

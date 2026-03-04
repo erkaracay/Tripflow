@@ -12,8 +12,10 @@ import QrScannerModal from '../../components/QrScannerModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import { formatDateRange, formatTime, formatUtcToLocal } from '../../lib/formatters'
 import type {
+  AppComboboxOption,
   Event as EventDto,
   EventDay,
   EventActivity,
@@ -194,6 +196,21 @@ const dayLabel = (day: EventDay) =>
 
 const activityOptionLabel = (a: EventActivity) =>
   t('activityCheckIn.optionTimeActivity', { time: formatTime(a.startTime), title: a.title })
+
+const activityOptions = computed<AppComboboxOption[]>(() =>
+  activitiesByDay.value.flatMap((group) =>
+    group.activities.map((activity) => {
+      const groupText = dayLabel(group.day)
+      return {
+        value: activity.id,
+        label: activityOptionLabel(activity),
+        description: groupText,
+        keywords: [activity.title, groupText, formatTime(activity.startTime)],
+        groupLabel: groupText,
+      }
+    })
+  )
+)
 
 const selectedActivity = computed(() => {
   if (!selectedActivityId.value) return null
@@ -517,19 +534,15 @@ watch(selectedActivityId, () => {
           <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
             <label class="min-w-0 flex-1">
               <span class="block text-sm text-slate-600">{{ t('activityCheckIn.activity') }}</span>
-              <select
+              <AppCombobox
                 v-model="selectedActivityId"
-                class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <template v-for="group in activitiesByDay" :key="group.day.id">
-                  <optgroup :label="dayLabel(group.day)">
-                    <option v-for="a in group.activities" :key="a.id" :value="a.id">
-                      {{ activityOptionLabel(a) }}
-                    </option>
-                  </optgroup>
-                </template>
-                <option v-if="activities.length === 0" value="" disabled>{{ t('activityCheckIn.noActivities') }}</option>
-              </select>
+                class="mt-1"
+                :options="activityOptions"
+                :placeholder="t('activityCheckIn.selectActivity')"
+                :search-placeholder="t('common.search')"
+                :empty-label="t('activityCheckIn.noActivities')"
+                :aria-label="t('activityCheckIn.activity')"
+              />
             </label>
             <div
               class="app-segmented w-full max-w-[240px] grid-cols-2 sm:w-auto"

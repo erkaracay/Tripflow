@@ -6,7 +6,13 @@ import { apiGet } from '../../lib/api'
 import { formatUtcDateTimeLocal } from '../../lib/formatters'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { Event as EventDto, EventParticipantLogItem, EventParticipantLogListResponse } from '../../types'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
+import type {
+  AppComboboxOption,
+  Event as EventDto,
+  EventParticipantLogItem,
+  EventParticipantLogListResponse,
+} from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -38,6 +44,34 @@ const debounceHandle = ref<number | ReturnType<typeof setTimeout> | null>(null)
 const totalPages = computed(() => Math.max(Math.ceil(total.value / pageSize.value), 1))
 const canPrev = computed(() => page.value > 1)
 const canNext = computed(() => page.value < totalPages.value)
+
+const directionOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'all', label: t('admin.logs.all') },
+  { value: 'entry', label: t('common.entry') },
+  { value: 'exit', label: t('common.exit') },
+])
+
+const methodOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'all', label: t('admin.logs.all') },
+  { value: 'manual', label: t('admin.logs.methods.manual') },
+  { value: 'qrscan', label: t('admin.logs.methods.qrScan') },
+])
+
+const resultOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'all', label: t('admin.logs.all') },
+  { value: 'Success', label: t('admin.logs.results.success') },
+  { value: 'AlreadyArrived', label: t('admin.logs.results.alreadyArrived') },
+  { value: 'NotFound', label: t('admin.logs.results.notFound') },
+  { value: 'InvalidRequest', label: t('admin.logs.results.invalidRequest') },
+  { value: 'Failed', label: t('admin.logs.results.failed') },
+])
+
+const pageSizeOptions: AppComboboxOption[] = [
+  { value: 25, label: '25' },
+  { value: 50, label: '50' },
+  { value: 100, label: '100' },
+  { value: 200, label: '200' },
+]
 
 const loadEvent = async () => {
   eventError.value = null
@@ -322,44 +356,44 @@ onMounted(loadEvent)
 
         <div>
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.logs.directionLabel') }}</label>
-          <select
+          <AppCombobox
             v-model="direction"
-            class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-            @change="onFiltersChange"
-          >
-            <option value="all">{{ t('admin.logs.all') }}</option>
-            <option value="entry">{{ t('common.entry') }}</option>
-            <option value="exit">{{ t('common.exit') }}</option>
-          </select>
+            class="mt-1"
+            :options="directionOptions"
+            :placeholder="t('admin.logs.directionLabel')"
+            :aria-label="t('admin.logs.directionLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onFiltersChange"
+          />
         </div>
 
         <div>
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.logs.methodLabel') }}</label>
-          <select
+          <AppCombobox
             v-model="method"
-            class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-            @change="onFiltersChange"
-          >
-            <option value="all">{{ t('admin.logs.all') }}</option>
-            <option value="manual">{{ t('admin.logs.methods.manual') }}</option>
-            <option value="qrscan">{{ t('admin.logs.methods.qrScan') }}</option>
-          </select>
+            class="mt-1"
+            :options="methodOptions"
+            :placeholder="t('admin.logs.methodLabel')"
+            :aria-label="t('admin.logs.methodLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onFiltersChange"
+          />
         </div>
 
         <div>
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.logs.resultLabel') }}</label>
-          <select
+          <AppCombobox
             v-model="result"
-            class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-            @change="onFiltersChange"
-          >
-            <option value="all">{{ t('admin.logs.all') }}</option>
-            <option value="Success">{{ t('admin.logs.results.success') }}</option>
-            <option value="AlreadyArrived">{{ t('admin.logs.results.alreadyArrived') }}</option>
-            <option value="NotFound">{{ t('admin.logs.results.notFound') }}</option>
-            <option value="InvalidRequest">{{ t('admin.logs.results.invalidRequest') }}</option>
-            <option value="Failed">{{ t('admin.logs.results.failed') }}</option>
-          </select>
+            class="mt-1"
+            :options="resultOptions"
+            :placeholder="t('admin.logs.resultLabel')"
+            :aria-label="t('admin.logs.resultLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onFiltersChange"
+          />
         </div>
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-4">
@@ -388,16 +422,16 @@ onMounted(loadEvent)
         <div>{{ t('admin.logs.pagination', { page, totalPages, total }) }}</div>
         <div class="flex items-center gap-2">
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.logs.pageSizeLabel') }}</label>
-          <select
-            v-model.number="pageSize"
-            class="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700"
-            @change="onPageSizeChange"
-          >
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-            <option :value="200">200</option>
-          </select>
+          <AppCombobox
+            v-model="pageSize"
+            class="w-24"
+            :options="pageSizeOptions"
+            :placeholder="t('admin.logs.pageSizeLabel')"
+            :aria-label="t('admin.logs.pageSizeLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onPageSizeChange"
+          />
         </div>
       </div>
     </section>

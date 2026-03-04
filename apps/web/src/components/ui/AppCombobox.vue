@@ -2,11 +2,20 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppDrawerShell from './AppDrawerShell.vue'
-import type { AppComboboxOption } from '../../types'
+import type { AppComboboxOption, AppComboboxValue } from '../../types'
+
+type ComboboxRenderGroup = {
+  key: string
+  label: string | null
+  options: Array<{
+    option: AppComboboxOption
+    index: number
+  }>
+}
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string | null
+    modelValue: AppComboboxValue | null
     options: AppComboboxOption[]
     placeholder?: string
     searchPlaceholder?: string
@@ -18,8 +27,10 @@ const props = withDefaults(
     disabled?: boolean
     ariaLabel?: string
     mobileBreakpoint?: 'md' | 'lg'
-    recommendedValues?: string[]
+    recommendedValues?: AppComboboxValue[]
     optionCountForInlineList?: number
+    searchable?: boolean
+    compact?: boolean
   }>(),
   {
     placeholder: '',
@@ -34,14 +45,17 @@ const props = withDefaults(
     mobileBreakpoint: 'md',
     recommendedValues: () => [],
     optionCountForInlineList: 8,
+    searchable: true,
+    compact: false,
   }
 )
 
 const emit = defineEmits<{
-  (event: 'update:modelValue', value: string): void
+  (event: 'update:modelValue', value: AppComboboxValue): void
   (event: 'open'): void
   (event: 'close'): void
 }>()
+
 const { t } = useI18n()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -65,18 +79,22 @@ const breakpointQuery = computed(() =>
 )
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
-const recommendedValueSet = computed(() => new Set(props.recommendedValues.filter(Boolean)))
+const recommendedValueSet = computed(() => new Set(props.recommendedValues))
+
+const hasValue = (value: AppComboboxValue | null | undefined) => value !== null && value !== undefined && value !== ''
+const optionKey = (value: AppComboboxValue) => `${typeof value}:${String(value)}`
 
 const selectedOption = computed<AppComboboxOption | null>(() => {
-  const selected = props.modelValue?.trim()
-  if (!selected) {
+  if (props.modelValue === null || props.modelValue === undefined || props.modelValue === '') {
     return null
   }
 
+  const selectedValue = props.modelValue
+
   return (
-    props.options.find((option) => option.value === selected) ?? {
-      value: selected,
-      label: selected,
+    props.options.find((option) => option.value === selectedValue) ?? {
+      value: selectedValue,
+      label: String(selectedValue),
       description: null,
     }
   )
@@ -90,7 +108,8 @@ const matchesSearch = (option: AppComboboxOption, query: string) => {
   const haystack = [
     option.label,
     option.description ?? '',
-    option.value,
+    option.groupLabel ?? '',
+    String(option.value),
     ...(option.keywords ?? []),
   ]
     .join(' ')
@@ -128,6 +147,42 @@ const visibleOptions = computed(() => {
 
   return inlineOptions.value
 })
+
+const buildRenderGroups = (options: AppComboboxOption[], startIndex = 0): ComboboxRenderGroup[] => {
+  const groups: ComboboxRenderGroup[] = []
+  const groupIndexByKey = new Map<string, number>()
+
+  options.forEach((option, offset) => {
+    const label = option.groupLabel?.trim() || null
+    const key = label ? `group:${label}` : 'group:__ungrouped__'
+    const existingIndex = groupIndexByKey.get(key)
+    const entry = {
+      option,
+      index: startIndex + offset,
+    }
+
+    if (existingIndex === undefined) {
+      groupIndexByKey.set(key, groups.length)
+      groups.push({
+        key,
+        label,
+        options: [entry],
+      })
+      return
+    }
+
+    const group = groups[existingIndex]
+    if (group) {
+      group.options.push(entry)
+    }
+  })
+
+  return groups
+}
+
+const filteredRenderGroups = computed(() => buildRenderGroups(filteredOptions.value))
+const inlineRenderGroups = computed(() => buildRenderGroups(inlineOptions.value))
+const remainingRenderGroups = computed(() => buildRenderGroups(remainingOptions.value, inlineOptions.value.length))
 
 const hasBrowseAll = computed(() => !normalizedSearch.value && remainingOptions.value.length > 0)
 const showRecommendedSection = computed(() => !normalizedSearch.value && recommendedAvailableOptions.value.length > 0)
@@ -174,6 +229,9 @@ const syncMobileMode = () => {
 }
 
 const focusSearchInput = async () => {
+  if (!props.searchable) {
+    return
+  }
   await nextTick()
   activeSearchRef()?.focus()
 }
@@ -190,14 +248,13 @@ const scrollHighlightedIntoView = async () => {
 }
 
 const syncHighlightedIndex = () => {
-  const selected = props.modelValue?.trim()
   if (!visibleOptions.value.length) {
     highlightedIndex.value = -1
     return
   }
 
-  const selectedIndex = selected
-    ? visibleOptions.value.findIndex((option) => option.value === selected)
+  const selectedIndex = hasValue(props.modelValue)
+    ? visibleOptions.value.findIndex((option) => option.value === props.modelValue)
     : -1
 
   highlightedIndex.value = selectedIndex >= 0 ? selectedIndex : 0
@@ -224,10 +281,15 @@ const openPanel = async () => {
     return
   }
 
-  const selected = props.modelValue?.trim()
-  const selectedInline = selected ? inlineOptions.value.some((option) => option.value === selected) : false
+  const selectedInline = hasValue(props.modelValue)
+    ? inlineOptions.value.some((option) => option.value === props.modelValue)
+    : false
 
-  showAll.value = Boolean(selected && !selectedInline && filteredOptions.value.some((option) => option.value === selected))
+  showAll.value = Boolean(
+    hasValue(props.modelValue)
+      && !selectedInline
+      && filteredOptions.value.some((option) => option.value === props.modelValue)
+  )
   search.value = ''
   open.value = true
   syncHighlightedIndex()
@@ -266,6 +328,13 @@ const moveHighlight = async (direction: 1 | -1) => {
   await scrollHighlightedIntoView()
 }
 
+const selectHighlighted = () => {
+  const option = visibleOptions.value[highlightedIndex.value]
+  if (option) {
+    selectOption(option)
+  }
+}
+
 const handleTriggerKeydown = async (event: KeyboardEvent) => {
   if (props.disabled) {
     return
@@ -277,6 +346,12 @@ const handleTriggerKeydown = async (event: KeyboardEvent) => {
       await openPanel()
     }
     await moveHighlight(event.key === 'ArrowDown' ? 1 : -1)
+    return
+  }
+
+  if (!props.searchable && open.value && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault()
+    selectHighlighted()
     return
   }
 
@@ -295,10 +370,7 @@ const handleSearchKeydown = async (event: KeyboardEvent) => {
 
   if (event.key === 'Enter') {
     event.preventDefault()
-    const option = visibleOptions.value[highlightedIndex.value]
-    if (option) {
-      selectOption(option)
-    }
+    selectHighlighted()
     return
   }
 
@@ -391,6 +463,7 @@ onUnmounted(() => {
       :class="{
         'app-combobox-trigger-invalid': invalid,
         'app-combobox-trigger-open': open,
+        'app-combobox-trigger-compact': compact,
         'cursor-not-allowed opacity-60': disabled,
       }"
       type="button"
@@ -424,7 +497,7 @@ onUnmounted(() => {
         ref="desktopPanelRef"
         class="app-combobox-panel absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30"
       >
-        <div class="border-b border-slate-100 px-3 py-3">
+        <div v-if="searchable" class="border-b border-slate-100 px-3 py-3">
           <label class="relative block">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="m14.5 14.5-3.2-3.2m1.7-4.05a5.75 5.75 0 1 1-11.5 0 5.75 5.75 0 0 1 11.5 0Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
@@ -444,29 +517,33 @@ onUnmounted(() => {
           <template v-if="normalizedSearch">
             <div v-if="filteredOptions.length === 0" class="px-3 py-6 text-sm text-slate-500">{{ emptyLabel }}</div>
             <div v-else class="space-y-1">
-              <button
-                v-for="(option, index) in filteredOptions"
-                :key="option.value"
-                class="app-combobox-option"
-                :class="{
-                  'app-combobox-option-active': highlightedIndex === index,
-                  'app-combobox-option-selected': option.value === modelValue,
-                }"
-                type="button"
-                role="option"
-                :aria-selected="option.value === modelValue"
-                :data-option-index="index"
-                @mouseenter="highlightedIndex = index"
-                @click="selectOption(option)"
-              >
-                <span class="min-w-0 flex-1 text-left">
-                  <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                  <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                </span>
-                <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                </svg>
-              </button>
+              <template v-for="group in filteredRenderGroups" :key="group.key">
+                <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                <button
+                  v-for="entry in group.options"
+                  :key="optionKey(entry.option.value)"
+                  class="app-combobox-option"
+                  :class="{
+                    'app-combobox-option-active': highlightedIndex === entry.index,
+                    'app-combobox-option-selected': entry.option.value === modelValue,
+                    'app-combobox-option-compact': compact,
+                  }"
+                  type="button"
+                  role="option"
+                  :aria-selected="entry.option.value === modelValue"
+                  :data-option-index="entry.index"
+                  @mouseenter="highlightedIndex = entry.index"
+                  @click="selectOption(entry.option)"
+                >
+                  <span class="min-w-0 flex-1 text-left">
+                    <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                    <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                  </span>
+                  <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                  </svg>
+                </button>
+              </template>
             </div>
           </template>
 
@@ -478,29 +555,33 @@ onUnmounted(() => {
                 {{ showRecommendedSection ? recommendedLabel : allLabel }}
               </div>
               <div class="space-y-1">
-                <button
-                  v-for="(option, index) in inlineOptions"
-                  :key="option.value"
-                  class="app-combobox-option"
-                  :class="{
-                    'app-combobox-option-active': highlightedIndex === index,
-                    'app-combobox-option-selected': option.value === modelValue,
-                  }"
-                  type="button"
-                  role="option"
-                  :aria-selected="option.value === modelValue"
-                  :data-option-index="index"
-                  @mouseenter="highlightedIndex = index"
-                  @click="selectOption(option)"
-                >
-                  <span class="min-w-0 flex-1 text-left">
-                    <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                    <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                  </span>
-                  <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                  </svg>
-                </button>
+                <template v-for="group in inlineRenderGroups" :key="group.key">
+                  <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                  <button
+                    v-for="entry in group.options"
+                    :key="optionKey(entry.option.value)"
+                    class="app-combobox-option"
+                    :class="{
+                      'app-combobox-option-active': highlightedIndex === entry.index,
+                      'app-combobox-option-selected': entry.option.value === modelValue,
+                      'app-combobox-option-compact': compact,
+                    }"
+                    type="button"
+                    role="option"
+                    :aria-selected="entry.option.value === modelValue"
+                    :data-option-index="entry.index"
+                    @mouseenter="highlightedIndex = entry.index"
+                    @click="selectOption(entry.option)"
+                  >
+                    <span class="min-w-0 flex-1 text-left">
+                      <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                      <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                    </span>
+                    <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                    </svg>
+                  </button>
+                </template>
               </div>
 
               <button
@@ -515,29 +596,33 @@ onUnmounted(() => {
               <template v-if="showAllSection">
                 <div class="px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ allLabel }}</div>
                 <div class="space-y-1">
-                  <button
-                    v-for="(option, index) in remainingOptions"
-                    :key="option.value"
-                    class="app-combobox-option"
-                    :class="{
-                      'app-combobox-option-active': highlightedIndex === inlineOptions.length + index,
-                      'app-combobox-option-selected': option.value === modelValue,
-                    }"
-                    type="button"
-                    role="option"
-                    :aria-selected="option.value === modelValue"
-                    :data-option-index="inlineOptions.length + index"
-                    @mouseenter="highlightedIndex = inlineOptions.length + index"
-                    @click="selectOption(option)"
-                  >
-                    <span class="min-w-0 flex-1 text-left">
-                      <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                      <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                    </span>
-                    <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                      <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                    </svg>
-                  </button>
+                  <template v-for="group in remainingRenderGroups" :key="group.key">
+                    <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                    <button
+                      v-for="entry in group.options"
+                      :key="optionKey(entry.option.value)"
+                      class="app-combobox-option"
+                      :class="{
+                        'app-combobox-option-active': highlightedIndex === entry.index,
+                        'app-combobox-option-selected': entry.option.value === modelValue,
+                        'app-combobox-option-compact': compact,
+                      }"
+                      type="button"
+                      role="option"
+                      :aria-selected="entry.option.value === modelValue"
+                      :data-option-index="entry.index"
+                      @mouseenter="highlightedIndex = entry.index"
+                      @click="selectOption(entry.option)"
+                    >
+                      <span class="min-w-0 flex-1 text-left">
+                        <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                        <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                      </span>
+                      <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                      </svg>
+                    </button>
+                  </template>
                 </div>
               </template>
             </template>
@@ -572,7 +657,7 @@ onUnmounted(() => {
           </div>
 
           <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-            <label class="relative block">
+            <label v-if="searchable" class="relative block">
               <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="m14.5 14.5-3.2-3.2m1.7-4.05a5.75 5.75 0 1 1-11.5 0 5.75 5.75 0 0 1 11.5 0Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
               </svg>
@@ -592,28 +677,32 @@ onUnmounted(() => {
                   {{ emptyLabel }}
                 </div>
                 <div v-else class="space-y-2">
-                  <button
-                    v-for="(option, index) in filteredOptions"
-                    :key="option.value"
-                    class="app-combobox-option"
-                    :class="{
-                      'app-combobox-option-active': highlightedIndex === index,
-                      'app-combobox-option-selected': option.value === modelValue,
-                    }"
-                    type="button"
-                    role="option"
-                    :aria-selected="option.value === modelValue"
-                    :data-option-index="index"
-                    @click="selectOption(option)"
-                  >
-                    <span class="min-w-0 flex-1 text-left">
-                      <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                      <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                    </span>
-                    <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                      <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                    </svg>
-                  </button>
+                  <template v-for="group in filteredRenderGroups" :key="group.key">
+                    <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                    <button
+                      v-for="entry in group.options"
+                      :key="optionKey(entry.option.value)"
+                      class="app-combobox-option"
+                      :class="{
+                        'app-combobox-option-active': highlightedIndex === entry.index,
+                        'app-combobox-option-selected': entry.option.value === modelValue,
+                        'app-combobox-option-compact': compact,
+                      }"
+                      type="button"
+                      role="option"
+                      :aria-selected="entry.option.value === modelValue"
+                      :data-option-index="entry.index"
+                      @click="selectOption(entry.option)"
+                    >
+                      <span class="min-w-0 flex-1 text-left">
+                        <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                        <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                      </span>
+                      <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                      </svg>
+                    </button>
+                  </template>
                 </div>
               </template>
 
@@ -626,28 +715,32 @@ onUnmounted(() => {
                   <section class="space-y-2">
                     <div class="app-combobox-section-label">{{ showRecommendedSection ? recommendedLabel : allLabel }}</div>
                     <div class="space-y-2">
-                      <button
-                        v-for="(option, index) in inlineOptions"
-                        :key="option.value"
-                        class="app-combobox-option"
-                        :class="{
-                          'app-combobox-option-active': highlightedIndex === index,
-                          'app-combobox-option-selected': option.value === modelValue,
-                        }"
-                        type="button"
-                        role="option"
-                        :aria-selected="option.value === modelValue"
-                        :data-option-index="index"
-                        @click="selectOption(option)"
-                      >
-                        <span class="min-w-0 flex-1 text-left">
-                          <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                          <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                        </span>
-                        <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                          <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                        </svg>
-                      </button>
+                      <template v-for="group in inlineRenderGroups" :key="group.key">
+                        <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                        <button
+                          v-for="entry in group.options"
+                          :key="optionKey(entry.option.value)"
+                          class="app-combobox-option"
+                          :class="{
+                            'app-combobox-option-active': highlightedIndex === entry.index,
+                            'app-combobox-option-selected': entry.option.value === modelValue,
+                            'app-combobox-option-compact': compact,
+                          }"
+                          type="button"
+                          role="option"
+                          :aria-selected="entry.option.value === modelValue"
+                          :data-option-index="entry.index"
+                          @click="selectOption(entry.option)"
+                        >
+                          <span class="min-w-0 flex-1 text-left">
+                            <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                            <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                          </span>
+                          <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                          </svg>
+                        </button>
+                      </template>
                     </div>
                   </section>
 
@@ -663,28 +756,32 @@ onUnmounted(() => {
                   <section v-if="showAllSection" class="space-y-2">
                     <div class="app-combobox-section-label">{{ allLabel }}</div>
                     <div class="space-y-2">
-                      <button
-                        v-for="(option, index) in remainingOptions"
-                        :key="option.value"
-                        class="app-combobox-option"
-                        :class="{
-                          'app-combobox-option-active': highlightedIndex === inlineOptions.length + index,
-                          'app-combobox-option-selected': option.value === modelValue,
-                        }"
-                        type="button"
-                        role="option"
-                        :aria-selected="option.value === modelValue"
-                        :data-option-index="inlineOptions.length + index"
-                        @click="selectOption(option)"
-                      >
-                        <span class="min-w-0 flex-1 text-left">
-                          <span class="block truncate text-sm font-medium text-slate-900">{{ option.label }}</span>
-                          <span v-if="option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ option.description }}</span>
-                        </span>
-                        <svg v-if="option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                          <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
-                        </svg>
-                      </button>
+                      <template v-for="group in remainingRenderGroups" :key="group.key">
+                        <div v-if="group.label" class="app-combobox-section-label">{{ group.label }}</div>
+                        <button
+                          v-for="entry in group.options"
+                          :key="optionKey(entry.option.value)"
+                          class="app-combobox-option"
+                          :class="{
+                            'app-combobox-option-active': highlightedIndex === entry.index,
+                            'app-combobox-option-selected': entry.option.value === modelValue,
+                            'app-combobox-option-compact': compact,
+                          }"
+                          type="button"
+                          role="option"
+                          :aria-selected="entry.option.value === modelValue"
+                          :data-option-index="entry.index"
+                          @click="selectOption(entry.option)"
+                        >
+                          <span class="min-w-0 flex-1 text-left">
+                            <span class="block truncate text-sm font-medium text-slate-900">{{ entry.option.label }}</span>
+                            <span v-if="entry.option.description" class="mt-0.5 block truncate text-xs text-slate-500">{{ entry.option.description }}</span>
+                          </span>
+                          <svg v-if="entry.option.value === modelValue" class="h-4 w-4 shrink-0 text-slate-900" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <path d="m5 10 3.25 3.25L15 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" />
+                          </svg>
+                        </button>
+                      </template>
                     </div>
                   </section>
                 </template>

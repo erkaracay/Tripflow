@@ -11,8 +11,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import CopyIcon from '../../components/icons/CopyIcon.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import { formatDateRange, formatUtcToLocal } from '../../lib/formatters'
 import type {
+  AppComboboxOption,
   Event as EventDto,
   EventItem,
   ItemActionResponse,
@@ -92,6 +94,22 @@ const typeLabel = (type: string) => {
     ? t('equipment.types.' + type)
     : type
 }
+
+const equipmentTypeOptions = computed<AppComboboxOption[]>(() =>
+  EQUIPMENT_TYPES.map((type) => ({
+    value: type,
+    label: t('equipment.types.' + type),
+  }))
+)
+
+const activeItemOptions = computed<AppComboboxOption[]>(() =>
+  activeItems.value.map((item) => ({
+    value: item.id,
+    label: item.name,
+    description: typeLabel(item.type),
+    keywords: [item.name, item.type, typeLabel(item.type)],
+  }))
+)
 
 const { pushToast, removeToast } = useToast()
 
@@ -533,14 +551,14 @@ watch(selectedItemId, () => {
                             <td class="w-[25%] p-2 align-middle">
                               <label class="block">
                                 <span class="sr-only">{{ t('equipment.type') }}</span>
-                                <select
+                                <AppCombobox
                                   v-model="editForm.type"
-                                  class="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm"
-                                >
-                                  <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
-                                    {{ t('equipment.types.' + opt) }}
-                                  </option>
-                                </select>
+                                  :options="equipmentTypeOptions"
+                                  :placeholder="t('equipment.type')"
+                                  :aria-label="t('equipment.type')"
+                                  :searchable="false"
+                                  compact
+                                />
                               </label>
                             </td>
                             <td class="w-[20%] p-2 align-middle">
@@ -603,14 +621,15 @@ watch(selectedItemId, () => {
           </label>
           <label class="min-w-0">
             <span class="block text-xs text-slate-500">{{ t('equipment.type') }}</span>
-            <select
+            <AppCombobox
               v-model="addForm.type"
-              class="mt-0.5 w-28 rounded border border-slate-200 px-2 py-1.5 text-sm"
-            >
-              <option v-for="opt in EQUIPMENT_TYPES" :key="opt" :value="opt">
-                {{ t('equipment.types.' + opt) }}
-              </option>
-            </select>
+              class="mt-0.5 w-40"
+              :options="equipmentTypeOptions"
+              :placeholder="t('equipment.type')"
+              :aria-label="t('equipment.type')"
+              :searchable="false"
+              compact
+            />
           </label>
           <button
             type="submit"
@@ -635,13 +654,15 @@ watch(selectedItemId, () => {
           <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
             <label class="min-w-0 flex-1 sm:max-w-xs">
               <span class="block text-sm text-slate-600">{{ t('equipment.item') }}</span>
-              <select
+              <AppCombobox
                 v-model="selectedItemId"
-                class="mt-1 w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option v-for="i in activeItems" :key="i.id" :value="i.id">{{ i.name }}</option>
-                <option v-if="activeItems.length === 0" value="" disabled>{{ t('equipment.noItems') }}</option>
-              </select>
+                class="mt-1"
+                :options="activeItemOptions"
+                :placeholder="t('equipment.item')"
+                :search-placeholder="t('common.search')"
+                :empty-label="t('equipment.noItems')"
+                :aria-label="t('equipment.item')"
+              />
             </label>
             <div
               class="app-segmented w-full max-w-[240px] grid-cols-2 sm:w-auto"

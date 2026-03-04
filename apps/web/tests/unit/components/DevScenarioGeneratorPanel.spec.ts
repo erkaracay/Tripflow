@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import DevScenarioGeneratorPanel from '../../../src/components/admin/DevScenarioGeneratorPanel.vue'
+import AppCombobox from '../../../src/components/ui/AppCombobox.vue'
 import { i18n, setLocale } from '../../../src/i18n'
 import type { ScenarioPresetDto } from '../../../src/types'
 
@@ -108,15 +109,27 @@ const openAdvanced = async (wrapper: ReturnType<typeof mount>) => {
   await advancedButton!.trigger('click')
 }
 
-const findFlightModeSelect = (wrapper: ReturnType<typeof mount>) =>
-  wrapper
-    .findAll('select')
-    .find((select) => select.text().includes('Direct only') && select.text().includes('Layover heavy'))
+const findComboboxByLabel = (wrapper: ReturnType<typeof mount>, label: string) =>
+  wrapper.findAllComponents(AppCombobox).find((component) => component.props('ariaLabel') === label)
 
-const findNamingModeSelect = (wrapper: ReturnType<typeof mount>) =>
-  wrapper
-    .findAll('select')
-    .find((select) => select.text().includes('Random sample names') && select.text().includes('Prefix + Guest'))
+const selectComboboxOption = async (
+  wrapper: ReturnType<typeof mount>,
+  label: string,
+  optionLabel: string
+) => {
+  const combobox = findComboboxByLabel(wrapper, label)
+  expect(combobox).toBeDefined()
+
+  const trigger = combobox!.get('button[aria-label]')
+  await trigger.trigger('click')
+
+  const option = wrapper
+    .findAll('.app-combobox-option')
+    .find((node) => node.text().includes(optionLabel))
+
+  expect(option).toBeDefined()
+  await option!.trigger('click')
+}
 
 const findPresetTab = (wrapper: ReturnType<typeof mount>, label: string) =>
   wrapper
@@ -155,9 +168,9 @@ describe('DevScenarioGeneratorPanel', () => {
     expect((numberInputs[0]!.element as HTMLInputElement).value).toBe('3')
     expect((numberInputs[1]!.element as HTMLInputElement).value).toBe('48')
 
-    const flightModeSelect = findFlightModeSelect(wrapper)
-    expect(flightModeSelect).toBeDefined()
-    expect((flightModeSelect!.element as HTMLSelectElement).value).toBe('layover_heavy')
+    const flightModeCombobox = findComboboxByLabel(wrapper, 'Flight structure')
+    expect(flightModeCombobox).toBeDefined()
+    expect(flightModeCombobox!.text()).toContain('Layover heavy')
   })
 
   it('submits and emits the generated event payload', async () => {
@@ -218,9 +231,7 @@ describe('DevScenarioGeneratorPanel', () => {
     await openPanel(wrapper)
     await openAdvanced(wrapper)
 
-    const namingModeSelect = findNamingModeSelect(wrapper)
-    expect(namingModeSelect).toBeDefined()
-    await namingModeSelect!.setValue('prefix')
+    await selectComboboxOption(wrapper, 'Participant naming mode', 'Prefix + Guest')
 
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
@@ -241,9 +252,9 @@ describe('DevScenarioGeneratorPanel', () => {
 
     await wrapper.get('input[type="checkbox"]').setValue(false)
 
-    const flightModeSelect = findFlightModeSelect(wrapper)
-    expect(flightModeSelect).toBeDefined()
-    expect(flightModeSelect!.attributes('disabled')).toBeDefined()
+    const flightModeCombobox = findComboboxByLabel(wrapper, 'Flight structure')
+    expect(flightModeCombobox).toBeDefined()
+    expect(flightModeCombobox!.get('button[aria-label]').attributes('disabled')).toBeDefined()
   })
 
   it('renders exact summary counts for the flight-heavy preset', async () => {

@@ -10,11 +10,14 @@ export type Event = {
   isDeleted: boolean
 }
 
+export type AppComboboxValue = string | number
+
 export type AppComboboxOption = {
-  value: string
+  value: AppComboboxValue
   label: string
   description?: string | null
   keywords?: string[]
+  groupLabel?: string | null
 }
 
 export type ScenarioPresetDefaults = {

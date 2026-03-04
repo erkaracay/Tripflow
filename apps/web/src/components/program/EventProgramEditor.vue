@@ -7,11 +7,12 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import ErrorState from '../ui/ErrorState.vue'
 import AppModalShell from '../ui/AppModalShell.vue'
+import AppCombobox from '../ui/AppCombobox.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import ActivityMealConfigEditor from './ActivityMealConfigEditor.vue'
 import MealReportView from '../meal/MealReportView.vue'
 import RichTextContent from '../editor/RichTextContent.vue'
-import type { Event as EventDto, EventActivity, EventDay } from '../../types'
+import type { AppComboboxOption, Event as EventDto, EventActivity, EventDay } from '../../types'
 
 const RichTextEditor = defineAsyncComponent(
   () => import('../editor/RichTextEditor.vue')
@@ -90,6 +91,17 @@ const activityForm = ref({
   programContent: '',
   surveyUrl: '',
 })
+
+const activityTypeOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'Meal', label: t('admin.program.activities.typeMeal') },
+  { value: 'Program', label: t('admin.program.activities.typeProgram') },
+  { value: 'Other', label: t('admin.program.activities.typeOther') },
+])
+
+const activityCheckInModeOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'EntryOnly', label: t('admin.program.activities.checkInModeEntry') },
+  { value: 'EntryExit', label: t('admin.program.activities.checkInModeEntryExit') },
+])
 
 const selectedDay = computed(() => days.value.find((day) => day.id === selectedDayId.value) ?? null)
 const persistedEditingActivity = computed(() => activities.value.find((activity) => activity.id === editingActivityId.value) ?? null)
@@ -875,16 +887,15 @@ onMounted(loadAll)
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.type') }}</span>
-            <select
+            <AppCombobox
               v-model="activityForm.type"
-              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              :options="activityTypeOptions"
+              :placeholder="t('admin.program.activities.form.type')"
+              :aria-label="t('admin.program.activities.form.type')"
               name="activityType"
               :disabled="savingActivity"
-            >
-              <option value="Meal">{{ t('admin.program.activities.typeMeal') }}</option>
-              <option value="Program">{{ t('admin.program.activities.typeProgram') }}</option>
-              <option value="Other">{{ t('admin.program.activities.typeOther') }}</option>
-            </select>
+              :searchable="false"
+            />
           </label>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.program.activities.form.startTime') }}</span>
@@ -989,15 +1000,15 @@ onMounted(loadAll)
           </label>
           <label class="grid gap-1 text-sm md:col-span-2" v-if="activityForm.checkInEnabled">
             <span class="text-slate-600">{{ t('admin.program.activities.form.checkInMode') }}</span>
-            <select
+            <AppCombobox
               v-model="activityForm.checkInMode"
-              class="rounded border border-slate-200 px-3 py-2 text-sm"
+              :options="activityCheckInModeOptions"
+              :placeholder="t('admin.program.activities.form.checkInMode')"
+              :aria-label="t('admin.program.activities.form.checkInMode')"
               name="activityCheckInMode"
               :disabled="savingActivity"
-            >
-              <option value="EntryOnly">{{ t('admin.program.activities.checkInModeEntry') }}</option>
-              <option value="EntryExit">{{ t('admin.program.activities.checkInModeEntryExit') }}</option>
-            </select>
+              :searchable="false"
+            />
           </label>
         </div>
         <p v-if="timeError" class="mt-3 text-xs text-rose-600">{{ timeError }}</p>

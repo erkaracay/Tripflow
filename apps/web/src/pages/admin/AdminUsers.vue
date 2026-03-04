@@ -7,7 +7,8 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import PasswordModal from '../../components/ui/PasswordModal.vue'
-import type { UserListItem, UserUpsertResponse } from '../../types'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
+import type { AppComboboxOption, UserListItem, UserUpsertResponse } from '../../types'
 
 type CreateRole = 'Admin' | 'Guide'
 
@@ -36,6 +37,11 @@ const passwordUser = ref<UserListItem | null>(null)
 const passwordErrorKey = ref<string | null>(null)
 const passwordErrorMessage = ref<string | null>(null)
 const passwordSaving = ref(false)
+
+const roleOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'Admin', label: t('admin.users.roles.admin') },
+  { value: 'Guide', label: t('admin.users.roles.guide') },
+])
 
 const loadUsers = async () => {
   if (!selectedOrgId.value) {
@@ -233,15 +239,16 @@ onMounted(loadUsers)
       <form class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2" @submit.prevent="createUser">
         <label class="grid min-w-0 gap-1 text-sm">
           <span class="text-slate-600">{{ t('admin.users.form.roleLabel') }}</span>
-          <select
+          <AppCombobox
             v-model="createForm.role"
-            class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+            class="rounded"
+            :options="roleOptions"
+            :placeholder="t('admin.users.form.roleLabel')"
+            :aria-label="t('admin.users.form.roleLabel')"
+            :searchable="false"
+            compact
             :disabled="creating"
-            name="role"
-          >
-            <option value="Admin">{{ t('admin.users.roles.admin') }}</option>
-            <option value="Guide">{{ t('admin.users.roles.guide') }}</option>
-          </select>
+          />
         </label>
         <label class="grid min-w-0 gap-1 text-sm">
           <span class="text-slate-600">{{ t('admin.users.form.emailLabel') }}</span>

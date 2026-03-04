@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { i18n } from '../../../src/i18n'
@@ -7,6 +7,8 @@ import GuideEquipment from '../../../src/pages/guide/GuideEquipment.vue'
 vi.mock('../../../src/lib/api', () => ({
   apiGet: vi.fn(),
   apiPostWithPayload: vi.fn(),
+  apiPut: vi.fn(),
+  apiDelete: vi.fn(),
 }))
 
 vi.mock('../../../src/lib/toast', () => ({
@@ -21,8 +23,24 @@ const router = createRouter({
   ],
 })
 
+const originalMatchMedia = window.matchMedia
+
+const mockMatchMedia = () => {
+  window.matchMedia = vi.fn().mockImplementation(() => ({
+    matches: false,
+    media: '(max-width: 767px)',
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    onchange: null,
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia
+}
+
 describe('GuideEquipment', () => {
   beforeEach(async () => {
+    mockMatchMedia()
     const { apiGet } = await import('../../../src/lib/api')
     vi.mocked(apiGet).mockReset()
     vi.mocked(apiGet)
@@ -31,21 +49,32 @@ describe('GuideEquipment', () => {
         name: 'Test Event',
         startDate: '2026-02-08',
         endDate: '2026-02-09',
+        guideUserIds: [],
         isDeleted: false,
       })
       .mockResolvedValueOnce([
         {
           id: 'item-1',
-          type: 'Equipment',
-          title: 'Item 1',
-          name: 'Item 1',
+          type: 'Headset',
+          title: 'Headset',
+          name: 'Headset',
           isActive: true,
           sortOrder: 0,
         },
       ])
+      .mockResolvedValueOnce({
+        page: 1,
+        pageSize: 50,
+        total: 0,
+        items: [],
+      })
   })
 
-  it('mounts and renders when API returns event and items', async () => {
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('renders custom comboboxes for item and type selection', async () => {
     await router.push({ path: '/guide/events/ev-1/equipment' })
     const wrapper = mount(GuideEquipment, {
       global: {
@@ -54,10 +83,12 @@ describe('GuideEquipment', () => {
           QrScannerModal: true,
           LoadingState: true,
           ErrorState: true,
+          ConfirmDialog: true,
         },
       },
     })
     await flushPromises()
-    expect(wrapper.exists()).toBe(true)
+
+    expect(wrapper.findAll('.app-combobox-trigger').length).toBeGreaterThan(0)
   })
 })

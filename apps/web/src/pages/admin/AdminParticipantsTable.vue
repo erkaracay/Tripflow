@@ -6,6 +6,7 @@ import { apiGet } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import FlightPanelHelperModal from '../../components/admin/FlightPanelHelperModal.vue'
 import { formatDate } from '../../lib/formatters'
@@ -16,6 +17,7 @@ import {
   PARTICIPANTS_SHEET_HEADERS,
 } from '../../lib/participantsExportWorkbook'
 import type {
+  AppComboboxOption,
   Event as EventDto,
   ParticipantProfile,
   ParticipantTableItem,
@@ -46,6 +48,19 @@ const debounceHandle = ref<number | ReturnType<typeof setTimeout> | null>(null)
 const totalPages = computed(() => Math.max(Math.ceil(total.value / pageSize.value), 1))
 const canPrev = computed(() => page.value > 1)
 const canNext = computed(() => page.value < totalPages.value)
+
+const statusOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'all', label: t('admin.participantsTable.statusAll') },
+  { value: 'arrived', label: t('admin.participantsTable.statusArrived') },
+  { value: 'not_arrived', label: t('admin.participantsTable.statusNotArrived') },
+])
+
+const pageSizeOptions: AppComboboxOption[] = [
+  { value: 25, label: '25' },
+  { value: 50, label: '50' },
+  { value: 100, label: '100' },
+  { value: 200, label: '200' },
+]
 
 const tableItems = computed(() => items.value)
 const hasItems = computed(() => tableItems.value.length > 0)
@@ -286,29 +301,30 @@ onMounted(loadEvent)
 
         <div class="min-w-[160px]">
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.participantsTable.statusLabel') }}</label>
-          <select
+          <AppCombobox
             v-model="status"
-            class="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm"
-            @change="onStatusChange"
-          >
-            <option value="all">{{ t('admin.participantsTable.statusAll') }}</option>
-            <option value="arrived">{{ t('admin.participantsTable.statusArrived') }}</option>
-            <option value="not_arrived">{{ t('admin.participantsTable.statusNotArrived') }}</option>
-          </select>
+            class="mt-1"
+            :options="statusOptions"
+            :placeholder="t('admin.participantsTable.statusLabel')"
+            :aria-label="t('admin.participantsTable.statusLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onStatusChange"
+          />
         </div>
 
         <div class="min-w-[140px]">
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.participantsTable.pageSizeLabel') }}</label>
-          <select
-            v-model.number="pageSize"
-            class="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm"
-            @change="onPageSizeChange"
-          >
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-            <option :value="200">200</option>
-          </select>
+          <AppCombobox
+            v-model="pageSize"
+            class="mt-1"
+            :options="pageSizeOptions"
+            :placeholder="t('admin.participantsTable.pageSizeLabel')"
+            :aria-label="t('admin.participantsTable.pageSizeLabel')"
+            :searchable="false"
+            compact
+            @update:modelValue="onPageSizeChange"
+          />
         </div>
 
         <div class="ml-auto text-xs text-slate-500">

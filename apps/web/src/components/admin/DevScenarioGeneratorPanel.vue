@@ -49,13 +49,13 @@ const form = reactive({
   dayCount: 3,
   participantCount: 40,
   equipmentTypeCount: 2,
-  mealMode: 'breakfast_only' as CreateScenarioEventRequest['mealMode'],
-  flightLegMode: 'mixed' as CreateScenarioEventRequest['flightLegMode'],
+  mealMode: 'breakfast_only' as NonNullable<CreateScenarioEventRequest['mealMode']>,
+  flightLegMode: 'mixed' as NonNullable<CreateScenarioEventRequest['flightLegMode']>,
   includeFlights: true,
-  activityDensity: 'normal' as CreateScenarioEventRequest['activityDensity'],
+  activityDensity: 'normal' as NonNullable<CreateScenarioEventRequest['activityDensity']>,
   mealSelectionCoveragePercent: 70,
   eventCheckInCoveragePercent: 20,
-  participantNamingMode: 'random' as CreateScenarioEventRequest['participantNamingMode'],
+  participantNamingMode: 'random' as NonNullable<CreateScenarioEventRequest['participantNamingMode']>,
   participantNamePrefix: '',
   randomSeed: '',
 })
@@ -451,14 +451,13 @@ function getTodayLocalDateString() {
 
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.mealModeLabel') }}</span>
-            <select
+            <AppCombobox
               v-model="form.mealMode"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            >
-              <option v-for="option in mealModeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
+              :options="mealModeOptions"
+              :placeholder="t('admin.devTools.scenario.mealModeLabel')"
+              :aria-label="t('admin.devTools.scenario.mealModeLabel')"
+              :searchable="false"
+            />
           </label>
 
           <label class="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 lg:col-span-2">
@@ -480,14 +479,13 @@ function getTodayLocalDateString() {
             <div v-if="advancedOpen" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-2 lg:grid-cols-2">
               <label class="grid gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.activityDensityLabel') }}</span>
-                <select
+                <AppCombobox
                   v-model="form.activityDensity"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                >
-                  <option v-for="option in activityDensityOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+                  :options="activityDensityOptions"
+                  :placeholder="t('admin.devTools.scenario.activityDensityLabel')"
+                  :aria-label="t('admin.devTools.scenario.activityDensityLabel')"
+                  :searchable="false"
+                />
                 <div class="min-h-5">
                   <p class="invisible text-xs">.</p>
                 </div>
@@ -495,15 +493,14 @@ function getTodayLocalDateString() {
 
               <label class="grid gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.flightLegModeLabel') }}</span>
-                <select
+                <AppCombobox
                   v-model="form.flightLegMode"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  :options="flightLegModeOptions"
+                  :placeholder="t('admin.devTools.scenario.flightLegModeLabel')"
+                  :aria-label="t('admin.devTools.scenario.flightLegModeLabel')"
                   :disabled="!form.includeFlights"
-                >
-                  <option v-for="option in flightLegModeOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+                  :searchable="false"
+                />
                 <div class="min-h-5">
                   <p class="text-xs text-slate-500">{{ t('admin.devTools.scenario.flightLegModeHelper') }}</p>
                 </div>
@@ -511,14 +508,13 @@ function getTodayLocalDateString() {
 
               <label class="grid gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.namingModeLabel') }}</span>
-                <select
+                <AppCombobox
                   v-model="form.participantNamingMode"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                >
-                  <option v-for="option in participantNamingOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+                  :options="participantNamingOptions"
+                  :placeholder="t('admin.devTools.scenario.namingModeLabel')"
+                  :aria-label="t('admin.devTools.scenario.namingModeLabel')"
+                  :searchable="false"
+                />
                 <div class="min-h-5">
                   <p class="invisible text-xs">.</p>
                 </div>
