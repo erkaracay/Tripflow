@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { defineComponent } from 'vue'
 import { i18n } from '../../../src/i18n'
 import AdminEventDetail from '../../../src/pages/admin/AdminEventDetail.vue'
-import type { Event, EventPortalInfo, Participant } from '../../../src/types'
+import type { Event, EventPortalInfo, Participant, UserListItem } from '../../../src/types'
 
 const pushToast = vi.fn()
 
@@ -49,6 +50,11 @@ const portalFixture: EventPortalInfo = {
   notes: ['Bring your badge'],
   eventContacts: null,
 }
+
+const guidesFixture: UserListItem[] = [
+  { id: 'guide-1', email: 'ayse@example.com', fullName: 'Ayse Demir', role: 'Guide' },
+  { id: 'guide-2', email: 'mert@example.com', fullName: 'Mert Kaya', role: 'Guide' },
+]
 
 const createTestRouter = () =>
   createRouter({
@@ -99,6 +105,7 @@ describe('AdminEventDetail', () => {
             template: '<div><slot /><slot name="default" :panelClass="\'\'" /></div>',
           },
           AppCombobox: true,
+          AppMultiCombobox: true,
           ConfirmDialog: true,
           WhatsAppIcon: true,
           RichTextEditor: true,
@@ -121,5 +128,82 @@ describe('AdminEventDetail', () => {
     expect(apiDelete).toHaveBeenCalledWith(`/api/dev/scenario-events/${eventFixture.id}`)
     expect(pushToast).toHaveBeenCalledWith({ key: 'toast.scenarioEventDeleted', tone: 'success' })
     expect(router.currentRoute.value.fullPath).toBe('/admin/events')
+  })
+
+  it('updates guide selections locally and persists them with the existing save action', async () => {
+    const { apiGet, apiPut } = await import('../../../src/lib/api')
+    vi.mocked(apiGet)
+      .mockResolvedValueOnce({ ...eventFixture, guideUserIds: ['guide-1'] })
+      .mockResolvedValueOnce([] satisfies Participant[])
+      .mockResolvedValueOnce(portalFixture)
+      .mockResolvedValueOnce(guidesFixture)
+    vi.mocked(apiPut).mockResolvedValue(undefined)
+
+    const AppMultiComboboxStub = defineComponent({
+      props: {
+        modelValue: {
+          type: Array,
+          required: true,
+        },
+      },
+      emits: ['update:modelValue'],
+      template: `
+        <div>
+          <span v-for="value in modelValue" :key="String(value)" class="guide-chip">{{ value }}</span>
+          <button class="guide-select" type="button" @click="$emit('update:modelValue', ['guide-1', 'guide-2'])">
+            select
+          </button>
+        </div>
+      `,
+    })
+
+    const router = createTestRouter()
+    await router.push(`/admin/events/${eventFixture.id}`)
+
+    const wrapper = mount(AdminEventDetail, {
+      props: { eventId: eventFixture.id },
+      global: {
+        plugins: [i18n, router],
+        stubs: {
+          Transition: false,
+          LoadingState: true,
+          ErrorState: true,
+          ParticipantFlightsModal: true,
+          AppModalShell: {
+            template: '<div><slot /><slot name="default" :panelClass="\'\'" /></div>',
+          },
+          AppCombobox: true,
+          AppMultiCombobox: AppMultiComboboxStub,
+          ConfirmDialog: true,
+          WhatsAppIcon: true,
+          RichTextEditor: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save guides'))
+
+    expect(saveButton).toBeDefined()
+    expect(saveButton!.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('.guide-chip')).toHaveLength(1)
+
+    await wrapper.get('.guide-select').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.guide-chip')).toHaveLength(2)
+    expect(saveButton!.attributes('disabled')).toBeUndefined()
+
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(apiPut).toHaveBeenCalledWith(`/api/events/${eventFixture.id}/guides`, {
+      guideUserIds: ['guide-1', 'guide-2'],
+    })
+    expect(pushToast).toHaveBeenCalledWith({ key: 'toast.guidesAssigned', tone: 'success' })
+    expect(saveButton!.attributes('disabled')).toBeDefined()
   })
 })

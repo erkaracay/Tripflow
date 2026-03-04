@@ -24,6 +24,7 @@
     "purge": "Permanently delete",
     "edit": "Edit",
     "remove": "Remove",
+    "removeSelection": "Remove selection",
     "moveUp": "Up",
     "moveDown": "Down",
     "prev": "Previous",

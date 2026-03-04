@@ -24,6 +24,7 @@
     "purge": "Kalıcı sil",
     "edit": "Düzenle",
     "remove": "Kaldır",
+    "removeSelection": "Seçimi kaldır",
     "moveUp": "Yukarı",
     "moveDown": "Aşağı",
     "prev": "Önceki",

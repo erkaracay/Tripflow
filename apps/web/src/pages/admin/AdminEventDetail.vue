@@ -35,9 +35,11 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
+import AppMultiCombobox from '../../components/ui/AppMultiCombobox.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
+  AppComboboxOption,
   DeleteScenarioEventResponse,
   EventAccessCodeResponse,
   LinkInfo,
@@ -93,7 +95,7 @@ const guideErrorMessage = ref<string | null>(null)
 const guideLoading = ref(true)
 const guides = ref<UserListItem[]>([])
 const guideIds = ref<string[]>([])
-const selectedGuideToAdd = ref('')
+const savedGuideIds = ref<string[]>([])
 const phoneErrorKey = ref<string | null>(null)
 const editPhoneErrorKey = ref<string | null>(null)
 const tcNoErrorKey = ref<string | null>(null)
@@ -153,6 +155,17 @@ const timeZoneComboboxOptions = computed(() => {
 const eventTimeZonePreview = computed(() => formatTimeZoneOffsetPreview(eventForm.timeZoneId))
 const showMissingTimeZoneWarning = computed(() => !!event.value && !event.value.timeZoneId)
 const isGeneratedScenarioEvent = computed(() => isDevelopment && !!event.value?.name?.startsWith('[DEV]'))
+
+const sameIdSet = (left: string[], right: string[]) => {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const leftSorted = [...left].sort()
+  const rightSorted = [...right].sort()
+
+  return leftSorted.every((value, index) => value === rightSorted[index])
+}
 
 const purgeConfirmValid = computed(() => {
   if (!event.value) {
@@ -431,6 +444,13 @@ const genderOptions = [
   { value: 'Other', label: 'common.genderOther' },
 ]
 
+const genderComboboxOptions = computed<AppComboboxOption[]>(() =>
+  genderOptions.map((option) => ({
+    value: option.value,
+    label: t(option.label),
+  }))
+)
+
 const sanitizeTcNoInput = (value: string) => value.replace(/\D/g, '').slice(0, 11)
 
 const handleTcNoInput = () => {
@@ -690,6 +710,7 @@ const loadEvent = async () => {
     participants.value = participantsData
     portal.value = portalData
     guideIds.value = eventData.guideUserIds ?? []
+    savedGuideIds.value = [...guideIds.value]
     setPortalForm(portalData)
     if (!participantAddInitialized.value) {
       const stored = globalThis.localStorage?.getItem(participantAddStorageKey.value)
@@ -1463,27 +1484,16 @@ const savePortal = async () => {
   }
 }
 
-const addGuide = () => {
-  if (!selectedGuideToAdd.value || guideIds.value.includes(selectedGuideToAdd.value)) {
-    selectedGuideToAdd.value = ''
-    return
-  }
-  guideIds.value = [...guideIds.value, selectedGuideToAdd.value]
-  selectedGuideToAdd.value = ''
-}
+const guideOptions = computed<AppComboboxOption[]>(() =>
+  guides.value.map((guide) => ({
+    value: guide.id,
+    label: guide.fullName || guide.email,
+    description: guide.fullName ? guide.email : null,
+    keywords: [guide.fullName ?? '', guide.email],
+  }))
+)
 
-const removeGuide = (guideId: string) => {
-  guideIds.value = guideIds.value.filter(id => id !== guideId)
-}
-
-const getGuideName = (guideId: string) => {
-  const guide = guides.value.find(g => g.id === guideId)
-  return guide ? (guide.fullName || guide.email) : guideId
-}
-
-const availableGuides = computed(() => {
-  return guides.value.filter(guide => !guideIds.value.includes(guide.id))
-})
+const guideDirty = computed(() => !sameIdSet(guideIds.value, savedGuideIds.value))
 
 const saveGuides = async () => {
   guideErrorKey.value = null
@@ -1497,6 +1507,7 @@ const saveGuides = async () => {
     if (event.value) {
       event.value = { ...event.value, guideUserIds: [...guideIds.value] }
     }
+    savedGuideIds.value = [...guideIds.value]
     pushToast({ key: 'toast.guidesAssigned', tone: 'success' })
   } catch (err) {
     guideErrorMessage.value = err instanceof Error ? err.message : null
@@ -1796,44 +1807,23 @@ onMounted(loadEvent)
           {{ t('admin.eventDetail.guide.empty') }}
         </div>
         <div v-else class="mt-4 space-y-4">
-          <!-- Selected guides as chips -->
-          <div v-if="guideIds.length > 0" class="flex flex-wrap gap-2">
-            <div
-              v-for="guideId in guideIds"
-              :key="guideId"
-              class="group inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-200"
-            >
-              <span class="font-medium">{{ getGuideName(guideId) }}</span>
-              <button
-                type="button"
-                @click="removeGuide(guideId)"
-                class="flex h-5 w-5 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
-                :aria-label="t('admin.eventDetail.guide.removeGuide')"
-              >
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Add guide dropdown -->
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <select
-              v-model="selectedGuideToAdd"
-              @change="addGuide"
-              class="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 sm:w-auto"
-            >
-              <option value="">{{ t('admin.eventDetail.guide.selectPlaceholder') }}</option>
-              <option v-for="guide in availableGuides" :key="guide.id" :value="guide.id">
-                {{ guide.fullName || guide.email }}
-              </option>
-            </select>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+            <AppMultiCombobox
+              v-model="guideIds"
+              class="w-full sm:min-w-[260px]"
+              :options="guideOptions"
+              :placeholder="t('admin.eventDetail.guide.selectPlaceholder')"
+              :search-placeholder="t('common.search')"
+              :empty-label="t('common.noData')"
+              :remove-chip-label="t('common.removeSelection')"
+              :max-visible-chips="3"
+              :aria-label="t('admin.eventDetail.guide.selectPlaceholder')"
+            />
             <button
               type="button"
               @click="saveGuides"
-              class="inline-flex items-center justify-center rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              :disabled="guideSaving"
+              class="inline-flex min-h-[52px] items-center justify-center rounded bg-slate-900 px-4 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              :disabled="guideSaving || !guideDirty"
             >
               <span v-if="guideSaving" class="mr-2 h-3 w-3 animate-spin rounded-full border border-white/60 border-t-transparent"></span>
               {{ guideSaving ? t('common.saving') : t('admin.eventDetail.guide.save') }}
@@ -1929,15 +1919,13 @@ onMounted(loadEvent)
               </label>
               <label class="grid gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
-                <select
+                <AppCombobox
                   v-model="form.gender"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                >
-                  <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
-                  <option v-for="option in genderOptions" :key="option.value" :value="option.value">
-                    {{ t(option.label) }}
-                  </option>
-                </select>
+                  :options="genderComboboxOptions"
+                  :placeholder="t('admin.participants.form.genderPlaceholder')"
+                  :aria-label="t('admin.participants.form.gender')"
+                  :searchable="false"
+                />
               </label>
               <div class="md:col-span-3">
                 <button
@@ -2244,15 +2232,13 @@ onMounted(loadEvent)
                 </label>
                 <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participants.form.gender') }}</span>
-                  <select
+                  <AppCombobox
                     v-model="editForm.gender"
-                    class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  >
-                    <option value="" disabled>{{ t('admin.participants.form.genderPlaceholder') }}</option>
-                    <option v-for="option in genderOptions" :key="option.value" :value="option.value">
-                      {{ t(option.label) }}
-                    </option>
-                  </select>
+                    :options="genderComboboxOptions"
+                    :placeholder="t('admin.participants.form.genderPlaceholder')"
+                    :aria-label="t('admin.participants.form.gender')"
+                    :searchable="false"
+                  />
                 </label>
               </div>
               <div class="space-y-3">
