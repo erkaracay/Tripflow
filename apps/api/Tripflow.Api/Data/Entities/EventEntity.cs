@@ -8,6 +8,7 @@ public sealed class EventEntity
     public string Name { get; set; } = default!;
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
+    public string? TimeZoneId { get; set; }
     public string? LogoUrl { get; set; }
     public string? GuideName { get; set; }
     public string? GuidePhone { get; set; }
@@ -27,4 +28,5 @@ public sealed class EventEntity
     public EventPortalEntity? Portal { get; set; }
     public List<EventDayEntity> Days { get; set; } = new();
     public List<EventDocTabEntity> DocTabs { get; set; } = new();
+    public List<EventItemEntity> Items { get; set; } = new();
 }

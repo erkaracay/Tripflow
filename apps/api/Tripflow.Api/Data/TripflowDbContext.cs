@@ -108,6 +108,7 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
             b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
             b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.TimeZoneId).HasMaxLength(100);
             b.Property(x => x.LogoUrl).HasMaxLength(500);
             b.Property(x => x.GuideName).HasMaxLength(200);
             b.Property(x => x.GuidePhone).HasMaxLength(50);
@@ -140,6 +141,11 @@ public sealed class TripflowDbContext : DbContext
             b.HasOne(x => x.Portal)
                 .WithOne(x => x.Event)
                 .HasForeignKey<EventPortalEntity>(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.Items)
+                .WithOne(x => x.Event)
+                .HasForeignKey(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -709,6 +715,16 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
             b.Property(x => x.SortOrder).IsRequired().HasDefaultValue(1);
             b.HasIndex(x => new { x.OrganizationId, x.EventId, x.Name }).IsUnique();
+
+            b.HasOne(x => x.Organization)
+                .WithMany(x => x.EventItems)
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ParticipantItemLogEntity>(b =>

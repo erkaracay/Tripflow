@@ -2,10 +2,10 @@ using System.Text.Json;
 
 namespace Tripflow.Api.Features.Events;
 
-public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate, string? EventAccessCode);
-public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate);
+public sealed record CreateEventRequest(string? Name, string? StartDate, string? EndDate, string? TimeZoneId, string? EventAccessCode);
+public sealed record UpdateEventRequest(string? Name, string? StartDate, string? EndDate, string? TimeZoneId);
 
-public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? LogoUrl, Guid[] GuideUserIds, bool IsDeleted, string EventAccessCode);
+public sealed record EventDto(Guid Id, string Name, string StartDate, string EndDate, string? TimeZoneId, string? LogoUrl, Guid[] GuideUserIds, bool IsDeleted, string EventAccessCode);
 public sealed record EventListItemDto(
     Guid Id,
     string Name,

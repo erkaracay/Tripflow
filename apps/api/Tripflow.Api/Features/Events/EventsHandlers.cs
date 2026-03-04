@@ -78,6 +78,15 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
+        if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out var timeZoneId, out var timeZoneErrorCode))
+        {
+            return Results.BadRequest(new
+            {
+                code = timeZoneErrorCode,
+                message = "Time zone is required and must be a valid IANA identifier."
+            });
+        }
+
         string eventAccessCode;
         if (!string.IsNullOrWhiteSpace(request.EventAccessCode))
         {
@@ -108,6 +117,7 @@ internal static class EventsHandlers
             Name = name,
             StartDate = startDate,
             EndDate = endDate,
+            TimeZoneId = timeZoneId,
             EventAccessCode = eventAccessCode,
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow
@@ -125,19 +135,9 @@ internal static class EventsHandlers
             PortalJson = portalJson,
             UpdatedAt = DateTime.UtcNow
         });
-        db.EventDocTabs.AddRange(CreateDefaultDocTabs(entity));
+        db.EventDocTabs.AddRange(EventsHelpers.CreateDefaultDocTabs(entity, DateTime.UtcNow));
         db.EventDays.AddRange(EventsHelpers.CreateDefaultDays(entity));
-        db.EventItems.Add(new EventItemEntity
-        {
-            Id = Guid.NewGuid(),
-            OrganizationId = orgId,
-            EventId = entity.Id,
-            Type = "Headset",
-            Title = "Equipment",
-            Name = "Headset",
-            IsActive = true,
-            SortOrder = 1
-        });
+        entity.Items.AddRange(EventsHelpers.CreateDefaultEventItems(entity, 1));
 
         try
         {
@@ -195,6 +195,15 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
+        if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out var timeZoneId, out var timeZoneErrorCode))
+        {
+            return Results.BadRequest(new
+            {
+                code = timeZoneErrorCode,
+                message = "Time zone is required and must be a valid IANA identifier."
+            });
+        }
+
         var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (entity is null)
         {
@@ -204,6 +213,7 @@ internal static class EventsHandlers
         entity.Name = name;
         entity.StartDate = startDate;
         entity.EndDate = endDate;
+        entity.TimeZoneId = timeZoneId;
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(EventsHelpers.ToDto(entity));
@@ -3868,71 +3878,6 @@ internal static class EventsHandlers
             return JsonSerializer.Deserialize<JsonElement>("{}");
         }
     }
-
-    private static IEnumerable<EventDocTabEntity> CreateDefaultDocTabs(EventEntity entity)
-    {
-        var hotelContent = JsonSerializer.Serialize(new
-        {
-            hotelName = string.Empty,
-            address = string.Empty,
-            phone = string.Empty,
-            checkInNote = string.Empty,
-            checkOutNote = string.Empty
-        });
-
-        var insuranceContent = JsonSerializer.Serialize(new
-        {
-            companyName = string.Empty,
-            policyNo = string.Empty,
-            startDate = string.Empty,
-            endDate = string.Empty
-        });
-
-        var transferContent = JsonSerializer.Serialize(new { });
-
-        var now = DateTime.UtcNow;
-
-        return new[]
-        {
-            new EventDocTabEntity
-            {
-                Id = Guid.NewGuid(),
-                OrganizationId = entity.OrganizationId,
-                EventId = entity.Id,
-                Title = "Hotel",
-                Type = "Hotel",
-                SortOrder = 1,
-                IsActive = true,
-                ContentJson = hotelContent,
-                CreatedAt = now
-            },
-            new EventDocTabEntity
-            {
-                Id = Guid.NewGuid(),
-                OrganizationId = entity.OrganizationId,
-                EventId = entity.Id,
-                Title = "Insurance",
-                Type = "Insurance",
-                SortOrder = 2,
-                IsActive = false,
-                ContentJson = insuranceContent,
-                CreatedAt = now
-            },
-            new EventDocTabEntity
-            {
-                Id = Guid.NewGuid(),
-                OrganizationId = entity.OrganizationId,
-                EventId = entity.Id,
-                Title = "Transfer",
-                Type = "Transfer",
-                SortOrder = 3,
-                IsActive = true,
-                ContentJson = transferContent,
-                CreatedAt = now
-            }
-        };
-    }
-
     private static ParticipantDetailsDto? MapDetails(ParticipantDetailsEntity? details)
     {
         if (details is null)

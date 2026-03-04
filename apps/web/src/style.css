@@ -193,6 +193,98 @@
   color: rgb(255 255 255);
 }
 
+.app-combobox-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgb(226 232 240);
+  background: rgb(255 255 255);
+  padding: 0.75rem 0.875rem;
+  text-align: left;
+  transition: border-color 180ms ease-out, box-shadow 180ms ease-out, background-color 180ms ease-out;
+}
+
+.app-combobox-trigger:hover:not(:disabled),
+.app-combobox-trigger-open {
+  border-color: rgb(148 163 184);
+}
+
+.app-combobox-trigger:focus-visible {
+  outline: none;
+  border-color: rgb(100 116 139);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
+}
+
+.app-combobox-trigger-invalid {
+  border-color: rgb(251 113 133);
+}
+
+.app-combobox-panel {
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(226 232 240);
+  background: rgb(255 255 255);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+}
+
+.app-combobox-search {
+  width: 100%;
+  border-radius: 0.875rem;
+  border: 1px solid rgb(226 232 240);
+  background: rgb(248 250 252);
+  padding: 0.7rem 0.875rem 0.7rem 2.4rem;
+  color: rgb(15 23 42);
+  transition: border-color 180ms ease-out, background-color 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.app-combobox-search::placeholder {
+  color: rgb(148 163 184);
+}
+
+.app-combobox-search:focus {
+  outline: none;
+  border-color: rgb(148 163 184);
+  background: rgb(255 255 255);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+}
+
+.app-combobox-option {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.8rem 0.875rem;
+  text-align: left;
+  transition: border-color 160ms ease-out, background-color 160ms ease-out, color 160ms ease-out;
+}
+
+.app-combobox-option:hover,
+.app-combobox-option-active {
+  border-color: rgb(226 232 240);
+  background: rgb(248 250 252);
+}
+
+.app-combobox-option-selected {
+  border-color: rgb(203 213 225);
+  background: rgb(241 245 249);
+}
+
+.app-combobox-section-label {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+}
+
 .portal-inline-action,
 .portal-copy-action {
   display: inline-flex;
@@ -242,6 +334,9 @@
   .app-drawer-leave-active .app-drawer-overlay,
   .app-drawer-enter-active .app-drawer-panel,
   .app-drawer-leave-active .app-drawer-panel,
+  .app-combobox-trigger,
+  .app-combobox-search,
+  .app-combobox-option,
   .app-segmented-indicator,
   .app-segmented-button,
   .portal-inline-action,

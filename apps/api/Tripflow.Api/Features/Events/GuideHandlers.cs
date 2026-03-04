@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Features.Organizations;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -801,8 +802,7 @@ internal static class GuideHandlers
             .FirstOrDefaultAsync(ct);
         if (eventContext is null) return (Results.NotFound(new { message = "Event not found." }), default, default);
 
-        httpContext.Request.Headers["X-Org-Id"] = eventContext.OrganizationId.ToString();
-        EnsureOrganizationClaim(httpContext, eventContext.OrganizationId);
+        OrganizationHelpers.ApplyOrganizationContext(httpContext, eventContext.OrganizationId);
         return (null, eventContext.Id, eventContext.OrganizationId);
     }
 
@@ -836,28 +836,8 @@ internal static class GuideHandlers
             return (Results.StatusCode(StatusCodes.Status403Forbidden), default, default);
         }
 
-        httpContext.Request.Headers["X-Org-Id"] = eventContext.OrganizationId.ToString();
-        EnsureOrganizationClaim(httpContext, eventContext.OrganizationId);
+        OrganizationHelpers.ApplyOrganizationContext(httpContext, eventContext.OrganizationId);
         return (null, eventContext.Id, eventContext.OrganizationId);
-    }
-
-    private static void EnsureOrganizationClaim(HttpContext httpContext, Guid organizationId)
-    {
-        if (httpContext.User.FindFirst("orgId")?.Value == organizationId.ToString())
-        {
-            return;
-        }
-
-        var claims = httpContext.User.Claims
-            .Where(x => !string.Equals(x.Type, "orgId", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        claims.Add(new Claim("orgId", organizationId.ToString()));
-
-        var identity = new ClaimsIdentity(
-            claims,
-            authenticationType: httpContext.User.Identity?.AuthenticationType ?? "GuideEventAccess");
-
-        httpContext.User = new ClaimsPrincipal(identity);
     }
 
     internal static async Task<IResult> GetEvent(

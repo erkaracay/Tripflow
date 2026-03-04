@@ -3,10 +3,90 @@ export type Event = {
   name: string
   startDate: string
   endDate: string
+  timeZoneId?: string | null
   logoUrl?: string | null
   guideUserIds: string[]
   eventAccessCode?: string | null
   isDeleted: boolean
+}
+
+export type AppComboboxOption = {
+  value: string
+  label: string
+  description?: string | null
+  keywords?: string[]
+}
+
+export type ScenarioPresetDefaults = {
+  dayCount: number
+  participantCount: number
+  equipmentTypeCount: number
+  activityDensity: 'light' | 'normal' | 'dense'
+  mealMode: 'none' | 'breakfast_only' | 'breakfast_and_dinner'
+  flightLegMode: 'mixed' | 'direct_only' | 'layover_heavy'
+  includeFlights: boolean
+  eventCheckInCoveragePercent: number
+  mealSelectionCoveragePercent: number
+  participantNamingMode: 'random' | 'prefix'
+}
+
+export type ScenarioPresetDto = {
+  id: 'minimal' | 'balanced' | 'operations_heavy' | 'meal_heavy' | 'flight_heavy' | 'checkin_heavy'
+  label: string
+  defaults: ScenarioPresetDefaults
+}
+
+export type DevToolsCapabilities = {
+  generalSeed: boolean
+  scenarioEventGenerator: boolean
+  presets: ScenarioPresetDto[]
+}
+
+export type CreateScenarioEventRequest = {
+  name?: string | null
+  startDate: string
+  dayCount?: number | null
+  timeZoneId: string
+  preset: ScenarioPresetDto['id']
+  activityDensity?: ScenarioPresetDefaults['activityDensity'] | null
+  mealMode?: ScenarioPresetDefaults['mealMode'] | null
+  flightLegMode?: ScenarioPresetDefaults['flightLegMode'] | null
+  participantCount?: number | null
+  equipmentTypeCount?: number | null
+  includeFlights?: boolean | null
+  mealSelectionCoveragePercent?: number | null
+  eventCheckInCoveragePercent?: number | null
+  participantNamingMode?: ScenarioPresetDefaults['participantNamingMode'] | null
+  participantNamePrefix?: string | null
+  randomSeed?: number | null
+}
+
+export type ScenarioEventCounts = {
+  days: number
+  activities: number
+  mealActivities: number
+  participants: number
+  equipmentTypes: number
+  mealGroups: number
+  mealOptions: number
+  mealSelections: number
+  flightSegments: number
+  eventCheckIns: number
+}
+
+export type CreateScenarioEventResponse = {
+  eventId: string
+  name: string
+  startDate: string
+  endDate: string
+  timeZoneId: string
+  eventAccessCode: string
+  created: ScenarioEventCounts
+}
+
+export type DeleteScenarioEventResponse = {
+  eventId: string
+  deleted: boolean
 }
 
 export type EventListItem = {

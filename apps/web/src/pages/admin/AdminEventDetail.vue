@@ -7,6 +7,15 @@ import { getAuthRole, getSelectedOrgId } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { formatBaggage, formatDateRange } from '../../lib/formatters'
 import {
+  formatTimeZoneOffsetPreview,
+  getAllTimeZoneOptions,
+  getBrowserTimeZone,
+  getRecommendedTimeZoneValues,
+  getTimeZoneDescription,
+  getTimeZoneDisplayLabel,
+  getTimeZoneKeywords,
+} from '../../lib/timezones'
+import {
   formatPhoneDisplay,
   normalizeEmail,
   normalizeName,
@@ -25,9 +34,11 @@ import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsMo
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon.vue'
 import type {
+  DeleteScenarioEventResponse,
   EventAccessCodeResponse,
   LinkInfo,
   Participant,
@@ -54,6 +65,7 @@ const eventForm = reactive({
   name: '',
   startDate: '',
   endDate: '',
+  timeZoneId: '',
 })
 const loading = ref(true)
 const submitting = ref(false)
@@ -113,12 +125,34 @@ const confirmTone = ref<'default' | 'danger'>('default')
 const confirmMessageKey = ref<string | null>(null)
 const confirmAction = ref<'resetCheckIns' | 'deleteAll' | null>(null)
 const deletingAllParticipants = ref(false)
+const deletingScenarioEvent = ref(false)
 
 const { pushToast } = useToast()
+const isDevelopment = import.meta.env.DEV
 const isSuperAdmin = computed(() => {
   return getAuthRole() === 'SuperAdmin'
 })
 const participantAddStorageKey = computed(() => `tripflow:event:${eventId.value}:participant-add-open`)
+const browserTimeZone = getBrowserTimeZone()
+const allTimeZoneOptions = getAllTimeZoneOptions()
+const recommendedTimeZoneValues = computed(() => getRecommendedTimeZoneValues(browserTimeZone))
+const timeZoneComboboxOptions = computed(() => {
+  const values = new Map(allTimeZoneOptions.map((option) => [option.value, option]))
+  const current = eventForm.timeZoneId.trim()
+  if (current) {
+    values.set(current, {
+      value: current,
+      label: getTimeZoneDisplayLabel(current),
+      description: getTimeZoneDescription(current),
+      keywords: getTimeZoneKeywords(current),
+    })
+  }
+
+  return [...values.values()]
+})
+const eventTimeZonePreview = computed(() => formatTimeZoneOffsetPreview(eventForm.timeZoneId))
+const showMissingTimeZoneWarning = computed(() => !!event.value && !event.value.timeZoneId)
+const isGeneratedScenarioEvent = computed(() => isDevelopment && !!event.value?.name?.startsWith('[DEV]'))
 
 const purgeConfirmValid = computed(() => {
   if (!event.value) {
@@ -466,6 +500,7 @@ const setEventForm = (data: EventDto) => {
   eventForm.name = data.name
   eventForm.startDate = data.startDate
   eventForm.endDate = data.endDate
+  eventForm.timeZoneId = data.timeZoneId ?? ''
 }
 
 const setPortalForm = (data: EventPortalInfo) => {
@@ -560,6 +595,28 @@ const purgeEvent = async () => {
     pushToast({ key: 'toast.eventPurgeFailed', tone: 'error' })
   } finally {
     purgingEvent.value = false
+  }
+}
+
+const deleteScenarioEvent = async () => {
+  if (!event.value || deletingScenarioEvent.value || !isGeneratedScenarioEvent.value) {
+    return
+  }
+
+  const confirmed = globalThis.confirm?.(t('admin.eventDetail.devDeleteConfirm')) ?? false
+  if (!confirmed) {
+    return
+  }
+
+  deletingScenarioEvent.value = true
+  try {
+    await apiDelete<DeleteScenarioEventResponse>(`/api/dev/scenario-events/${eventId.value}`)
+    pushToast({ key: 'toast.scenarioEventDeleted', tone: 'success' })
+    await router.push('/admin/events')
+  } catch {
+    pushToast({ key: 'errors.generic', tone: 'error' })
+  } finally {
+    deletingScenarioEvent.value = false
   }
 }
 
@@ -686,18 +743,31 @@ const saveEvent = async () => {
     return
   }
 
+  if (!eventForm.timeZoneId.trim()) {
+    eventErrorKey.value = 'admin.eventDetail.form.timeZoneInvalid'
+    return
+  }
+
   eventSaving.value = true
   try {
     const updated = await apiPut<EventDto>(`/api/events/${eventId.value}`, {
       name,
       startDate: eventForm.startDate,
       endDate: eventForm.endDate,
+      timeZoneId: eventForm.timeZoneId.trim(),
     })
     event.value = updated
     setEventForm(updated)
     showEventSaved()
     pushToast({ key: 'toast.eventUpdated', tone: 'success' })
   } catch (err) {
+    const payload = err && typeof err === 'object' && 'payload' in err ? (err as { payload?: { code?: string } }).payload : undefined
+    if (payload?.code === 'invalid_time_zone_id') {
+      eventErrorKey.value = 'admin.eventDetail.form.timeZoneInvalid'
+      eventErrorMessage.value = null
+      pushToast({ key: 'toast.eventUpdateFailed', tone: 'error' })
+      return
+    }
     eventErrorMessage.value = err instanceof Error ? err.message : null
     if (!eventErrorMessage.value) {
       eventErrorKey.value = 'errors.eventDetail.update'
@@ -1586,6 +1656,13 @@ onMounted(loadEvent)
           </div>
         </div>
 
+        <div
+          v-if="showMissingTimeZoneWarning"
+          class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {{ t('admin.eventDetail.timeZoneMissingWarning') }}
+        </div>
+
         <form class="mt-4 space-y-4" @submit.prevent="saveEvent">
           <fieldset class="grid gap-4 md:grid-cols-3" :disabled="eventSaving">
             <label class="grid gap-1 text-sm md:col-span-1">
@@ -1614,6 +1691,26 @@ onMounted(loadEvent)
                 type="date"
               />
             </label>
+            <div class="grid gap-1 text-sm md:col-span-3">
+              <span class="text-slate-600">{{ t('admin.eventDetail.form.timeZoneLabel') }}</span>
+              <AppCombobox
+                v-model="eventForm.timeZoneId"
+                :options="timeZoneComboboxOptions"
+                :recommended-values="recommendedTimeZoneValues"
+                :placeholder="t('admin.eventDetail.form.timeZonePlaceholder')"
+                :search-placeholder="t('admin.eventDetail.form.timeZoneSearchPlaceholder')"
+                :recommended-label="t('admin.eventDetail.form.timeZoneRecommended')"
+                :all-label="t('admin.eventDetail.form.timeZoneAll')"
+                :browse-all-label="t('admin.eventDetail.form.timeZoneBrowseAll')"
+                :empty-label="t('admin.eventDetail.form.timeZoneEmpty')"
+                :invalid="eventErrorKey === 'admin.eventDetail.form.timeZoneInvalid'"
+                :aria-label="t('admin.eventDetail.form.timeZoneLabel')"
+                @update:model-value="eventErrorKey = null; eventErrorMessage = null"
+              />
+              <p class="text-xs text-slate-500">
+                {{ t('admin.eventDetail.form.timeZoneHelper', { offset: eventTimeZonePreview || '—' }) }}
+              </p>
+            </div>
           </fieldset>
           <div class="flex flex-wrap items-center gap-3">
             <button
@@ -2494,6 +2591,26 @@ onMounted(loadEvent)
             </div>
           </li>
         </ul>
+      </section>
+
+      <section
+        v-if="isGeneratedScenarioEvent"
+        class="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm"
+      >
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="space-y-1">
+            <h2 class="text-lg font-semibold text-amber-900">{{ t('admin.eventDetail.devDelete') }}</h2>
+            <p class="text-sm text-amber-800">{{ t('admin.eventDetail.devDeleteHelper') }}</p>
+          </div>
+          <button
+            class="rounded border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="deletingScenarioEvent"
+            type="button"
+            @click="deleteScenarioEvent"
+          >
+            {{ deletingScenarioEvent ? t('common.saving') : t('admin.eventDetail.devDelete') }}
+          </button>
+        </div>
       </section>
 
       <section class="rounded-lg border border-rose-200 bg-rose-50 p-6 shadow-sm">

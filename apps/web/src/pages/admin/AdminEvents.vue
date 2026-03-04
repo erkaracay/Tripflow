@@ -6,10 +6,18 @@ import { apiGet, apiPost } from '../../lib/api'
 import { getAuthRole } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { formatDateRange } from '../../lib/formatters'
+import {
+  formatTimeZoneOffsetPreview,
+  getAllTimeZoneOptions,
+  getBrowserTimeZone,
+  getRecommendedTimeZoneValues,
+} from '../../lib/timezones'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { Event as EventDto, EventListItem } from '../../types'
+import AppCombobox from '../../components/ui/AppCombobox.vue'
+import DevScenarioGeneratorPanel from '../../components/admin/DevScenarioGeneratorPanel.vue'
+import type { CreateScenarioEventResponse, DevToolsCapabilities, Event as EventDto, EventListItem } from '../../types'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -26,19 +34,27 @@ const showArchived = ref(false)
 const createOpen = ref(true)
 const createOpenInitialized = ref(false)
 const createTransitionReady = ref(false)
+const isDevelopment = import.meta.env.DEV
+const devTools = ref<DevToolsCapabilities | null>(null)
 
 const EVENT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const browserTimeZone = getBrowserTimeZone()
+const allTimeZoneOptions = getAllTimeZoneOptions()
+const recommendedTimeZoneValues = getRecommendedTimeZoneValues(browserTimeZone)
 
 const form = reactive({
   name: '',
   startDate: '',
   endDate: '',
+  timeZoneId: browserTimeZone ?? 'Europe/Istanbul',
   eventCode: '',
 })
 
 const isSuperAdmin = computed(() => {
   return getAuthRole() === 'SuperAdmin'
 })
+
+const showScenarioGenerator = computed(() => isDevelopment && devTools.value?.scenarioEventGenerator === true)
 
 watch(
   () => form.startDate,
@@ -76,7 +92,28 @@ const loadEvents = async () => {
   }
 }
 
+const loadDevTools = async () => {
+  if (!isDevelopment) {
+    devTools.value = null
+    return
+  }
+
+  try {
+    devTools.value = await apiGet<DevToolsCapabilities>('/api/dev/tools')
+  } catch (error: unknown) {
+    const status = error && typeof error === 'object' && 'status' in error ? (error as { status?: number }).status : null
+    if (status === 401 || status === 403 || status === 404) {
+      devTools.value = null
+      return
+    }
+
+    devTools.value = null
+  }
+}
+
 const eventCodeErrorKey = ref<string | null>(null)
+const timeZoneErrorKey = ref<string | null>(null)
+const createTimeZonePreview = computed(() => formatTimeZoneOffsetPreview(form.timeZoneId))
 
 const generateRandomEventCode = () => {
   let code = ''
@@ -91,6 +128,7 @@ const createEvent = async () => {
   formErrorKey.value = null
   formErrorMessage.value = null
   eventCodeErrorKey.value = null
+  timeZoneErrorKey.value = null
 
   if (!form.name.trim()) {
     formErrorKey.value = 'validation.eventNameRequired'
@@ -110,6 +148,12 @@ const createEvent = async () => {
     return
   }
 
+  if (!form.timeZoneId.trim()) {
+    timeZoneErrorKey.value = 'admin.events.form.timeZoneInvalid'
+    createOpen.value = true
+    return
+  }
+
   const code = sanitizeEventAccessCode(form.eventCode)
   if (code && !isValidEventCodeLength(code)) {
     eventCodeErrorKey.value = 'admin.events.form.eventCodeInvalid'
@@ -119,10 +163,11 @@ const createEvent = async () => {
 
   submitting.value = true
   try {
-    const body: { name: string; startDate: string; endDate: string; eventAccessCode?: string } = {
+    const body: { name: string; startDate: string; endDate: string; timeZoneId: string; eventAccessCode?: string } = {
       name: form.name,
       startDate: form.startDate,
       endDate: form.endDate,
+      timeZoneId: form.timeZoneId.trim(),
     }
     if (code) body.eventAccessCode = code
 
@@ -136,6 +181,13 @@ const createEvent = async () => {
       formErrorKey.value = null
       formErrorMessage.value = null
       eventCodeErrorKey.value = 'admin.events.form.eventCodeTaken'
+      createOpen.value = true
+      return
+    }
+    if (apiCode === 'invalid_time_zone_id') {
+      formErrorKey.value = null
+      formErrorMessage.value = null
+      timeZoneErrorKey.value = 'admin.events.form.timeZoneInvalid'
       createOpen.value = true
       return
     }
@@ -196,7 +248,24 @@ const copyPortalLoginLink = async (code?: string) => {
   }
 }
 
-onMounted(loadEvents)
+const handleScenarioGenerated = async (response: CreateScenarioEventResponse) => {
+  pushToast({
+    key: 'toast.scenarioEventGenerated',
+    params: {
+      days: response.created.days,
+      activities: response.created.activities,
+      participants: response.created.participants,
+    },
+    tone: 'success',
+  })
+
+  await router.push(`/admin/events/${response.eventId}`)
+}
+
+onMounted(() => {
+  void loadEvents()
+  void loadDevTools()
+})
 </script>
 
 <template>
@@ -264,6 +333,29 @@ onMounted(loadEvents)
               />
             </label>
 
+            <div class="grid gap-1 text-sm md:col-span-3">
+              <span class="text-slate-600">{{ t('admin.events.form.timeZoneLabel') }}</span>
+              <AppCombobox
+                v-model="form.timeZoneId"
+                :options="allTimeZoneOptions"
+                :recommended-values="recommendedTimeZoneValues"
+                :placeholder="t('admin.events.form.timeZonePlaceholder')"
+                :search-placeholder="t('admin.events.form.timeZoneSearchPlaceholder')"
+                :recommended-label="t('admin.events.form.timeZoneRecommended')"
+                :all-label="t('admin.events.form.timeZoneAll')"
+                :browse-all-label="t('admin.events.form.timeZoneBrowseAll')"
+                :empty-label="t('admin.events.form.timeZoneEmpty')"
+                :invalid="Boolean(timeZoneErrorKey)"
+                :aria-label="t('admin.events.form.timeZoneLabel')"
+                :disabled="submitting"
+                @update:model-value="timeZoneErrorKey = null"
+              />
+              <p class="text-xs text-slate-500">
+                {{ t('admin.events.form.timeZoneHelper', { offset: createTimeZonePreview || '—' }) }}
+              </p>
+              <p v-if="timeZoneErrorKey" class="text-xs text-rose-600">{{ t(timeZoneErrorKey) }}</p>
+            </div>
+
             <label class="grid gap-1 text-sm md:col-span-3">
               <span class="text-slate-600">{{ t('admin.events.form.eventCodeLabel') }}</span>
               <div class="flex flex-wrap items-center gap-2">
@@ -316,6 +408,12 @@ onMounted(loadEvents)
         </div>
       </Transition>
     </section>
+
+    <DevScenarioGeneratorPanel
+      v-if="showScenarioGenerator && devTools"
+      :presets="devTools.presets"
+      @generated="handleScenarioGenerated"
+    />
 
     <section class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">

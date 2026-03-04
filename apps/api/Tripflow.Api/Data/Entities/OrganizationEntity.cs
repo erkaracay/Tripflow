@@ -24,4 +24,5 @@ public sealed class OrganizationEntity
     public List<CheckInEntity> CheckIns { get; set; } = new();
     public List<EventPortalEntity> Portals { get; set; } = new();
     public List<EventDocTabEntity> DocTabs { get; set; } = new();
+    public List<EventItemEntity> EventItems { get; set; } = new();
 }

@@ -267,73 +267,14 @@ internal static class MealMenuHandlers
         }
 
         var resolvedContext = context!;
-        var groups = await db.ActivityMealGroups.AsNoTracking()
-            .Where(x => x.OrganizationId == resolvedContext.OrganizationId && x.EventId == resolvedContext.EventId && x.ActivityId == resolvedContext.Activity.Id)
-            .Include(x => x.Options)
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.Title)
-            .ToListAsync(ct);
+        var summary = await MealSummaryQueries.GetSummaryAsync(
+            db,
+            resolvedContext.OrganizationId,
+            resolvedContext.EventId,
+            resolvedContext.Activity.Id,
+            ct);
 
-        var counts = await db.ParticipantMealSelections.AsNoTracking()
-            .Where(x => x.OrganizationId == resolvedContext.OrganizationId && x.EventId == resolvedContext.EventId && x.ActivityId == resolvedContext.Activity.Id)
-            .GroupBy(x => new { x.GroupId, x.OptionId })
-            .Select(g => new
-            {
-                g.Key.GroupId,
-                g.Key.OptionId,
-                Count = g.Count()
-            })
-            .ToListAsync(ct);
-
-        var noteCounts = await db.ParticipantMealSelections.AsNoTracking()
-            .Where(x => x.OrganizationId == resolvedContext.OrganizationId
-                && x.EventId == resolvedContext.EventId
-                && x.ActivityId == resolvedContext.Activity.Id
-                && x.Note != null)
-            .GroupBy(x => x.GroupId)
-            .Select(g => new
-            {
-                GroupId = g.Key,
-                Count = g.Count()
-            })
-            .ToListAsync(ct);
-
-        var countLookup = counts
-            .GroupBy(x => x.GroupId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.ToList());
-        var noteLookup = noteCounts.ToDictionary(x => x.GroupId, x => x.Count);
-
-        var responseGroups = groups.Select(group =>
-        {
-            countLookup.TryGetValue(group.Id, out var groupCounts);
-            var optionCounts = group.Options
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.Label)
-                .Select(option => new MealSummaryCountDto(
-                    option.Id,
-                    option.Label,
-                    groupCounts?.FirstOrDefault(x => x.OptionId == option.Id)?.Count ?? 0))
-                .Where(x => x.Count > 0)
-                .ToList();
-
-            var otherCount = groupCounts?.FirstOrDefault(x => x.OptionId == null)?.Count ?? 0;
-            if (otherCount > 0)
-            {
-                optionCounts.Add(new MealSummaryCountDto(null, MealMenuHelpers.OtherLabel, otherCount));
-            }
-
-            return new MealSummaryGroupDto(
-                group.Id,
-                group.Title,
-                group.AllowOther,
-                group.AllowNote,
-                optionCounts.ToArray(),
-                noteLookup.TryGetValue(group.Id, out var noteCount) ? noteCount : 0);
-        }).ToArray();
-
-        return Results.Ok(new MealSummaryResponse(resolvedContext.Activity.Id, responseGroups));
+        return Results.Ok(summary);
     }
 
     internal static async Task<IResult> GetMealChoices(

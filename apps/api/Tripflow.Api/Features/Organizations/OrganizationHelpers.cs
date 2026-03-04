@@ -13,7 +13,7 @@ internal static class OrganizationHelpers
             var header = context.Request.Headers["X-Org-Id"].FirstOrDefault();
             if (!Guid.TryParse(header, out organizationId))
             {
-                error = Results.BadRequest(new { message = "X-Org-Id required for SuperAdmin." });
+                error = Results.BadRequest(new { code = "invalid_org_scope", message = "X-Org-Id required for SuperAdmin." });
                 return false;
             }
 
@@ -24,11 +24,34 @@ internal static class OrganizationHelpers
         var orgClaim = context.User.FindFirstValue("orgId");
         if (!Guid.TryParse(orgClaim, out organizationId))
         {
-            error = Results.BadRequest(new { message = "orgId claim is required." });
+            error = Results.BadRequest(new { code = "invalid_org_scope", message = "orgId claim is required." });
             return false;
         }
 
         error = null;
         return true;
+    }
+
+    internal static void ApplyOrganizationContext(HttpContext context, Guid organizationId)
+    {
+        context.Request.Headers["X-Org-Id"] = organizationId.ToString();
+
+        if (context.User.FindFirst("orgId")?.Value == organizationId.ToString())
+        {
+            return;
+        }
+
+        var claims = context.User.Claims
+            .Where(x => !string.Equals(x.Type, "orgId", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        claims.Add(new Claim("orgId", organizationId.ToString()));
+
+        var identity = new ClaimsIdentity(
+            claims,
+            authenticationType: context.User.Identity?.AuthenticationType ?? "OrganizationContext",
+            nameType: context.User.Identity is ClaimsIdentity currentIdentity ? currentIdentity.NameClaimType : ClaimTypes.Name,
+            roleType: context.User.Identity is ClaimsIdentity currentRoleIdentity ? currentRoleIdentity.RoleClaimType : ClaimTypes.Role);
+
+        context.User = new ClaimsPrincipal(identity);
     }
 }

@@ -9,6 +9,7 @@ using Tripflow.Api.Data;
 using Tripflow.Api.Data.Dev;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Auth;
+using Tripflow.Api.Features.Dev;
 using Tripflow.Api.Features.Organizations;
 using Tripflow.Api.Features.Portal;
 using Tripflow.Api.Features.Events;
@@ -173,6 +174,25 @@ if (app.Environment.IsDevelopment())
     .WithSummary("Dev seed (Development only)")
     .WithDescription("Seeds demo data for local development.")
     .WithOpenApi();
+
+    var devAdmin = app.MapGroup("/api/dev")
+        .WithTags("Dev")
+        .RequireAuthorization("AdminOnly");
+
+    devAdmin.MapGet("/tools", DevToolsHandlers.GetTools)
+        .WithSummary("Development tools capabilities")
+        .WithDescription("Returns which development-only tools are enabled for the current environment.")
+        .WithOpenApi();
+
+    devAdmin.MapPost("/scenario-events", DevToolsHandlers.CreateScenarioEvent)
+        .WithSummary("Create scenario event")
+        .WithDescription("Creates a single development scenario event with generated schedule, participants, equipment, and optional meals/flights.")
+        .WithOpenApi();
+
+    devAdmin.MapDelete("/scenario-events/{eventId}", DevToolsHandlers.DeleteScenarioEvent)
+        .WithSummary("Delete scenario event")
+        .WithDescription("Deletes a generated development scenario event in the current organization.")
+        .WithOpenApi();
 }
 
 if (app.Environment.IsProduction())

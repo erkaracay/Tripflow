@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Events;
-using Tripflow.Api.Features.Portal;
 
 namespace Tripflow.Api.Data.Dev;
 
@@ -16,6 +15,7 @@ public static class DevSeed
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const string DefaultTimeZoneId = "Europe/Istanbul";
     private static readonly string[] SampleNames =
     [
         "Ayşe Demir",
@@ -145,6 +145,11 @@ public static class DevSeed
         await EnsureDocTabsAsync(db, eventB1, orgB.Id, now, ct, state);
         await EnsureDocTabsAsync(db, eventB2, orgB.Id, now, ct, state);
 
+        await EnsureEventItemsAsync(db, eventA1, orgA.Id, ct, state);
+        await EnsureEventItemsAsync(db, eventA2, orgA.Id, ct, state);
+        await EnsureEventItemsAsync(db, eventB1, orgB.Id, ct, state);
+        await EnsureEventItemsAsync(db, eventB2, orgB.Id, ct, state);
+
         await EnsureScheduleAsync(db, eventA1, orgA.Id, now, ct, state);
         await EnsureScheduleAsync(db, eventA2, orgA.Id, now, ct, state);
         await EnsureScheduleAsync(db, eventB1, orgB.Id, now, ct, state);
@@ -155,13 +160,18 @@ public static class DevSeed
         await EnsureParticipantsAsync(db, eventB1, orgB.Id, "B1", 30, now, ct, state);
         await EnsureParticipantsAsync(db, eventB2, orgB.Id, "B2", 30, now, ct, state);
 
+        await EnsureMealDemoAsync(db, eventA1, orgA.Id, now, ct, state);
+        await EnsureMealDemoAsync(db, eventA2, orgA.Id, now, ct, state);
+        await EnsureMealDemoAsync(db, eventB1, orgB.Id, now, ct, state);
+        await EnsureMealDemoAsync(db, eventB2, orgB.Id, now, ct, state);
+
         await EnsureCheckInsAsync(db, eventA1, orgA.Id, now, ct, state);
         await EnsureCheckInsAsync(db, eventB1, orgB.Id, now, ct, state);
 
         await db.SaveChangesAsync(ct);
 
         var message = state.Seeded
-            ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 etkinlik, 120 katılımcı, check-in örnekleri."
+            ? "Seed tamam: 2 org, 5 kullanıcı (superadmin/admin/guide), 4 etkinlik, 120 katılımcı, portal/docs/program, ekipman, uçuş ve meal demo verileri."
             : "Seed zaten yapılmış. Mevcut demo kayıtları korundu.";
 
         return (state.Seeded, message);
@@ -390,6 +400,11 @@ public static class DevSeed
                 eventEntity.WhatsappGroupUrl = defaultWhatsappGroupUrl;
                 updated = true;
             }
+            if (string.IsNullOrWhiteSpace(eventEntity.TimeZoneId))
+            {
+                eventEntity.TimeZoneId = DefaultTimeZoneId;
+                updated = true;
+            }
 
             if (updated)
             {
@@ -413,6 +428,7 @@ public static class DevSeed
             LeaderPhone = defaultLeaderPhone,
             EmergencyPhone = defaultEmergencyPhone,
             WhatsappGroupUrl = defaultWhatsappGroupUrl,
+            TimeZoneId = DefaultTimeZoneId,
             EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct),
             CreatedAt = now,
             EventGuides = new List<EventGuideEntity>
@@ -438,9 +454,23 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
-        var portalExists = await db.EventPortals.AnyAsync(x => x.EventId == eventEntity.Id, ct);
-        if (portalExists)
+        var portalEntity = await db.EventPortals.FirstOrDefaultAsync(x => x.EventId == eventEntity.Id, ct);
+        var portalJson = JsonSerializer.Serialize(
+            EventsHelpers.CreateDefaultPortalInfo(EventsHelpers.ToDto(eventEntity)),
+            JsonOptions);
+
+        if (portalEntity is not null)
         {
+            if (EventsHelpers.TryDeserializePortal(portalEntity.PortalJson) is not null)
+            {
+                return;
+            }
+
+            portalEntity.OrganizationId = organizationId;
+            portalEntity.PortalJson = portalJson;
+            portalEntity.UpdatedAt = now;
+            db.EventPortals.Update(portalEntity);
+            state.Seeded = true;
             return;
         }
 
@@ -448,7 +478,7 @@ public static class DevSeed
         {
             EventId = eventEntity.Id,
             OrganizationId = organizationId,
-            PortalJson = CreatePortalJson(eventEntity.Name, "09:00", "Lobby", "https://maps.google.com/?q=Lobby"),
+            PortalJson = portalJson,
             UpdatedAt = now
         });
         state.Seeded = true;
@@ -1277,6 +1307,60 @@ public static class DevSeed
         state.Seeded = true;
     }
 
+    private static async Task EnsureEventItemsAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var hasHeadset = await db.EventItems.AsNoTracking()
+            .AnyAsync(x =>
+                x.EventId == eventEntity.Id &&
+                x.OrganizationId == organizationId &&
+                x.Name == "Headset",
+                ct);
+
+        if (!hasHeadset)
+        {
+            db.EventItems.Add(new EventItemEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                Type = "Headset",
+                Title = "Equipment",
+                Name = "Headset",
+                IsActive = true,
+                SortOrder = 1
+            });
+            state.Seeded = true;
+        }
+
+        var hasBadge = await db.EventItems.AsNoTracking()
+            .AnyAsync(x =>
+                x.EventId == eventEntity.Id &&
+                x.OrganizationId == organizationId &&
+                x.Name == "Badge",
+                ct);
+
+        if (!hasBadge)
+        {
+            db.EventItems.Add(new EventItemEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventEntity.Id,
+                Type = "Badge",
+                Title = "Equipment",
+                Name = "Badge",
+                IsActive = true,
+                SortOrder = 2
+            });
+            state.Seeded = true;
+        }
+    }
+
     private static async Task EnsureCheckInsAsync(
         TripflowDbContext db,
         EventEntity eventEntity,
@@ -1401,6 +1485,172 @@ public static class DevSeed
         state.Seeded = true;
     }
 
+    private static async Task EnsureMealDemoAsync(
+        TripflowDbContext db,
+        EventEntity eventEntity,
+        Guid organizationId,
+        DateTime now,
+        CancellationToken ct,
+        SeedState state)
+    {
+        var mealActivities = await db.EventActivities
+            .Where(x =>
+                x.EventId == eventEntity.Id &&
+                x.OrganizationId == organizationId &&
+                x.Type == "Meal")
+            .OrderBy(x => x.EventDayId)
+            .ThenBy(x => x.StartTime)
+            .ToListAsync(ct);
+
+        if (mealActivities.Count == 0)
+        {
+            return;
+        }
+
+        var participants = await db.Participants.AsNoTracking()
+            .Where(x => x.EventId == eventEntity.Id)
+            .OrderBy(x => x.CreatedAt)
+            .Take(12)
+            .ToListAsync(ct);
+
+        if (participants.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var activity in mealActivities)
+        {
+            var existingGroups = await db.ActivityMealGroups
+                .Include(x => x.Options)
+                .Where(x => x.ActivityId == activity.Id && x.OrganizationId == organizationId)
+                .OrderBy(x => x.SortOrder)
+                .ToListAsync(ct);
+
+            var mainGroup = existingGroups.FirstOrDefault();
+            if (mainGroup is null)
+            {
+                mainGroup = new ActivityMealGroupEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    EventId = eventEntity.Id,
+                    ActivityId = activity.Id,
+                    Title = "Breakfast selection",
+                    SortOrder = 1,
+                    AllowOther = true,
+                    AllowNote = true,
+                    IsActive = true
+                };
+                mainGroup.Options.Add(new ActivityMealOptionEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    Label = "Classic breakfast",
+                    SortOrder = 1,
+                    IsActive = true
+                });
+                mainGroup.Options.Add(new ActivityMealOptionEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    Label = "Vegetarian plate",
+                    SortOrder = 2,
+                    IsActive = true
+                });
+                mainGroup.Options.Add(new ActivityMealOptionEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    Label = "Light breakfast",
+                    SortOrder = 3,
+                    IsActive = true
+                });
+
+                db.ActivityMealGroups.Add(mainGroup);
+                existingGroups.Add(mainGroup);
+                state.Seeded = true;
+            }
+            else if (mainGroup.Options.Count == 0)
+            {
+                db.ActivityMealOptions.AddRange(
+                    new ActivityMealOptionEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganizationId = organizationId,
+                        GroupId = mainGroup.Id,
+                        Label = "Classic breakfast",
+                        SortOrder = 1,
+                        IsActive = true
+                    },
+                    new ActivityMealOptionEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganizationId = organizationId,
+                        GroupId = mainGroup.Id,
+                        Label = "Vegetarian plate",
+                        SortOrder = 2,
+                        IsActive = true
+                    },
+                    new ActivityMealOptionEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganizationId = organizationId,
+                        GroupId = mainGroup.Id,
+                        Label = "Light breakfast",
+                        SortOrder = 3,
+                        IsActive = true
+                    });
+                state.Seeded = true;
+                await db.SaveChangesAsync(ct);
+                mainGroup = await db.ActivityMealGroups
+                    .Include(x => x.Options)
+                    .FirstAsync(x => x.Id == mainGroup.Id, ct);
+            }
+
+            var existingSelectionParticipantIds = await db.ParticipantMealSelections.AsNoTracking()
+                .Where(x => x.ActivityId == activity.Id && x.GroupId == mainGroup.Id && x.OrganizationId == organizationId)
+                .Select(x => x.ParticipantId)
+                .ToListAsync(ct);
+
+            if (existingSelectionParticipantIds.Count >= participants.Count)
+            {
+                continue;
+            }
+
+            var optionCycle = mainGroup.Options.OrderBy(x => x.SortOrder).ToArray();
+            if (optionCycle.Length == 0)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < participants.Count; i++)
+            {
+                var participant = participants[i];
+                if (existingSelectionParticipantIds.Contains(participant.Id))
+                {
+                    continue;
+                }
+
+                var useOther = i % 5 == 4;
+                db.ParticipantMealSelections.Add(new ParticipantMealSelectionEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    EventId = eventEntity.Id,
+                    ActivityId = activity.Id,
+                    GroupId = mainGroup.Id,
+                    ParticipantId = participant.Id,
+                    OptionId = useOther ? null : optionCycle[i % optionCycle.Length].Id,
+                    OtherText = useOther ? "Gluten-free request" : null,
+                    Note = i % 4 == 0 ? "No olives, please." : null,
+                    CreatedAt = now.AddMinutes(-(i + 1)),
+                    UpdatedAt = now.AddMinutes(-(i + 1))
+                });
+                state.Seeded = true;
+            }
+        }
+    }
+
     private static string NormalizePersonName(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1432,33 +1682,6 @@ public static class DevSeed
 
         lastName = parts[^1];
         firstName = string.Join(' ', parts[..^1]);
-    }
-
-    private static string CreatePortalJson(string eventName, string time, string place, string mapsUrl)
-    {
-        var obj = new
-        {
-            meeting = new
-            {
-                time,
-                place,
-                mapsUrl,
-                note = $"Welcome to {eventName}. Please arrive 15 minutes early."
-            },
-            links = new[]
-            {
-                new { label = "Info Pack", url = "https://example.com/info" },
-                new { label = "Emergency", url = "https://example.com/emergency" }
-            },
-            days = new[]
-            {
-                new { day = 1, title = "Day 1", items = new[] { "Meet", "Walk", "Lunch" } },
-                new { day = 2, title = "Day 2", items = new[] { "Museum", "Free time", "Dinner" } }
-            },
-            notes = new[] { "Comfortable shoes", "Water bottle" }
-        };
-
-        return JsonSerializer.Serialize(obj, JsonOptions);
     }
 
     private static string BuildDemoEmail(string prefix, int index)

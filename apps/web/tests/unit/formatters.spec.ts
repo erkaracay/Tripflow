@@ -18,7 +18,7 @@ describe('formatDate', () => {
     expect(formatDate('')).toBe('—')
   })
   it('extracts date part from YYYY-MM-DD', () => {
-    expect(formatDate('2026-02-08')).toBe('2026-02-08')
+    expect(formatDate('2026-02-08')).toBe('08.02.2026')
   })
 })
 

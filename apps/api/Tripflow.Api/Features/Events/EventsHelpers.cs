@@ -13,6 +13,16 @@ namespace Tripflow.Api.Features.Events;
 internal static class EventsHelpers
 {
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly string[] DefaultEquipmentCatalog =
+    [
+        "Headset",
+        "Badge",
+        "Radio",
+        "Lanyard",
+        "Tablet",
+        "Power Bank",
+        "Welcome Kit"
+    ];
 
     internal static IResult BadRequest(string message) => Results.BadRequest(new { message });
 
@@ -159,6 +169,34 @@ internal static class EventsHelpers
         return ValidEventCodeRegex.IsMatch(code);
     }
 
+    internal static bool TryNormalizeTimeZoneId(string? raw, out string normalized, out string errorCode)
+    {
+        errorCode = "invalid_time_zone_id";
+        normalized = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var trimmed = raw.Trim();
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(trimmed);
+            normalized = trimmed;
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
+    }
+
     internal static async Task<string> GenerateEventAccessCodeAsync(TripflowDbContext db, CancellationToken ct)
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -187,6 +225,7 @@ internal static class EventsHelpers
             entity.Name,
             entity.StartDate.ToString("yyyy-MM-dd"),
             entity.EndDate.ToString("yyyy-MM-dd"),
+            entity.TimeZoneId,
             entity.LogoUrl,
             entity.EventGuides.Select(g => g.GuideUserId).ToArray(),
             entity.IsDeleted,
@@ -310,6 +349,95 @@ internal static class EventsHelpers
         };
 
         return new EventPortalInfo(meeting, links, days, notes);
+    }
+
+    internal static List<EventDocTabEntity> CreateDefaultDocTabs(EventEntity entity, DateTime createdAtUtc)
+    {
+        var hotelContent = JsonSerializer.Serialize(new
+        {
+            hotelName = string.Empty,
+            address = string.Empty,
+            phone = string.Empty,
+            checkInNote = string.Empty,
+            checkOutNote = string.Empty
+        });
+
+        var insuranceContent = JsonSerializer.Serialize(new
+        {
+            companyName = string.Empty,
+            policyNo = string.Empty,
+            startDate = string.Empty,
+            endDate = string.Empty
+        });
+
+        var transferContent = JsonSerializer.Serialize(new { });
+
+        return
+        [
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Hotel",
+                Type = "Hotel",
+                SortOrder = 1,
+                IsActive = true,
+                ContentJson = hotelContent,
+                CreatedAt = createdAtUtc
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Insurance",
+                Type = "Insurance",
+                SortOrder = 2,
+                IsActive = false,
+                ContentJson = insuranceContent,
+                CreatedAt = createdAtUtc
+            },
+            new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Title = "Transfer",
+                Type = "Transfer",
+                SortOrder = 3,
+                IsActive = true,
+                ContentJson = transferContent,
+                CreatedAt = createdAtUtc
+            }
+        ];
+    }
+
+    internal static List<EventItemEntity> CreateDefaultEventItems(EventEntity entity, int count)
+    {
+        var safeCount = Math.Clamp(count, 0, 10);
+        var items = new List<EventItemEntity>(safeCount);
+
+        for (var i = 0; i < safeCount; i++)
+        {
+            var itemName = i < DefaultEquipmentCatalog.Length
+                ? DefaultEquipmentCatalog[i]
+                : $"Equipment {i + 1}";
+
+            items.Add(new EventItemEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Type = itemName,
+                Title = "Equipment",
+                Name = itemName,
+                IsActive = true,
+                SortOrder = i + 1
+            });
+        }
+
+        return items;
     }
 
     internal static async Task<string> GenerateUniqueCheckInCodeAsync(TripflowDbContext db, CancellationToken ct)
