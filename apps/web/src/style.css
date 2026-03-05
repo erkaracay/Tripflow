@@ -87,6 +87,10 @@
   transform: translateY(16px);
 }
 
+.app-drawer-panel {
+  overscroll-behavior: contain;
+}
+
 .app-drawer-swipe-handle-wrap {
   display: flex;
   justify-content: center;
@@ -345,6 +349,22 @@
   border-color: rgb(148 163 184);
   background: rgb(255 255 255);
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 1024px) {
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']),
+    textarea,
+    select,
+    .app-combobox-search {
+      font-size: 16px !important;
+    }
+  }
 }
 
 .app-combobox-option {

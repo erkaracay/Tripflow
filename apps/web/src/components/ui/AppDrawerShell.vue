@@ -38,11 +38,35 @@ const emit = defineEmits<{
 const getScrollLockState = () => {
   const stateKey = '__tripflowDrawerScrollLockState' as const
   const globalRecord = globalThis as typeof globalThis & {
-    __tripflowDrawerScrollLockState?: { count: number; overflow: string }
+    __tripflowDrawerScrollLockState?: {
+      count: number
+      scrollY: number
+      bodyOverflow: string
+      bodyPosition: string
+      bodyTop: string
+      bodyWidth: string
+      bodyLeft: string
+      bodyRight: string
+      bodyOverscrollBehavior: string
+      htmlOverflow: string
+      htmlOverscrollBehavior: string
+    }
   }
 
   if (!globalRecord[stateKey]) {
-    globalRecord[stateKey] = { count: 0, overflow: '' }
+    globalRecord[stateKey] = {
+      count: 0,
+      scrollY: 0,
+      bodyOverflow: '',
+      bodyPosition: '',
+      bodyTop: '',
+      bodyWidth: '',
+      bodyLeft: '',
+      bodyRight: '',
+      bodyOverscrollBehavior: '',
+      htmlOverflow: '',
+      htmlOverscrollBehavior: '',
+    }
   }
 
   return globalRecord[stateKey]!
@@ -262,20 +286,38 @@ const handlePointerDown = (event: PointerEvent) => {
 }
 
 const lockBodyScroll = () => {
-  if (typeof document === 'undefined') {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
     return
   }
 
   const state = getScrollLockState()
   if (state.count === 0) {
-    state.overflow = document.body.style.overflow
+    state.scrollY = window.scrollY
+    state.bodyOverflow = document.body.style.overflow
+    state.bodyPosition = document.body.style.position
+    state.bodyTop = document.body.style.top
+    state.bodyWidth = document.body.style.width
+    state.bodyLeft = document.body.style.left
+    state.bodyRight = document.body.style.right
+    state.bodyOverscrollBehavior = document.body.style.overscrollBehavior
+    state.htmlOverflow = document.documentElement.style.overflow
+    state.htmlOverscrollBehavior = document.documentElement.style.overscrollBehavior
+
+    document.documentElement.style.overflow = 'hidden'
+    document.documentElement.style.overscrollBehavior = 'none'
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${state.scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.width = '100%'
+    document.body.style.overscrollBehavior = 'none'
   }
   state.count += 1
-  document.body.style.overflow = 'hidden'
 }
 
 const unlockBodyScroll = () => {
-  if (typeof document === 'undefined') {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
     return
   }
 
@@ -286,8 +328,27 @@ const unlockBodyScroll = () => {
 
   state.count -= 1
   if (state.count === 0) {
-    document.body.style.overflow = state.overflow
-    state.overflow = ''
+    document.documentElement.style.overflow = state.htmlOverflow
+    document.documentElement.style.overscrollBehavior = state.htmlOverscrollBehavior
+    document.body.style.overflow = state.bodyOverflow
+    document.body.style.position = state.bodyPosition
+    document.body.style.top = state.bodyTop
+    document.body.style.width = state.bodyWidth
+    document.body.style.left = state.bodyLeft
+    document.body.style.right = state.bodyRight
+    document.body.style.overscrollBehavior = state.bodyOverscrollBehavior
+    window.scrollTo(0, state.scrollY)
+
+    state.scrollY = 0
+    state.bodyOverflow = ''
+    state.bodyPosition = ''
+    state.bodyTop = ''
+    state.bodyWidth = ''
+    state.bodyLeft = ''
+    state.bodyRight = ''
+    state.bodyOverscrollBehavior = ''
+    state.htmlOverflow = ''
+    state.htmlOverscrollBehavior = ''
   }
 }
 

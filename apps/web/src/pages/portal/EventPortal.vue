@@ -11,6 +11,7 @@ import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import PortalMealSelectionCard from '../../components/portal/PortalMealSelectionCard.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
+import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import { formatPhoneDisplay } from '../../lib/normalize'
@@ -76,6 +77,11 @@ const tabs = computed<{ id: TabKey; label: string }[]>(() => [
   { id: 'docs', label: t('portal.tabs.docs') },
   { id: 'qr', label: t('portal.tabs.qr') },
   { id: 'info', label: t('portal.tabs.info') },
+])
+
+const localeOptions = computed(() => [
+  { value: 'tr', label: t('portal.info.languageTr') },
+  { value: 'en', label: t('portal.info.languageEn') },
 ])
 
 const tabOrder: TabKey[] = ['days', 'docs', 'qr', 'info']
@@ -1053,32 +1059,14 @@ onUnmounted(() => {
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 class="text-lg font-semibold">{{ t('portal.info.languageTitle') }}</h2>
-              <div class="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  class="w-full rounded-full border px-3 py-2 text-sm font-semibold"
-                  :class="
-                    locale === 'tr'
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  "
-                  type="button"
-                  @click="switchLocale('tr')"
-                >
-                  {{ t('portal.info.languageTr') }}
-                </button>
-                <button
-                  class="w-full rounded-full border px-3 py-2 text-sm font-semibold"
-                  :class="
-                    locale === 'en'
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  "
-                  type="button"
-                  @click="switchLocale('en')"
-                >
-                  {{ t('portal.info.languageEn') }}
-                </button>
-              </div>
+              <AppSegmentedControl
+                class-name="mt-3"
+                :model-value="locale"
+                :options="localeOptions"
+                :aria-label="t('portal.info.languageTitle')"
+                full-width
+                @update:modelValue="switchLocale($event as Locale)"
+              />
 
               <button
                 class="mt-5 inline-flex w-full items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:border-rose-300"
