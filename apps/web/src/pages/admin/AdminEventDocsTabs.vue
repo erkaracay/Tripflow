@@ -5,12 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
-import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import EventDocPreviewDrawer from '../../components/docs/EventDocPreviewDrawer.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { AppComboboxOption, Event as TripEvent, EventDocTabDto } from '../../types'
+import type { Event as TripEvent, EventDocTabDto } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -24,8 +23,6 @@ const eventError = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const tabs = ref<EventDocTabDto[]>([])
-const sortKey = ref<'sortOrder' | 'title' | 'type'>('sortOrder')
-const sortDir = ref<'asc' | 'desc'>('asc')
 
 const modalOpen = ref(false)
 const saving = ref(false)
@@ -43,6 +40,8 @@ const form = reactive({
   hotelName: '',
   hotelAddress: '',
   hotelPhone: '',
+  hotelCheckInDate: '',
+  hotelCheckOutDate: '',
   hotelCheckInNote: '',
   hotelCheckOutNote: '',
   transferArrivalPickupTime: '',
@@ -72,12 +71,6 @@ const customEditorModeOptions = computed(() => [
   { value: 'form', label: t('admin.docs.customText') },
   { value: 'advanced', label: t('admin.docs.advancedJson') },
 ])
-const docTypeOptions = computed<AppComboboxOption[]>(() => [
-  { value: 'Hotel', label: t('admin.docs.types.hotel') },
-  { value: 'Insurance', label: t('admin.docs.types.insurance') },
-  { value: 'Transfer', label: t('admin.docs.types.transfer') },
-  { value: 'Custom', label: t('admin.docs.types.custom') },
-])
 
 const resolvedType = computed(() => {
   if (form.type === 'Custom') {
@@ -86,50 +79,75 @@ const resolvedType = computed(() => {
   return form.type
 })
 
-const isSystemFormType = computed(() => form.type !== 'Custom')
+const nextSortOrder = computed(() =>
+  tabs.value.reduce((max, tab) => Math.max(max, tab.sortOrder), 0) + 1
+)
 
-const sortedTabs = computed(() => {
-  const list = [...tabs.value]
-  const dir = sortDir.value === 'asc' ? 1 : -1
-  list.sort((a, b) => {
-    let cmp = 0
-    if (sortKey.value === 'sortOrder') {
-      cmp = (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-    } else if (sortKey.value === 'title') {
-      cmp = (a.title ?? '').localeCompare(b.title ?? '')
-    } else {
-      cmp = (a.type ?? '').localeCompare(b.type ?? '')
+const sortedByOrderTabs = computed(() =>
+  [...tabs.value].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) {
+      return a.sortOrder - b.sortOrder
     }
-    return cmp * dir
+
+    return a.title.localeCompare(b.title)
   })
-  return list
+)
+
+const normalizeDocType = (type: string | null | undefined) => (type ?? '').trim().toLowerCase()
+const accommodationAliasSet = new Set(['hotel', 'otel', 'accommodation', 'konaklama'])
+
+const isAccommodationDocType = (type: string | null | undefined) => normalizeDocType(type) === 'hotel'
+
+const isLockedSystemDocType = (type: string | null | undefined) => {
+  const normalized = normalizeDocType(type)
+  return normalized === 'insurance' || normalized === 'transfer'
+}
+
+const isLockedFormType = computed(() => isLockedSystemDocType(form.type))
+
+const accommodationTabs = computed(() =>
+  sortedByOrderTabs.value.filter((tab) => isAccommodationDocType(tab.type))
+)
+
+const systemTabs = computed(() =>
+  sortedByOrderTabs.value.filter((tab) => isLockedSystemDocType(tab.type))
+)
+
+const customTabs = computed(() =>
+  sortedByOrderTabs.value.filter((tab) => !isAccommodationDocType(tab.type) && !isLockedSystemDocType(tab.type))
+)
+
+const systemTabWarnings = computed(() => {
+  const warnings: string[] = []
+  const insuranceCount = systemTabs.value.filter((tab) => normalizeDocType(tab.type) === 'insurance').length
+  const transferCount = systemTabs.value.filter((tab) => normalizeDocType(tab.type) === 'transfer').length
+
+  if (insuranceCount > 1) {
+    warnings.push(t('admin.docs.systemTabs.duplicateWarning', { type: t('admin.docs.types.insurance'), count: insuranceCount }))
+  }
+
+  if (transferCount > 1) {
+    warnings.push(t('admin.docs.systemTabs.duplicateWarning', { type: t('admin.docs.types.transfer'), count: transferCount }))
+  }
+
+  return warnings
 })
 
-const setSort = (key: 'sortOrder' | 'title' | 'type') => {
-  if (sortKey.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDir.value = 'asc'
-  }
-}
-
-const sortIndicator = (key: 'sortOrder' | 'title' | 'type') => {
-  if (sortKey.value !== key) return ''
-  return sortDir.value === 'asc' ? ' ↑' : ' ↓'
-}
-
 const formatType = (type: string) => {
-  const normalized = type.toLowerCase()
+  const normalized = normalizeDocType(type)
   if (normalized === 'hotel') return t('admin.docs.types.hotel')
   if (normalized === 'insurance') return t('admin.docs.types.insurance')
   if (normalized === 'transfer') return t('admin.docs.types.transfer')
   return type
 }
 
-const isSystemType = (type: string) => {
-  const normalized = type.toLowerCase()
-  return normalized === 'hotel' || normalized === 'insurance' || normalized === 'transfer'
+const displayTitle = (tab: EventDocTabDto) => {
+  if (!isAccommodationDocType(tab.type)) {
+    return tab.title
+  }
+
+  const normalizedTitle = normalizeDocType(tab.title)
+  return accommodationAliasSet.has(normalizedTitle) ? t('admin.docs.types.hotel') : tab.title
 }
 
 const toObject = (content: unknown): Record<string, unknown> => {
@@ -143,6 +161,47 @@ const readContent = (content: Record<string, unknown>, key: string) => {
   const value = content[key]
   if (typeof value !== 'string') return ''
   return value
+}
+
+const tryParseIsoDate = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+  if (!match) return null
+  const year = Number(match[1] ?? 0)
+  const month = Number(match[2] ?? 0)
+  const day = Number(match[3] ?? 0)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  if (
+    Number.isNaN(parsed.getTime())
+    || parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) {
+    return null
+  }
+  return parsed
+}
+
+const eventStartDate = computed(() => {
+  const value = event.value?.startDate?.trim()
+  if (!value) return null
+  return tryParseIsoDate(value)
+})
+
+const eventEndDate = computed(() => {
+  const value = event.value?.endDate?.trim()
+  if (!value) return null
+  return tryParseIsoDate(value)
+})
+
+const isOutsideEventDateRange = (date: Date | null) => {
+  if (!date || !eventStartDate.value || !eventEndDate.value) {
+    return false
+  }
+
+  const dateMs = date.getTime()
+  return dateMs < eventStartDate.value.getTime() || dateMs > eventEndDate.value.getTime()
 }
 
 const normalizeTransferContent = (content: unknown) => {
@@ -219,6 +278,8 @@ const resetForm = () => {
   form.hotelName = ''
   form.hotelAddress = ''
   form.hotelPhone = ''
+  form.hotelCheckInDate = ''
+  form.hotelCheckOutDate = ''
   form.hotelCheckInNote = ''
   form.hotelCheckOutNote = ''
   form.transferArrivalPickupTime = ''
@@ -245,9 +306,23 @@ const resetForm = () => {
   formError.value = null
 }
 
-const openCreate = () => {
+const openCreateAccommodation = () => {
   editingTab.value = null
   resetForm()
+  form.type = 'Hotel'
+  form.title = t('admin.docs.types.hotel')
+  form.customType = ''
+  form.sortOrder = nextSortOrder.value
+  modalOpen.value = true
+}
+
+const openCreateCustom = () => {
+  editingTab.value = null
+  resetForm()
+  form.type = 'Custom'
+  form.title = ''
+  form.customType = 'Custom'
+  form.sortOrder = nextSortOrder.value
   modalOpen.value = true
 }
 
@@ -283,6 +358,8 @@ const openEdit = (tab: EventDocTabDto) => {
     form.hotelName = readContent(content, 'hotelName')
     form.hotelAddress = readContent(content, 'address')
     form.hotelPhone = readContent(content, 'phone')
+    form.hotelCheckInDate = readContent(content, 'checkInDate')
+    form.hotelCheckOutDate = readContent(content, 'checkOutDate')
     form.hotelCheckInNote = readContent(content, 'checkInNote')
     form.hotelCheckOutNote = readContent(content, 'checkOutNote')
   } else if (form.type === 'Transfer') {
@@ -381,6 +458,8 @@ const buildContent = () => {
       hotelName: form.hotelName.trim(),
       address: form.hotelAddress.trim(),
       phone: form.hotelPhone.trim(),
+      checkInDate: form.hotelCheckInDate.trim(),
+      checkOutDate: form.hotelCheckOutDate.trim(),
       checkInNote: form.hotelCheckInNote.trim(),
       checkOutNote: form.hotelCheckOutNote.trim(),
     }
@@ -430,6 +509,29 @@ const validateForm = () => {
   if (form.sortOrder < 1) {
     formError.value = t('admin.docs.validation.sortOrder')
     return false
+  }
+  if (form.type === 'Hotel') {
+    const parsedCheckInDate = form.hotelCheckInDate.trim() ? tryParseIsoDate(form.hotelCheckInDate) : null
+    const parsedCheckOutDate = form.hotelCheckOutDate.trim() ? tryParseIsoDate(form.hotelCheckOutDate) : null
+
+    if (form.hotelCheckInDate.trim() && !parsedCheckInDate) {
+      formError.value = t('admin.docs.validation.hotelCheckInDateInvalid')
+      return false
+    }
+    if (form.hotelCheckOutDate.trim() && !parsedCheckOutDate) {
+      formError.value = t('admin.docs.validation.hotelCheckOutDateInvalid')
+      return false
+    }
+
+    if (isOutsideEventDateRange(parsedCheckInDate) || isOutsideEventDateRange(parsedCheckOutDate)) {
+      formError.value = t('admin.docs.validation.hotelDateOutsideEventRange')
+      return false
+    }
+
+    if (parsedCheckInDate && parsedCheckOutDate && parsedCheckOutDate.getTime() < parsedCheckInDate.getTime()) {
+      formError.value = t('admin.docs.validation.hotelDateRange')
+      return false
+    }
   }
   if (form.type === 'Custom') {
     if (showAdvanced.value && !applyRawJson()) {
@@ -554,13 +656,22 @@ onMounted(() => {
         <h1 class="text-2xl font-semibold text-slate-900">{{ t('admin.docs.title') }}</h1>
         <p class="text-sm text-slate-500">{{ event?.name || eventError }}</p>
       </div>
-      <button
-        class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-        type="button"
-        @click="openCreate"
-      >
-        {{ t('admin.docs.newTab') }}
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          type="button"
+          @click="openCreateAccommodation"
+        >
+          {{ t('admin.docs.accommodations.add') }}
+        </button>
+        <button
+          class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          type="button"
+          @click="openCreateCustom"
+        >
+          {{ t('admin.docs.customTabs.add') }}
+        </button>
+      </div>
     </div>
 
     <LoadingState v-if="loading" message-key="common.loading" />
@@ -571,103 +682,142 @@ onMounted(() => {
       @retry="fetchTabs"
     />
 
-    <div v-else class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div v-if="tabs.length === 0" class="p-6 text-sm text-slate-500">
+    <div v-else class="space-y-4">
+      <div v-if="tabs.length === 0" class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
         {{ t('admin.docs.empty') }}
       </div>
-      <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-          <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <tr>
-              <th class="px-4 py-3 text-left">
-                <button
-                  type="button"
-                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
-                  @click="setSort('sortOrder')"
-                >
-                  {{ t('admin.docs.sortOrder') }}{{ sortIndicator('sortOrder') }}
-                </button>
-              </th>
-              <th class="px-4 py-3 text-left">
-                <button
-                  type="button"
-                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
-                  @click="setSort('title')"
-                >
-                  {{ t('admin.docs.tabTitle') }}{{ sortIndicator('title') }}
-                </button>
-              </th>
-              <th class="px-4 py-3 text-left">
-                <button
-                  type="button"
-                  class="inline-flex cursor-pointer select-none items-center gap-0.5 rounded hover:bg-slate-100"
-                  @click="setSort('type')"
-                >
-                  {{ t('admin.docs.tabType') }}{{ sortIndicator('type') }}
-                </button>
-              </th>
-              <th class="px-4 py-3 text-left">{{ t('admin.docs.active') }}</th>
-              <th class="px-4 py-3 text-right">{{ t('admin.docs.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            <tr v-for="tab in sortedTabs" :key="tab.id" class="text-slate-700">
-              <td class="px-4 py-3">{{ tab.sortOrder }}</td>
-              <td class="px-4 py-3">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium text-slate-900">{{ tab.title }}</span>
-                  <span class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
-                    {{ t('admin.docs.participantView') }}
-                  </span>
-                </div>
-              </td>
-              <td class="px-4 py-3">{{ formatType(tab.type) }}</td>
-              <td class="px-4 py-3">
-                <label class="inline-flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    class="h-4 w-4 rounded border-slate-300"
-                    :checked="tab.isActive"
-                    :disabled="updatingId === tab.id || isSystemType(tab.type)"
-                    @change="toggleActive(tab)"
-                  />
-                  <span v-if="isSystemType(tab.type)">{{ t('admin.docs.defaultTab') }}</span>
-                  <span v-else>{{ tab.isActive ? t('common.show') : t('common.hide') }}</span>
-                </label>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex justify-end gap-2">
-                  <button
-                    class="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
-                    type="button"
-                    @click="openPreview(tab)"
-                  >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M1.75 10s2.75-5 8.25-5 8.25 5 8.25 5-2.75 5-8.25 5-8.25-5-8.25-5Z" />
-                      <circle cx="10" cy="10" r="2.5" />
-                    </svg>
-                    {{ t('admin.docs.preview') }}
-                  </button>
-                  <button
-                    class="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-900 hover:border-slate-400"
-                    type="button"
-                    @click="openEdit(tab)"
-                  >
-                    {{ t('common.edit') }}
-                  </button>
-                  <button
-                    class="rounded border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300"
-                    type="button"
-                    @click="deleteTab(tab)"
-                  >
-                    {{ t('common.delete') }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+
+      <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.docs.accommodations.title') }}</h2>
+          <span class="text-xs text-slate-500">{{ accommodationTabs.length }} {{ t('common.total') }}</span>
+        </header>
+        <div v-if="accommodationTabs.length === 0" class="px-4 py-5 text-sm text-slate-500">
+          {{ t('admin.docs.accommodations.empty') }}
+        </div>
+        <div v-else class="divide-y divide-slate-200">
+          <div v-for="(tab, index) in accommodationTabs" :key="tab.id" class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500">#{{ index + 1 }}</span>
+                <span class="font-medium text-slate-900">{{ displayTitle(tab) }}</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                  {{ t('admin.docs.participantView') }}
+                </span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">{{ formatType(tab.type) }}</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-slate-300"
+                  :checked="tab.isActive"
+                  :disabled="updatingId === tab.id"
+                  @change="toggleActive(tab)"
+                />
+                {{ tab.isActive ? t('common.show') : t('common.hide') }}
+              </label>
+              <button class="rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700" type="button" @click="openPreview(tab)">
+                {{ t('admin.docs.preview') }}
+              </button>
+              <button class="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900" type="button" @click="openEdit(tab)">
+                {{ t('common.edit') }}
+              </button>
+              <button class="rounded border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600" type="button" @click="deleteTab(tab)">
+                {{ t('common.delete') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.docs.systemTabs.title') }}</h2>
+          <span class="text-xs text-slate-500">{{ systemTabs.length }} {{ t('common.total') }}</span>
+        </header>
+        <div class="px-4 py-3">
+          <p class="text-xs text-slate-500">{{ t('admin.docs.systemTabs.helper') }}</p>
+          <p v-for="warning in systemTabWarnings" :key="warning" class="mt-2 text-xs text-amber-700">{{ warning }}</p>
+        </div>
+        <div v-if="systemTabs.length === 0" class="px-4 pb-4 text-sm text-slate-500">
+          {{ t('admin.docs.systemTabs.empty') }}
+        </div>
+        <div v-else class="divide-y divide-slate-200">
+          <div v-for="tab in systemTabs" :key="tab.id" class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium text-slate-900">{{ displayTitle(tab) }}</span>
+                <span class="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  {{ t('admin.docs.systemTabs.badge') }}
+                </span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">{{ formatType(tab.type) }}</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-slate-300"
+                  :checked="tab.isActive"
+                  :disabled="updatingId === tab.id"
+                  @change="toggleActive(tab)"
+                />
+                {{ tab.isActive ? t('common.show') : t('common.hide') }}
+              </label>
+              <button class="rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700" type="button" @click="openPreview(tab)">
+                {{ t('admin.docs.preview') }}
+              </button>
+              <button class="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900" type="button" @click="openEdit(tab)">
+                {{ t('common.edit') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-900">{{ t('admin.docs.customTabs.title') }}</h2>
+          <span class="text-xs text-slate-500">{{ customTabs.length }} {{ t('common.total') }}</span>
+        </header>
+        <div v-if="customTabs.length === 0" class="px-4 py-5 text-sm text-slate-500">
+          {{ t('admin.docs.customTabs.empty') }}
+        </div>
+        <div v-else class="divide-y divide-slate-200">
+          <div v-for="tab in customTabs" :key="tab.id" class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500">#{{ tab.sortOrder }}</span>
+                <span class="font-medium text-slate-900">{{ tab.title }}</span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">{{ formatType(tab.type) }}</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-slate-300"
+                  :checked="tab.isActive"
+                  :disabled="updatingId === tab.id"
+                  @change="toggleActive(tab)"
+                />
+                {{ tab.isActive ? t('common.show') : t('common.hide') }}
+              </label>
+              <button class="rounded border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700" type="button" @click="openPreview(tab)">
+                {{ t('admin.docs.preview') }}
+              </button>
+              <button class="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900" type="button" @click="openEdit(tab)">
+                {{ t('common.edit') }}
+              </button>
+              <button class="rounded border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600" type="button" @click="deleteTab(tab)">
+                {{ t('common.delete') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -690,26 +840,12 @@ onMounted(() => {
               :disabled="saving"
             />
           </label>
-          <label class="grid gap-1 text-sm">
+          <div class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.docs.tabType') }}</span>
-            <AppCombobox
-              v-model="form.type"
-              :options="docTypeOptions"
-              :placeholder="t('admin.docs.tabType')"
-              :aria-label="t('admin.docs.tabType')"
-              :disabled="saving"
-              :searchable="false"
-            />
-          </label>
-          <label v-if="form.type === 'Custom'" class="grid gap-1 text-sm">
-            <span class="text-slate-600">{{ t('admin.docs.customType') }}</span>
-            <input
-              v-model.trim="form.customType"
-              type="text"
-              class="rounded border border-slate-200 px-3 py-2 text-sm"
-              :disabled="saving"
-            />
-          </label>
+            <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+              {{ formatType(resolvedType) }}
+            </div>
+          </div>
           <label class="grid gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.docs.sortOrder') }}</span>
             <input
@@ -717,13 +853,10 @@ onMounted(() => {
               type="number"
               min="1"
               class="rounded border border-slate-200 px-3 py-2 text-sm"
-              :disabled="saving || isSystemFormType"
+              :disabled="saving || isLockedFormType"
             />
           </label>
-          <label
-            v-if="form.type === 'Custom'"
-            class="inline-flex items-center gap-2 text-sm text-slate-600 md:col-span-2"
-          >
+          <label class="inline-flex items-center gap-2 text-sm text-slate-600 md:col-span-2">
             <input
               v-model="form.isActive"
               type="checkbox"
@@ -732,8 +865,8 @@ onMounted(() => {
             />
             {{ t('admin.docs.active') }}
           </label>
-          <p v-else class="text-xs text-slate-500 md:col-span-2">
-            {{ t('admin.docs.defaultTab') }}
+          <p v-if="isLockedFormType" class="text-xs text-slate-500 md:col-span-2">
+            {{ t('admin.docs.systemTabs.badge') }}
           </p>
 
           <div v-if="form.type === 'Hotel'" class="md:col-span-2 grid gap-3">
@@ -749,6 +882,26 @@ onMounted(() => {
             <label class="grid gap-1 text-sm">
               <span class="text-slate-600">{{ t('admin.docs.hotelPhone') }}</span>
               <input v-model.trim="form.hotelPhone" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" />
+            </label>
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.docs.checkInDate') }}</span>
+              <input
+                v-model="form.hotelCheckInDate"
+                type="date"
+                class="rounded border border-slate-200 px-3 py-2 text-sm"
+                :min="event?.startDate || undefined"
+                :max="form.hotelCheckOutDate || event?.endDate || undefined"
+              />
+            </label>
+            <label class="grid gap-1 text-sm">
+              <span class="text-slate-600">{{ t('admin.docs.checkOutDate') }}</span>
+              <input
+                v-model="form.hotelCheckOutDate"
+                type="date"
+                class="rounded border border-slate-200 px-3 py-2 text-sm"
+                :min="form.hotelCheckInDate || event?.startDate || undefined"
+                :max="event?.endDate || undefined"
+              />
             </label>
             <label class="grid gap-1 text-sm">
               <span class="text-slate-600">{{ t('admin.docs.checkInNote') }}</span>

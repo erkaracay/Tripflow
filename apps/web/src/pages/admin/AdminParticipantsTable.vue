@@ -266,6 +266,12 @@ onMounted(loadEvent)
           :initial-status="status"
           @applied="fetchTable"
         />
+        <RouterLink
+          class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
+          :to="`/admin/events/${eventId}/participants/rooms`"
+        >
+          {{ t('admin.participants.roomOps') }}
+        </RouterLink>
         <button
           class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"
           type="button"

@@ -391,6 +391,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPost("/{eventId}/participants/rooms/bulk-apply", EventsHandlers.BulkApplyParticipantRooms)
+            .WithSummary("Bulk apply participant room data")
+            .WithDescription("Applies room/accommodation updates to participants in one operation.")
+            .Produces<BulkApplyParticipantRoomsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/participants/{participantId:guid}", EventsHandlers.GetParticipantProfile)
             .WithSummary("Participant profile")
             .WithDescription("Returns participant details for an event (includes arrived status).")

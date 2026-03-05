@@ -14,6 +14,24 @@ namespace Tripflow.Api.Features.Events;
 
 internal static class EventsHandlers
 {
+    private const string DocTypeHotel = "hotel";
+    private const string DocTypeInsurance = "insurance";
+    private const string DocTypeTransfer = "transfer";
+    private const string DocTypeCategorySystem = "system";
+    private const string DocTypeCategoryAccommodation = "accommodation";
+    private const string DocTypeCategoryCustom = "custom";
+
+    private static readonly HashSet<string> AccommodationContentAllowedKeys = new(StringComparer.Ordinal)
+    {
+        "hotelName",
+        "address",
+        "phone",
+        "checkInDate",
+        "checkOutDate",
+        "checkInNote",
+        "checkOutNote"
+    };
+
     internal static async Task<IResult> GetEvents(
         bool? includeArchived,
         HttpContext httpContext,
@@ -1388,9 +1406,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -1398,6 +1418,8 @@ internal static class EventsHandlers
         var tabs = await db.EventDocTabs.AsNoTracking()
             .Where(x => x.EventId == id && x.OrganizationId == orgId)
             .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
 
         var response = tabs.Select(MapDocTab).ToArray();
@@ -1425,9 +1447,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -1439,6 +1463,8 @@ internal static class EventsHandlers
             request.IsActive,
             request.Content,
             null,
+            eventInfo.StartDate,
+            eventInfo.EndDate,
             out var title,
             out var type,
             out var sortOrder,
@@ -1447,6 +1473,16 @@ internal static class EventsHandlers
         if (validation is not null)
         {
             return validation;
+        }
+
+        var normalizedType = NormalizeDocType(type);
+        if (IsSystemDocType(normalizedType))
+        {
+            return Results.Conflict(new
+            {
+                code = "system_doc_type_create_forbidden",
+                message = "System doc tabs cannot be created manually."
+            });
         }
 
         var entity = new EventDocTabEntity
@@ -1502,6 +1538,15 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Doc tab not found." });
         }
 
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
         var validation = ValidateDocTabRequest(
             request.Title,
             request.Type,
@@ -1509,6 +1554,8 @@ internal static class EventsHandlers
             request.IsActive,
             request.Content,
             entity,
+            eventInfo.StartDate,
+            eventInfo.EndDate,
             out var title,
             out var type,
             out var sortOrder,
@@ -1517,6 +1564,29 @@ internal static class EventsHandlers
         if (validation is not null)
         {
             return validation;
+        }
+
+        var existingNormalizedType = NormalizeDocType(entity.Type);
+        var nextNormalizedType = NormalizeDocType(type);
+        var existingCategory = GetDocTypeCategory(existingNormalizedType);
+        var nextCategory = GetDocTypeCategory(nextNormalizedType);
+
+        if (existingCategory != nextCategory)
+        {
+            return Results.Conflict(new
+            {
+                code = "doc_type_change_forbidden",
+                message = "Doc tab type category cannot be changed."
+            });
+        }
+
+        if (IsSystemDocType(existingNormalizedType) && existingNormalizedType != nextNormalizedType)
+        {
+            return Results.Conflict(new
+            {
+                code = "doc_type_change_forbidden",
+                message = "System doc tab type cannot be changed."
+            });
         }
 
         entity.Title = title!;
@@ -1556,6 +1626,15 @@ internal static class EventsHandlers
         if (entity is null)
         {
             return Results.NotFound(new { message = "Doc tab not found." });
+        }
+
+        if (IsSystemDocType(NormalizeDocType(entity.Type)))
+        {
+            return Results.Conflict(new
+            {
+                code = "system_doc_type_delete_forbidden",
+                message = "System doc tabs cannot be deleted."
+            });
         }
 
         db.EventDocTabs.Remove(entity);
@@ -1646,9 +1725,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -1738,6 +1819,7 @@ internal static class EventsHandlers
         string? query,
         string? status,
         string? flightFilter,
+        string? accommodationFilter,
         int? page,
         int? pageSize,
         string? sort,
@@ -1756,9 +1838,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -1815,6 +1899,19 @@ internal static class EventsHandlers
                     c.EventId == id && c.OrganizationId == orgId && c.ParticipantId == x.Id))
                 : participantsQuery.Where(x => !db.CheckIns.Any(c =>
                     c.EventId == id && c.OrganizationId == orgId && c.ParticipantId == x.Id));
+        }
+
+        var accommodationFilterValue = accommodationFilter?.Trim();
+        if (!string.IsNullOrWhiteSpace(accommodationFilterValue))
+        {
+            if (string.Equals(accommodationFilterValue, "unassigned", StringComparison.OrdinalIgnoreCase))
+            {
+                participantsQuery = participantsQuery.Where(x => x.Details == null || x.Details.AccommodationDocTabId == null);
+            }
+            else if (Guid.TryParse(accommodationFilterValue, out var accommodationDocTabId))
+            {
+                participantsQuery = participantsQuery.Where(x => x.Details != null && x.Details.AccommodationDocTabId == accommodationDocTabId);
+            }
         }
 
         var flightFilterValue = (flightFilter ?? "all").Trim().ToLowerInvariant();
@@ -2049,7 +2146,8 @@ internal static class EventsHandlers
                 row.details.ReturnTransferVehicle,
                 row.details.ReturnTransferPlate,
                 row.details.ReturnTransferDriverInfo,
-                row.details.ReturnTransferNote)))
+                row.details.ReturnTransferNote,
+                row.details.AccommodationDocTabId)))
             .ToArray();
 
         return Results.Ok(new ParticipantTableResponseDto(
@@ -2057,6 +2155,271 @@ internal static class EventsHandlers
             resolvedPageSize,
             total,
             items));
+    }
+
+    internal static async Task<IResult> BulkApplyParticipantRooms(
+        string eventId,
+        BulkApplyParticipantRoomsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return EventsHelpers.BadRequest("Request body is required.");
+        }
+
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var overwriteMode = NormalizeRoomOverwriteMode(request.OverwriteMode);
+        if (overwriteMode is null)
+        {
+            return Results.BadRequest(new
+            {
+                code = "invalid_room_overwrite_mode",
+                message = "overwriteMode must be always or only_empty."
+            });
+        }
+
+        var onlyEmpty = overwriteMode == "only_empty";
+        var errors = new List<BulkApplyParticipantRoomsErrorDto>();
+        var notFoundTcNoCount = 0;
+        var updatedCount = 0;
+        var skippedCount = 0;
+        var affectedCount = 0;
+
+        var accommodationValidationCache = new Dictionary<Guid, AccommodationDocValidationResult>();
+
+        async Task<(bool hasPatch, Guid? normalizedValue, IResult? validationError)> ResolveAccommodationPatch(Guid? rawValue)
+        {
+            if (!rawValue.HasValue)
+            {
+                return (false, null, null);
+            }
+
+            if (rawValue.Value == Guid.Empty)
+            {
+                return (true, null, null);
+            }
+
+            if (!accommodationValidationCache.TryGetValue(rawValue.Value, out var cached))
+            {
+                cached = await ValidateAccommodationDocReference(id, orgId, rawValue.Value, db, ct);
+                accommodationValidationCache[rawValue.Value] = cached;
+            }
+
+            return (true, cached.Value, cached.Error);
+        }
+
+        var hasRowUpdates = request.RowUpdates is { Length: > 0 };
+
+        if (hasRowUpdates)
+        {
+            var rowUpdates = request.RowUpdates!;
+            affectedCount = rowUpdates.Length;
+
+            var participantIds = rowUpdates
+                .Select(x => x.ParticipantId)
+                .Where(x => x != Guid.Empty)
+                .Distinct()
+                .ToArray();
+
+            var participantsById = await db.Participants
+                .Include(x => x.Details)
+                .Where(x => x.EventId == id && x.OrganizationId == orgId && participantIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+
+            foreach (var row in rowUpdates)
+            {
+                if (!participantsById.TryGetValue(row.ParticipantId, out var participant))
+                {
+                    skippedCount++;
+                    if (!string.IsNullOrWhiteSpace(row.TcNo))
+                    {
+                        notFoundTcNoCount++;
+                    }
+
+                    errors.Add(new BulkApplyParticipantRoomsErrorDto(
+                        row.ParticipantId,
+                        row.TcNo,
+                        "participant_not_found",
+                        "Participant could not be resolved for room update."));
+                    continue;
+                }
+
+                var patch = row.Patch ?? request.Patch;
+                if (!HasAnyRoomPatchField(patch))
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                var accommodationResolve = await ResolveAccommodationPatch(patch!.AccommodationDocTabId);
+                if (accommodationResolve.validationError is not null)
+                {
+                    skippedCount++;
+                    errors.Add(new BulkApplyParticipantRoomsErrorDto(
+                        participant.Id,
+                        row.TcNo ?? participant.TcNo,
+                        "invalid_accommodation_doc_tab_id",
+                        "Accommodation doc tab id must belong to this event and must be of type Hotel."));
+                    continue;
+                }
+
+                participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+
+                if (!TryApplyRoomPatch(
+                        participant.Details,
+                        patch!,
+                        onlyEmpty,
+                        accommodationResolve.hasPatch,
+                        accommodationResolve.normalizedValue,
+                        eventInfo.StartDate,
+                        eventInfo.EndDate,
+                        out var patchErrorCode,
+                        out var patchErrorMessage,
+                        out var changed))
+                {
+                    skippedCount++;
+                    errors.Add(new BulkApplyParticipantRoomsErrorDto(
+                        participant.Id,
+                        row.TcNo ?? participant.TcNo,
+                        patchErrorCode,
+                        patchErrorMessage));
+                    continue;
+                }
+
+                if (changed)
+                {
+                    updatedCount++;
+                }
+                else
+                {
+                    skippedCount++;
+                }
+            }
+        }
+        else
+        {
+            if (!HasAnyRoomPatchField(request.Patch))
+            {
+                return Results.BadRequest(new
+                {
+                    code = "invalid_room_patch",
+                    message = "patch or rowUpdates is required."
+                });
+            }
+
+            var scope = NormalizeRoomScope(request.Scope);
+            if (scope is null)
+            {
+                return Results.BadRequest(new
+                {
+                    code = "invalid_room_scope",
+                    message = "scope must be manual, filtered, or all_event."
+                });
+            }
+
+            IQueryable<ParticipantEntity> participantsQuery = db.Participants
+                .Include(x => x.Details)
+                .Where(x => x.EventId == id && x.OrganizationId == orgId);
+
+            if (scope == "manual")
+            {
+                var participantIds = (request.ParticipantIds ?? Array.Empty<Guid>())
+                    .Where(x => x != Guid.Empty)
+                    .Distinct()
+                    .ToArray();
+                if (participantIds.Length == 0)
+                {
+                    return Results.BadRequest(new
+                    {
+                        code = "invalid_room_scope",
+                        message = "participantIds is required when scope is manual."
+                    });
+                }
+
+                participantsQuery = participantsQuery.Where(x => participantIds.Contains(x.Id));
+            }
+            else if (scope == "filtered")
+            {
+                participantsQuery = ApplyRoomFilters(participantsQuery, request.Filters, id, orgId, db);
+            }
+
+            var participants = await participantsQuery.ToListAsync(ct);
+            affectedCount = participants.Count;
+
+            var patch = request.Patch!;
+            var accommodationResolve = await ResolveAccommodationPatch(patch.AccommodationDocTabId);
+            if (accommodationResolve.validationError is not null)
+            {
+                return accommodationResolve.validationError;
+            }
+
+            foreach (var participant in participants)
+            {
+                participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+
+                if (!TryApplyRoomPatch(
+                        participant.Details,
+                        patch,
+                        onlyEmpty,
+                        accommodationResolve.hasPatch,
+                        accommodationResolve.normalizedValue,
+                        eventInfo.StartDate,
+                        eventInfo.EndDate,
+                        out var patchErrorCode,
+                        out var patchErrorMessage,
+                        out var changed))
+                {
+                    skippedCount++;
+                    errors.Add(new BulkApplyParticipantRoomsErrorDto(
+                        participant.Id,
+                        participant.TcNo,
+                        patchErrorCode,
+                        patchErrorMessage));
+                    continue;
+                }
+
+                if (changed)
+                {
+                    updatedCount++;
+                }
+                else
+                {
+                    skippedCount++;
+                }
+            }
+        }
+
+        if (updatedCount > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        return Results.Ok(new BulkApplyParticipantRoomsResponse(
+            affectedCount,
+            updatedCount,
+            skippedCount,
+            notFoundTcNoCount,
+            errors.ToArray()));
     }
 
     internal static async Task<IResult> GetParticipantProfile(
@@ -2140,9 +2503,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -2270,9 +2635,11 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        var eventExists = await db.Events.AsNoTracking()
-            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
-        if (!eventExists)
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
         {
             return Results.NotFound(new { message = "Event not found." });
         }
@@ -2353,7 +2720,24 @@ internal static class EventsHandlers
                 };
             }
 
-            if (!TryApplyDetails(entity.Details, request.Details, out var detailsError))
+            var detailsValidation = await ValidateAccommodationDocReference(
+                id,
+                orgId,
+                request.Details.AccommodationDocTabId,
+                db,
+                ct);
+            if (detailsValidation.Error is not null)
+            {
+                return detailsValidation.Error;
+            }
+
+            if (!TryApplyDetails(
+                    entity.Details,
+                    request.Details,
+                    detailsValidation.Value,
+                    eventInfo.StartDate,
+                    eventInfo.EndDate,
+                    out var detailsError))
             {
                 return EventsHelpers.BadRequest(detailsError);
             }
@@ -3687,6 +4071,319 @@ internal static class EventsHandlers
         return Results.Ok(new EventParticipantLogListResponseDto(resolvedPage, resolvedPageSize, total, items));
     }
 
+    private static string? NormalizeRoomScope(string? raw)
+    {
+        var normalized = raw?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            null or "" => "manual",
+            "manual" => "manual",
+            "filtered" => "filtered",
+            "all_event" => "all_event",
+            _ => null
+        };
+    }
+
+    private static string? NormalizeRoomOverwriteMode(string? raw)
+    {
+        var normalized = raw?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            null or "" => "always",
+            "always" => "always",
+            "only_empty" => "only_empty",
+            _ => null
+        };
+    }
+
+    private static bool HasAnyRoomPatchField(ParticipantRoomPatchRequest? patch)
+    {
+        if (patch is null)
+        {
+            return false;
+        }
+
+        return patch.AccommodationDocTabId.HasValue
+               || patch.RoomNo is not null
+               || patch.RoomType is not null
+               || patch.BoardType is not null
+               || patch.PersonNo is not null
+               || patch.HotelCheckInDate is not null
+               || patch.HotelCheckOutDate is not null;
+    }
+
+    private static IQueryable<ParticipantEntity> ApplyRoomFilters(
+        IQueryable<ParticipantEntity> query,
+        ParticipantRoomFiltersRequest? filters,
+        Guid eventId,
+        Guid organizationId,
+        TripflowDbContext db)
+    {
+        if (filters is null)
+        {
+            return query;
+        }
+
+        var search = filters.Query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(x =>
+                EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.FirstName, pattern)
+                || EF.Functions.ILike(x.LastName, pattern)
+                || EF.Functions.ILike(x.TcNo, pattern)
+                || (x.Phone != null && EF.Functions.ILike(x.Phone, pattern))
+                || (x.Email != null && EF.Functions.ILike(x.Email, pattern))
+                || EF.Functions.ILike(x.CheckInCode, pattern)
+                || (x.Details != null && (
+                    (x.Details.RoomNo != null && EF.Functions.ILike(x.Details.RoomNo, pattern))
+                    || (x.Details.AgencyName != null && EF.Functions.ILike(x.Details.AgencyName, pattern))
+                )));
+        }
+
+        var status = filters.Status?.Trim().ToLowerInvariant();
+        if (status is "arrived" or "not_arrived")
+        {
+            query = status == "arrived"
+                ? query.Where(x => db.CheckIns.Any(c =>
+                    c.EventId == eventId && c.OrganizationId == organizationId && c.ParticipantId == x.Id))
+                : query.Where(x => !db.CheckIns.Any(c =>
+                    c.EventId == eventId && c.OrganizationId == organizationId && c.ParticipantId == x.Id));
+        }
+
+        var accommodationFilter = filters.AccommodationFilter?.Trim();
+        if (!string.IsNullOrWhiteSpace(accommodationFilter))
+        {
+            if (string.Equals(accommodationFilter, "unassigned", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(x => x.Details == null || x.Details.AccommodationDocTabId == null);
+            }
+            else if (Guid.TryParse(accommodationFilter, out var accommodationDocTabId))
+            {
+                query = query.Where(x => x.Details != null && x.Details.AccommodationDocTabId == accommodationDocTabId);
+            }
+        }
+
+        return query;
+    }
+
+    private static bool TryApplyRoomPatch(
+        ParticipantDetailsEntity details,
+        ParticipantRoomPatchRequest patch,
+        bool onlyEmpty,
+        bool hasAccommodationPatch,
+        Guid? normalizedAccommodationDocTabId,
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        out string errorCode,
+        out string errorMessage,
+        out bool changed)
+    {
+        errorCode = string.Empty;
+        errorMessage = string.Empty;
+        changed = false;
+
+        if (hasAccommodationPatch)
+        {
+            if (TryApplyRoomGuidField(details.AccommodationDocTabId, normalizedAccommodationDocTabId, onlyEmpty, out var nextAccommodationDocTabId))
+            {
+                details.AccommodationDocTabId = nextAccommodationDocTabId;
+                changed = true;
+            }
+        }
+
+        if (TryApplyRoomTextField(details.RoomNo, patch.RoomNo, onlyEmpty, out var nextRoomNo))
+        {
+            details.RoomNo = nextRoomNo;
+            changed = true;
+        }
+        if (TryApplyRoomTextField(details.RoomType, patch.RoomType, onlyEmpty, out var nextRoomType))
+        {
+            details.RoomType = nextRoomType;
+            changed = true;
+        }
+        if (TryApplyRoomTextField(details.BoardType, patch.BoardType, onlyEmpty, out var nextBoardType))
+        {
+            details.BoardType = nextBoardType;
+            changed = true;
+        }
+        if (TryApplyRoomTextField(details.PersonNo, patch.PersonNo, onlyEmpty, out var nextPersonNo))
+        {
+            details.PersonNo = nextPersonNo;
+            changed = true;
+        }
+
+        if (!TryApplyRoomDateField(
+                details.HotelCheckInDate,
+                patch.HotelCheckInDate,
+                onlyEmpty,
+                "invalid_hotel_check_in_date",
+                out var checkInError,
+                out var checkInChanged,
+                out var nextHotelCheckInDate))
+        {
+            errorCode = "invalid_hotel_check_in_date";
+            errorMessage = checkInError ?? "Hotel check-in date is invalid.";
+            return false;
+        }
+        if (!TryApplyRoomDateField(
+                details.HotelCheckOutDate,
+                patch.HotelCheckOutDate,
+                onlyEmpty,
+                "invalid_hotel_check_out_date",
+                out var checkOutError,
+                out var checkOutChanged,
+                out var nextHotelCheckOutDate))
+        {
+            errorCode = "invalid_hotel_check_out_date";
+            errorMessage = checkOutError ?? "Hotel check-out date is invalid.";
+            return false;
+        }
+
+        if (!TryValidateStayDates(
+                nextHotelCheckInDate,
+                nextHotelCheckOutDate,
+                eventStartDate,
+                eventEndDate,
+                out var stayDateError))
+        {
+            errorCode = "invalid_hotel_date_range";
+            errorMessage = stayDateError;
+            return false;
+        }
+
+        if (checkInChanged || checkOutChanged)
+        {
+            details.HotelCheckInDate = nextHotelCheckInDate;
+            details.HotelCheckOutDate = nextHotelCheckOutDate;
+            changed = true;
+        }
+
+        return true;
+    }
+
+    private static bool TryApplyRoomGuidField(Guid? target, Guid? incoming, bool onlyEmpty, out Guid? updated)
+    {
+        updated = target;
+        if (onlyEmpty && target.HasValue && incoming.HasValue)
+        {
+            return false;
+        }
+
+        if (target == incoming)
+        {
+            return false;
+        }
+
+        updated = incoming;
+        return true;
+    }
+
+    private static bool TryApplyRoomTextField(string? target, string? incoming, bool onlyEmpty, out string? updated)
+    {
+        updated = target;
+        if (incoming is null)
+        {
+            return false;
+        }
+
+        var normalizedIncoming = incoming.Trim();
+        var normalizedTarget = target?.Trim() ?? string.Empty;
+
+        if (onlyEmpty && !string.IsNullOrWhiteSpace(normalizedTarget))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedTarget, normalizedIncoming, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        updated = string.IsNullOrWhiteSpace(normalizedIncoming) ? null : normalizedIncoming;
+        return true;
+    }
+
+    private static bool TryApplyRoomDateField(
+        DateOnly? target,
+        string? incoming,
+        bool onlyEmpty,
+        string code,
+        out string? error,
+        out bool changed,
+        out DateOnly? updated)
+    {
+        error = null;
+        changed = false;
+        updated = target;
+
+        if (incoming is null)
+        {
+            return true;
+        }
+
+        var normalized = incoming.Trim();
+        if (onlyEmpty && target.HasValue)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            if (target.HasValue)
+            {
+                changed = true;
+            }
+            updated = null;
+            return true;
+        }
+
+        if (!TryParseDateOnly(normalized, out var parsed))
+        {
+            error = code == "invalid_hotel_check_in_date"
+                ? "Hotel check-in date must be in YYYY-MM-DD format."
+                : "Hotel check-out date must be in YYYY-MM-DD format.";
+            return false;
+        }
+
+        if (target != parsed)
+        {
+            changed = true;
+        }
+        updated = parsed;
+        return true;
+    }
+
+    private static bool TryValidateStayDates(
+        DateOnly? checkIn,
+        DateOnly? checkOut,
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        out string error)
+    {
+        if (checkIn.HasValue && (checkIn.Value < eventStartDate || checkIn.Value > eventEndDate))
+        {
+            error = "Hotel check-in date must be within the event date range.";
+            return false;
+        }
+
+        if (checkOut.HasValue && (checkOut.Value < eventStartDate || checkOut.Value > eventEndDate))
+        {
+            error = "Hotel check-out date must be within the event date range.";
+            return false;
+        }
+
+        if (checkIn.HasValue && checkOut.HasValue && checkOut.Value < checkIn.Value)
+        {
+            error = "Hotel check-out date must be on or after check-in date.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
     private static bool TryParseLogFilterDate(string raw, out DateTime valueUtc, out bool isDateOnly)
     {
         var trimmed = raw.Trim();
@@ -3759,6 +4456,8 @@ internal static class EventsHandlers
         bool? isActiveInput,
         JsonElement? contentInput,
         EventDocTabEntity? existing,
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
         out string? title,
         out string? type,
         out int sortOrder,
@@ -3842,7 +4541,7 @@ internal static class EventsHandlers
             var value = contentInput.Value;
             if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
             {
-                contentJson = existing?.ContentJson ?? "{}";
+                contentJson = ResolveDocContent(existing, type!);
             }
             else if (value.ValueKind != JsonValueKind.Object)
             {
@@ -3851,15 +4550,219 @@ internal static class EventsHandlers
             }
             else
             {
-                contentJson = JsonSerializer.Serialize(value);
+                if (IsAccommodationDocType(type))
+                {
+                    if (!TryNormalizeAccommodationContent(
+                        value,
+                        eventStartDate,
+                        eventEndDate,
+                        out contentJson,
+                        out var errorCode,
+                        out var errorMessage))
+                    {
+                        return Results.BadRequest(new { code = errorCode, message = errorMessage });
+                    }
+                }
+                else
+                {
+                    contentJson = JsonSerializer.Serialize(value);
+                }
             }
         }
         else
         {
-            contentJson = existing?.ContentJson ?? "{}";
+            contentJson = ResolveDocContent(existing, type!);
         }
 
         return null;
+    }
+
+    private static string NormalizeDocType(string? type)
+        => type?.Trim().ToLowerInvariant() ?? string.Empty;
+
+    private static bool IsAccommodationDocType(string? type)
+        => NormalizeDocType(type) == DocTypeHotel;
+
+    private static bool IsSystemDocType(string? normalizedType)
+        => normalizedType is DocTypeInsurance or DocTypeTransfer;
+
+    private static string GetDocTypeCategory(string? normalizedType)
+    {
+        if (normalizedType is DocTypeInsurance or DocTypeTransfer)
+        {
+            return DocTypeCategorySystem;
+        }
+
+        if (normalizedType == DocTypeHotel)
+        {
+            return DocTypeCategoryAccommodation;
+        }
+
+        return DocTypeCategoryCustom;
+    }
+
+    private static string ResolveDocContent(EventDocTabEntity? existing, string resolvedType)
+    {
+        if (IsAccommodationDocType(resolvedType))
+        {
+            return existing?.ContentJson ?? BuildAccommodationContentJson(
+                hotelName: string.Empty,
+                address: string.Empty,
+                phone: string.Empty,
+                checkInDate: string.Empty,
+                checkOutDate: string.Empty,
+                checkInNote: string.Empty,
+                checkOutNote: string.Empty);
+        }
+
+        return existing?.ContentJson ?? "{}";
+    }
+
+    private static bool TryNormalizeAccommodationContent(
+        JsonElement content,
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        out string normalizedJson,
+        out string errorCode,
+        out string message)
+    {
+        errorCode = "invalid_doc_content";
+        message = "Accommodation content allows only hotelName, address, phone, checkInDate, checkOutDate, checkInNote, checkOutNote.";
+        normalizedJson = string.Empty;
+
+        if (content.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        string? hotelName = null;
+        string? address = null;
+        string? phone = null;
+        string? checkInDate = null;
+        string? checkOutDate = null;
+        string? checkInNote = null;
+        string? checkOutNote = null;
+
+        foreach (var property in content.EnumerateObject())
+        {
+            if (!AccommodationContentAllowedKeys.Contains(property.Name))
+            {
+                return false;
+            }
+
+            if (!ReadOptionalTrimmedString(property.Value, out var normalizedValue))
+            {
+                message = "Accommodation content fields must be string values.";
+                return false;
+            }
+
+            switch (property.Name)
+            {
+                case "hotelName":
+                    hotelName = normalizedValue;
+                    break;
+                case "address":
+                    address = normalizedValue;
+                    break;
+                case "phone":
+                    phone = normalizedValue;
+                    break;
+                case "checkInDate":
+                    checkInDate = normalizedValue;
+                    break;
+                case "checkOutDate":
+                    checkOutDate = normalizedValue;
+                    break;
+                case "checkInNote":
+                    checkInNote = normalizedValue;
+                    break;
+                case "checkOutNote":
+                    checkOutNote = normalizedValue;
+                    break;
+            }
+        }
+
+        if (!TryParseDateOnly(checkInDate, out var parsedCheckInDate))
+        {
+            message = "Accommodation check-in date must be in YYYY-MM-DD format.";
+            return false;
+        }
+
+        if (!TryParseDateOnly(checkOutDate, out var parsedCheckOutDate))
+        {
+            message = "Accommodation check-out date must be in YYYY-MM-DD format.";
+            return false;
+        }
+
+        if (parsedCheckInDate.HasValue
+            && parsedCheckOutDate.HasValue
+            && parsedCheckOutDate.Value < parsedCheckInDate.Value)
+        {
+            message = "Accommodation check-out date must be on or after check-in date.";
+            return false;
+        }
+
+        if (parsedCheckInDate.HasValue
+            && (parsedCheckInDate.Value < eventStartDate || parsedCheckInDate.Value > eventEndDate))
+        {
+            message = "Accommodation check-in date must be within the event date range.";
+            return false;
+        }
+
+        if (parsedCheckOutDate.HasValue
+            && (parsedCheckOutDate.Value < eventStartDate || parsedCheckOutDate.Value > eventEndDate))
+        {
+            message = "Accommodation check-out date must be within the event date range.";
+            return false;
+        }
+
+        normalizedJson = BuildAccommodationContentJson(
+            hotelName: hotelName,
+            address: address,
+            phone: phone,
+            checkInDate: parsedCheckInDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            checkOutDate: parsedCheckOutDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            checkInNote: checkInNote,
+            checkOutNote: checkOutNote);
+
+        return true;
+    }
+
+    private static string BuildAccommodationContentJson(
+        string? hotelName,
+        string? address,
+        string? phone,
+        string? checkInDate,
+        string? checkOutDate,
+        string? checkInNote,
+        string? checkOutNote)
+        => JsonSerializer.Serialize(new
+        {
+            hotelName = hotelName ?? string.Empty,
+            address = address ?? string.Empty,
+            phone = phone ?? string.Empty,
+            checkInDate = checkInDate ?? string.Empty,
+            checkOutDate = checkOutDate ?? string.Empty,
+            checkInNote = checkInNote ?? string.Empty,
+            checkOutNote = checkOutNote ?? string.Empty
+        });
+
+    private static bool ReadOptionalTrimmedString(JsonElement value, out string? normalized)
+    {
+        if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
+        {
+            normalized = string.Empty;
+            return true;
+        }
+
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            normalized = value.GetString()?.Trim() ?? string.Empty;
+            return true;
+        }
+
+        normalized = null;
+        return false;
     }
 
     private static JsonElement ParseContentJson(string? json)
@@ -3940,7 +4843,8 @@ internal static class EventsHandlers
             details.ReturnTransferVehicle,
             details.ReturnTransferPlate,
             details.ReturnTransferDriverInfo,
-            details.ReturnTransferNote);
+            details.ReturnTransferNote,
+            details.AccommodationDocTabId);
     }
 
     private static FlightSegmentDto[] MapFlightSegments(
@@ -4216,9 +5120,48 @@ internal static class EventsHandlers
                || !string.IsNullOrWhiteSpace(cabinBaggage);
     }
 
+    private readonly record struct AccommodationDocValidationResult(Guid? Value, IResult? Error);
+
+    private static async Task<AccommodationDocValidationResult> ValidateAccommodationDocReference(
+        Guid eventId,
+        Guid organizationId,
+        Guid? accommodationDocTabId,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!accommodationDocTabId.HasValue || accommodationDocTabId == Guid.Empty)
+        {
+            return new AccommodationDocValidationResult(null, null);
+        }
+
+        var exists = await db.EventDocTabs.AsNoTracking()
+            .AnyAsync(tab =>
+                tab.Id == accommodationDocTabId.Value
+                && tab.EventId == eventId
+                && tab.OrganizationId == organizationId
+                && IsAccommodationDocType(tab.Type),
+                ct);
+
+        if (!exists)
+        {
+            return new AccommodationDocValidationResult(
+                null,
+                Results.BadRequest(new
+                {
+                    code = "invalid_accommodation_doc_tab_id",
+                    message = "Accommodation doc tab id must belong to this event and must be of type Hotel."
+                }));
+        }
+
+        return new AccommodationDocValidationResult(accommodationDocTabId.Value, null);
+    }
+
     private static bool TryApplyDetails(
         ParticipantDetailsEntity details,
         ParticipantDetailsRequest request,
+        Guid? accommodationDocTabId,
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
         out string error)
     {
         details.RoomNo = request.RoomNo;
@@ -4228,6 +5171,7 @@ internal static class EventsHandlers
         details.AgencyName = request.AgencyName;
         details.City = request.City;
         details.FlightCity = request.FlightCity;
+        details.AccommodationDocTabId = accommodationDocTabId;
         if (!TryParseDateOnly(request.HotelCheckInDate, out var checkIn))
         {
             error = "Hotel check-in date must be in YYYY-MM-DD format.";
@@ -4238,6 +5182,12 @@ internal static class EventsHandlers
             error = "Hotel check-out date must be in YYYY-MM-DD format.";
             return false;
         }
+
+        if (!TryValidateStayDates(checkIn, checkOut, eventStartDate, eventEndDate, out error))
+        {
+            return false;
+        }
+
         details.HotelCheckInDate = checkIn;
         details.HotelCheckOutDate = checkOut;
         var legacyTicketNo = NormalizeOptionalText(request.TicketNo);

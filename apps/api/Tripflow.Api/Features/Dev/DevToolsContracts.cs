@@ -2,6 +2,7 @@ namespace Tripflow.Api.Features.Dev;
 
 public sealed record ScenarioPresetDefaultsDto(
     int DayCount,
+    int AccommodationCount,
     int ParticipantCount,
     int EquipmentTypeCount,
     string ActivityDensity,
@@ -31,6 +32,7 @@ public sealed record CreateScenarioEventRequest(
     string? ActivityDensity,
     string? MealMode,
     string? FlightLegMode,
+    int? AccommodationCount,
     int? ParticipantCount,
     int? EquipmentTypeCount,
     bool? IncludeFlights,
@@ -42,6 +44,7 @@ public sealed record CreateScenarioEventRequest(
 
 public sealed record ScenarioEventCountsDto(
     int Days,
+    int Accommodations,
     int Activities,
     int MealActivities,
     int Participants,

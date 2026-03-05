@@ -82,6 +82,11 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
     },
     {
+      path: '/admin/events/:eventId/participants/rooms',
+      component: () => import('./pages/admin/AdminParticipantRoomOps.vue'),
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
       path: '/admin/events/:eventId/participants/:participantId',
       component: () => import('./pages/admin/AdminParticipantProfile.vue'),
       props: true,

@@ -238,6 +238,8 @@ internal static class PortalLoginHandlers
         var allTabs = await db.EventDocTabs.AsNoTracking()
             .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == eventEntity.OrganizationId)
             .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
 
         var insuranceDefaults = allTabs.FirstOrDefault(x => x.Type == "Insurance");

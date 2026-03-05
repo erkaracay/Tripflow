@@ -49,7 +49,33 @@ const returnSegments = computed(() => sortedSegments(travel.value?.returnSegment
 
 const normalizeType = (value?: string | null) => (value ?? '').trim().toLowerCase()
 
-const hotelTab = computed(() => props.docs?.tabs.find((tab) => normalizeType(tab.type) === 'hotel') ?? null)
+const accommodationAliasSet = new Set(['hotel', 'otel', 'accommodation', 'konaklama'])
+const normalizeAccommodationTitle = (title?: string | null) => {
+  const trimmed = title?.trim() ?? ''
+  if (!trimmed) {
+    return t('portal.infoTabs.hotel')
+  }
+
+  return accommodationAliasSet.has(trimmed.toLowerCase()) ? t('portal.infoTabs.hotel') : trimmed
+}
+
+const accommodationListLabel = (index: number, title: string) => `${index + 1}. ${title}`
+
+const accommodationTabs = computed(() =>
+  [...(props.docs?.tabs ?? [])]
+    .filter((tab) => normalizeType(tab.type) === 'hotel')
+    .sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder
+      }
+      return a.id.localeCompare(b.id)
+    })
+    .map((tab) => ({
+      ...tab,
+      displayTitle: normalizeAccommodationTitle(tab.title),
+    }))
+)
+
 const transferTabs = computed(() =>
   [...(props.docs?.tabs ?? [])]
     .filter((tab) => normalizeType(tab.type) === 'transfer')
@@ -274,6 +300,53 @@ const contentPhone = (content: unknown) => {
     display: display || raw,
     link: buildTelLink(raw),
   }
+}
+
+const hasAccommodationContent = (content: unknown) =>
+  Boolean(
+    hasText(readContentString(content, 'hotelName')) ||
+      hasText(readContentString(content, 'address')) ||
+      hasText(readContentString(content, 'phone')) ||
+      hasText(readContentString(content, 'checkInDate')) ||
+      hasText(readContentString(content, 'checkOutDate')) ||
+      hasText(readContentString(content, 'checkInNote')) ||
+      hasText(readContentString(content, 'checkOutNote'))
+  )
+
+const parseIsoDate = (value?: string | null) => {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+  if (!match) return null
+  const year = Number(match[1] ?? 0)
+  const month = Number(match[2] ?? 0)
+  const day = Number(match[3] ?? 0)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  if (
+    Number.isNaN(parsed.getTime())
+    || parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) {
+    return null
+  }
+  return parsed
+}
+
+const getAccommodationStayNights = (content: unknown) => {
+  const checkIn = parseIsoDate(readContentString(content, 'checkInDate'))
+  const checkOut = parseIsoDate(readContentString(content, 'checkOutDate'))
+  if (!checkIn || !checkOut) {
+    return null
+  }
+
+  const nights = Math.floor((checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000))
+  if (nights < 0) {
+    return null
+  }
+
+  return nights
 }
 
 const parseTransferContent = (content: unknown) => {
@@ -744,46 +817,73 @@ const formatCustomValue = (value: unknown): string => {
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.infoTabs.hotel') }}</div>
-        <div class="mt-3 space-y-2 text-sm">
-          <div v-if="hasText(readContentString(hotelTab?.content, 'hotelName'))" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'hotelName') }}</span>
+        <div class="mt-3 space-y-3 text-sm">
+          <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500 print-row">
+            {{ t('portal.infoTabs.empty') }}
           </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'address'))" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              <a
-                v-if="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-                :href="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-                target="_blank"
-                rel="noreferrer"
-                class="underline"
-              >
-                {{ readContentString(hotelTab?.content, 'address') }}
-              </a>
-              <span v-else>{{ contentValue(hotelTab?.content, 'address') }}</span>
-            </span>
-          </div>
-          <div v-if="hasText(contentPhone(hotelTab?.content).raw)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
-            <span class="text-right font-medium text-slate-800">
-              <a
-                v-if="contentPhone(hotelTab?.content).link"
-                :href="contentPhone(hotelTab?.content).link"
-                class="underline"
-              >
-                {{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}
-              </a>
-              <span v-else>{{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}</span>
-            </span>
-          </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'checkInNote'))" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkInNote') }}</span>
-          </div>
-          <div v-if="hasText(readContentString(hotelTab?.content, 'checkOutNote'))" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkOutNote') }}</span>
+          <div
+            v-for="(tab, index) in accommodationTabs"
+            :key="`print-accommodation-${tab.id}`"
+            class="space-y-2 rounded-xl border border-slate-100 p-3 print-row"
+          >
+            <div class="text-xs font-semibold text-slate-500">{{ accommodationListLabel(index, tab.displayTitle) }}</div>
+            <template v-if="hasAccommodationContent(tab.content)">
+              <div v-if="hasText(readContentString(tab.content, 'hotelName'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'hotelName') }}</span>
+              </div>
+              <div v-if="hasText(readContentString(tab.content, 'address'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+                <span class="text-right font-medium text-slate-800">
+                  <a
+                    v-if="buildMapsLink(readContentString(tab.content, 'address'))"
+                    :href="buildMapsLink(readContentString(tab.content, 'address'))"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="underline"
+                  >
+                    {{ readContentString(tab.content, 'address') }}
+                  </a>
+                  <span v-else>{{ contentValue(tab.content, 'address') }}</span>
+                </span>
+              </div>
+              <div v-if="hasText(contentPhone(tab.content).raw)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+                <span class="text-right font-medium text-slate-800">
+                  <a
+                    v-if="contentPhone(tab.content).link"
+                    :href="contentPhone(tab.content).link"
+                    class="underline"
+                  >
+                    {{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}
+                  </a>
+                  <span v-else>{{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}</span>
+                </span>
+              </div>
+              <div v-if="hasText(readContentString(tab.content, 'checkInDate'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.checkInDate') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkInDate')) }}</span>
+              </div>
+              <div v-if="hasText(readContentString(tab.content, 'checkOutDate'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.checkOutDate') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkOutDate')) }}</span>
+              </div>
+              <div v-if="getAccommodationStayNights(tab.content) !== null" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.stayDuration') }}</span>
+                <span class="text-right font-medium text-slate-800">
+                  {{ t('portal.docs.stayDurationNights', { count: getAccommodationStayNights(tab.content) }) }}
+                </span>
+              </div>
+              <div v-if="hasText(readContentString(tab.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkInNote') }}</span>
+              </div>
+              <div v-if="hasText(readContentString(tab.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkOutNote') }}</span>
+              </div>
+            </template>
+            <p v-else class="text-xs text-slate-500">{{ t('portal.infoTabs.empty') }}</p>
           </div>
         </div>
         <div class="mt-4 space-y-2 text-sm">
@@ -1264,47 +1364,74 @@ const formatCustomValue = (value: unknown): string => {
     </div>
 
     <div v-else-if="activeTab?.kind === 'hotel'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.hotelCardTitle') }}</div>
-      <div class="mt-3 space-y-2 text-sm">
-        <div v-if="hasText(readContentString(hotelTab?.content, 'hotelName'))" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'hotelName') }}</span>
+      <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.accommodationCardTitle') }}</div>
+      <div class="mt-3 space-y-3 text-sm">
+        <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500">
+          {{ t('portal.infoTabs.empty') }}
         </div>
-        <div v-if="hasText(readContentString(hotelTab?.content, 'address'))" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
-          <span class="text-right font-medium text-slate-800">
-            <a
-              v-if="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-              :href="buildMapsLink(readContentString(hotelTab?.content, 'address'))"
-              target="_blank"
-              rel="noreferrer"
-              class="portal-inline-action text-slate-800"
-            >
-              {{ readContentString(hotelTab?.content, 'address') }}
-            </a>
-            <span v-else>{{ contentValue(hotelTab?.content, 'address') }}</span>
-          </span>
-        </div>
-        <div v-if="hasText(contentPhone(hotelTab?.content).raw)" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
-          <span class="text-right font-medium text-slate-800">
-            <a
-              v-if="contentPhone(hotelTab?.content).link"
-              :href="contentPhone(hotelTab?.content).link"
-              class="portal-inline-action text-slate-800"
-            >
-              {{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}
-            </a>
-            <span v-else>{{ contentPhone(hotelTab?.content).display || contentPhone(hotelTab?.content).raw }}</span>
-          </span>
-        </div>
-        <div v-if="hasText(readContentString(hotelTab?.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkInNote') }}</span>
-        </div>
-        <div v-if="hasText(readContentString(hotelTab?.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
-          <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
-          <span class="text-right font-medium text-slate-800">{{ contentValue(hotelTab?.content, 'checkOutNote') }}</span>
+        <div
+          v-for="(tab, index) in accommodationTabs"
+          :key="`accommodation-${tab.id}`"
+          class="space-y-2 rounded-xl border border-slate-100 p-3"
+        >
+          <div class="text-xs font-semibold text-slate-500">{{ accommodationListLabel(index, tab.displayTitle) }}</div>
+          <template v-if="hasAccommodationContent(tab.content)">
+            <div v-if="hasText(readContentString(tab.content, 'hotelName'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'hotelName') }}</span>
+            </div>
+            <div v-if="hasText(readContentString(tab.content, 'address'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                <a
+                  v-if="buildMapsLink(readContentString(tab.content, 'address'))"
+                  :href="buildMapsLink(readContentString(tab.content, 'address'))"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="portal-inline-action text-slate-800"
+                >
+                  {{ readContentString(tab.content, 'address') }}
+                </a>
+                <span v-else>{{ contentValue(tab.content, 'address') }}</span>
+              </span>
+            </div>
+            <div v-if="hasText(contentPhone(tab.content).raw)" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                <a
+                  v-if="contentPhone(tab.content).link"
+                  :href="contentPhone(tab.content).link"
+                  class="portal-inline-action text-slate-800"
+                >
+                  {{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}
+                </a>
+                <span v-else>{{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}</span>
+              </span>
+            </div>
+            <div v-if="hasText(readContentString(tab.content, 'checkInDate'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.checkInDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkInDate')) }}</span>
+            </div>
+            <div v-if="hasText(readContentString(tab.content, 'checkOutDate'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.checkOutDate') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkOutDate')) }}</span>
+            </div>
+            <div v-if="getAccommodationStayNights(tab.content) !== null" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.stayDuration') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ t('portal.docs.stayDurationNights', { count: getAccommodationStayNights(tab.content) }) }}
+              </span>
+            </div>
+            <div v-if="hasText(readContentString(tab.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkInNote') }}</span>
+            </div>
+            <div v-if="hasText(readContentString(tab.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkOutNote') }}</span>
+            </div>
+          </template>
+          <p v-else class="text-xs text-slate-500">{{ t('portal.infoTabs.empty') }}</p>
         </div>
       </div>
 

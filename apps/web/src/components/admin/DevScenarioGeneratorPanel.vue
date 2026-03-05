@@ -25,6 +25,7 @@ type FieldErrorState = {
   startDate: string | null
   timeZoneId: string | null
   dayCount: string | null
+  accommodationCount: string | null
   participantCount: string | null
   equipmentTypeCount: string | null
   mealSelectionCoveragePercent: string | null
@@ -47,6 +48,7 @@ const form = reactive({
   startDate: getTodayLocalDateString(),
   timeZoneId: browserTimeZone ?? 'Europe/Istanbul',
   dayCount: 3,
+  accommodationCount: 2,
   participantCount: 40,
   equipmentTypeCount: 2,
   mealMode: 'breakfast_only' as NonNullable<CreateScenarioEventRequest['mealMode']>,
@@ -65,6 +67,7 @@ const errors = reactive<FieldErrorState>({
   startDate: null,
   timeZoneId: null,
   dayCount: null,
+  accommodationCount: null,
   participantCount: null,
   equipmentTypeCount: null,
   mealSelectionCoveragePercent: null,
@@ -106,6 +109,23 @@ const participantNamingOptions = computed(() => [
   { value: 'prefix', label: t('admin.devTools.scenario.namingOptions.prefix') },
 ])
 
+const resolveAccommodationCount = (raw: unknown, dayCountFallback: number) => {
+  const parsed = typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : Number.NaN
+  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 6) {
+    return parsed
+  }
+
+  return dayCountFallback >= 5 ? 3 : 2
+}
+
+const ensureAccommodationCountDefault = () => {
+  if (Number.isFinite(form.accommodationCount) && form.accommodationCount >= 1 && form.accommodationCount <= 6) {
+    return
+  }
+
+  form.accommodationCount = resolveAccommodationCount(undefined, form.dayCount)
+}
+
 const applyPreset = (presetId: ScenarioPresetDto['id']) => {
   const preset = props.presets.find((option) => option.id === presetId)
   if (!preset) {
@@ -114,6 +134,10 @@ const applyPreset = (presetId: ScenarioPresetDto['id']) => {
 
   form.preset = preset.id
   form.dayCount = preset.defaults.dayCount
+  form.accommodationCount = resolveAccommodationCount(
+    (preset.defaults as { accommodationCount?: number }).accommodationCount,
+    form.dayCount
+  )
   form.participantCount = preset.defaults.participantCount
   form.equipmentTypeCount = preset.defaults.equipmentTypeCount
   form.activityDensity = preset.defaults.activityDensity
@@ -126,6 +150,7 @@ const applyPreset = (presetId: ScenarioPresetDto['id']) => {
   if (form.participantNamingMode !== 'prefix') {
     form.participantNamePrefix = ''
   }
+  ensureAccommodationCountDefault()
 }
 
 const handlePresetChange = (value: string) => {
@@ -165,6 +190,18 @@ watch(
       form.participantNamePrefix = ''
     }
   }
+)
+
+watch(
+  () => panelOpen.value,
+  (isOpen) => {
+    if (!isOpen) {
+      return
+    }
+
+    ensureAccommodationCountDefault()
+  },
+  { immediate: true }
 )
 
 const coverageCount = (total: number, percent: number) => Math.max(0, Math.min(total, Math.round(total * (percent / 100))))
@@ -225,6 +262,7 @@ const resetErrors = () => {
   errors.startDate = null
   errors.timeZoneId = null
   errors.dayCount = null
+  errors.accommodationCount = null
   errors.participantCount = null
   errors.equipmentTypeCount = null
   errors.mealSelectionCoveragePercent = null
@@ -262,6 +300,12 @@ const submit = async () => {
     return
   }
 
+  if (!Number.isFinite(form.accommodationCount) || form.accommodationCount < 1 || form.accommodationCount > 6) {
+    errors.accommodationCount = 'admin.devTools.scenario.errors.invalid_accommodation_count'
+    panelOpen.value = true
+    return
+  }
+
   if (form.participantNamingMode === 'prefix' && !form.participantNamePrefix.trim()) {
     errors.participantNamePrefix = 'admin.devTools.scenario.errors.invalid_participant_name_prefix'
     panelOpen.value = true
@@ -275,6 +319,7 @@ const submit = async () => {
       name: form.name.trim() || null,
       startDate: form.startDate,
       dayCount: form.dayCount,
+      accommodationCount: form.accommodationCount,
       timeZoneId: form.timeZoneId.trim(),
       preset: form.preset,
       activityDensity: form.activityDensity,
@@ -419,6 +464,21 @@ function getTodayLocalDateString() {
               type="number"
             />
             <p v-if="errors.dayCount" class="text-xs text-rose-600">{{ t(errors.dayCount) }}</p>
+          </label>
+
+          <label class="grid gap-1 text-sm">
+            <span class="text-slate-600">{{ t('admin.devTools.scenario.accommodationCountLabel') }}</span>
+            <input
+              v-model.number="form.accommodationCount"
+              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              :class="errors.accommodationCount ? 'border-rose-400' : ''"
+              min="1"
+              max="6"
+              step="1"
+              type="number"
+              @blur="ensureAccommodationCountDefault"
+            />
+            <p v-if="errors.accommodationCount" class="text-xs text-rose-600">{{ t(errors.accommodationCount) }}</p>
           </label>
 
           <label class="grid gap-1 text-sm">
@@ -596,6 +656,7 @@ function getTodayLocalDateString() {
             </div>
             <div class="space-y-1 text-sm text-slate-600">
               <p>{{ t('admin.devTools.scenario.summaryDays', { count: form.dayCount }) }}</p>
+              <p>{{ t('admin.devTools.scenario.summaryAccommodations', { count: form.accommodationCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryActivities', { count: activityCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryMealActivities', { count: mealActivityCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryParticipants', { count: form.participantCount }) }}</p>

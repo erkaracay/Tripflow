@@ -422,7 +422,8 @@ internal static class GuideHandlers
             details.ReturnTransferVehicle,
             details.ReturnTransferPlate,
             details.ReturnTransferDriverInfo,
-            details.ReturnTransferNote);
+            details.ReturnTransferNote,
+            details.AccommodationDocTabId);
     }
 
     internal static async Task<IResult> GetActivitiesForCheckIn(

@@ -201,6 +201,7 @@ const editForm = reactive({
 })
 
 const editDetails = reactive({
+  accommodationDocTabId: '',
   roomNo: '',
   roomType: '',
   personNo: '',
@@ -902,6 +903,7 @@ const startEditParticipant = (participant: Participant) => {
 
   editDetails.roomNo = participant.details?.roomNo ?? ''
   editDetails.roomType = participant.details?.roomType ?? ''
+  editDetails.accommodationDocTabId = participant.details?.accommodationDocTabId ?? ''
   editDetails.personNo = participant.details?.personNo ?? ''
   editDetails.agencyName = participant.details?.agencyName ?? ''
   editDetails.city = participant.details?.city ?? ''
@@ -1007,6 +1009,7 @@ const saveParticipant = async (participant: Participant) => {
         birthDate: editForm.birthDate,
         gender: editForm.gender,
         details: {
+          accommodationDocTabId: editDetails.accommodationDocTabId || undefined,
           roomNo: editDetails.roomNo || undefined,
           roomType: editDetails.roomType || undefined,
           boardType: participant.details?.boardType || undefined,
@@ -2126,6 +2129,12 @@ onMounted(loadEvent)
               :to="`/admin/events/${eventId}/participants/table`"
             >
               {{ t('admin.participants.tableView') }}
+            </RouterLink>
+            <RouterLink
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 md:px-3 md:py-1.5"
+              :to="`/admin/events/${eventId}/participants/rooms`"
+            >
+              {{ t('admin.participants.roomOps') }}
             </RouterLink>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button

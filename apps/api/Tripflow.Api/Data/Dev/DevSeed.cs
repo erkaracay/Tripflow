@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
@@ -1240,71 +1241,148 @@ public static class DevSeed
         CancellationToken ct,
         SeedState state)
     {
-        var hasTabs = await db.EventDocTabs
-            .AnyAsync(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId, ct);
-        if (hasTabs)
+        var existingTabs = await db.EventDocTabs
+            .Where(x => x.EventId == eventEntity.Id && x.OrganizationId == organizationId)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
+            .ToListAsync(ct);
+
+        var nextSortOrder = existingTabs.Count > 0
+            ? existingTabs.Max(x => x.SortOrder) + 1
+            : 1;
+
+        var accommodationTabCount = existingTabs.Count(x =>
+            string.Equals(x.Type, "Hotel", StringComparison.OrdinalIgnoreCase));
+
+        if (accommodationTabCount < 2)
         {
-            return;
+            for (var index = accommodationTabCount; index < 2; index++)
+            {
+                db.EventDocTabs.Add(new EventDocTabEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = organizationId,
+                    EventId = eventEntity.Id,
+                    Title = $"Konaklama {index + 1}",
+                    Type = "Hotel",
+                    SortOrder = nextSortOrder++,
+                    IsActive = true,
+                    ContentJson = BuildAccommodationContentJson(
+                        hotelName: $"{eventEntity.Name} Konaklama {index + 1}",
+                        address: index == 0
+                            ? "Merkez Mah. 10. Sokak No:5"
+                            : "Sahil Cad. No:24",
+                        phone: index == 0 ? "+90 212 555 0000" : "+90 242 555 0001",
+                        checkInDate: BuildAccommodationBoundaryDate(eventEntity.StartDate, eventEntity.EndDate, 2, index, isCheckout: false),
+                        checkOutDate: BuildAccommodationBoundaryDate(eventEntity.StartDate, eventEntity.EndDate, 2, index, isCheckout: true),
+                        checkInNote: "Giriş 14:00 itibarıyla",
+                        checkOutNote: "Çıkış 12:00"),
+                    CreatedAt = now
+                });
+
+                state.Seeded = true;
+            }
         }
 
-        var hotelContent = JsonSerializer.Serialize(new
+        var hasInsurance = existingTabs.Any(x =>
+            string.Equals(x.Type, "Insurance", StringComparison.OrdinalIgnoreCase));
+
+        if (!hasInsurance)
         {
-            hotelName = $"{eventEntity.Name} Otel",
-            address = "Merkez Mah. 10. Sokak No:5",
-            phone = "+90 212 555 0000",
-            checkInNote = "Giriş 14:00 itibarıyla",
-            checkOutNote = "Çıkış 12:00"
-        });
-
-        var insuranceContent = JsonSerializer.Serialize(new
-        {
-            companyName = string.Empty,
-            policyNo = string.Empty,
-            startDate = string.Empty,
-            endDate = string.Empty
-        });
-
-        var transferContent = JsonSerializer.Serialize(new { });
-
-        db.EventDocTabs.AddRange(
-            new EventDocTabEntity
-            {
-                Id = Guid.NewGuid(),
-                OrganizationId = organizationId,
-                EventId = eventEntity.Id,
-                Title = "Hotel",
-                Type = "Hotel",
-                SortOrder = 1,
-                IsActive = true,
-                ContentJson = hotelContent,
-                CreatedAt = now
-            },
-            new EventDocTabEntity
+            db.EventDocTabs.Add(new EventDocTabEntity
             {
                 Id = Guid.NewGuid(),
                 OrganizationId = organizationId,
                 EventId = eventEntity.Id,
                 Title = "Insurance",
                 Type = "Insurance",
-                SortOrder = 2,
+                SortOrder = nextSortOrder++,
                 IsActive = false,
-                ContentJson = insuranceContent,
+                ContentJson = JsonSerializer.Serialize(new
+                {
+                    companyName = string.Empty,
+                    policyNo = string.Empty,
+                    startDate = string.Empty,
+                    endDate = string.Empty
+                }),
                 CreatedAt = now
-            },
-            new EventDocTabEntity
+            });
+
+            state.Seeded = true;
+        }
+
+        var hasTransfer = existingTabs.Any(x =>
+            string.Equals(x.Type, "Transfer", StringComparison.OrdinalIgnoreCase));
+
+        if (!hasTransfer)
+        {
+            db.EventDocTabs.Add(new EventDocTabEntity
             {
                 Id = Guid.NewGuid(),
                 OrganizationId = organizationId,
                 EventId = eventEntity.Id,
                 Title = "Transfer",
                 Type = "Transfer",
-                SortOrder = 3,
+                SortOrder = nextSortOrder,
                 IsActive = true,
-                ContentJson = transferContent,
+                ContentJson = JsonSerializer.Serialize(new { }),
                 CreatedAt = now
             });
 
-        state.Seeded = true;
+            state.Seeded = true;
+        }
+    }
+
+    private static string BuildAccommodationContentJson(
+        string hotelName,
+        string address,
+        string phone,
+        string checkInDate,
+        string checkOutDate,
+        string checkInNote,
+        string checkOutNote)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            hotelName,
+            address,
+            phone,
+            checkInDate,
+            checkOutDate,
+            checkInNote,
+            checkOutNote
+        });
+    }
+
+    private static string BuildAccommodationBoundaryDate(
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        int accommodationCount,
+        int accommodationIndex,
+        bool isCheckout)
+    {
+        var totalNights = Math.Max(0, eventEndDate.DayNumber - eventStartDate.DayNumber);
+        if (totalNights == 0)
+        {
+            return eventStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        var safeCount = Math.Max(1, accommodationCount);
+        var index = Math.Clamp(accommodationIndex, 0, safeCount - 1);
+        var startOffset = (int)Math.Floor(index * totalNights / (double)safeCount);
+        if (!isCheckout)
+        {
+            return eventStartDate.AddDays(startOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        var endOffset = (int)Math.Floor((index + 1) * totalNights / (double)safeCount);
+        if (endOffset <= startOffset)
+        {
+            endOffset = Math.Min(totalNights, startOffset + 1);
+        }
+
+        return eventStartDate.AddDays(endOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
     private static async Task EnsureEventItemsAsync(

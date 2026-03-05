@@ -307,6 +307,8 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.AgencyName).HasMaxLength(200);
             b.Property(x => x.City).HasMaxLength(100);
             b.Property(x => x.FlightCity).HasMaxLength(100);
+            b.Property(x => x.AccommodationDocTabId);
+            b.HasIndex(x => x.AccommodationDocTabId);
 
             b.Property(x => x.HotelCheckInDate).HasColumnType("date");
             b.Property(x => x.HotelCheckOutDate).HasColumnType("date");

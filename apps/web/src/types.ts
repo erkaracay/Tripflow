@@ -22,6 +22,7 @@ export type AppComboboxOption = {
 
 export type ScenarioPresetDefaults = {
   dayCount: number
+  accommodationCount: number
   participantCount: number
   equipmentTypeCount: number
   activityDensity: 'light' | 'normal' | 'dense'
@@ -54,6 +55,7 @@ export type CreateScenarioEventRequest = {
   activityDensity?: ScenarioPresetDefaults['activityDensity'] | null
   mealMode?: ScenarioPresetDefaults['mealMode'] | null
   flightLegMode?: ScenarioPresetDefaults['flightLegMode'] | null
+  accommodationCount?: number | null
   participantCount?: number | null
   equipmentTypeCount?: number | null
   includeFlights?: boolean | null
@@ -66,6 +68,7 @@ export type CreateScenarioEventRequest = {
 
 export type ScenarioEventCounts = {
   days: number
+  accommodations: number
   activities: number
   mealActivities: number
   participants: number
@@ -183,6 +186,7 @@ export type ParticipantDetails = {
   agencyName?: string | null
   city?: string | null
   flightCity?: string | null
+  accommodationDocTabId?: string | null
   hotelCheckInDate?: string | null
   hotelCheckOutDate?: string | null
   ticketNo?: string | null
@@ -268,6 +272,52 @@ export type BulkApplyFlightSegmentsResponse = {
     Arrival?: number | null
     Return?: number | null
   }
+}
+
+export type ParticipantRoomFilters = {
+  query?: string | null
+  status?: 'all' | 'arrived' | 'not_arrived' | null
+  accommodationFilter?: string | null
+}
+
+export type ParticipantRoomPatch = {
+  accommodationDocTabId?: string | null
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+  hotelCheckInDate?: string | null
+  hotelCheckOutDate?: string | null
+}
+
+export type ParticipantRoomRowUpdate = {
+  participantId: string
+  tcNo?: string | null
+  patch?: ParticipantRoomPatch | null
+}
+
+export type BulkApplyParticipantRoomsRequest = {
+  scope?: 'manual' | 'filtered' | 'all_event' | null
+  participantIds?: string[] | null
+  filters?: ParticipantRoomFilters | null
+  patch?: ParticipantRoomPatch | null
+  overwriteMode?: 'always' | 'only_empty' | null
+  rowUpdates?: ParticipantRoomRowUpdate[] | null
+}
+
+export type BulkApplyParticipantRoomsError = {
+  participantId?: string | null
+  tcNo?: string | null
+  code: string
+  message: string
+}
+
+export type BulkApplyParticipantRoomsResponse = {
+  affectedCount: number
+  updatedCount: number
+  skippedCount: number
+  notFoundTcNoCount: number
+  errors: BulkApplyParticipantRoomsError[]
 }
 
 export type FlightPanelHelperDirection = 'Arrival' | 'Return'

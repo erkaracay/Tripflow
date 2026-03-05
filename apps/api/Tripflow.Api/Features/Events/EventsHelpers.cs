@@ -358,6 +358,8 @@ internal static class EventsHelpers
             hotelName = string.Empty,
             address = string.Empty,
             phone = string.Empty,
+            checkInDate = string.Empty,
+            checkOutDate = string.Empty,
             checkInNote = string.Empty,
             checkOutNote = string.Empty
         });
@@ -379,7 +381,7 @@ internal static class EventsHelpers
                 Id = Guid.NewGuid(),
                 OrganizationId = entity.OrganizationId,
                 EventId = entity.Id,
-                Title = "Hotel",
+                Title = "Accommodation",
                 Type = "Hotel",
                 SortOrder = 1,
                 IsActive = true,
@@ -394,7 +396,7 @@ internal static class EventsHelpers
                 Title = "Insurance",
                 Type = "Insurance",
                 SortOrder = 2,
-                IsActive = false,
+                IsActive = true,
                 ContentJson = insuranceContent,
                 CreatedAt = createdAtUtc
             },

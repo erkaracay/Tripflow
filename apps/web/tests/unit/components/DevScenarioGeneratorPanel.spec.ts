@@ -15,6 +15,7 @@ const presets: ScenarioPresetDto[] = [
     label: 'Minimal',
     defaults: {
       dayCount: 2,
+      accommodationCount: 2,
       participantCount: 20,
       equipmentTypeCount: 1,
       activityDensity: 'light',
@@ -31,6 +32,7 @@ const presets: ScenarioPresetDto[] = [
     label: 'Balanced',
     defaults: {
       dayCount: 3,
+      accommodationCount: 2,
       participantCount: 40,
       equipmentTypeCount: 2,
       activityDensity: 'normal',
@@ -47,6 +49,7 @@ const presets: ScenarioPresetDto[] = [
     label: 'Operations Heavy',
     defaults: {
       dayCount: 4,
+      accommodationCount: 3,
       participantCount: 80,
       equipmentTypeCount: 4,
       activityDensity: 'dense',
@@ -63,6 +66,7 @@ const presets: ScenarioPresetDto[] = [
     label: 'Flight Heavy',
     defaults: {
       dayCount: 3,
+      accommodationCount: 2,
       participantCount: 48,
       equipmentTypeCount: 2,
       activityDensity: 'normal',
@@ -166,7 +170,8 @@ describe('DevScenarioGeneratorPanel', () => {
 
     const numberInputs = wrapper.findAll('input[type="number"]')
     expect((numberInputs[0]!.element as HTMLInputElement).value).toBe('3')
-    expect((numberInputs[1]!.element as HTMLInputElement).value).toBe('48')
+    expect((numberInputs[1]!.element as HTMLInputElement).value).toBe('2')
+    expect((numberInputs[2]!.element as HTMLInputElement).value).toBe('48')
 
     const flightModeCombobox = findComboboxByLabel(wrapper, 'Flight structure')
     expect(flightModeCombobox).toBeDefined()
@@ -183,6 +188,7 @@ describe('DevScenarioGeneratorPanel', () => {
       eventAccessCode: 'ABC12345',
       created: {
         days: 3,
+        accommodations: 2,
         activities: 10,
         mealActivities: 3,
         participants: 40,
@@ -215,6 +221,7 @@ describe('DevScenarioGeneratorPanel', () => {
         preset: 'balanced',
         timeZoneId: expect.any(String),
         flightLegMode: 'mixed',
+        accommodationCount: 2,
       })
     )
     expect(wrapper.emitted('generated')).toEqual([[response]])
@@ -273,6 +280,7 @@ describe('DevScenarioGeneratorPanel', () => {
     await flightHeavyTab!.trigger('click')
 
     expect(wrapper.text()).toContain('3 days')
+    expect(wrapper.text()).toContain('2 accommodations')
     expect(wrapper.text()).toContain('12 activities')
     expect(wrapper.text()).toContain('3 meal activities')
     expect(wrapper.text()).toContain('48 participants')

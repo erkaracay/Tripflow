@@ -206,7 +206,8 @@ public sealed record ParticipantDetailsRequest(
     string? ReturnTransferVehicle,
     string? ReturnTransferPlate,
     string? ReturnTransferDriverInfo,
-    string? ReturnTransferNote);
+    string? ReturnTransferNote,
+    Guid? AccommodationDocTabId = null);
 
 public sealed record ParticipantDetailsDto(
     string? RoomNo,
@@ -263,7 +264,48 @@ public sealed record ParticipantDetailsDto(
     string? ReturnTransferVehicle,
     string? ReturnTransferPlate,
     string? ReturnTransferDriverInfo,
-    string? ReturnTransferNote);
+    string? ReturnTransferNote,
+    Guid? AccommodationDocTabId = null);
+
+public sealed record ParticipantRoomFiltersRequest(
+    string? Query,
+    string? Status,
+    string? AccommodationFilter);
+
+public sealed record ParticipantRoomPatchRequest(
+    Guid? AccommodationDocTabId,
+    string? RoomNo,
+    string? RoomType,
+    string? BoardType,
+    string? PersonNo,
+    string? HotelCheckInDate,
+    string? HotelCheckOutDate);
+
+public sealed record ParticipantRoomRowUpdateRequest(
+    Guid ParticipantId,
+    string? TcNo,
+    ParticipantRoomPatchRequest? Patch);
+
+public sealed record BulkApplyParticipantRoomsRequest(
+    string? Scope,
+    Guid[]? ParticipantIds,
+    ParticipantRoomFiltersRequest? Filters,
+    ParticipantRoomPatchRequest? Patch,
+    string? OverwriteMode,
+    ParticipantRoomRowUpdateRequest[]? RowUpdates);
+
+public sealed record BulkApplyParticipantRoomsErrorDto(
+    Guid? ParticipantId,
+    string? TcNo,
+    string Code,
+    string Message);
+
+public sealed record BulkApplyParticipantRoomsResponse(
+    int AffectedCount,
+    int UpdatedCount,
+    int SkippedCount,
+    int NotFoundTcNoCount,
+    BulkApplyParticipantRoomsErrorDto[] Errors);
 
 public sealed record FlightSegmentDto(
     int SegmentIndex,

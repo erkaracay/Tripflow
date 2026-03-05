@@ -14,6 +14,7 @@ internal static class ScenarioEventGenerator
         string Id,
         string Label,
         int DayCount,
+        int AccommodationCount,
         int ParticipantCount,
         int EquipmentTypeCount,
         string ActivityDensity,
@@ -30,6 +31,7 @@ internal static class ScenarioEventGenerator
                 Label,
                 new ScenarioPresetDefaultsDto(
                     DayCount,
+                    AccommodationCount,
                     ParticipantCount,
                     EquipmentTypeCount,
                     ActivityDensity,
@@ -47,6 +49,7 @@ internal static class ScenarioEventGenerator
         string? Name,
         DateOnly StartDate,
         int DayCount,
+        int AccommodationCount,
         string TimeZoneId,
         string PresetId,
         string PresetLabel,
@@ -86,12 +89,12 @@ internal static class ScenarioEventGenerator
 
     private static readonly ScenarioPresetDefinition[] Presets =
     [
-        new("minimal", "Minimal", 2, 20, 1, "light", "none", "mixed", false, 0, 0, "random"),
-        new("balanced", "Balanced", 3, 40, 2, "normal", "breakfast_only", "mixed", true, 20, 70, "random"),
-        new("operations_heavy", "Operations Heavy", 4, 80, 4, "dense", "breakfast_and_dinner", "mixed", true, 35, 85, "random"),
-        new("meal_heavy", "Meal Heavy", 3, 36, 2, "normal", "breakfast_and_dinner", "mixed", false, 5, 95, "random"),
-        new("flight_heavy", "Flight Heavy", 3, 48, 2, "normal", "breakfast_only", "layover_heavy", true, 10, 30, "random"),
-        new("checkin_heavy", "Check-in Heavy", 2, 60, 1, "light", "none", "mixed", false, 90, 0, "random")
+        new("minimal", "Minimal", 2, 2, 20, 1, "light", "none", "mixed", false, 0, 0, "random"),
+        new("balanced", "Balanced", 3, 2, 40, 2, "normal", "breakfast_only", "mixed", true, 20, 70, "random"),
+        new("operations_heavy", "Operations Heavy", 4, 3, 80, 4, "dense", "breakfast_and_dinner", "mixed", true, 35, 85, "random"),
+        new("meal_heavy", "Meal Heavy", 3, 2, 36, 2, "normal", "breakfast_and_dinner", "mixed", false, 5, 95, "random"),
+        new("flight_heavy", "Flight Heavy", 3, 2, 48, 2, "normal", "breakfast_only", "layover_heavy", true, 10, 30, "random"),
+        new("checkin_heavy", "Check-in Heavy", 2, 2, 60, 1, "light", "none", "mixed", false, 90, 0, "random")
     ];
 
     private static readonly string[] SampleNames =
@@ -180,6 +183,13 @@ internal static class ScenarioEventGenerator
             return false;
         }
 
+        var accommodationCount = request.AccommodationCount ?? preset.AccommodationCount;
+        if (accommodationCount is < 1 or > 6)
+        {
+            error = new ScenarioValidationError("invalid_accommodation_count", "accommodationCount", "accommodationCount must be between 1 and 6.");
+            return false;
+        }
+
         var participantCount = request.ParticipantCount ?? preset.ParticipantCount;
         if (participantCount is < 0 or > 500)
         {
@@ -253,6 +263,7 @@ internal static class ScenarioEventGenerator
             NormalizeNullableText(request.Name),
             startDate,
             dayCount,
+            accommodationCount,
             timeZoneId,
             preset.Id,
             preset.Label,
@@ -312,7 +323,7 @@ internal static class ScenarioEventGenerator
         }
 
         entity.Days.AddRange(EventsHelpers.CreateDefaultDays(entity));
-        entity.DocTabs.AddRange(CreateScenarioDocTabs(entity, now));
+        entity.DocTabs.AddRange(CreateScenarioDocTabs(entity, now, request));
         entity.Items.AddRange(EventsHelpers.CreateDefaultEventItems(entity, request.EquipmentTypeCount));
 
         entity.Portal = new EventPortalEntity
@@ -377,6 +388,7 @@ internal static class ScenarioEventGenerator
             entity.EventAccessCode,
             new ScenarioEventCountsDto(
                 days.Count,
+                request.AccommodationCount,
                 activities.Count,
                 activities.Count(x => IsMealActivity(x.Type)),
                 participantEntities.Count,
@@ -408,46 +420,137 @@ internal static class ScenarioEventGenerator
             .FirstOrDefaultAsync(ct);
     }
 
-    private static List<EventDocTabEntity> CreateScenarioDocTabs(EventEntity entity, DateTime createdAtUtc)
+    private static List<EventDocTabEntity> CreateScenarioDocTabs(
+        EventEntity entity,
+        DateTime createdAtUtc,
+        ResolvedScenarioEventRequest request)
     {
         var tabs = EventsHelpers.CreateDefaultDocTabs(entity, createdAtUtc);
+        var accommodationCount = request.AccommodationCount;
+        var hotelTabs = tabs
+            .Where(x => string.Equals(x.Type, "Hotel", StringComparison.Ordinal))
+            .ToList();
+        var insuranceTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
+        var transferTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));
 
-        foreach (var tab in tabs)
+        tabs.RemoveAll(x => string.Equals(x.Type, "Hotel", StringComparison.Ordinal));
+        tabs.RemoveAll(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
+        tabs.RemoveAll(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));
+
+        for (var index = 0; index < accommodationCount; index++)
         {
-            if (string.Equals(tab.Type, "Hotel", StringComparison.Ordinal))
-            {
-                tab.ContentJson = JsonSerializer.Serialize(new
+            var hotelTab = index < hotelTabs.Count
+                ? hotelTabs[index]
+                : new EventDocTabEntity
                 {
-                    hotelName = $"{entity.Name} Demo Hotel",
-                    address = "Merkez Mah. 10. Sokak No:5",
-                    phone = "+90 212 555 0000",
-                    checkInNote = "Check-in 14:00 itibariyla",
-                    checkOutNote = "Check-out 12:00"
-                });
-            }
-            else if (string.Equals(tab.Type, "Insurance", StringComparison.Ordinal))
-            {
-                tab.ContentJson = JsonSerializer.Serialize(new
-                {
-                    companyName = "Tripflow Sigorta",
-                    policyNo = $"POL-{entity.StartDate:yyyyMMdd}",
-                    startDate = entity.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    endDate = entity.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                });
-            }
-            else if (string.Equals(tab.Type, "Transfer", StringComparison.Ordinal))
-            {
-                tab.ContentJson = JsonSerializer.Serialize(new
-                {
-                    provider = "Tripflow Transport",
-                    arrivalMeetingPoint = "Airport exit gate",
-                    departureMeetingPoint = "Hotel lobby",
-                    note = "Driver contact details are shared on the event day."
-                });
-            }
+                    Id = Guid.NewGuid(),
+                    OrganizationId = entity.OrganizationId,
+                    EventId = entity.Id,
+                    Type = "Hotel",
+                    IsActive = true,
+                    CreatedAt = createdAtUtc
+                };
+
+            hotelTab.Title = $"Konaklama {index + 1}";
+            hotelTab.SortOrder = index + 1;
+            hotelTab.ContentJson = BuildAccommodationContentJson(
+                hotelName: $"{entity.Name} Konaklama {index + 1}",
+                address: index == 0
+                    ? "Merkez Mah. 10. Sokak No:5"
+                    : "Sahil Cad. No:24",
+                phone: index == 0 ? "+90 212 555 0000" : "+90 242 555 0001",
+                checkInDate: BuildAccommodationBoundaryDate(entity.StartDate, entity.EndDate, accommodationCount, index, isCheckout: false),
+                checkOutDate: BuildAccommodationBoundaryDate(entity.StartDate, entity.EndDate, accommodationCount, index, isCheckout: true),
+                checkInNote: index == 0
+                    ? "Giriş 14:00 itibarıyla"
+                    : "İkinci konaklama için giriş 15:00 itibarıyla",
+                checkOutNote: "Çıkış 12:00");
+
+            tabs.Add(hotelTab);
         }
 
-        return tabs;
+        var nextSortOrder = accommodationCount + 1;
+
+        if (insuranceTab is not null)
+        {
+            insuranceTab.SortOrder = nextSortOrder++;
+            insuranceTab.ContentJson = JsonSerializer.Serialize(new
+            {
+                companyName = "Tripflow Sigorta",
+                policyNo = $"POL-{entity.StartDate:yyyyMMdd}",
+                startDate = entity.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                endDate = entity.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            });
+            tabs.Add(insuranceTab);
+        }
+
+        if (transferTab is not null)
+        {
+            transferTab.SortOrder = nextSortOrder;
+            transferTab.ContentJson = JsonSerializer.Serialize(new
+            {
+                provider = "Tripflow Transport",
+                arrivalMeetingPoint = "Airport exit gate",
+                departureMeetingPoint = "Konaklama lobisi",
+                note = "Driver contact details are shared on the event day."
+            });
+            tabs.Add(transferTab);
+        }
+
+        return tabs
+            .OrderBy(x => x.SortOrder)
+            .ToList();
+    }
+
+    private static string BuildAccommodationContentJson(
+        string hotelName,
+        string address,
+        string phone,
+        string checkInDate,
+        string checkOutDate,
+        string checkInNote,
+        string checkOutNote)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            hotelName,
+            address,
+            phone,
+            checkInDate,
+            checkOutDate,
+            checkInNote,
+            checkOutNote
+        });
+    }
+
+    private static string BuildAccommodationBoundaryDate(
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        int accommodationCount,
+        int accommodationIndex,
+        bool isCheckout)
+    {
+        var totalNights = Math.Max(0, eventEndDate.DayNumber - eventStartDate.DayNumber);
+        if (totalNights == 0)
+        {
+            return eventStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        var safeCount = Math.Max(1, accommodationCount);
+        var index = Math.Clamp(accommodationIndex, 0, safeCount - 1);
+        var startOffset = (int)Math.Floor(index * totalNights / (double)safeCount);
+        if (!isCheckout)
+        {
+            return eventStartDate.AddDays(startOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        var endOffset = (int)Math.Floor((index + 1) * totalNights / (double)safeCount);
+        if (endOffset <= startOffset)
+        {
+            endOffset = Math.Min(totalNights, startOffset + 1);
+        }
+
+        return eventStartDate.AddDays(endOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
     private static List<EventActivityEntity> BuildActivities(

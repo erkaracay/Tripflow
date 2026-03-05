@@ -12,6 +12,7 @@ public sealed class ParticipantDetailsEntity
     public string? AgencyName { get; set; }
     public string? City { get; set; }
     public string? FlightCity { get; set; }
+    public Guid? AccommodationDocTabId { get; set; }
 
     public DateOnly? HotelCheckInDate { get; set; }
     public DateOnly? HotelCheckOutDate { get; set; }
