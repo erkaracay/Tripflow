@@ -12,6 +12,7 @@ import PortalMealSelectionCard from '../../components/portal/PortalMealSelection
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
+import AppModalShell from '../../components/ui/AppModalShell.vue'
 import RichTextContent from '../../components/editor/RichTextContent.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import { formatPhoneDisplay } from '../../lib/normalize'
@@ -51,6 +52,12 @@ const previousSelectedDayIndex = ref(0)
 const checkInCode = ref('')
 const qrDataUrl = ref<string | null>(null)
 const qrError = ref(false)
+const qrPreviewOpen = ref(false)
+type ScreenBrightnessState =
+  | { provider: 'brightness'; previous: number }
+  | { provider: 'mozBrightness'; previous: number }
+  | null
+const qrBrightnessState = ref<ScreenBrightnessState>(null)
 
 const welcomeVisible = ref(false)
 const welcomeTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -290,6 +297,104 @@ const buildMapsLink = (activity: { locationName?: string | null; address?: strin
   return `https://maps.google.com/?q=${encodeURIComponent(query)}`
 }
 
+const normalizeLocationText = (value?: string | null) =>
+  (value ?? '')
+    .trim()
+    .toLocaleLowerCase('tr')
+    .replace(/\s+/g, ' ')
+
+const activityLocationPrimary = (activity: { locationName?: string | null; address?: string | null }) => {
+  const locationName = activity.locationName?.trim() ?? ''
+  const address = activity.address?.trim() ?? ''
+
+  if (!locationName && !address) {
+    return ''
+  }
+
+  return locationName || address
+}
+
+const activityLocationSecondary = (activity: { locationName?: string | null; address?: string | null }) => {
+  const locationName = activity.locationName?.trim() ?? ''
+  const address = activity.address?.trim() ?? ''
+
+  if (!locationName || !address) {
+    return ''
+  }
+
+  if (normalizeLocationText(locationName) === normalizeLocationText(address)) {
+    return ''
+  }
+
+  return address
+}
+
+const setBrightnessValue = (value: number) => {
+  const screenAny = globalThis.screen as Screen & { brightness?: number; mozBrightness?: number }
+
+  try {
+    if (typeof screenAny.brightness === 'number') {
+      screenAny.brightness = value
+      return true
+    }
+  } catch {}
+
+  try {
+    if (typeof screenAny.mozBrightness === 'number') {
+      screenAny.mozBrightness = value
+      return true
+    }
+  } catch {}
+
+  return false
+}
+
+const enableQrBrightnessBoost = () => {
+  const screenAny = globalThis.screen as Screen & { brightness?: number; mozBrightness?: number }
+
+  if (qrBrightnessState.value) {
+    return
+  }
+
+  if (typeof screenAny.brightness === 'number') {
+    qrBrightnessState.value = { provider: 'brightness', previous: screenAny.brightness }
+    if (!setBrightnessValue(1)) {
+      qrBrightnessState.value = null
+    }
+    return
+  }
+
+  if (typeof screenAny.mozBrightness === 'number') {
+    qrBrightnessState.value = { provider: 'mozBrightness', previous: screenAny.mozBrightness }
+    if (!setBrightnessValue(1)) {
+      qrBrightnessState.value = null
+    }
+  }
+}
+
+const restoreQrBrightnessBoost = () => {
+  if (!qrBrightnessState.value) {
+    return
+  }
+
+  void setBrightnessValue(qrBrightnessState.value.previous)
+  qrBrightnessState.value = null
+}
+
+const openQrPreview = () => {
+  if (!qrDataUrl.value) {
+    return
+  }
+
+  qrPreviewOpen.value = true
+  enableQrBrightnessBoost()
+}
+
+const closeQrPreview = () => {
+  qrPreviewOpen.value = false
+  restoreQrBrightnessBoost()
+}
+
 const parseDate = (value?: string | null) => {
   if (!value) {
     return null
@@ -350,8 +455,11 @@ const setActiveTab = (value: string) => {
   activeTab.value = nextTab
 }
 
+const isMobileViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+
 const isTopTabSwipeEnabled = () =>
-  typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches && !requiresLogin.value
+  isMobileViewport() && !requiresLogin.value
 
 const { bindSwipeHandlers } = useHorizontalSwipeTabs<TabKey>({
   orderedIds: tabOrder,
@@ -538,14 +646,23 @@ watch(
       scrollHintTimer = null
     }
 
-    if (count > 2) {
+    if (count > 2 && isMobileViewport()) {
       showDayScrollHint.value = true
       scrollHintTimer = globalThis.setTimeout(() => {
         showDayScrollHint.value = false
         scrollHintTimer = null
-      }, 15000)
+      }, 7000)
     } else {
       showDayScrollHint.value = false
+    }
+  }
+)
+
+watch(
+  () => activeTab.value,
+  (tab) => {
+    if (tab !== 'qr' && qrPreviewOpen.value) {
+      closeQrPreview()
     }
   }
 )
@@ -559,6 +676,7 @@ onUnmounted(() => {
   if (scrollHintTimer) {
     globalThis.clearTimeout(scrollHintTimer)
   }
+  closeQrPreview()
   clearPortalHeader()
 })
 </script>
@@ -732,8 +850,9 @@ onUnmounted(() => {
                     </div>
                   </button>
                 </div>
-                <div v-if="showDayScrollHint" class="text-center text-xs font-semibold text-rose-600 animate-pulse">
-                  {{ t('portal.schedule.scrollHint') }}
+                <div v-if="showDayScrollHint" class="flex items-center justify-center gap-1 text-center text-[11px] font-medium text-slate-500">
+                  <span aria-hidden="true">↔</span>
+                  <span>{{ t('portal.schedule.scrollHint') }}</span>
                 </div>
 
                 <Transition :name="dayTransitionName" mode="out-in">
@@ -778,8 +897,10 @@ onUnmounted(() => {
                       </div>
 
                       <div v-if="activity.locationName || activity.address" class="mt-3 text-sm text-slate-600">
-                        <div class="font-medium text-slate-700" v-if="activity.locationName">{{ activity.locationName }}</div>
-                        <div v-if="activity.address">{{ activity.address }}</div>
+                        <div class="font-medium text-slate-700" v-if="activityLocationPrimary(activity)">
+                          {{ activityLocationPrimary(activity) }}
+                        </div>
+                        <div v-if="activityLocationSecondary(activity)">{{ activityLocationSecondary(activity) }}</div>
                         <a
                           v-if="buildMapsLink(activity)"
                           :href="buildMapsLink(activity)"
@@ -957,6 +1078,16 @@ onUnmounted(() => {
                 />
                 <div v-else class="text-sm text-slate-500">{{ t('portal.qr.empty') }}</div>
 
+                <div v-if="qrDataUrl" class="flex w-full max-w-sm flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                    @click="openQrPreview"
+                  >
+                    {{ t('portal.qr.openFullscreen') }}
+                  </button>
+                </div>
+
                 <p class="mt-2 max-w-xs text-center text-xs leading-relaxed text-slate-500">
                   {{ t('portal.qr.screenshotHint') }}
                 </p>
@@ -1014,24 +1145,34 @@ onUnmounted(() => {
                     }}
                   </div>
                   <div v-if="row.name" class="mt-1 font-medium text-slate-800">{{ row.name }}</div>
-                  <div v-if="row.phoneDisplay" class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <div v-if="row.phoneDisplay" class="mt-2 space-y-2">
                     <a
                       v-if="row.telHref"
                       :href="row.telHref"
-                      class="font-medium text-slate-800 underline"
+                      class="inline-flex font-medium text-slate-800 underline"
                     >
                       {{ row.phoneDisplay }}
                     </a>
-                    <span v-else class="font-medium text-slate-800">{{ row.phoneDisplay }}</span>
-                    <a
-                      v-if="row.whatsappHref"
-                      :href="row.whatsappHref"
-                      class="text-sm font-medium text-emerald-700 underline"
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {{ t('portal.info.messageOnWhatsapp') }}
-                    </a>
+                    <span v-else class="inline-flex font-medium text-slate-800">{{ row.phoneDisplay }}</span>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                      <a
+                        v-if="row.telHref"
+                        :href="row.telHref"
+                        class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                      >
+                        {{ t('portal.info.call') }}
+                      </a>
+                      <a
+                        v-if="row.whatsappHref"
+                        :href="row.whatsappHref"
+                        class="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {{ t('portal.info.messageOnWhatsapp') }}
+                      </a>
+                    </div>
                   </div>
                 </div>
 
@@ -1091,6 +1232,45 @@ onUnmounted(() => {
   >
     <PortalTabBar :tabs="tabs" :active="activeTab" :swipe-handlers="bindSwipeHandlers" @select="setActiveTab" />
   </div>
+
+  <AppModalShell
+    :open="qrPreviewOpen"
+    overlay-class="bg-black/85"
+    content-class="px-4 py-6 sm:px-6"
+    panel-class="w-full max-w-md rounded-3xl border border-white/15 bg-slate-950 p-4 text-white sm:p-6"
+    @close="closeQrPreview"
+  >
+    <template #default="{ panelClass }">
+      <section
+        :class="panelClass"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="portal-qr-preview-title"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h3 id="portal-qr-preview-title" class="text-base font-semibold">{{ t('portal.qr.openFullscreen') }}</h3>
+          <button
+            type="button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-lg leading-none text-white/80"
+            @click="closeQrPreview"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="mt-4 flex justify-center">
+          <img
+            v-if="qrDataUrl"
+            :src="qrDataUrl"
+            :alt="t('portal.qr.imageAlt')"
+            class="h-[78vw] w-[78vw] max-h-[430px] max-w-[430px] rounded-2xl border border-slate-200 bg-white p-3"
+          />
+          <div v-else class="text-sm text-slate-300">{{ t('portal.qr.empty') }}</div>
+        </div>
+
+      </section>
+    </template>
+  </AppModalShell>
 </template>
 
 <style scoped>
