@@ -1496,7 +1496,10 @@
     "next": "Sonraki",
     "results": "{count} sonuç",
     "panelTitle": "Menü raporu",
-    "openButton": "Menü"
+    "openButton": "Menü",
+    "shareWhatsApp": "WhatsApp'ta paylaş",
+    "shareError": "Paylaşım özeti yüklenemedi.",
+    "clipboardFallback": "Mesaj kopyalandı — WhatsApp'a yapıştır."
   },
   "portal": {
     "greeting": "Hoş geldiniz, {name}",

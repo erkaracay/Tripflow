@@ -554,6 +554,23 @@ export type MealChoiceListResponse = {
   items: MealChoiceListItem[]
 }
 
+export type MealShareSummaryCount = { label: string; count: number }
+
+export type MealShareSummaryGroup = { title: string; counts: MealShareSummaryCount[] }
+
+export type MealShareSummarySpecialRequest = {
+  participantName: string
+  roomNo?: string | null
+  otherText?: string | null
+  note?: string | null
+}
+
+export type MealShareSummaryResponse = {
+  activityTitle: string
+  groups: MealShareSummaryGroup[]
+  specialRequests: MealShareSummarySpecialRequest[]
+}
+
 export type MealReportMode = 'admin' | 'guide'
 
 export type MealReportFilterState = {

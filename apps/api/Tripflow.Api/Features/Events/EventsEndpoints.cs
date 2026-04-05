@@ -204,6 +204,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/activities/{activityId}/meal/share-summary", MealMenuHandlers.GetMealShareSummary)
+            .WithSummary("Meal share summary")
+            .WithDescription("Returns per-group counts and special requests for WhatsApp sharing.")
+            .Produces<MealShareSummaryResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/activities/{activityId}/meal/choices", MealMenuHandlers.GetMealChoices)
             .WithSummary("Meal choice drill-down")
             .WithDescription("Returns a paginated participant list for a meal option or Other selections.")

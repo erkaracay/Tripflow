@@ -8,10 +8,12 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../ui/LoadingState.vue'
 import ErrorState from '../ui/ErrorState.vue'
 import AppDrawerShell from '../ui/AppDrawerShell.vue'
+import WhatsAppIcon from '../icons/WhatsAppIcon.vue'
 import type {
   MealChoiceListItem,
   MealChoiceListResponse,
   MealReportMode,
+  MealShareSummaryResponse,
   MealSummaryCount,
   MealSummaryGroup,
   MealSummaryResponse,
@@ -228,6 +230,48 @@ const copySummary = async () => {
   }
 }
 
+const shareLoading = ref(false)
+
+const shareOnWhatsApp = async () => {
+  shareLoading.value = true
+  try {
+    const data = await apiGet<MealShareSummaryResponse>(
+      `${apiBase.value}/${props.eventId}/activities/${props.activityId}/meal/share-summary`,
+    )
+
+    const groupLines = data.groups.map((g) => {
+      const countsText = g.counts.map((c) => `${c.label} ${c.count}`).join(', ')
+      return countsText ? `${g.title}: ${countsText}` : g.title
+    })
+
+    const lines: string[] = [data.activityTitle, '', ...groupLines]
+
+    if (data.specialRequests.length > 0) {
+      lines.push('', '-- Özel İstekler --')
+      for (const r of data.specialRequests) {
+        const loc = r.roomNo ? ` (Oda ${r.roomNo})` : ''
+        const detail = [r.otherText, r.note].filter(Boolean).join(' / ')
+        lines.push(`- ${r.participantName}${loc}: ${detail}`)
+      }
+    }
+
+    const message = lines.join('\n')
+    const url = new URL('https://wa.me/')
+    url.searchParams.set('text', message)
+    if (url.toString().length > 1800) {
+      await navigator.clipboard.writeText(message)
+      pushToast({ key: 'mealReport.clipboardFallback', tone: 'info' })
+      window.open('https://wa.me/', '_blank')
+      return
+    }
+    window.open(url.toString(), '_blank')
+  } catch {
+    pushToast({ key: 'mealReport.shareError', tone: 'error' })
+  } finally {
+    shareLoading.value = false
+  }
+}
+
 watch(
   () => [props.eventId, props.activityId, props.mode] as const,
   () => {
@@ -292,13 +336,24 @@ onUnmounted(() => {
           <h1 class="mt-3 text-2xl font-semibold text-slate-900">{{ resolvedActivityTitle }}</h1>
           <p class="mt-1 text-sm text-slate-500">{{ t('mealReport.subtitle') }}</p>
         </div>
-        <button
-          class="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          type="button"
-          @click="copySummary"
-        >
-          {{ t('mealReport.copySummary') }}
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            type="button"
+            @click="copySummary"
+          >
+            {{ t('mealReport.copySummary') }}
+          </button>
+          <button
+            class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+            type="button"
+            :disabled="shareLoading"
+            @click="shareOnWhatsApp"
+          >
+            <WhatsAppIcon />
+            {{ t('mealReport.shareWhatsApp') }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -355,12 +410,21 @@ onUnmounted(() => {
   >
     <template #default="{ panelClass }">
       <section :class="[panelClass, 'meal-drawer-surface']">
-        <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ t('mealReport.panelTitle') }}</div>
-            <h2 class="mt-1 text-xl font-semibold text-slate-900">{{ resolvedActivityTitle }}</h2>
+        <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ t('mealReport.panelTitle') }}</div>
+              <h2 class="mt-1 text-xl font-semibold text-slate-900">{{ resolvedActivityTitle }}</h2>
+            </div>
+            <button
+              class="shrink-0 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              type="button"
+              @click="emit('close')"
+            >
+              {{ t('common.dismiss') }}
+            </button>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="mt-3 flex flex-wrap gap-2">
             <button
               class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               type="button"
@@ -369,11 +433,13 @@ onUnmounted(() => {
               {{ t('mealReport.copySummary') }}
             </button>
             <button
-              class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
               type="button"
-              @click="emit('close')"
+              :disabled="shareLoading"
+              @click="shareOnWhatsApp"
             >
-              {{ t('common.dismiss') }}
+              <WhatsAppIcon :size="14" />
+              {{ t('mealReport.shareWhatsApp') }}
             </button>
           </div>
         </div>

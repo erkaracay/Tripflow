@@ -277,6 +277,31 @@ internal static class MealMenuHandlers
         return Results.Ok(summary);
     }
 
+    internal static async Task<IResult> GetMealShareSummary(
+        string eventId,
+        string activityId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (error, context) = await ResolveMealActivityContext(eventId, activityId, httpContext, db, ct);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var resolvedContext = context!;
+        var result = await MealSummaryQueries.GetShareSummaryAsync(
+            db,
+            resolvedContext.OrganizationId,
+            resolvedContext.EventId,
+            resolvedContext.Activity.Id,
+            resolvedContext.Activity.Title,
+            ct);
+
+        return Results.Ok(result);
+    }
+
     internal static async Task<IResult> GetMealChoices(
         string eventId,
         string activityId,

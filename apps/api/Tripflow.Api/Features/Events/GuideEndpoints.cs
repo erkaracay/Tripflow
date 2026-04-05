@@ -159,6 +159,13 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/events/{eventId}/activities/{activityId}/meal/share-summary", MealMenuHandlers.GetMealShareSummary)
+            .WithSummary("Guide meal share summary")
+            .WithDescription("Returns per-group counts and special requests for WhatsApp sharing.")
+            .Produces<MealShareSummaryResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/events/{eventId}/activities/{activityId}/meal-groups", GuideHandlers.GetMealGroups)
             .WithSummary("Guide meal groups")
             .WithDescription("Returns meal choice groups and options for a Meal activity in a guide's event.")

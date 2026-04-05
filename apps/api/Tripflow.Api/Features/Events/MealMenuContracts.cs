@@ -80,3 +80,18 @@ public sealed record MealChoiceListResponse(
     int PageSize,
     int Total,
     MealChoiceListItemDto[] Items);
+
+public sealed record MealShareSummaryCountDto(string Label, int Count);
+
+public sealed record MealShareSummaryGroupDto(string Title, MealShareSummaryCountDto[] Counts);
+
+public sealed record MealShareSummarySpecialRequestDto(
+    string ParticipantName,
+    string? RoomNo,
+    string? OtherText,
+    string? Note);
+
+public sealed record MealShareSummaryResponse(
+    string ActivityTitle,
+    MealShareSummaryGroupDto[] Groups,
+    MealShareSummarySpecialRequestDto[] SpecialRequests);

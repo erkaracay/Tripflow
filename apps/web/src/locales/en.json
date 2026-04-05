@@ -1509,7 +1509,10 @@
     "next": "Next",
     "results": "{count} results",
     "panelTitle": "Menu report",
-    "openButton": "Menu"
+    "openButton": "Menu",
+    "shareWhatsApp": "Share on WhatsApp",
+    "shareError": "Could not load share summary.",
+    "clipboardFallback": "Message copied — paste it in WhatsApp."
   },
   "portal": {
     "greeting": "Welcome, {name}",
