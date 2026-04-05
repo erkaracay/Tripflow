@@ -241,8 +241,8 @@ onMounted(loadEvent)
 
 <template>
   <div class="mx-auto max-w-7xl space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
         <RouterLink
           class="text-sm text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
           :to="`/admin/events/${eventId}`"

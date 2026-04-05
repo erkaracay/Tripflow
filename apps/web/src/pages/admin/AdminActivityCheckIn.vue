@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet, apiPost, apiPostWithPayload, apiPatchWithPayload } from '../../lib/api'
@@ -53,6 +53,15 @@ const scannerOpen = ref(false)
 const autoSubmitAfterScan = ref(true)
 const codeInput = ref<HTMLInputElement | null>(null)
 const updatingWillNotAttendId = ref<string | null>(null)
+const openMenuRowId = ref<string | null>(null)
+
+const toggleRowMenu = (id: string) => {
+  openMenuRowId.value = openMenuRowId.value === id ? null : id
+}
+
+const closeRowMenus = () => {
+  openMenuRowId.value = null
+}
 const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmMessageKey = ref<string | null>(null)
@@ -490,6 +499,12 @@ onMounted(() => {
   if (storedMode === 'Exit' || storedMode === 'Entry') direction.value = storedMode
   // Tarayıcıya otomatik gönder: her açılışta seçili (varsayılan true)
   void loadEventAndActivities()
+  document.addEventListener('click', closeRowMenus)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRowMenus() })
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeRowMenus)
 })
 
 watch(direction, persistMode)
@@ -757,7 +772,7 @@ watch(selectedActivityId, () => {
                 </tr>
                 <tr class="border-b border-slate-200 bg-slate-50">
                   <td colspan="4" class="p-2">
-                    <div class="flex flex-row flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-2">
                       <button
                         v-if="!row.activityState?.isCheckedIn"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
@@ -778,24 +793,6 @@ watch(selectedActivityId, () => {
                       </button>
                       <button
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                        type="button"
-                        :disabled="!row.phone"
-                        @click="openCall(row)"
-                      >
-                        {{ t('actions.call') }}
-                      </button>
-                      <button
-                        class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-                        type="button"
-                        :aria-label="t('actions.whatsappAria')"
-                        :disabled="!row.phone"
-                        @click="openWhatsApp(row)"
-                      >
-                        <WhatsAppIcon class="text-emerald-700" :size="14" />
-                        {{ t('actions.whatsapp') }}
-                      </button>
-                      <button
-                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="updatingWillNotAttendId === row.id"
                         type="button"
                         @click="setActivityWillNotAttend(row, !row.activityState?.willNotAttend)"
@@ -808,6 +805,38 @@ watch(selectedActivityId, () => {
                               : t('common.willNotAttend')
                         }}
                       </button>
+                      <div class="relative" @click.stop>
+                        <button
+                          class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                          type="button"
+                          :aria-label="t('common.moreActions')"
+                          @click="toggleRowMenu(row.id)"
+                        >
+                          ···
+                        </button>
+                        <div
+                          v-if="openMenuRowId === row.id"
+                          class="absolute left-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg transition ease-out"
+                        >
+                          <button
+                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            type="button"
+                            :disabled="!row.phone"
+                            @click="openCall(row); closeRowMenus()"
+                          >
+                            {{ t('actions.call') }}
+                          </button>
+                          <button
+                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-emerald-800 hover:bg-slate-50 disabled:opacity-50"
+                            type="button"
+                            :disabled="!row.phone"
+                            @click="openWhatsApp(row); closeRowMenus()"
+                          >
+                            <WhatsAppIcon class="text-emerald-700" :size="13" />
+                            {{ t('actions.whatsapp') }}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </td>
                 </tr>
