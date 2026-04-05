@@ -9,7 +9,7 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import FlightPanelHelperModal from '../../components/admin/FlightPanelHelperModal.vue'
-import { formatDate } from '../../lib/formatters'
+import { formatDate, localizeAttendanceStatus } from '../../lib/formatters'
 import {
   buildFlightSegmentsSheetRows,
   buildParticipantsSheetRows,
@@ -402,7 +402,7 @@ onMounted(loadEvent)
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.flightCity') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.hotelCheckInDate') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.hotelCheckOutDate') }}</th>
-              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.ticketNo') }}</th>
+              <th class="min-w-[96px] px-3 py-2">{{ t('admin.participantsTable.columns.ticketNo') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.attendanceStatus') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.flights') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.actions') }}</th>
@@ -447,7 +447,7 @@ onMounted(loadEvent)
                 </div>
                 <span v-else>—</span>
               </td>
-              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.attendanceStatus ?? '—' }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ localizeAttendanceStatus(row.details?.attendanceStatus) }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">
                 <ParticipantFlightsModal
                   :event-id="eventId"

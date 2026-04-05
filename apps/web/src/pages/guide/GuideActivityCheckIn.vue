@@ -56,13 +56,25 @@ const autoSubmitAfterScan = ref(true)
 const codeInput = ref<HTMLInputElement | null>(null)
 const updatingWillNotAttendId = ref<string | null>(null)
 const openMenuRowId = ref<string | null>(null)
+const openMenuRow = ref<ActivityParticipantTableItem | null>(null)
+const menuPosition = ref({ top: 0, left: 0 })
 
-const toggleRowMenu = (id: string) => {
-  openMenuRowId.value = openMenuRowId.value === id ? null : id
+const toggleRowMenu = (row: ActivityParticipantTableItem, event: MouseEvent) => {
+  if (openMenuRowId.value === row.id) {
+    openMenuRowId.value = null
+    openMenuRow.value = null
+    return
+  }
+  const btn = event.currentTarget as HTMLElement
+  const rect = btn.getBoundingClientRect()
+  menuPosition.value = { top: rect.bottom + 4, left: rect.left }
+  openMenuRowId.value = row.id
+  openMenuRow.value = row
 }
 
 const closeRowMenus = () => {
   openMenuRowId.value = null
+  openMenuRow.value = null
 }
 const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
@@ -819,38 +831,14 @@ watch(selectedActivityId, () => {
                               : t('common.willNotAttend')
                         }}
                       </button>
-                      <div class="relative" @click.stop>
-                        <button
-                          class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
-                          type="button"
-                          :aria-label="t('common.moreActions')"
-                          @click="toggleRowMenu(row.id)"
-                        >
-                          ···
-                        </button>
-                        <div
-                          v-if="openMenuRowId === row.id"
-                          class="absolute left-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg transition ease-out"
-                        >
-                          <button
-                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                            type="button"
-                            :disabled="!row.phone"
-                            @click="openCall(row); closeRowMenus()"
-                          >
-                            {{ t('actions.call') }}
-                          </button>
-                          <button
-                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-emerald-800 hover:bg-slate-50 disabled:opacity-50"
-                            type="button"
-                            :disabled="!row.phone"
-                            @click="openWhatsApp(row); closeRowMenus()"
-                          >
-                            <WhatsAppIcon class="text-emerald-700" :size="13" />
-                            {{ t('actions.whatsapp') }}
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300"
+                        type="button"
+                        :aria-label="t('common.moreActions')"
+                        @click.stop="toggleRowMenu(row, $event)"
+                      >
+                        ···
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -893,4 +881,39 @@ watch(selectedActivityId, () => {
       @confirm="handleConfirm"
     />
   </div>
+
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition ease-out duration-100"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-75"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="openMenuRowId && openMenuRow"
+        class="fixed z-50 min-w-[140px] origin-top-left rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+        :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
+      >
+        <button
+          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          type="button"
+          :disabled="!openMenuRow.phone"
+          @click="openCall(openMenuRow); closeRowMenus()"
+        >
+          {{ t('actions.call') }}
+        </button>
+        <button
+          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-emerald-800 hover:bg-slate-50 disabled:opacity-50"
+          type="button"
+          :disabled="!openMenuRow.phone"
+          @click="openWhatsApp(openMenuRow); closeRowMenus()"
+        >
+          <WhatsAppIcon class="text-emerald-700" :size="13" />
+          {{ t('actions.whatsapp') }}
+        </button>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

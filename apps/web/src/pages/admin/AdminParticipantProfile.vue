@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { apiGet } from '../../lib/api'
 import { useToast } from '../../lib/toast'
-import { formatDate, formatTime } from '../../lib/formatters'
+import { formatDate, formatTime, localizeAttendanceStatus } from '../../lib/formatters'
 import { formatPhoneDisplay, normalizePhone } from '../../lib/normalize'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -310,7 +310,7 @@ onMounted(loadProfile)
           </div>
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
             <span class="text-slate-500">{{ t('admin.participantProfile.fields.attendanceStatus') }}</span>
-            <span class="text-slate-900">{{ displayValue(details?.attendanceStatus ?? undefined) }}</span>
+            <span class="text-slate-900">{{ localizeAttendanceStatus(details?.attendanceStatus) }}</span>
           </div>
         </div>
       </section>

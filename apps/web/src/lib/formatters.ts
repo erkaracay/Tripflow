@@ -1,3 +1,23 @@
+const ATTENDANCE_STATUS_MAP: Record<string, string> = {
+  confirmed: 'Onaylandı',
+  late: 'Geç',
+  cancelled: 'İptal',
+  canceled: 'İptal',
+  'no show': 'Gelmedi',
+  no_show: 'Gelmedi',
+  noshow: 'Gelmedi',
+  pending: 'Bekliyor',
+  waitlist: 'Bekleme listesi',
+  waitlisted: 'Bekleme listesi',
+  tentative: 'Geçici',
+}
+
+export const localizeAttendanceStatus = (value?: string | null): string => {
+  if (!value || !value.trim()) return '—'
+  const key = value.trim().toLowerCase()
+  return ATTENDANCE_STATUS_MAP[key] ?? value.trim()
+}
+
 export const formatBaggage = (pieces?: number | null, kg?: number | null, allowance?: string | null) => {
   const segments: string[] = []
   if (typeof pieces === 'number' && pieces > 0) {

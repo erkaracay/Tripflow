@@ -669,7 +669,7 @@
       "title": "Participants",
       "import": "Import",
       "tableView": "Table view",
-      "roomOps": "Room ops",
+      "roomOps": "Room assignments",
       "resetAll": "Reset all check-ins",
       "deleteAll": "Delete all",
       "resetAllConfirm": "Reset check-ins for all participants?",
@@ -827,7 +827,7 @@
       }
     },
     "roomOps": {
-      "title": "Room Operations",
+      "title": "Room Assignments",
       "subtitle": "Manage participant room and accommodation fields in bulk.",
       "total": "{count} participants total",
       "empty": "No participants found.",
@@ -955,7 +955,7 @@
       "all": "All",
       "quickFilters": {
         "onlyExit": "Exit only",
-        "onlyNotFound": "NotFound only",
+        "onlyNotFound": "Not found only",
         "onlyQr": "QR only"
       },
       "searchLabel": "Search",
