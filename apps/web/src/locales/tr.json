@@ -870,9 +870,9 @@
     },
     "stays": {
       "title": "Konaklama Kayıtları",
-      "add": "Stay ekle",
-      "copyPrevious": "Önceki stay'i kopyala",
-      "badge": "Stays: {count}",
+      "add": "Konaklama ekle",
+      "copyPrevious": "Öncekini kopyala",
+      "badge": "Konaklama: {count}",
       "empty": "Konaklama kaydı yok.",
       "deleteConfirm": "Bu kaydı sil?",
       "overlapError": "Bu tarih aralığı mevcut bir kayıtla çakışıyor.",
