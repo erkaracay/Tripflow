@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast'
 import CopyIcon from '../icons/CopyIcon.vue'
 import type {
   FlightSegment,
+  ParticipantAccommodationStay,
   PortalDocsResponse,
   PortalFlightInfo,
   PortalInsuranceInfo,
@@ -20,7 +21,12 @@ type TabItem = {
   content?: unknown
 }
 
-const props = defineProps<{ docs?: PortalDocsResponse | null; printMode?: boolean; participantName?: string | null }>()
+const props = defineProps<{
+  docs?: PortalDocsResponse | null
+  stays?: ParticipantAccommodationStay[] | null
+  printMode?: boolean
+  participantName?: string | null
+}>()
 
 const { t } = useI18n()
 const { pushToast } = useToast()
@@ -1365,6 +1371,70 @@ const formatCustomValue = (value: unknown): string => {
 
     <div v-else-if="activeTab?.kind === 'hotel'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.accommodationCardTitle') }}</div>
+
+      <!-- New stays-based view -->
+      <template v-if="props.stays && props.stays.length > 0">
+        <div class="mt-3 space-y-3">
+          <div
+            v-for="stay in props.stays"
+            :key="stay.id"
+            :class="['rounded-xl border p-3 text-sm space-y-2', stay.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-slate-100']"
+          >
+            <div class="text-xs font-semibold text-slate-500">
+              <span v-if="stay.isCurrent">{{ t('portal.docs.currentStay') }}</span>
+              <span v-else-if="stay.checkIn && stay.checkIn > new Date().toISOString().slice(0,10)">{{ t('portal.docs.nextStay') }}</span>
+              <span v-else>{{ t('portal.docs.previousStay') }}</span>
+            </div>
+            <div v-if="stay.accommodationTitle" class="font-semibold text-slate-800">{{ stay.accommodationTitle }}</div>
+            <template v-if="stay.accommodationContent">
+              <div v-if="hasText(readContentString(stay.accommodationContent, 'address'))" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+                <span class="text-right font-medium text-slate-800">
+                  <a
+                    v-if="buildMapsLink(readContentString(stay.accommodationContent, 'address'))"
+                    :href="buildMapsLink(readContentString(stay.accommodationContent, 'address'))"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="portal-inline-action text-slate-800"
+                  >{{ readContentString(stay.accommodationContent, 'address') }}</a>
+                  <span v-else>{{ readContentString(stay.accommodationContent, 'address') }}</span>
+                </span>
+              </div>
+              <div v-if="hasText(contentPhone(stay.accommodationContent).raw)" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+                <span class="text-right font-medium text-slate-800">
+                  <a v-if="contentPhone(stay.accommodationContent).link" :href="contentPhone(stay.accommodationContent).link" class="portal-inline-action text-slate-800">
+                    {{ contentPhone(stay.accommodationContent).display || contentPhone(stay.accommodationContent).raw }}
+                  </a>
+                  <span v-else>{{ contentPhone(stay.accommodationContent).display || contentPhone(stay.accommodationContent).raw }}</span>
+                </span>
+              </div>
+            </template>
+            <div v-if="stay.checkIn || stay.checkOut" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.checkIn') }} – {{ t('portal.docs.checkOut') }}</span>
+              <span class="text-right font-medium text-slate-800">
+                {{ formatDate(stay.checkIn) }} – {{ formatDate(stay.checkOut) }}
+                <span v-if="stay.nightCount" class="ml-1 text-slate-400">({{ stay.nightCount }}n)</span>
+              </span>
+            </div>
+            <div v-if="stay.roomNo" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.roomNo') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ stay.roomNo }}</span>
+            </div>
+            <div v-if="stay.boardType" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.boardType') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatBoard(stay.boardType) }}</span>
+            </div>
+            <div v-if="stay.roommates && stay.roommates.length > 0" class="flex items-start justify-between gap-3">
+              <span class="text-slate-500">{{ t('portal.docs.roommates') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ stay.roommates.join(', ') }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Legacy flat view (fallback when stays not provided) -->
+      <template v-else>
       <div class="mt-3 space-y-3 text-sm">
         <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500">
           {{ t('portal.infoTabs.empty') }}
@@ -1459,6 +1529,7 @@ const formatCustomValue = (value: unknown): string => {
           </div>
         </div>
       </div>
+      </template><!-- end legacy flat view -->
     </div>
 
     <div v-else-if="activeTab?.kind === 'insurance'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

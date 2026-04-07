@@ -876,6 +876,17 @@
         "summary": "{parsed} parsed · {matched} matched · {notFound} not found · {invalid} invalid"
       }
     },
+    "stays": {
+      "title": "Accommodation Stays",
+      "add": "Add stay",
+      "copyPrevious": "Copy previous stay",
+      "badge": "Stays: {count}",
+      "empty": "No stays recorded.",
+      "deleteConfirm": "Delete this stay?",
+      "overlapError": "This date range overlaps with an existing stay.",
+      "checkOutBeforeCheckIn": "Check-out must be on or after check-in.",
+      "accRequired": "Please select an accommodation."
+    },
     "flightPanelHelper": {
       "title": "Bulk apply flights",
       "subtitle": "Apply the same flight segment template to selected participants or export an import-ready Excel workbook.",
@@ -1624,6 +1635,10 @@
       "stayDurationNights": "{count} night(s)",
       "checkInNote": "Check-in note",
       "checkOutNote": "Check-out note",
+      "currentStay": "Current Stay",
+      "nextStay": "Upcoming",
+      "previousStay": "Previous",
+      "roommates": "Roommates",
       "empty": "No documents yet.",
       "board": {
         "roomOnly": "Room only",

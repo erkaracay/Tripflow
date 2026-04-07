@@ -590,6 +590,28 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/participants/{participantId:guid}/stays", ParticipantAccommodationStayHandlers.GetStays)
+            .WithSummary("List participant accommodation stays")
+            .Produces<ParticipantAccommodationStayDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/participants/{participantId:guid}/stays", ParticipantAccommodationStayHandlers.CreateStay)
+            .WithSummary("Create participant accommodation stay")
+            .Produces<ParticipantAccommodationStayDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/participants/{participantId:guid}/stays/{stayId:guid}", ParticipantAccommodationStayHandlers.UpdateStay)
+            .WithSummary("Update participant accommodation stay")
+            .Produces<ParticipantAccommodationStayDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/participants/{participantId:guid}/stays/{stayId:guid}", ParticipantAccommodationStayHandlers.DeleteStay)
+            .WithSummary("Delete participant accommodation stay")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

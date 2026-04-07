@@ -18,7 +18,8 @@ public sealed record PortalMeResponse(
     PortalParticipantSummaryFull Participant,
     EventPortalInfo Portal,
     EventScheduleDto Schedule,
-    PortalDocsResponse Docs);
+    PortalDocsResponse Docs,
+    ParticipantAccommodationStayDto[] Stays);
 
 public sealed record PortalEventSummary(
     Guid Id,

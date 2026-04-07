@@ -853,6 +853,32 @@ export type EventDocTabDto = {
   content: unknown
 }
 
+export type ParticipantAccommodationStay = {
+  id: string
+  eventAccommodationId: string
+  accommodationTitle: string
+  accommodationContent: unknown
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+  checkIn?: string | null
+  checkOut?: string | null
+  nightCount?: number | null
+  isCurrent: boolean
+  roommates: string[]
+}
+
+export type UpsertParticipantAccommodationStayRequest = {
+  eventAccommodationId?: string | null
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+  checkIn?: string | null
+  checkOut?: string | null
+}
+
 export type PortalMeResponse = {
   event: {
     id: string
@@ -874,6 +900,7 @@ export type PortalMeResponse = {
   portal: EventPortalInfo
   schedule: EventSchedule
   docs: PortalDocsResponse
+  stays: ParticipantAccommodationStay[]
 }
 
 export type EventAccessCodeResponse = {
