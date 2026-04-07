@@ -868,6 +868,17 @@
         "summary": "{parsed} satır okundu · {matched} eşleşti · {notFound} bulunamadı · {invalid} geçersiz"
       }
     },
+    "stays": {
+      "title": "Konaklama Kayıtları",
+      "add": "Stay ekle",
+      "copyPrevious": "Önceki stay'i kopyala",
+      "badge": "Stays: {count}",
+      "empty": "Konaklama kaydı yok.",
+      "deleteConfirm": "Bu kaydı sil?",
+      "overlapError": "Bu tarih aralığı mevcut bir kayıtla çakışıyor.",
+      "checkOutBeforeCheckIn": "Çıkış tarihi giriş tarihinde veya sonrasında olmalıdır.",
+      "accRequired": "Lütfen bir konaklama seçin."
+    },
     "flightPanelHelper": {
       "title": "Toplu uçuş uygula",
       "subtitle": "Aynı uçuş segment şablonunu seçilen katılımcılara toplu uygula veya importa hazır Excel dışa aktar.",
@@ -1611,6 +1622,10 @@
       "stayDurationNights": "{count} gece",
       "checkInNote": "Giriş notu",
       "checkOutNote": "Çıkış notu",
+      "currentStay": "Şu Anki Konaklama",
+      "nextStay": "Sonraki",
+      "previousStay": "Önceki",
+      "roommates": "Oda Arkadaşları",
       "empty": "Henüz belge yok.",
       "board": {
         "roomOnly": "Sadece oda",
