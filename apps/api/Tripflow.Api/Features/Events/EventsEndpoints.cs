@@ -398,6 +398,48 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/accommodation-segments", AccommodationSegmentsHandlers.GetSegments)
+            .WithSummary("List accommodation segments")
+            .WithDescription("Returns accommodation segments configured for the event.")
+            .Produces<AccommodationSegmentDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/accommodation-segments", AccommodationSegmentsHandlers.CreateSegment)
+            .WithSummary("Create accommodation segment")
+            .WithDescription("Creates an event-level accommodation segment tied to a hotel doc tab.")
+            .Produces<AccommodationSegmentDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPut("/{eventId}/accommodation-segments/{segmentId:guid}", AccommodationSegmentsHandlers.UpdateSegment)
+            .WithSummary("Update accommodation segment")
+            .WithDescription("Updates an event-level accommodation segment.")
+            .Produces<AccommodationSegmentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapDelete("/{eventId}/accommodation-segments/{segmentId:guid}", AccommodationSegmentsHandlers.DeleteSegment)
+            .WithSummary("Delete accommodation segment")
+            .WithDescription("Deletes an accommodation segment and its participant assignments.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapGet("/{eventId}/accommodation-segments/{segmentId:guid}/participants/table", AccommodationSegmentsHandlers.GetSegmentParticipantsTable)
+            .WithSummary("Accommodation segment participant table")
+            .WithDescription("Returns effective accommodation data for participants in the selected segment.")
+            .Produces<AccommodationSegmentParticipantTableResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/accommodation-segments/{segmentId:guid}/participants/bulk-apply", AccommodationSegmentsHandlers.BulkApplyParticipants)
+            .WithSummary("Bulk apply accommodation segment assignments")
+            .WithDescription("Applies room detail and hotel override changes for the selected segment.")
+            .Produces<BulkApplyAccommodationSegmentParticipantsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{eventId}/participants/rooms/bulk-apply", EventsHandlers.BulkApplyParticipantRooms)
             .WithSummary("Bulk apply participant room data")
             .WithDescription("Applies room/accommodation updates to participants in one operation.")

@@ -34,6 +34,7 @@ public sealed class ParticipantEntity
     public List<ParticipantFlightSegmentEntity> FlightSegments { get; set; } = new();
     public List<ParticipantMealSelectionEntity> MealSelections { get; set; } = new();
     public List<ParticipantAccommodationStayEntity> AccommodationStays { get; set; } = new();
+    public List<ParticipantAccommodationAssignmentEntity> AccommodationAssignments { get; set; } = new();
 
     public DateTime CreatedAt { get; set; }
 }
