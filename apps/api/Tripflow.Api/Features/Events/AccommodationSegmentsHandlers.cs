@@ -8,8 +8,6 @@ namespace Tripflow.Api.Features.Events;
 
 internal static class AccommodationSegmentsHandlers
 {
-    private const string DocTypeHotel = "hotel";
-
     internal static async Task<IResult> GetSegments(
         string eventId,
         HttpContext httpContext,
@@ -57,7 +55,7 @@ internal static class AccommodationSegmentsHandlers
             return eventContext.Error;
         }
 
-        var defaultAccommodation = await ValidateHotelDocTab(
+        var defaultAccommodation = await AccommodationSegmentAssignmentHelpers.ValidateHotelDocTab(
             eventContext.EventId,
             eventContext.OrganizationId,
             request.DefaultAccommodationDocTabId,
@@ -160,7 +158,7 @@ internal static class AccommodationSegmentsHandlers
             return Results.NotFound(new { message = "Accommodation segment not found." });
         }
 
-        var defaultAccommodation = await ValidateHotelDocTab(
+        var defaultAccommodation = await AccommodationSegmentAssignmentHelpers.ValidateHotelDocTab(
             eventContext.EventId,
             eventContext.OrganizationId,
             request.DefaultAccommodationDocTabId,
@@ -250,6 +248,7 @@ internal static class AccommodationSegmentsHandlers
         string eventId,
         Guid segmentId,
         string? query,
+        string? status,
         string? accommodationFilter,
         int? page,
         int? pageSize,
@@ -280,6 +279,19 @@ internal static class AccommodationSegmentsHandlers
 
         var participantsQuery = db.Participants.AsNoTracking()
             .Where(x => x.EventId == segmentContext.EventId && x.OrganizationId == segmentContext.OrganizationId);
+
+        var statusValue = status?.Trim().ToLowerInvariant();
+        if (statusValue is "arrived" or "not_arrived")
+        {
+            var arrivedParticipantIds = db.CheckIns.AsNoTracking()
+                .Where(x => x.EventId == segmentContext.EventId && x.OrganizationId == segmentContext.OrganizationId)
+                .Select(x => x.ParticipantId)
+                .Distinct();
+
+            participantsQuery = statusValue == "arrived"
+                ? participantsQuery.Where(x => arrivedParticipantIds.Contains(x.Id))
+                : participantsQuery.Where(x => !arrivedParticipantIds.Contains(x.Id));
+        }
 
         var search = query?.Trim();
 
@@ -399,88 +411,66 @@ internal static class AccommodationSegmentsHandlers
             .Where(x => x != Guid.Empty)
             .Distinct()
             .ToArray();
-        if (participantIds.Length == 0)
+        var rowUpdates = (request.RowUpdates ?? Array.Empty<AccommodationSegmentParticipantRowUpdateRequest>())
+            .Where(x => x.ParticipantId != Guid.Empty)
+            .GroupBy(x => x.ParticipantId)
+            .Select(x => x.Last())
+            .ToArray();
+
+        var hasSharedMutation = HasSharedMutationRequested(request);
+        if (participantIds.Length == 0 && rowUpdates.Length == 0)
         {
-            return EventsHelpers.BadRequest("participantIds is required.");
+            return EventsHelpers.BadRequest("participantIds or rowUpdates is required.");
         }
 
-        var overwriteMode = NormalizeOverwriteMode(request.OverwriteMode);
-        if (overwriteMode is null)
-        {
-            return Results.BadRequest(new
-            {
-                code = "invalid_overwrite_mode",
-                message = "overwriteMode must be always or only_empty."
-            });
-        }
-
-        var accommodationMode = NormalizeAccommodationMode(request.AccommodationMode);
-        if (accommodationMode is null)
-        {
-            return Results.BadRequest(new
-            {
-                code = "invalid_accommodation_mode",
-                message = "accommodationMode must be keep, default, or override."
-            });
-        }
-
-        var roomNoMode = NormalizeFieldMode(request.RoomNoMode);
-        var roomTypeMode = NormalizeFieldMode(request.RoomTypeMode);
-        var boardTypeMode = NormalizeFieldMode(request.BoardTypeMode);
-        var personNoMode = NormalizeFieldMode(request.PersonNoMode);
-        if (roomNoMode is null || roomTypeMode is null || boardTypeMode is null || personNoMode is null)
-        {
-            return Results.BadRequest(new
-            {
-                code = "invalid_field_mode",
-                message = "Field modes must be keep, set, or clear."
-            });
-        }
-
-        if (accommodationMode == "keep"
-            && roomNoMode == "keep"
-            && roomTypeMode == "keep"
-            && boardTypeMode == "keep"
-            && personNoMode == "keep")
+        if (!hasSharedMutation && rowUpdates.Length == 0)
         {
             return Results.BadRequest(new
             {
                 code = "no_changes_requested",
-                message = "At least one field mode or accommodationMode must change data."
+                message = "At least one shared mutation or row update is required."
             });
         }
 
-        var overrideAccommodation = await ValidateOverrideMode(
-            accommodationMode,
-            request.OverrideAccommodationDocTabId,
+        if (participantIds.Length == 0 && hasSharedMutation)
+        {
+            return EventsHelpers.BadRequest("participantIds is required when shared bulk fields are used.");
+        }
+
+        var validatedSharedMutation = hasSharedMutation
+            ? await ValidateSharedMutation(request, segmentContext.EventId, segmentContext.OrganizationId, db, ct)
+            : (Error: (IResult?)null, Mutation: (ValidatedSharedMutation?)null);
+        if (validatedSharedMutation.Error is not null)
+        {
+            return validatedSharedMutation.Error;
+        }
+
+        var validatedRowUpdates = await ValidateRowUpdates(
+            rowUpdates,
             segmentContext.EventId,
             segmentContext.OrganizationId,
             db,
             ct);
-        if (overrideAccommodation.Error is not null)
+        if (validatedRowUpdates.Error is not null)
         {
-            return overrideAccommodation.Error;
+            return validatedRowUpdates.Error;
         }
 
-        var fieldValidations = ValidateTextModes(
-            roomNoMode,
-            request.RoomNo,
-            roomTypeMode,
-            request.RoomType,
-            boardTypeMode,
-            request.BoardType,
-            personNoMode,
-            request.PersonNo);
-        if (fieldValidations.Error is not null)
-        {
-            return fieldValidations.Error;
-        }
+        var targetedParticipantIds = hasSharedMutation
+            ? participantIds
+                .Concat(validatedRowUpdates.Rows.Select(x => x.ParticipantId))
+                .Distinct()
+                .ToArray()
+            : validatedRowUpdates.Rows
+                .Select(x => x.ParticipantId)
+                .Distinct()
+                .ToArray();
 
         var participantsById = await db.Participants.AsNoTracking()
             .Where(x =>
                 x.EventId == segmentContext.EventId
                 && x.OrganizationId == segmentContext.OrganizationId
-                && participantIds.Contains(x.Id))
+                && targetedParticipantIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
 
         var assignmentsByParticipantId = await db.ParticipantAccommodationAssignments
@@ -488,7 +478,7 @@ internal static class AccommodationSegmentsHandlers
                 x.EventId == segmentContext.EventId
                 && x.OrganizationId == segmentContext.OrganizationId
                 && x.SegmentId == segmentContext.SegmentId
-                && participantIds.Contains(x.ParticipantId))
+                && targetedParticipantIds.Contains(x.ParticipantId))
             .ToDictionaryAsync(x => x.ParticipantId, ct);
 
         var errors = new List<BulkApplyAccommodationSegmentParticipantsErrorDto>();
@@ -496,10 +486,10 @@ internal static class AccommodationSegmentsHandlers
         var updatedCount = 0;
         var deletedCount = 0;
         var unchangedCount = 0;
-        var onlyEmpty = overwriteMode == "only_empty";
         var now = DateTime.UtcNow;
+        var rowUpdateLookup = validatedRowUpdates.Rows.ToDictionary(x => x.ParticipantId);
 
-        foreach (var participantId in participantIds)
+        foreach (var participantId in targetedParticipantIds)
         {
             if (!participantsById.ContainsKey(participantId))
             {
@@ -512,94 +502,44 @@ internal static class AccommodationSegmentsHandlers
 
             assignmentsByParticipantId.TryGetValue(participantId, out var assignment);
 
-            var nextOverrideAccommodationDocTabId = assignment?.OverrideAccommodationDocTabId;
-            var nextRoomNo = NormalizeStoredText(assignment?.RoomNo);
-            var nextRoomType = NormalizeStoredText(assignment?.RoomType);
-            var nextBoardType = NormalizeStoredText(assignment?.BoardType);
-            var nextPersonNo = NormalizeStoredText(assignment?.PersonNo);
-            var changed = false;
+            var result = rowUpdateLookup.TryGetValue(participantId, out var rowUpdate)
+                ? ApplyAbsoluteMutation(
+                    participantId,
+                    assignment,
+                    segmentContext.OrganizationId,
+                    segmentContext.EventId,
+                    segmentContext.SegmentId,
+                    rowUpdate,
+                    db,
+                    now)
+                : ApplySharedMutation(
+                    participantId,
+                    assignment,
+                    segmentContext.OrganizationId,
+                    segmentContext.EventId,
+                    segmentContext.SegmentId,
+                    validatedSharedMutation.Mutation!,
+                    db,
+                    now);
 
-            switch (accommodationMode)
+            switch (result.Action)
             {
-                case "default":
-                    if (nextOverrideAccommodationDocTabId.HasValue)
-                    {
-                        nextOverrideAccommodationDocTabId = null;
-                        changed = true;
-                    }
+                case MutationAction.Created:
+                    createdCount++;
+                    assignmentsByParticipantId[participantId] = result.Entity!;
                     break;
-                case "override":
-                    if (nextOverrideAccommodationDocTabId != overrideAccommodation.DocTabId)
-                    {
-                        nextOverrideAccommodationDocTabId = overrideAccommodation.DocTabId;
-                        changed = true;
-                    }
+                case MutationAction.Updated:
+                    updatedCount++;
+                    assignmentsByParticipantId[participantId] = result.Entity!;
                     break;
-            }
-
-            changed |= ApplyTextMode(roomNoMode, fieldValidations.RoomNoValue, onlyEmpty, ref nextRoomNo);
-            changed |= ApplyTextMode(roomTypeMode, fieldValidations.RoomTypeValue, onlyEmpty, ref nextRoomType);
-            changed |= ApplyTextMode(boardTypeMode, fieldValidations.BoardTypeValue, onlyEmpty, ref nextBoardType);
-            changed |= ApplyTextMode(personNoMode, fieldValidations.PersonNoValue, onlyEmpty, ref nextPersonNo);
-
-            var emptyRow = IsAssignmentEmpty(
-                nextOverrideAccommodationDocTabId,
-                nextRoomNo,
-                nextRoomType,
-                nextBoardType,
-                nextPersonNo);
-
-            if (assignment is null)
-            {
-                if (!changed || emptyRow)
-                {
+                case MutationAction.Deleted:
+                    deletedCount++;
+                    assignmentsByParticipantId.Remove(participantId);
+                    break;
+                default:
                     unchangedCount++;
-                    continue;
-                }
-
-                var created = new ParticipantAccommodationAssignmentEntity
-                {
-                    Id = Guid.NewGuid(),
-                    OrganizationId = segmentContext.OrganizationId,
-                    EventId = segmentContext.EventId,
-                    ParticipantId = participantId,
-                    SegmentId = segmentContext.SegmentId,
-                    OverrideAccommodationDocTabId = nextOverrideAccommodationDocTabId,
-                    RoomNo = nextRoomNo,
-                    RoomType = nextRoomType,
-                    BoardType = nextBoardType,
-                    PersonNo = nextPersonNo,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                };
-
-                db.ParticipantAccommodationAssignments.Add(created);
-                assignmentsByParticipantId[participantId] = created;
-                createdCount++;
-                continue;
+                    break;
             }
-
-            if (!changed)
-            {
-                unchangedCount++;
-                continue;
-            }
-
-            if (emptyRow)
-            {
-                db.ParticipantAccommodationAssignments.Remove(assignment);
-                assignmentsByParticipantId.Remove(participantId);
-                deletedCount++;
-                continue;
-            }
-
-            assignment.OverrideAccommodationDocTabId = nextOverrideAccommodationDocTabId;
-            assignment.RoomNo = nextRoomNo;
-            assignment.RoomType = nextRoomType;
-            assignment.BoardType = nextBoardType;
-            assignment.PersonNo = nextPersonNo;
-            assignment.UpdatedAt = now;
-            updatedCount++;
         }
 
         if (createdCount > 0 || updatedCount > 0 || deletedCount > 0)
@@ -608,7 +548,7 @@ internal static class AccommodationSegmentsHandlers
         }
 
         return Results.Ok(new BulkApplyAccommodationSegmentParticipantsResponse(
-            participantIds.Length,
+            targetedParticipantIds.Length,
             createdCount,
             updatedCount,
             deletedCount,
@@ -694,46 +634,338 @@ internal static class AccommodationSegmentsHandlers
             segment.DefaultAccommodationTitle);
     }
 
-    private static async Task<(IResult? Error, Guid? DocTabId, string? Title)> ValidateHotelDocTab(
+    private static bool HasSharedMutationRequested(BulkApplyAccommodationSegmentParticipantsRequest request)
+        => !string.IsNullOrWhiteSpace(request.AccommodationMode)
+           || !string.IsNullOrWhiteSpace(request.RoomNoMode)
+           || !string.IsNullOrWhiteSpace(request.RoomTypeMode)
+           || !string.IsNullOrWhiteSpace(request.BoardTypeMode)
+           || !string.IsNullOrWhiteSpace(request.PersonNoMode);
+
+    private static async Task<(IResult? Error, ValidatedSharedMutation? Mutation)> ValidateSharedMutation(
+        BulkApplyAccommodationSegmentParticipantsRequest request,
         Guid eventId,
         Guid organizationId,
-        Guid? accommodationDocTabId,
-        string fieldName,
         TripflowDbContext db,
         CancellationToken ct)
     {
-        if (!accommodationDocTabId.HasValue || accommodationDocTabId == Guid.Empty)
+        var overwriteMode = AccommodationSegmentAssignmentHelpers.NormalizeOverwriteMode(request.OverwriteMode);
+        if (overwriteMode is null)
         {
-            return (
-                EventsHelpers.BadRequest(
-                    "invalid_accommodation_doc_tab_id",
-                    fieldName,
-                    "Accommodation doc tab id must belong to this event and must be of type Hotel."),
-                null,
-                null);
+            return (Results.BadRequest(new
+            {
+                code = "invalid_overwrite_mode",
+                message = "overwriteMode must be always or only_empty."
+            }), null);
         }
 
-        var tab = await db.EventDocTabs.AsNoTracking()
-            .Where(x =>
-                x.Id == accommodationDocTabId.Value
-                && x.EventId == eventId
-                && x.OrganizationId == organizationId
-                && x.Type != null
-                && x.Type.ToLower() == DocTypeHotel)
-            .Select(x => new { x.Id, x.Title })
-            .FirstOrDefaultAsync(ct);
-        if (tab is null)
+        var accommodationMode = AccommodationSegmentAssignmentHelpers.NormalizeAccommodationMode(request.AccommodationMode);
+        if (accommodationMode is null)
         {
-            return (
-                EventsHelpers.BadRequest(
-                    "invalid_accommodation_doc_tab_id",
-                    fieldName,
-                    "Accommodation doc tab id must belong to this event and must be of type Hotel."),
-                null,
-                null);
+            return (Results.BadRequest(new
+            {
+                code = "invalid_accommodation_mode",
+                message = "accommodationMode must be keep, default, or override."
+            }), null);
         }
 
-        return (null, tab.Id, tab.Title);
+        var roomNoMode = AccommodationSegmentAssignmentHelpers.NormalizeFieldMode(request.RoomNoMode);
+        var roomTypeMode = AccommodationSegmentAssignmentHelpers.NormalizeFieldMode(request.RoomTypeMode);
+        var boardTypeMode = AccommodationSegmentAssignmentHelpers.NormalizeFieldMode(request.BoardTypeMode);
+        var personNoMode = AccommodationSegmentAssignmentHelpers.NormalizeFieldMode(request.PersonNoMode);
+        if (roomNoMode is null || roomTypeMode is null || boardTypeMode is null || personNoMode is null)
+        {
+            return (Results.BadRequest(new
+            {
+                code = "invalid_field_mode",
+                message = "Field modes must be keep, set, or clear."
+            }), null);
+        }
+
+        if (accommodationMode == "keep"
+            && roomNoMode == "keep"
+            && roomTypeMode == "keep"
+            && boardTypeMode == "keep"
+            && personNoMode == "keep")
+        {
+            return (Results.BadRequest(new
+            {
+                code = "no_changes_requested",
+                message = "At least one field mode or accommodationMode must change data."
+            }), null);
+        }
+
+        var overrideAccommodation = await AccommodationSegmentAssignmentHelpers.ValidateOverrideMode(
+            accommodationMode,
+            request.OverrideAccommodationDocTabId,
+            eventId,
+            organizationId,
+            db,
+            ct);
+        if (overrideAccommodation.Error is not null)
+        {
+            return (overrideAccommodation.Error, null);
+        }
+
+        var fieldValidations = AccommodationSegmentAssignmentHelpers.ValidateTextModes(
+            roomNoMode,
+            request.RoomNo,
+            roomTypeMode,
+            request.RoomType,
+            boardTypeMode,
+            request.BoardType,
+            personNoMode,
+            request.PersonNo);
+        if (fieldValidations.Error is not null)
+        {
+            return (fieldValidations.Error, null);
+        }
+
+        return (null, new ValidatedSharedMutation(
+            overwriteMode,
+            accommodationMode,
+            overrideAccommodation.DocTabId,
+            roomNoMode,
+            fieldValidations.RoomNoValue,
+            roomTypeMode,
+            fieldValidations.RoomTypeValue,
+            boardTypeMode,
+            fieldValidations.BoardTypeValue,
+            personNoMode,
+            fieldValidations.PersonNoValue));
+    }
+
+    private static async Task<(IResult? Error, ValidatedRowUpdate[] Rows)> ValidateRowUpdates(
+        AccommodationSegmentParticipantRowUpdateRequest[] rowUpdates,
+        Guid eventId,
+        Guid organizationId,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var results = new List<ValidatedRowUpdate>(rowUpdates.Length);
+        var hotelValidationCache = new Dictionary<Guid, Guid>();
+
+        foreach (var row in rowUpdates)
+        {
+            var accommodationMode = AccommodationSegmentAssignmentHelpers.NormalizeAccommodationMode(row.AccommodationMode, "default");
+            if (accommodationMode is null || accommodationMode == "keep")
+            {
+                return (Results.BadRequest(new
+                {
+                    code = "invalid_row_update_accommodation_mode",
+                    message = "rowUpdates[].accommodationMode must be default or override."
+                }), []);
+            }
+
+            Guid? overrideAccommodationDocTabId = null;
+            if (accommodationMode == "override")
+            {
+                if (!row.OverrideAccommodationDocTabId.HasValue || row.OverrideAccommodationDocTabId == Guid.Empty)
+                {
+                    return (EventsHelpers.BadRequest(
+                        "invalid_override_accommodation_doc_tab_id",
+                        "rowUpdates.overrideAccommodationDocTabId",
+                        "overrideAccommodationDocTabId is required when row update accommodationMode is override."), []);
+                }
+
+                if (!hotelValidationCache.TryGetValue(row.OverrideAccommodationDocTabId.Value, out var cachedId))
+                {
+                    var validation = await AccommodationSegmentAssignmentHelpers.ValidateHotelDocTab(
+                        eventId,
+                        organizationId,
+                        row.OverrideAccommodationDocTabId,
+                        "rowUpdates.overrideAccommodationDocTabId",
+                        db,
+                        ct);
+                    if (validation.Error is not null)
+                    {
+                        return (validation.Error, []);
+                    }
+
+                    cachedId = validation.DocTabId!.Value;
+                    hotelValidationCache[cachedId] = cachedId;
+                }
+
+                overrideAccommodationDocTabId = cachedId;
+            }
+
+            results.Add(new ValidatedRowUpdate(
+                row.ParticipantId,
+                accommodationMode,
+                overrideAccommodationDocTabId,
+                AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.RoomNo),
+                AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.RoomType),
+                AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.BoardType),
+                AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.PersonNo)));
+        }
+
+        return (null, results.ToArray());
+    }
+
+    private static MutationResult ApplySharedMutation(
+        Guid participantId,
+        ParticipantAccommodationAssignmentEntity? assignment,
+        Guid organizationId,
+        Guid eventId,
+        Guid segmentId,
+        ValidatedSharedMutation mutation,
+        TripflowDbContext db,
+        DateTime now)
+    {
+        var nextOverrideAccommodationDocTabId = assignment?.OverrideAccommodationDocTabId;
+        var nextRoomNo = AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment?.RoomNo);
+        var nextRoomType = AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment?.RoomType);
+        var nextBoardType = AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment?.BoardType);
+        var nextPersonNo = AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment?.PersonNo);
+        var changed = false;
+
+        switch (mutation.AccommodationMode)
+        {
+            case "default":
+                if (nextOverrideAccommodationDocTabId.HasValue)
+                {
+                    nextOverrideAccommodationDocTabId = null;
+                    changed = true;
+                }
+                break;
+            case "override":
+                if (nextOverrideAccommodationDocTabId != mutation.OverrideAccommodationDocTabId)
+                {
+                    nextOverrideAccommodationDocTabId = mutation.OverrideAccommodationDocTabId;
+                    changed = true;
+                }
+                break;
+        }
+
+        var onlyEmpty = mutation.OverwriteMode == "only_empty";
+        changed |= AccommodationSegmentAssignmentHelpers.ApplyTextMode(mutation.RoomNoMode, mutation.RoomNo, onlyEmpty, ref nextRoomNo);
+        changed |= AccommodationSegmentAssignmentHelpers.ApplyTextMode(mutation.RoomTypeMode, mutation.RoomType, onlyEmpty, ref nextRoomType);
+        changed |= AccommodationSegmentAssignmentHelpers.ApplyTextMode(mutation.BoardTypeMode, mutation.BoardType, onlyEmpty, ref nextBoardType);
+        changed |= AccommodationSegmentAssignmentHelpers.ApplyTextMode(mutation.PersonNoMode, mutation.PersonNo, onlyEmpty, ref nextPersonNo);
+
+        return ApplyResolvedMutation(
+            participantId,
+            assignment,
+            organizationId,
+            eventId,
+            segmentId,
+            nextOverrideAccommodationDocTabId,
+            nextRoomNo,
+            nextRoomType,
+            nextBoardType,
+            nextPersonNo,
+            changed,
+            db,
+            now);
+    }
+
+    private static MutationResult ApplyAbsoluteMutation(
+        Guid participantId,
+        ParticipantAccommodationAssignmentEntity? assignment,
+        Guid organizationId,
+        Guid eventId,
+        Guid segmentId,
+        ValidatedRowUpdate rowUpdate,
+        TripflowDbContext db,
+        DateTime now)
+    {
+        var nextOverrideAccommodationDocTabId = rowUpdate.AccommodationMode == "override"
+            ? rowUpdate.OverrideAccommodationDocTabId
+            : null;
+        var nextRoomNo = rowUpdate.RoomNo;
+        var nextRoomType = rowUpdate.RoomType;
+        var nextBoardType = rowUpdate.BoardType;
+        var nextPersonNo = rowUpdate.PersonNo;
+
+        var changed = assignment is null
+            || assignment.OverrideAccommodationDocTabId != nextOverrideAccommodationDocTabId
+            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.RoomNo) != nextRoomNo
+            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.RoomType) != nextRoomType
+            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.BoardType) != nextBoardType
+            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.PersonNo) != nextPersonNo;
+
+        return ApplyResolvedMutation(
+            participantId,
+            assignment,
+            organizationId,
+            eventId,
+            segmentId,
+            nextOverrideAccommodationDocTabId,
+            nextRoomNo,
+            nextRoomType,
+            nextBoardType,
+            nextPersonNo,
+            changed,
+            db,
+            now);
+    }
+
+    private static MutationResult ApplyResolvedMutation(
+        Guid participantId,
+        ParticipantAccommodationAssignmentEntity? assignment,
+        Guid organizationId,
+        Guid eventId,
+        Guid segmentId,
+        Guid? nextOverrideAccommodationDocTabId,
+        string? nextRoomNo,
+        string? nextRoomType,
+        string? nextBoardType,
+        string? nextPersonNo,
+        bool changed,
+        TripflowDbContext db,
+        DateTime now)
+    {
+        var emptyRow = AccommodationSegmentAssignmentHelpers.IsAssignmentEmpty(
+            nextOverrideAccommodationDocTabId,
+            nextRoomNo,
+            nextRoomType,
+            nextBoardType,
+            nextPersonNo);
+
+        if (assignment is null)
+        {
+            if (!changed || emptyRow)
+            {
+                return new MutationResult(MutationAction.Unchanged, null);
+            }
+
+            var created = new ParticipantAccommodationAssignmentEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = organizationId,
+                EventId = eventId,
+                ParticipantId = participantId,
+                SegmentId = segmentId,
+                OverrideAccommodationDocTabId = nextOverrideAccommodationDocTabId,
+                RoomNo = nextRoomNo,
+                RoomType = nextRoomType,
+                BoardType = nextBoardType,
+                PersonNo = nextPersonNo,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            db.ParticipantAccommodationAssignments.Add(created);
+            return new MutationResult(MutationAction.Created, created);
+        }
+
+        if (!changed)
+        {
+            return new MutationResult(MutationAction.Unchanged, assignment);
+        }
+
+        if (emptyRow)
+        {
+            db.ParticipantAccommodationAssignments.Remove(assignment);
+            return new MutationResult(MutationAction.Deleted, null);
+        }
+
+        assignment.OverrideAccommodationDocTabId = nextOverrideAccommodationDocTabId;
+        assignment.RoomNo = nextRoomNo;
+        assignment.RoomType = nextRoomType;
+        assignment.BoardType = nextBoardType;
+        assignment.PersonNo = nextPersonNo;
+        assignment.UpdatedAt = now;
+        return new MutationResult(MutationAction.Updated, assignment);
     }
 
     private static bool TryParseSegmentDates(
@@ -797,161 +1029,35 @@ internal static class AccommodationSegmentsHandlers
                 && x.EndDate >= startDate,
                 ct);
 
-    private static string? NormalizeOverwriteMode(string? raw)
+    private sealed record ValidatedSharedMutation(
+        string OverwriteMode,
+        string AccommodationMode,
+        Guid? OverrideAccommodationDocTabId,
+        string RoomNoMode,
+        string? RoomNo,
+        string RoomTypeMode,
+        string? RoomType,
+        string BoardTypeMode,
+        string? BoardType,
+        string PersonNoMode,
+        string? PersonNo);
+
+    private sealed record ValidatedRowUpdate(
+        Guid ParticipantId,
+        string AccommodationMode,
+        Guid? OverrideAccommodationDocTabId,
+        string? RoomNo,
+        string? RoomType,
+        string? BoardType,
+        string? PersonNo);
+
+    private sealed record MutationResult(MutationAction Action, ParticipantAccommodationAssignmentEntity? Entity);
+
+    private enum MutationAction
     {
-        var normalized = raw?.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            null or "" => "always",
-            "always" => "always",
-            "only_empty" => "only_empty",
-            _ => null
-        };
-    }
-
-    private static string? NormalizeAccommodationMode(string? raw)
-    {
-        var normalized = raw?.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            null or "" => "keep",
-            "keep" => "keep",
-            "default" => "default",
-            "override" => "override",
-            _ => null
-        };
-    }
-
-    private static string? NormalizeFieldMode(string? raw)
-    {
-        var normalized = raw?.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            null or "" => "keep",
-            "keep" => "keep",
-            "set" => "set",
-            "clear" => "clear",
-            _ => null
-        };
-    }
-
-    private static async Task<(IResult? Error, Guid? DocTabId)> ValidateOverrideMode(
-        string accommodationMode,
-        Guid? overrideAccommodationDocTabId,
-        Guid eventId,
-        Guid organizationId,
-        TripflowDbContext db,
-        CancellationToken ct)
-    {
-        if (accommodationMode != "override")
-        {
-            return (null, null);
-        }
-
-        var validation = await ValidateHotelDocTab(
-            eventId,
-            organizationId,
-            overrideAccommodationDocTabId,
-            "overrideAccommodationDocTabId",
-            db,
-            ct);
-        return (validation.Error, validation.DocTabId);
-    }
-
-    private static (IResult? Error, string? RoomNoValue, string? RoomTypeValue, string? BoardTypeValue, string? PersonNoValue) ValidateTextModes(
-        string roomNoMode,
-        string? roomNo,
-        string roomTypeMode,
-        string? roomType,
-        string boardTypeMode,
-        string? boardType,
-        string personNoMode,
-        string? personNo)
-    {
-        if (roomNoMode == "set" && NormalizeIncomingText(roomNo) is null)
-        {
-            return (EventsHelpers.BadRequest("invalid_room_no", "roomNo", "roomNo is required when roomNoMode is set."), null, null, null, null);
-        }
-
-        if (roomTypeMode == "set" && NormalizeIncomingText(roomType) is null)
-        {
-            return (EventsHelpers.BadRequest("invalid_room_type", "roomType", "roomType is required when roomTypeMode is set."), null, null, null, null);
-        }
-
-        if (boardTypeMode == "set" && NormalizeIncomingText(boardType) is null)
-        {
-            return (EventsHelpers.BadRequest("invalid_board_type", "boardType", "boardType is required when boardTypeMode is set."), null, null, null, null);
-        }
-
-        if (personNoMode == "set" && NormalizeIncomingText(personNo) is null)
-        {
-            return (EventsHelpers.BadRequest("invalid_person_no", "personNo", "personNo is required when personNoMode is set."), null, null, null, null);
-        }
-
-        return (
-            null,
-            NormalizeIncomingText(roomNo),
-            NormalizeIncomingText(roomType),
-            NormalizeIncomingText(boardType),
-            NormalizeIncomingText(personNo));
-    }
-
-    private static bool ApplyTextMode(
-        string mode,
-        string? incomingValue,
-        bool onlyEmpty,
-        ref string? targetValue)
-    {
-        var normalizedTarget = NormalizeStoredText(targetValue);
-        switch (mode)
-        {
-            case "clear":
-                if (normalizedTarget is null)
-                {
-                    return false;
-                }
-
-                targetValue = null;
-                return true;
-            case "set":
-                if (onlyEmpty && normalizedTarget is not null)
-                {
-                    return false;
-                }
-
-                if (string.Equals(normalizedTarget, incomingValue, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                targetValue = incomingValue;
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static bool IsAssignmentEmpty(
-        Guid? overrideAccommodationDocTabId,
-        string? roomNo,
-        string? roomType,
-        string? boardType,
-        string? personNo)
-        => !overrideAccommodationDocTabId.HasValue
-           && NormalizeStoredText(roomNo) is null
-           && NormalizeStoredText(roomType) is null
-           && NormalizeStoredText(boardType) is null
-           && NormalizeStoredText(personNo) is null;
-
-    private static string? NormalizeIncomingText(string? value)
-    {
-        var normalized = value?.Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
-
-    private static string? NormalizeStoredText(string? value)
-    {
-        var normalized = value?.Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+        Unchanged,
+        Created,
+        Updated,
+        Deleted
     }
 }

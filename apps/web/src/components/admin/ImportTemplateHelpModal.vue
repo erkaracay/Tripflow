@@ -26,6 +26,7 @@ const participantItems = [
   'admin.import.helper.participantsCoreRule',
   'admin.import.helper.participantsNameRule',
   'admin.import.helper.participantsNoFlightRule',
+  'admin.import.helper.participantsNoAccommodationRule',
   'admin.import.helper.participantsUpdateRule',
 ] as const
 
@@ -39,11 +40,19 @@ const segmentItems = [
   'admin.import.helper.segmentsCabinBaggageRule',
 ] as const
 
+const accommodationItems = [
+  'admin.import.helper.accommodationSegmentsRule',
+  'admin.import.helper.accommodationAssignmentsRule',
+  'admin.import.helper.accommodationSegmentKeyRule',
+  'admin.import.helper.accommodationResolveRule',
+] as const
+
 const commonIssueItems = [
   'admin.import.helper.issueDirectionRule',
   'admin.import.helper.issueNotFoundRule',
   'admin.import.helper.issueParticipantNameMismatchRule',
   'admin.import.helper.issueLegacyIgnoredRule',
+  'admin.import.helper.issueAccommodationLegacyIgnoredRule',
   'admin.import.helper.issuePreviewLimitRule',
 ] as const
 
@@ -153,6 +162,22 @@ onUnmounted(() => {
               </div>
               <code class="mt-1 block whitespace-pre-wrap text-xs text-slate-700">
                 {{ t('admin.import.helper.requiredColumnsValue') }}
+              </code>
+            </div>
+          </section>
+
+          <section class="mb-5">
+            <h4 class="text-sm font-semibold text-slate-900">{{ t('admin.import.helper.sectionAccommodation') }}</h4>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              <li v-for="key in accommodationItems" :key="key">{{ t(key) }}</li>
+            </ul>
+
+            <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {{ t('admin.import.helper.accommodationRequiredColumnsLabel') }}
+              </div>
+              <code class="mt-1 block whitespace-pre-wrap text-xs text-slate-700">
+                {{ t('admin.import.helper.accommodationRequiredColumnsValue') }}
               </code>
             </div>
           </section>

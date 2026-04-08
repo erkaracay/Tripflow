@@ -20,7 +20,14 @@ public sealed record ParticipantImportReport(
     string[] IgnoredColumns,
     ParticipantImportError[] Errors,
     ParticipantImportWarning[] Warnings,
-    ParticipantImportPreviewRow[] ParsedPreviewRows);
+    ParticipantImportPreviewRow[] ParsedPreviewRows,
+    int AccommodationSegmentsImported = 0,
+    int AccommodationSegmentsCreated = 0,
+    int AccommodationSegmentsUpdated = 0,
+    int AccommodationAssignmentsImported = 0,
+    int AccommodationAssignmentsCreated = 0,
+    int AccommodationAssignmentsUpdated = 0,
+    int AccommodationAssignmentsDeleted = 0);
 
 public sealed record ParticipantImportError(int Row, string? TcNo, string Message, string[] Fields)
 {
@@ -63,4 +70,12 @@ public sealed record ParticipantImportPreviewRow(
     string? DepartureTime = null,
     string? ArrivalDate = null,
     string? ArrivalTime = null,
-    string? CabinBaggage = null);
+    string? CabinBaggage = null,
+    string? SegmentKey = null,
+    string? AccommodationTitle = null,
+    string? StartDate = null,
+    string? EndDate = null,
+    string? RoomNo = null,
+    string? RoomType = null,
+    string? BoardType = null,
+    string? PersonNo = null);

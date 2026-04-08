@@ -44,6 +44,16 @@ public sealed record BulkApplyAccommodationSegmentParticipantsRequest(
     string? BoardTypeMode,
     string? BoardType,
     string? PersonNoMode,
+    string? PersonNo,
+    AccommodationSegmentParticipantRowUpdateRequest[]? RowUpdates);
+
+public sealed record AccommodationSegmentParticipantRowUpdateRequest(
+    Guid ParticipantId,
+    string? AccommodationMode,
+    Guid? OverrideAccommodationDocTabId,
+    string? RoomNo,
+    string? RoomType,
+    string? BoardType,
     string? PersonNo);
 
 public sealed record BulkApplyAccommodationSegmentParticipantsErrorDto(

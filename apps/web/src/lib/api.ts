@@ -1,7 +1,11 @@
 import { clearToken, getAuthRole, getSelectedOrgId } from './auth'
 import { pushToast } from './toast'
 import type {
+  AccommodationSegment,
+  AccommodationSegmentParticipantTableResponse,
   AuthMeResponse,
+  BulkApplyAccommodationSegmentParticipantsRequest,
+  BulkApplyAccommodationSegmentParticipantsResponse,
   BulkApplyParticipantRoomsRequest,
   BulkApplyParticipantRoomsResponse,
   BulkApplyFlightSegmentsRequest,
@@ -13,6 +17,7 @@ import type {
   PortalMealSelectionsUpsertRequest,
   PortalMeResponse,
   PortalResolveEventResponse,
+  UpsertAccommodationSegmentRequest,
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string
@@ -188,6 +193,44 @@ export const bulkApplyParticipantRooms = async (
   payload: BulkApplyParticipantRoomsRequest
 ): Promise<BulkApplyParticipantRoomsResponse> =>
   apiPost<BulkApplyParticipantRoomsResponse>(`/api/events/${eventId}/participants/rooms/bulk-apply`, payload)
+
+export const getAccommodationSegments = async (eventId: string): Promise<AccommodationSegment[]> =>
+  apiGet<AccommodationSegment[]>(`/api/events/${eventId}/accommodation-segments`)
+
+export const createAccommodationSegment = async (
+  eventId: string,
+  payload: UpsertAccommodationSegmentRequest
+): Promise<AccommodationSegment> =>
+  apiPost<AccommodationSegment>(`/api/events/${eventId}/accommodation-segments`, payload)
+
+export const updateAccommodationSegment = async (
+  eventId: string,
+  segmentId: string,
+  payload: UpsertAccommodationSegmentRequest
+): Promise<AccommodationSegment> =>
+  apiPut<AccommodationSegment>(`/api/events/${eventId}/accommodation-segments/${segmentId}`, payload)
+
+export const deleteAccommodationSegment = async (eventId: string, segmentId: string): Promise<void> =>
+  apiDelete<void>(`/api/events/${eventId}/accommodation-segments/${segmentId}`)
+
+export const getAccommodationSegmentParticipants = async (
+  eventId: string,
+  segmentId: string,
+  params: URLSearchParams
+): Promise<AccommodationSegmentParticipantTableResponse> =>
+  apiGet<AccommodationSegmentParticipantTableResponse>(
+    `/api/events/${eventId}/accommodation-segments/${segmentId}/participants/table?${params.toString()}`
+  )
+
+export const bulkApplyAccommodationSegmentParticipants = async (
+  eventId: string,
+  segmentId: string,
+  payload: BulkApplyAccommodationSegmentParticipantsRequest
+): Promise<BulkApplyAccommodationSegmentParticipantsResponse> =>
+  apiPost<BulkApplyAccommodationSegmentParticipantsResponse>(
+    `/api/events/${eventId}/accommodation-segments/${segmentId}/participants/bulk-apply`,
+    payload
+  )
 
 export const apiPostWithPayload = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(buildUrl(path), {

@@ -320,6 +320,83 @@ export type BulkApplyParticipantRoomsResponse = {
   errors: BulkApplyParticipantRoomsError[]
 }
 
+export type AccommodationSegment = {
+  id: string
+  defaultAccommodationDocTabId: string
+  defaultAccommodationTitle: string
+  startDate: string
+  endDate: string
+  sortOrder: number
+}
+
+export type UpsertAccommodationSegmentRequest = {
+  defaultAccommodationDocTabId?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  sortOrder?: number | null
+}
+
+export type AccommodationSegmentParticipantTableItem = {
+  participantId: string
+  fullName: string
+  tcNo: string
+  effectiveAccommodationDocTabId: string
+  effectiveAccommodationTitle: string
+  usesOverride: boolean
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+}
+
+export type AccommodationSegmentParticipantTableResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: AccommodationSegmentParticipantTableItem[]
+}
+
+export type AccommodationSegmentParticipantRowUpdate = {
+  participantId: string
+  accommodationMode?: 'default' | 'override' | null
+  overrideAccommodationDocTabId?: string | null
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+}
+
+export type BulkApplyAccommodationSegmentParticipantsRequest = {
+  participantIds?: string[] | null
+  overwriteMode?: 'always' | 'only_empty' | null
+  accommodationMode?: 'keep' | 'default' | 'override' | null
+  overrideAccommodationDocTabId?: string | null
+  roomNoMode?: 'keep' | 'set' | 'clear' | null
+  roomNo?: string | null
+  roomTypeMode?: 'keep' | 'set' | 'clear' | null
+  roomType?: string | null
+  boardTypeMode?: 'keep' | 'set' | 'clear' | null
+  boardType?: string | null
+  personNoMode?: 'keep' | 'set' | 'clear' | null
+  personNo?: string | null
+  rowUpdates?: AccommodationSegmentParticipantRowUpdate[] | null
+}
+
+export type BulkApplyAccommodationSegmentParticipantsError = {
+  participantId: string
+  code: string
+  message: string
+}
+
+export type BulkApplyAccommodationSegmentParticipantsResponse = {
+  affectedCount: number
+  createdCount: number
+  updatedCount: number
+  deletedCount: number
+  unchangedCount: number
+  errors: BulkApplyAccommodationSegmentParticipantsError[]
+}
+
 export type FlightPanelHelperDirection = 'Arrival' | 'Return'
 
 export type ParticipantTableItem = {
@@ -956,6 +1033,14 @@ export type ParticipantImportPreviewRow = {
   arrivalDate?: string | null
   arrivalTime?: string | null
   cabinBaggage?: string | null
+  segmentKey?: string | null
+  accommodationTitle?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
 }
 
 export type ParticipantImportReport = {
@@ -973,4 +1058,11 @@ export type ParticipantImportReport = {
   errors: ParticipantImportError[]
   warnings: ParticipantImportWarning[]
   parsedPreviewRows?: ParticipantImportPreviewRow[]
+  accommodationSegmentsImported?: number
+  accommodationSegmentsCreated?: number
+  accommodationSegmentsUpdated?: number
+  accommodationAssignmentsImported?: number
+  accommodationAssignmentsCreated?: number
+  accommodationAssignmentsUpdated?: number
+  accommodationAssignmentsDeleted?: number
 }

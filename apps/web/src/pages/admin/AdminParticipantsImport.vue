@@ -23,7 +23,7 @@ type ImportFormat = 'xlsx' | 'csv'
 type HeaderLanguage = 'auto' | 'tr' | 'en'
 type IssueFilter = 'all' | 'errors' | 'warnings'
 type RowStatus = 'ok' | 'warn' | 'error'
-type PreviewTypeFilter = 'all' | 'participant' | 'segment'
+type PreviewTypeFilter = 'all' | 'participant' | 'flight' | 'accommodation'
 type PreviewDirectionFilter = 'all' | 'arrival' | 'return'
 
 type ImportIssueRow = {
@@ -132,7 +132,11 @@ const previewTruncated = computed(() => {
   return current?.previewTruncated ?? false
 })
 
-const isSegmentPreviewRow = (row: ParticipantImportPreviewRow) => row.recordType === 'flight_segment'
+const isFlightPreviewRow = (row: ParticipantImportPreviewRow) => row.recordType === 'flight_segment'
+const isAccommodationSegmentPreviewRow = (row: ParticipantImportPreviewRow) => row.recordType === 'accommodation_segment'
+const isAccommodationAssignmentPreviewRow = (row: ParticipantImportPreviewRow) => row.recordType === 'accommodation_assignment'
+const isAccommodationPreviewRow = (row: ParticipantImportPreviewRow) =>
+  isAccommodationSegmentPreviewRow(row) || isAccommodationAssignmentPreviewRow(row)
 
 const mapDirectionLabel = (direction?: string | null) => {
   const normalized = (direction ?? '').trim().toLowerCase()
@@ -166,51 +170,76 @@ const buildTimeRange = (start?: string | null, end?: string | null) => {
 }
 
 const previewTypeLabel = (row: ParticipantImportPreviewRow) =>
-  isSegmentPreviewRow(row)
+  isFlightPreviewRow(row)
     ? t('admin.import.previewTable.typeFlightSegment')
-    : t('admin.import.previewTable.typeParticipant')
+    : isAccommodationSegmentPreviewRow(row)
+      ? t('admin.import.previewTable.typeAccommodationSegment')
+      : isAccommodationAssignmentPreviewRow(row)
+        ? t('admin.import.previewTable.typeAccommodationAssignment')
+        : t('admin.import.previewTable.typeParticipant')
 
 const previewParticipantText = (row: ParticipantImportPreviewRow) => row.fullName?.trim() || t('common.noData')
 const previewParticipantReferenceText = (row: ParticipantImportPreviewRow) =>
   row.participantNameReference?.trim() || null
 
 const previewMainText = (row: ParticipantImportPreviewRow) => {
-  if (!isSegmentPreviewRow(row)) {
-    return t('common.noData')
+  if (isFlightPreviewRow(row)) {
+    const direction = mapDirectionLabel(row.direction)
+    const segment = row.segmentIndex ? `#${row.segmentIndex}` : ''
+    const flightCode = row.flightCode?.trim()
+
+    if (flightCode) {
+      return `${direction} ${segment} - ${flightCode}`.trim()
+    }
+
+    const fallback = `${direction} ${segment}`.trim()
+    return fallback || t('common.noData')
   }
 
-  const direction = mapDirectionLabel(row.direction)
-  const segment = row.segmentIndex ? `#${row.segmentIndex}` : ''
-  const flightCode = row.flightCode?.trim()
-
-  if (flightCode) {
-    return `${direction} ${segment} - ${flightCode}`.trim()
+  if (isAccommodationSegmentPreviewRow(row)) {
+    return row.segmentKey?.trim() || t('common.noData')
   }
 
-  const fallback = `${direction} ${segment}`.trim()
-  return fallback || t('common.noData')
+  if (isAccommodationAssignmentPreviewRow(row)) {
+    return row.segmentKey?.trim() || t('common.noData')
+  }
+
+  return t('common.noData')
 }
 
 const previewRouteText = (row: ParticipantImportPreviewRow) => {
-  if (!isSegmentPreviewRow(row)) {
-    return t('common.noData')
+  if (isFlightPreviewRow(row)) {
+    const route = [row.departureAirport, row.arrivalAirport]
+      .map((item) => item?.trim())
+      .filter((item): item is string => Boolean(item))
+
+    return route.length > 0 ? route.join(' → ') : t('common.noData')
   }
 
-  const route = [row.departureAirport, row.arrivalAirport]
-    .map((item) => item?.trim())
-    .filter((item): item is string => Boolean(item))
+  if (isAccommodationPreviewRow(row)) {
+    return row.accommodationTitle?.trim() || t('common.noData')
+  }
 
-  return route.length > 0 ? route.join(' → ') : t('common.noData')
+  return t('common.noData')
 }
 
 const previewScheduleText = (row: ParticipantImportPreviewRow) => {
-  if (isSegmentPreviewRow(row)) {
+  if (isFlightPreviewRow(row)) {
     const departure = buildDateTime(row.departureDate, row.departureTime)
     const arrival = buildDateTime(row.arrivalDate, row.arrivalTime)
     if (!departure && !arrival) {
       return t('common.noData')
     }
     return `${departure || t('common.noData')} → ${arrival || t('common.noData')}`
+  }
+
+  if (isAccommodationPreviewRow(row)) {
+    const start = toVisibleDate(row.startDate)
+    const end = toVisibleDate(row.endDate)
+    if (!start && !end) {
+      return t('common.noData')
+    }
+    return `${start || t('common.noData')} → ${end || t('common.noData')}`
   }
 
   const arrivalRange = buildTimeRange(row.arrivalDepartureTime, row.arrivalArrivalTime)
@@ -226,7 +255,7 @@ const previewScheduleText = (row: ParticipantImportPreviewRow) => {
 }
 
 const previewBaggageText = (row: ParticipantImportPreviewRow) => {
-  if (isSegmentPreviewRow(row)) {
+  if (isFlightPreviewRow(row)) {
     const pieces = row.arrivalBaggagePieces ?? row.returnBaggagePieces ?? null
     const totalKg = row.arrivalBaggageTotalKg ?? row.returnBaggageTotalKg ?? null
     const checked = formatBaggage(pieces, totalKg)
@@ -239,6 +268,21 @@ const previewBaggageText = (row: ParticipantImportPreviewRow) => {
       parts.push(cabin)
     }
     return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+  }
+
+  if (isAccommodationAssignmentPreviewRow(row)) {
+    const parts = [
+      row.roomNo ? `${t('admin.roomOps.columns.roomNo')}: ${row.roomNo}` : null,
+      row.roomType ? `${t('admin.roomOps.columns.roomType')}: ${row.roomType}` : null,
+      row.boardType ? `${t('admin.roomOps.columns.boardType')}: ${row.boardType}` : null,
+      row.personNo ? `${t('admin.roomOps.columns.personNo')}: ${row.personNo}` : null,
+    ].filter((part): part is string => Boolean(part))
+
+    return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+  }
+
+  if (isAccommodationSegmentPreviewRow(row)) {
+    return row.accommodationTitle?.trim() || t('common.noData')
   }
 
   const arrival = formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg)
@@ -264,18 +308,20 @@ const filteredPreviewRows = computed(() => {
   const term = previewSearch.value.trim().toLowerCase()
 
   return previewRows.value.filter((row) => {
-    const isSegment = isSegmentPreviewRow(row)
+    const isFlight = isFlightPreviewRow(row)
+    const isAccommodation = isAccommodationPreviewRow(row)
     const typeMatches =
       previewTypeFilter.value === 'all'
-      || (previewTypeFilter.value === 'participant' && !isSegment)
-      || (previewTypeFilter.value === 'segment' && isSegment)
+      || (previewTypeFilter.value === 'participant' && !isFlight && !isAccommodation)
+      || (previewTypeFilter.value === 'flight' && isFlight)
+      || (previewTypeFilter.value === 'accommodation' && isAccommodation)
 
     if (!typeMatches) {
       return false
     }
 
-    if (previewTypeFilter.value === 'segment' && previewDirectionFilter.value !== 'all') {
-      if (!isSegment || normalizeDirectionFilter(row.direction) !== previewDirectionFilter.value) {
+    if (previewTypeFilter.value === 'flight' && previewDirectionFilter.value !== 'all') {
+      if (!isFlight || normalizeDirectionFilter(row.direction) !== previewDirectionFilter.value) {
         return false
       }
     }
@@ -298,6 +344,14 @@ const filteredPreviewRows = computed(() => {
       row.departureTime,
       row.arrivalDate,
       row.arrivalTime,
+      row.segmentKey,
+      row.accommodationTitle,
+      row.startDate,
+      row.endDate,
+      row.roomNo,
+      row.roomType,
+      row.boardType,
+      row.personNo,
       previewMainText(row),
       previewRouteText(row),
       previewScheduleText(row),
@@ -313,8 +367,8 @@ const previewStats = computed(() => ({
   total: previewRows.value.length,
 }))
 
-const showSegmentPreviewColumns = computed(() => previewTypeFilter.value !== 'participant')
-const previewNoRowsColspan = computed(() => (showSegmentPreviewColumns.value ? 8 : 4))
+const showExtendedPreviewColumns = computed(() => previewTypeFilter.value !== 'participant')
+const previewNoRowsColspan = computed(() => (showExtendedPreviewColumns.value ? 8 : 4))
 
 const filteredIssueRows = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -360,7 +414,8 @@ const issueFilterOptions = computed(() => [
 const previewTypeOptions = computed(() => [
   { value: 'all', label: t('admin.import.previewFilters.typeAll') },
   { value: 'participant', label: t('admin.import.previewFilters.typeParticipant') },
-  { value: 'segment', label: t('admin.import.previewFilters.typeSegment') },
+  { value: 'flight', label: t('admin.import.previewFilters.typeFlight') },
+  { value: 'accommodation', label: t('admin.import.previewFilters.typeAccommodation') },
 ])
 const previewDirectionOptions = computed(() => [
   { value: 'all', label: t('admin.import.previewFilters.directionAll') },
@@ -380,6 +435,26 @@ const compactSummaryItems = computed(() => {
     { key: 'errors', label: t('admin.import.summary.errorRows'), value: summary.value.errorRows },
     { key: 'warnings', label: t('admin.import.filters.warnings'), value: current.warnings.length },
   ]
+})
+
+const accommodationSummaryItems = computed(() => {
+  const current = finalReport.value ?? report.value
+  if (!current) {
+    return []
+  }
+
+  return [
+    {
+      key: 'segments',
+      label: t('admin.import.summary.accommodationSegments'),
+      value: current.accommodationSegmentsImported ?? 0,
+    },
+    {
+      key: 'assignments',
+      label: t('admin.import.summary.accommodationAssignments'),
+      value: current.accommodationAssignmentsImported ?? 0,
+    },
+  ].filter((item) => item.value > 0)
 })
 
 const syncStickyObserver = async () => {
@@ -643,6 +718,13 @@ const downloadReportCsv = () => {
   lines.push(`created,${current.created}`)
   lines.push(`updated,${current.updated}`)
   lines.push(`failed,${current.failed}`)
+  lines.push(`accommodationSegmentsImported,${current.accommodationSegmentsImported ?? 0}`)
+  lines.push(`accommodationSegmentsCreated,${current.accommodationSegmentsCreated ?? 0}`)
+  lines.push(`accommodationSegmentsUpdated,${current.accommodationSegmentsUpdated ?? 0}`)
+  lines.push(`accommodationAssignmentsImported,${current.accommodationAssignmentsImported ?? 0}`)
+  lines.push(`accommodationAssignmentsCreated,${current.accommodationAssignmentsCreated ?? 0}`)
+  lines.push(`accommodationAssignmentsUpdated,${current.accommodationAssignmentsUpdated ?? 0}`)
+  lines.push(`accommodationAssignmentsDeleted,${current.accommodationAssignmentsDeleted ?? 0}`)
   lines.push('')
   lines.push('row,status,tcNo,message')
 
@@ -716,6 +798,9 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   }
   if (warning.code === 'participants_flight_columns_ignored_due_segments_sheet') {
     return t('admin.import.messages.participantsFlightColumnsIgnoredDueSegments')
+  }
+  if (warning.code === 'participants_accommodation_columns_ignored_due_segments_sheet') {
+    return t('admin.import.messages.participantsAccommodationColumnsIgnoredDueSegments')
   }
   if (warning.code === 'baggage_pieces_decimal_not_allowed') {
     return t('admin.import.messages.baggagePiecesWholeNumber')
@@ -795,7 +880,7 @@ watch(summary, () => {
         <div class="flex flex-wrap items-center gap-2">
           <div class="flex flex-wrap items-center gap-2">
             <span
-              v-for="item in compactSummaryItems"
+              v-for="item in [...compactSummaryItems, ...accommodationSummaryItems]"
               :key="item.key"
               class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600"
             >
@@ -820,7 +905,7 @@ watch(summary, () => {
               class-name="w-full sm:w-auto"
             />
             <AppSegmentedControl
-              v-if="previewTypeFilter === 'segment'"
+              v-if="previewTypeFilter === 'flight'"
               v-model="previewDirectionFilter"
               :options="previewDirectionOptions"
               size="sm"
@@ -1084,7 +1169,7 @@ watch(summary, () => {
                 class-name="w-full sm:w-auto"
               />
 
-              <template v-if="previewTypeFilter === 'segment'">
+              <template v-if="previewTypeFilter === 'flight'">
                 <label class="ml-2 text-xs text-slate-600">{{ t('admin.import.previewFilters.directionLabel') }}</label>
                 <AppSegmentedControl
                   v-model="previewDirectionFilter"
@@ -1112,10 +1197,10 @@ watch(summary, () => {
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.type') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.tcNo') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.participant') }}</th>
-                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
-                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
-                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
-                      <th v-if="showSegmentPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1130,16 +1215,16 @@ watch(summary, () => {
                       <td class="px-3 py-2 text-xs text-slate-700">
                         <div>{{ previewParticipantText(row) }}</div>
                         <div
-                          v-if="isSegmentPreviewRow(row) && previewParticipantReferenceText(row)"
+                          v-if="isFlightPreviewRow(row) && previewParticipantReferenceText(row)"
                           class="mt-0.5 text-[11px] text-slate-500"
                         >
                           {{ t('admin.import.previewTable.sheetParticipantName', { name: previewParticipantReferenceText(row) }) }}
                         </div>
                       </td>
-                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
-                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
-                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>
-                      <td v-if="showSegmentPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewBaggageText(row) }}</td>
+                      <td v-if="showExtendedPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewMainText(row) }}</td>
+                      <td v-if="showExtendedPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewRouteText(row) }}</td>
+                      <td v-if="showExtendedPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewScheduleText(row) }}</td>
+                      <td v-if="showExtendedPreviewColumns" class="px-3 py-2 text-xs text-slate-700">{{ previewBaggageText(row) }}</td>
                     </tr>
                     <tr v-if="filteredPreviewRows.length === 0">
                       <td class="px-3 py-4 text-xs text-slate-500" :colspan="previewNoRowsColspan">{{ t('admin.import.noRows') }}</td>
