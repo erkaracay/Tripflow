@@ -872,12 +872,16 @@
       "title": "Konaklama Kayıtları",
       "add": "Konaklama ekle",
       "copyPrevious": "Öncekini kopyala",
-      "badge": "Konaklama: {count}",
+      "badge": "{count} kayıt",
       "empty": "Konaklama kaydı yok.",
-      "deleteConfirm": "Bu kaydı sil?",
+      "deleteConfirmTitle": "Konaklama kaydını sil",
+      "deleteConfirmMessage": "Bu konaklama kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
       "overlapError": "Bu tarih aralığı mevcut bir kayıtla çakışıyor.",
       "checkOutBeforeCheckIn": "Çıkış tarihi giriş tarihinde veya sonrasında olmalıdır.",
-      "accRequired": "Lütfen bir konaklama seçin."
+      "checkInOutOfRange": "Giriş tarihi etkinlik tarih aralığının dışında.",
+      "checkOutOutOfRange": "Çıkış tarihi etkinlik tarih aralığının dışında.",
+      "accRequired": "Lütfen bir konaklama seçin.",
+      "nightsShort": "{count}g"
     },
     "flightPanelHelper": {
       "title": "Toplu uçuş uygula",

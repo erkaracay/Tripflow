@@ -5140,7 +5140,7 @@ internal static class EventsHandlers
                 tab.Id == accommodationDocTabId.Value
                 && tab.EventId == eventId
                 && tab.OrganizationId == organizationId
-                && IsAccommodationDocType(tab.Type),
+                && tab.Type != null && tab.Type.ToLower() == DocTypeHotel,
                 ct);
 
         if (!exists)

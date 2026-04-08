@@ -15,6 +15,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppDrawerShell from '../../components/ui/AppDrawerShell.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import type {
   AppComboboxOption,
   BulkApplyParticipantRoomsRequest,
@@ -117,13 +118,6 @@ const accommodationTabs = computed(() =>
     })
 )
 
-const accommodationLabelById = computed(() => {
-  const map = new Map<string, string>()
-  for (const tab of accommodationTabs.value) {
-    map.set(tab.id, tab.title)
-  }
-  return map
-})
 
 const statusOptions = computed<AppComboboxOption[]>(() => [
   { value: 'all', label: t('admin.roomOps.filters.statusAll') },
@@ -596,13 +590,6 @@ const applyChanges = async () => {
   }
 }
 
-const accommodationLabel = (docTabId: string | null | undefined) => {
-  if (!docTabId) {
-    return t('admin.roomOps.filters.accommodationUnassigned')
-  }
-
-  return accommodationLabelById.value.get(docTabId) ?? t('admin.roomOps.filters.accommodationUnknown')
-}
 
 // --- Stays drawer ---
 
@@ -641,6 +628,26 @@ const stayFormErrors = ref<Record<string, string>>({})
 const stayAccommodationOptions = computed<AppComboboxOption[]>(() =>
   accommodationTabs.value.map((tab) => ({ value: tab.id, label: tab.title }))
 )
+
+// Prevent stays drawer from closing on overlay tap-through when a
+// combobox inside the drawer is open or has just closed (mobile sheet tap-through guard).
+const drawerComboboxOpen = ref(false)
+let drawerComboboxCloseTimer: ReturnType<typeof setTimeout> | null = null
+
+const onDrawerComboboxOpen = () => {
+  if (drawerComboboxCloseTimer !== null) {
+    clearTimeout(drawerComboboxCloseTimer)
+    drawerComboboxCloseTimer = null
+  }
+  drawerComboboxOpen.value = true
+}
+
+const onDrawerComboboxClose = () => {
+  drawerComboboxCloseTimer = setTimeout(() => {
+    drawerComboboxOpen.value = false
+    drawerComboboxCloseTimer = null
+  }, 320)
+}
 
 const syncDraftFromStays = (pid: string) => {
   const first = drawerStays.value[0]
@@ -685,11 +692,11 @@ const validateStayForm = (form: StayForm, formKey: string): boolean => {
   const max = event.value?.endDate
   if (min && max) {
     if (form.checkIn && (form.checkIn < min || form.checkIn > max)) {
-      stayFormErrors.value[`${formKey}.date`] = t('admin.stays.checkOutBeforeCheckIn')
+      stayFormErrors.value[`${formKey}.date`] = t('admin.stays.checkInOutOfRange')
       return false
     }
     if (form.checkOut && (form.checkOut < min || form.checkOut > max)) {
-      stayFormErrors.value[`${formKey}.date`] = t('admin.stays.checkOutBeforeCheckIn')
+      stayFormErrors.value[`${formKey}.date`] = t('admin.stays.checkOutOutOfRange')
       return false
     }
   }
@@ -837,9 +844,18 @@ const submitEditStay = async (stayId: string) => {
   }
 }
 
-const deleteStay = async (stayId: string) => {
-  if (!drawerParticipantId.value) return
-  if (!confirm(t('admin.stays.deleteConfirm'))) return
+const deleteConfirmOpen = ref(false)
+const deleteConfirmStayId = ref<string | null>(null)
+
+const openDeleteConfirm = (stayId: string) => {
+  deleteConfirmStayId.value = stayId
+  deleteConfirmOpen.value = true
+}
+
+const confirmDeleteStay = async () => {
+  const stayId = deleteConfirmStayId.value
+  if (!stayId || !drawerParticipantId.value) return
+  deleteConfirmOpen.value = false
   drawerSaving.value = true
   try {
     await deleteParticipantStay(eventId.value, drawerParticipantId.value, stayId)
@@ -850,6 +866,7 @@ const deleteStay = async (stayId: string) => {
     pushToast({ key: 'errors.generic', tone: 'error' })
   } finally {
     drawerSaving.value = false
+    deleteConfirmStayId.value = null
   }
 }
 
@@ -890,7 +907,7 @@ onMounted(() => {
     </div>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div class="grid gap-3 lg:grid-cols-[2fr,1fr,1fr,auto]">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr,1fr,1fr,auto]">
         <div>
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.roomOps.filters.query') }}</label>
           <div class="mt-1 flex items-center gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
@@ -945,7 +962,7 @@ onMounted(() => {
     </section>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr,1fr,1fr,1fr,1fr,1fr,1fr]">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.4fr,1fr,1fr,1fr,1fr,1fr,1fr]">
         <div>
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.roomOps.bulk.accommodation') }}</label>
           <AppCombobox
@@ -1049,7 +1066,7 @@ onMounted(() => {
     <section v-else class="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div class="max-h-[65vh] overflow-auto">
         <table class="min-w-full text-sm">
-          <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+          <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600 whitespace-nowrap">
             <tr>
               <th class="px-3 py-2">
                 <input
@@ -1093,7 +1110,6 @@ onMounted(() => {
                   </option>
                 </select>
                 <div class="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
-                  {{ accommodationLabel(getDraft(row.id).accommodationDocTabId) }}
                   <button
                     type="button"
                     class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-200"
@@ -1159,162 +1175,247 @@ onMounted(() => {
   </div>
 
   <!-- Stays Drawer -->
-  <AppDrawerShell :open="drawerOpen" desktop-width="lg" @close="closeStaysDrawer">
-    <template #default>
-      <div class="flex h-full flex-col overflow-hidden">
-        <!-- Header -->
-        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-800">{{ t('admin.stays.title') }}</h2>
-          <button type="button" class="text-slate-400 hover:text-slate-600" @click="closeStaysDrawer">✕</button>
+  <AppDrawerShell
+    :open="drawerOpen"
+    :close-on-overlay="!drawerComboboxOpen"
+    desktop-width="lg"
+    desktop-breakpoint="md"
+    swipe-to-close
+    labelled-by="stays-drawer-title"
+    @close="closeStaysDrawer"
+  >
+    <template #default="{ panelClass }">
+      <section :class="[panelClass, 'flex flex-col overflow-hidden bg-white']" role="dialog" aria-modal="true">
+        <!-- Swipe handle (mobile) -->
+        <div class="flex justify-center pt-3 pb-1 md:hidden" data-drawer-swipe-handle>
+          <div class="h-1 w-10 rounded-full bg-slate-300" />
         </div>
 
-        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <!-- Header -->
+        <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+          <h2 id="stays-drawer-title" class="text-base font-semibold text-slate-900">{{ t('admin.stays.title') }}</h2>
+          <button
+            type="button"
+            class="-mr-2 flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            :aria-label="t('common.close')"
+            @click="closeStaysDrawer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto overscroll-contain px-5 py-5">
           <!-- Loading -->
-          <div v-if="drawerLoading" class="text-center text-sm text-slate-500 py-8">{{ t('common.loading') }}</div>
+          <div v-if="drawerLoading" class="flex items-center justify-center py-16">
+            <div class="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
+          </div>
 
           <template v-else>
+            <!-- Empty state -->
+            <div v-if="drawerStays.length === 0" class="py-12 text-center">
+              <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5 text-slate-400"><path d="M10.75 6.5a.75.75 0 0 0-1.5 0v2.75H6.5a.75.75 0 0 0 0 1.5h2.75v2.75a.75.75 0 0 0 1.5 0v-2.75h2.75a.75.75 0 0 0 0-1.5h-2.75V6.5Z" /><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-1.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z" clip-rule="evenodd" /></svg>
+              </div>
+              <p class="text-sm text-slate-500">{{ t('admin.stays.empty') }}</p>
+            </div>
+
             <!-- Stay cards -->
-            <div v-if="drawerStays.length === 0" class="text-sm text-slate-500">{{ t('admin.stays.empty') }}</div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="stay in drawerStays"
+                :key="stay.id"
+                :class="[
+                  'rounded-xl border p-4 transition-colors',
+                  stay.isCurrent ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white',
+                ]"
+              >
+                <!-- View mode -->
+                <template v-if="drawerDirtyId !== stay.id">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1 space-y-1.5">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-900">{{ stay.accommodationTitle }}</span>
+                        <span
+                          v-if="stay.isCurrent"
+                          class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700"
+                        >{{ t('portal.docs.currentStay') }}</span>
+                      </div>
+                      <div v-if="stay.checkIn || stay.checkOut" class="text-sm text-slate-600">
+                        {{ formatDate(stay.checkIn) }} – {{ formatDate(stay.checkOut) }}
+                        <span v-if="stay.nightCount" class="ml-1 text-slate-400">({{ t('admin.stays.nightsShort', { count: stay.nightCount }) }})</span>
+                      </div>
+                      <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                        <span v-if="stay.roomNo">{{ t('admin.roomOps.columns.roomNo') }}: {{ stay.roomNo }}</span>
+                        <span v-if="stay.roomType">{{ t('admin.roomOps.columns.roomType') }}: {{ stay.roomType }}</span>
+                        <span v-if="stay.boardType">{{ t('admin.roomOps.columns.boardType') }}: {{ stay.boardType }}</span>
+                        <span v-if="stay.personNo">{{ t('admin.roomOps.columns.personNo') }}: {{ stay.personNo }}</span>
+                      </div>
+                      <div v-if="stay.roommates && stay.roommates.length > 0" class="text-sm text-slate-500">
+                        {{ t('portal.docs.roommates') }}: {{ stay.roommates.join(', ') }}
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        :aria-label="t('common.edit')"
+                        @click="startEditStay(stay)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" /></svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        :disabled="drawerSaving"
+                        :aria-label="t('common.delete')"
+                        @click="openDeleteConfirm(stay.id)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
 
-            <div
-              v-for="stay in drawerStays"
-              :key="stay.id"
-              class="rounded-lg border border-slate-200 bg-white p-3 space-y-2"
-            >
-              <!-- View mode -->
-              <template v-if="drawerDirtyId !== stay.id">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="space-y-0.5">
-                    <div class="text-xs font-semibold text-slate-800">{{ stay.accommodationTitle }}</div>
-                    <div v-if="stay.checkIn || stay.checkOut" class="text-xs text-slate-600">
-                      {{ formatDate(stay.checkIn) }} – {{ formatDate(stay.checkOut) }}
-                      <span v-if="stay.nightCount" class="text-slate-400">({{ stay.nightCount }}n)</span>
+                <!-- Edit mode -->
+                <template v-else-if="editFormById[stay.id]">
+                  <div class="space-y-3">
+                    <div>
+                      <label class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.accommodation') }}</label>
+                      <AppCombobox
+                        v-model="editFormById[stay.id]!.eventAccommodationId"
+                        :options="stayAccommodationOptions"
+                        :invalid="!!stayFormErrors[`edit-${stay.id}.acc`]"
+                        @open="onDrawerComboboxOpen"
+                        @close="onDrawerComboboxClose"
+                      />
+                      <p v-if="stayFormErrors[`edit-${stay.id}.acc`]" class="mt-1 text-xs text-red-500">{{ stayFormErrors[`edit-${stay.id}.acc`] }}</p>
                     </div>
-                    <div v-if="stay.roomNo" class="text-xs text-slate-600">{{ t('admin.roomOps.columns.roomNo') }}: {{ stay.roomNo }}</div>
-                    <div v-if="stay.boardType" class="text-xs text-slate-600">{{ t('admin.roomOps.columns.boardType') }}: {{ stay.boardType }}</div>
-                    <div v-if="stay.roommates && stay.roommates.length > 0" class="text-xs text-slate-500">
-                      {{ t('portal.docs.roommates') }}: {{ stay.roommates.join(', ') }}
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.roomNo') }}</span>
+                        <input v-model.trim="editFormById[stay.id]!.roomNo" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.roomType') }}</span>
+                        <input v-model.trim="editFormById[stay.id]!.roomType" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.boardType') }}</span>
+                        <input v-model.trim="editFormById[stay.id]!.boardType" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.personNo') }}</span>
+                        <input v-model.trim="editFormById[stay.id]!.personNo" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.checkInDate') }}</span>
+                        <input v-model="editFormById[stay.id]!.checkIn" type="date" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" :min="eventDateMin" :max="eventDateMax" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.checkOutDate') }}</span>
+                        <input v-model="editFormById[stay.id]!.checkOut" type="date" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" :min="eventDateMin" :max="eventDateMax" />
+                      </label>
+                    </div>
+                    <p v-if="stayFormErrors[`edit-${stay.id}.date`]" class="text-xs text-red-500">{{ stayFormErrors[`edit-${stay.id}.date`] }}</p>
+                    <div class="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                        :disabled="drawerSaving"
+                        @click="submitEditStay(stay.id)"
+                      >
+                        {{ t('common.save') }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                        @click="cancelEditStay(stay.id)"
+                      >
+                        {{ t('common.cancel') }}
+                      </button>
                     </div>
                   </div>
-                  <div class="flex gap-1 shrink-0">
-                    <button type="button" class="rounded px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100" @click="startEditStay(stay)">✏️</button>
-                    <button type="button" class="rounded px-2 py-1 text-[11px] text-red-500 hover:bg-red-50" :disabled="drawerSaving" @click="deleteStay(stay.id)">🗑</button>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Edit mode -->
-              <template v-else-if="editFormById[stay.id]">
-                <div class="space-y-2">
-                  <div>
-                    <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.accommodation') }}</label>
-                    <AppCombobox
-                      v-model="editFormById[stay.id]!.eventAccommodationId"
-                      :options="stayAccommodationOptions"
-                      :invalid="!!stayFormErrors[`edit-${stay.id}.acc`]"
-                    />
-                    <p v-if="stayFormErrors[`edit-${stay.id}.acc`]" class="text-[11px] text-red-500">{{ stayFormErrors[`edit-${stay.id}.acc`] }}</p>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.roomNo') }}</label>
-                      <input v-model.trim="editFormById[stay.id]!.roomNo" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                    </div>
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.roomType') }}</label>
-                      <input v-model.trim="editFormById[stay.id]!.roomType" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                    </div>
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.boardType') }}</label>
-                      <input v-model.trim="editFormById[stay.id]!.boardType" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                    </div>
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.personNo') }}</label>
-                      <input v-model.trim="editFormById[stay.id]!.personNo" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                    </div>
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.checkInDate') }}</label>
-                      <input v-model="editFormById[stay.id]!.checkIn" type="date" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" :min="eventDateMin" :max="eventDateMax" />
-                    </div>
-                    <div>
-                      <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.checkOutDate') }}</label>
-                      <input v-model="editFormById[stay.id]!.checkOut" type="date" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" :min="eventDateMin" :max="eventDateMax" />
-                    </div>
-                  </div>
-                  <p v-if="stayFormErrors[`edit-${stay.id}.date`]" class="text-[11px] text-red-500">{{ stayFormErrors[`edit-${stay.id}.date`] }}</p>
-                  <div class="flex gap-2 pt-1">
-                    <button type="button" class="rounded bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60" :disabled="drawerSaving" @click="submitEditStay(stay.id)">
-                      {{ t('common.save') }}
-                    </button>
-                    <button type="button" class="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50" @click="cancelEditStay(stay.id)">
-                      {{ t('common.cancel') }}
-                    </button>
-                  </div>
-                </div>
-              </template>
+                </template>
+              </div>
             </div>
 
             <!-- Add stay form -->
-            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-700">{{ t('admin.stays.add') }}</span>
+            <div class="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold text-slate-800">{{ t('admin.stays.add') }}</span>
                 <button
                   v-if="drawerStays.length > 0"
                   type="button"
-                  class="text-[11px] text-blue-600 hover:underline"
+                  class="rounded-md px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
                   @click="copyPreviousStay"
                 >
                   {{ t('admin.stays.copyPrevious') }}
                 </button>
               </div>
-              <div>
-                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.accommodation') }}</label>
-                <AppCombobox
-                  v-model="addForm.eventAccommodationId"
-                  :options="stayAccommodationOptions"
-                  :invalid="!!stayFormErrors['add.acc']"
-                />
-                <p v-if="stayFormErrors['add.acc']" class="text-[11px] text-red-500">{{ stayFormErrors['add.acc'] }}</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.accommodation') }}</label>
+                  <AppCombobox
+                    v-model="addForm.eventAccommodationId"
+                    :options="stayAccommodationOptions"
+                    :invalid="!!stayFormErrors['add.acc']"
+                    @open="onDrawerComboboxOpen"
+                    @close="onDrawerComboboxClose"
+                  />
+                  <p v-if="stayFormErrors['add.acc']" class="mt-1 text-xs text-red-500">{{ stayFormErrors['add.acc'] }}</p>
+                </div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.roomNo') }}</span>
+                    <input v-model.trim="addForm.roomNo" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.roomType') }}</span>
+                    <input v-model.trim="addForm.roomType" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.boardType') }}</span>
+                    <input v-model.trim="addForm.boardType" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.personNo') }}</span>
+                    <input v-model.trim="addForm.personNo" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.checkInDate') }}</span>
+                    <input v-model="addForm.checkIn" type="date" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" :min="eventDateMin" :max="eventDateMax" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-slate-600">{{ t('admin.roomOps.columns.checkOutDate') }}</span>
+                    <input v-model="addForm.checkOut" type="date" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" :min="eventDateMin" :max="eventDateMax" />
+                  </label>
+                </div>
+                <p v-if="stayFormErrors['add.date']" class="text-xs text-red-500">{{ stayFormErrors['add.date'] }}</p>
+                <button
+                  type="button"
+                  class="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
+                  :disabled="drawerSaving"
+                  @click="submitAddStay"
+                >
+                  {{ t('admin.stays.add') }}
+                </button>
               </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.roomNo') }}</label>
-                  <input v-model.trim="addForm.roomNo" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.roomType') }}</label>
-                  <input v-model.trim="addForm.roomType" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.boardType') }}</label>
-                  <input v-model.trim="addForm.boardType" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.personNo') }}</label>
-                  <input v-model.trim="addForm.personNo" type="text" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.checkInDate') }}</label>
-                  <input v-model="addForm.checkIn" type="date" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" :min="eventDateMin" :max="eventDateMax" />
-                </div>
-                <div>
-                  <label class="block text-[11px] font-medium text-slate-600 mb-0.5">{{ t('admin.roomOps.columns.checkOutDate') }}</label>
-                  <input v-model="addForm.checkOut" type="date" class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs" :min="eventDateMin" :max="eventDateMax" />
-                </div>
-              </div>
-              <p v-if="stayFormErrors['add.date']" class="text-[11px] text-red-500">{{ stayFormErrors['add.date'] }}</p>
-              <button
-                type="button"
-                class="rounded bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                :disabled="drawerSaving"
-                @click="submitAddStay"
-              >
-                {{ t('admin.stays.add') }}
-              </button>
             </div>
           </template>
         </div>
-      </div>
+      </section>
     </template>
   </AppDrawerShell>
+
+  <!-- Delete stay confirmation -->
+  <ConfirmDialog
+    :open="deleteConfirmOpen"
+    :title="t('admin.stays.deleteConfirmTitle')"
+    :message="t('admin.stays.deleteConfirmMessage')"
+    tone="danger"
+    :confirm-disabled="drawerSaving"
+    @update:open="deleteConfirmOpen = $event"
+    @confirm="confirmDeleteStay"
+  />
 </template>

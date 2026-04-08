@@ -1,4 +1,4 @@
-# Infora AI Playbook (for Cursor / contributors)
+# Infora AI Playbook
 
 This document explains how we implement features in Infora, what patterns we follow, and what “done” means.
 
@@ -171,7 +171,7 @@ This document explains how we implement features in Infora, what patterns we fol
 - Manual test checklist updated and performed for changed flows
 - Contract changes are backward compatible (unless explicitly breaking)
 
-## 9) Suggested work loop for Cursor
+## 9) Suggested work loop for agents
 
 1) Summarize the ask in 3–6 bullets.
 2) Propose a minimal plan and list the files to edit.

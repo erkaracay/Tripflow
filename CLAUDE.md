@@ -182,6 +182,11 @@ Secondary goal: maximize user experience and operational clarity while keeping c
 - API local development commonly uses PostgreSQL on `localhost:5432`.
 - Connection string and JWT settings should come from `.NET user-secrets` or environment variables, not committed config.
 
+## Git
+
+- Never run `git commit` or `git push` without explicit user instruction.
+- When changes are ready, show a summary and ask the user whether to commit and/or push.
+
 ## Workflow
 
 - Before editing, inspect nearby files for naming, typing, API shape, and UI patterns.
