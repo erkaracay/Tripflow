@@ -159,6 +159,7 @@ internal static class PortalLoginHandlers
 
         var schedule = await EventsHandlers.BuildScheduleAsync(eventEntity.Id, eventEntity.OrganizationId, db, ct);
         var docs = await BuildDocsAsync(db, eventEntity, participant, ct);
+        var accommodationSegments = await BuildPortalAccommodationSegmentsAsync(db, participant.Id, eventEntity, ct);
         var stays = await BuildPortalStaysAsync(db, participant.Id, eventEntity.Id, ct);
 
         var response = new PortalMeResponse(
@@ -180,6 +181,7 @@ internal static class PortalLoginHandlers
             portal,
             schedule,
             docs,
+            accommodationSegments,
             stays);
 
         return Results.Ok(response);
@@ -635,5 +637,38 @@ internal static class PortalLoginHandlers
             nightCount,
             isCurrent,
             roommates);
+    }
+
+    private static async Task<PortalAccommodationSegmentDto[]> BuildPortalAccommodationSegmentsAsync(
+        TripflowDbContext db,
+        Guid participantId,
+        EventEntity eventEntity,
+        CancellationToken ct)
+    {
+        var rows = await AccommodationSegmentsReadHelpers.BuildPortalAccommodationSegmentsAsync(
+            db,
+            eventEntity.Id,
+            eventEntity.OrganizationId,
+            participantId,
+            ct);
+
+        return rows
+            .Select(x => new PortalAccommodationSegmentDto(
+                x.SegmentId,
+                x.StartDate,
+                x.EndDate,
+                x.AccommodationDocTabId,
+                x.AccommodationTitle,
+                x.AccommodationContent,
+                x.RoomNo,
+                x.RoomType,
+                x.BoardType,
+                x.PersonNo,
+                x.UsesOverride,
+                x.NightCount,
+                x.IsCurrent,
+                x.IsUpcoming,
+                x.Roommates))
+            .ToArray();
     }
 }

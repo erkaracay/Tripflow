@@ -914,12 +914,15 @@
         "endDate": "End date",
         "createSuccess": "Accommodation plan created.",
         "updateSuccess": "Accommodation plan updated.",
-        "deleteSuccess": "Accommodation plan deleted.",
-        "deleteConfirmTitle": "Delete accommodation plan",
-        "deleteConfirmMessage": "Delete this plan? Participant override rows linked to this plan will also be removed."
-      },
-      "validation": {
-        "overrideRequired": "An override accommodation must be selected.",
+      "deleteSuccess": "Accommodation plan deleted.",
+      "deleteConfirmTitle": "Delete accommodation plan",
+      "deleteConfirmMessage": "Delete this plan? Participant override rows linked to this plan will also be removed."
+    },
+    "warnings": {
+      "roomCapacityMismatch": "Room {roomNo} occupancy does not match. Declared: {declaredCount}, assigned: {assignedCount}."
+    },
+    "validation": {
+      "overrideRequired": "An override accommodation must be selected.",
         "segmentAccommodationRequired": "Select a default accommodation for the plan.",
         "segmentDatesRequired": "Start date and end date are required for the plan.",
         "segmentDateRange": "End date must be on or after start date."
@@ -1564,6 +1567,34 @@
       "edit": "Edit program",
       "checkInEnabled": "Check-in enabled",
       "openMealReport": "Menu"
+    },
+    "accommodation": {
+      "nav": "Accommodation",
+      "title": "Accommodation",
+      "subtitle": "Review participant accommodation details for the selected plan.",
+      "loading": "Loading accommodation plans...",
+      "loadError": "Accommodation data could not be loaded.",
+      "empty": "No accommodation plan has been created for this event yet.",
+      "emptyParticipants": "No participants found for the selected plan.",
+      "searchPlaceholder": "Search by name, ID, or room no",
+      "filters": {
+        "search": "Search",
+        "accommodation": "Accommodation",
+        "accommodationAll": "All accommodations"
+      },
+      "total": "{count} participants",
+      "defaultAccommodation": "Default hotel",
+      "dateRange": "Date range",
+      "overrideBadge": "Override",
+      "columns": {
+        "participant": "Participant",
+        "accommodation": "Accommodation",
+        "roomNo": "Room no",
+        "roomType": "Room type",
+        "boardType": "Board",
+        "personNo": "Person no",
+        "roommates": "Roommates"
+      }
     }
   },
   "mealReport": {
@@ -1675,6 +1706,7 @@
       "roomNo": "Room no",
       "roomType": "Room type",
       "boardType": "Board",
+      "personNo": "Person no",
       "checkIn": "Check-in",
       "checkOut": "Check-out",
       "airline": "Airline",
@@ -1703,9 +1735,9 @@
       "stayDurationNights": "{count} night(s)",
       "checkInNote": "Check-in note",
       "checkOutNote": "Check-out note",
-      "currentStay": "Current Stay",
-      "nextStay": "Upcoming",
-      "previousStay": "Previous",
+      "currentStay": "Current accommodation",
+      "nextStay": "Upcoming accommodation",
+      "previousStay": "Previous accommodation",
       "roommates": "Roommates",
       "empty": "No documents yet.",
       "board": {

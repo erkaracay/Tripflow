@@ -7,7 +7,7 @@ import PortalInfoTabs from '../../components/portal/PortalInfoTabs.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
-import type { PortalMeResponse } from '../../types'
+import type { PortalAccommodationSegment, PortalMeResponse } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +19,7 @@ const event = ref<PortalMeResponse['event'] | null>(null)
 const portal = ref<PortalMeResponse['portal'] | null>(null)
 const docs = ref<PortalMeResponse['docs'] | null>(null)
 const participant = ref<PortalMeResponse['participant'] | null>(null)
+const accommodationSegments = ref<PortalAccommodationSegment[]>([])
 
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
@@ -70,6 +71,7 @@ const loadDocs = async () => {
     portal.value = response.portal
     docs.value = response.docs
     participant.value = response.participant
+    accommodationSegments.value = response.accommodationSegments ?? []
     setPortalHeader(
       response.event.name,
       response.event.logoUrl ?? null,
@@ -174,7 +176,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <PortalInfoTabs :docs="docs" :participant-name="participant?.fullName" print-mode />
+      <PortalInfoTabs :docs="docs" :accommodation-segments="accommodationSegments" :participant-name="participant?.fullName" print-mode />
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.docs.linksTitle') }}</div>

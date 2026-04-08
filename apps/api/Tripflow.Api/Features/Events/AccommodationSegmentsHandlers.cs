@@ -295,37 +295,14 @@ internal static class AccommodationSegmentsHandlers
 
         var search = query?.Trim();
 
-        var assignmentsQuery = db.ParticipantAccommodationAssignments.AsNoTracking()
-            .Where(x =>
-                x.EventId == segmentContext.EventId
-                && x.OrganizationId == segmentContext.OrganizationId
-                && x.SegmentId == segmentContext.SegmentId);
-
-        var baseQuery =
-            from participant in participantsQuery
-            join assignment in assignmentsQuery
-                on participant.Id equals assignment.ParticipantId into assignmentJoin
-            from assignment in assignmentJoin.DefaultIfEmpty()
-            join overrideTab in db.EventDocTabs.AsNoTracking()
-                on assignment.OverrideAccommodationDocTabId equals overrideTab.Id into overrideJoin
-            from overrideTab in overrideJoin.DefaultIfEmpty()
-            select new
-            {
-                participant.Id,
-                participant.FullName,
-                participant.TcNo,
-                RoomNo = assignment != null ? assignment.RoomNo : null,
-                RoomType = assignment != null ? assignment.RoomType : null,
-                BoardType = assignment != null ? assignment.BoardType : null,
-                PersonNo = assignment != null ? assignment.PersonNo : null,
-                UsesOverride = assignment != null && assignment.OverrideAccommodationDocTabId.HasValue,
-                EffectiveAccommodationDocTabId = assignment != null && assignment.OverrideAccommodationDocTabId.HasValue
-                    ? assignment.OverrideAccommodationDocTabId.Value
-                    : segmentContext.DefaultAccommodationDocTabId,
-                EffectiveAccommodationTitle = overrideTab != null
-                    ? overrideTab.Title
-                    : segmentContext.DefaultAccommodationTitle
-            };
+        var baseQuery = AccommodationSegmentsReadHelpers.BuildSegmentParticipantsQuery(db, participantsQuery, new AccommodationSegmentsReadHelpers.SegmentContext(
+            segmentContext.EventId,
+            segmentContext.OrganizationId,
+            segmentContext.SegmentId,
+            segmentContext.DefaultAccommodationDocTabId,
+            segmentContext.DefaultAccommodationTitle,
+            default,
+            default));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -368,24 +345,45 @@ internal static class AccommodationSegmentsHandlers
         var items = await orderedQuery
             .Skip((resolvedPage - 1) * resolvedPageSize)
             .Take(resolvedPageSize)
-            .Select(x => new AccommodationSegmentParticipantTableItemDto(
-                x.Id,
-                x.FullName,
-                x.TcNo,
-                x.EffectiveAccommodationDocTabId,
-                x.EffectiveAccommodationTitle,
-                x.UsesOverride,
-                x.RoomNo,
-                x.RoomType,
-                x.BoardType,
-                x.PersonNo))
             .ToArrayAsync(ct);
+
+        var warningsLookup = await AccommodationSegmentsReadHelpers.BuildSegmentOccupancyWarningsLookupAsync(
+            db,
+            new AccommodationSegmentsReadHelpers.SegmentContext(
+                segmentContext.EventId,
+                segmentContext.OrganizationId,
+                segmentContext.SegmentId,
+                segmentContext.DefaultAccommodationDocTabId,
+                segmentContext.DefaultAccommodationTitle,
+                default,
+                default),
+            items,
+            ct);
 
         return Results.Ok(new AccommodationSegmentParticipantTableResponseDto(
             resolvedPage,
             resolvedPageSize,
             total,
-            items));
+            items
+                .Select(x => new AccommodationSegmentParticipantTableItemDto(
+                    x.ParticipantId,
+                    x.FullName,
+                    x.TcNo,
+                    x.EffectiveAccommodationDocTabId,
+                    x.EffectiveAccommodationTitle,
+                    x.UsesOverride,
+                    x.RoomNo,
+                    x.RoomType,
+                    x.BoardType,
+                    x.PersonNo,
+                    warningsLookup.GetValueOrDefault(x.ParticipantId, [])
+                        .Select(w => new AccommodationSegmentParticipantWarningDto(
+                            w.Code,
+                            w.RoomNo,
+                            w.AssignedCount,
+                            w.DeclaredCount))
+                        .ToArray()))
+                .ToArray()));
     }
 
     internal static async Task<IResult> BulkApplyParticipants(

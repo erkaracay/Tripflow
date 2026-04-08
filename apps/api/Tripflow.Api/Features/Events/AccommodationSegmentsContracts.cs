@@ -24,7 +24,14 @@ public sealed record AccommodationSegmentParticipantTableItemDto(
     string? RoomNo,
     string? RoomType,
     string? BoardType,
-    string? PersonNo);
+    string? PersonNo,
+    AccommodationSegmentParticipantWarningDto[] Warnings);
+
+public sealed record AccommodationSegmentParticipantWarningDto(
+    string Code,
+    string? RoomNo,
+    int AssignedCount,
+    int DeclaredCount);
 
 public sealed record AccommodationSegmentParticipantTableResponseDto(
     int Page,

@@ -272,6 +272,140 @@ internal static class GuideHandlers
         return Results.Ok(schedule);
     }
 
+    internal static async Task<IResult> GetAccommodationSegments(
+        string eventId,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
+        {
+            return eventError;
+        }
+
+        var items = await db.EventAccommodationSegments.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .OrderBy(x => x.StartDate)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.Id)
+            .Select(x => new AccommodationSegmentDto(
+                x.Id,
+                x.DefaultAccommodationDocTabId,
+                x.DefaultAccommodationDocTab.Title,
+                x.StartDate.ToString("yyyy-MM-dd"),
+                x.EndDate.ToString("yyyy-MM-dd"),
+                x.SortOrder))
+            .ToArrayAsync(ct);
+
+        return Results.Ok(items);
+    }
+
+    internal static async Task<IResult> GetAccommodationSegmentParticipants(
+        string eventId,
+        Guid segmentId,
+        string? query,
+        string? accommodationFilter,
+        int? page,
+        int? pageSize,
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
+        if (eventError is not null)
+        {
+            return eventError;
+        }
+
+        var segmentContext = await AccommodationSegmentsReadHelpers.GetSegmentContextAsync(db, id, orgId, segmentId, ct);
+        if (segmentContext is null)
+        {
+            return Results.NotFound(new { message = "Accommodation segment not found." });
+        }
+
+        var resolvedPage = page.GetValueOrDefault(1);
+        if (resolvedPage < 1)
+        {
+            resolvedPage = 1;
+        }
+
+        var resolvedPageSize = pageSize.GetValueOrDefault(50);
+        if (resolvedPageSize < 1)
+        {
+            resolvedPageSize = 50;
+        }
+        resolvedPageSize = Math.Min(resolvedPageSize, 200);
+
+        var participantsQuery = db.Participants.AsNoTracking()
+            .Where(x => x.EventId == id && x.OrganizationId == orgId);
+
+        var baseQuery = AccommodationSegmentsReadHelpers.BuildSegmentParticipantsQuery(db, participantsQuery, segmentContext);
+
+        var availableAccommodations = await baseQuery
+            .Select(x => new { x.EffectiveAccommodationDocTabId, x.EffectiveAccommodationTitle })
+            .Distinct()
+            .OrderBy(x => x.EffectiveAccommodationTitle)
+            .Select(x => new GuideAccommodationOptionDto(
+                x.EffectiveAccommodationDocTabId,
+                x.EffectiveAccommodationTitle))
+            .ToArrayAsync(ct);
+
+        var search = query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            baseQuery = baseQuery.Where(x =>
+                EF.Functions.ILike(x.FullName, pattern)
+                || EF.Functions.ILike(x.TcNo, pattern)
+                || (x.RoomNo != null && EF.Functions.ILike(x.RoomNo, pattern)));
+        }
+
+        var accommodationFilterValue = accommodationFilter?.Trim();
+        if (!string.IsNullOrWhiteSpace(accommodationFilterValue)
+            && Guid.TryParse(accommodationFilterValue, out var accommodationDocTabId))
+        {
+            baseQuery = baseQuery.Where(x => x.EffectiveAccommodationDocTabId == accommodationDocTabId);
+        }
+
+        var total = await baseQuery.CountAsync(ct);
+
+        var items = await baseQuery
+            .OrderBy(x => x.FullName)
+            .ThenBy(x => x.TcNo)
+            .Skip((resolvedPage - 1) * resolvedPageSize)
+            .Take(resolvedPageSize)
+            .ToArrayAsync(ct);
+
+        var roommateLookup = await AccommodationSegmentsReadHelpers.BuildSegmentRoommatesLookupAsync(
+            db,
+            segmentContext,
+            items,
+            ct);
+
+        return Results.Ok(new GuideAccommodationParticipantResponseDto(
+            resolvedPage,
+            resolvedPageSize,
+            total,
+            items
+                .Select(x => new GuideAccommodationParticipantDto(
+                    x.ParticipantId,
+                    x.FullName,
+                    x.TcNo,
+                    x.EffectiveAccommodationDocTabId,
+                    x.EffectiveAccommodationTitle,
+                    x.UsesOverride,
+                    x.RoomNo,
+                    x.RoomType,
+                    x.BoardType,
+                    x.PersonNo,
+                    roommateLookup.GetValueOrDefault(x.ParticipantId, [])))
+                .ToArray(),
+            availableAccommodations));
+    }
+
     internal static async Task<IResult> CheckInByCode(
         string eventId,
         CheckInCodeRequest request,

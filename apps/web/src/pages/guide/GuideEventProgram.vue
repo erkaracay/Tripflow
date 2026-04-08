@@ -185,6 +185,13 @@ onMounted(loadData)
         >
           {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
+        <RouterLink
+          :to="`/guide/events/${eventId}/accommodation`"
+          active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+        >
+          {{ t('guide.accommodation.nav') }}
+        </RouterLink>
       </nav>
       <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

@@ -284,6 +284,18 @@ const buildRowUpdate = (participantId: string): AccommodationSegmentParticipantR
   }
 }
 
+const rowWarningMessage = (code: string, roomNo?: string | null, assignedCount?: number, declaredCount?: number) => {
+  if (code === 'room_capacity_mismatch') {
+    return t('admin.roomOps.warnings.roomCapacityMismatch', {
+      roomNo: normalize(roomNo) || '—',
+      assignedCount: assignedCount ?? 0,
+      declaredCount: declaredCount ?? 0,
+    })
+  }
+
+  return t('warnings.generic')
+}
+
 const handleApiError = (err: unknown, fallbackKey = 'errors.generic') => {
   if (err instanceof Error && err.message) {
     return err.message
@@ -1152,6 +1164,15 @@ onMounted(async () => {
                     </td>
                     <td class="px-3 py-3">
                       <div class="font-medium text-slate-900">{{ row.fullName }}</div>
+                      <div v-if="row.warnings?.length" class="mt-1 space-y-1">
+                        <p
+                          v-for="warning in row.warnings"
+                          :key="`${row.participantId}-${warning.code}-${warning.roomNo ?? 'none'}`"
+                          class="text-xs font-medium text-amber-700"
+                        >
+                          {{ rowWarningMessage(warning.code, warning.roomNo, warning.assignedCount, warning.declaredCount) }}
+                        </p>
+                      </div>
                     </td>
                     <td class="px-3 py-3 font-mono text-xs text-slate-700">{{ row.tcNo }}</td>
                     <td class="px-3 py-3">

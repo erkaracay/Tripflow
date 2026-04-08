@@ -906,12 +906,15 @@
         "endDate": "Bitiş tarihi",
         "createSuccess": "Konaklama planı oluşturuldu.",
         "updateSuccess": "Konaklama planı güncellendi.",
-        "deleteSuccess": "Konaklama planı silindi.",
-        "deleteConfirmTitle": "Konaklama planını sil",
-        "deleteConfirmMessage": "Bu planı silmek istediğinize emin misiniz? Plana bağlı katılımcı override kayıtları da kaldırılır."
-      },
-      "validation": {
-        "overrideRequired": "Override konaklama seçilmelidir.",
+      "deleteSuccess": "Konaklama planı silindi.",
+      "deleteConfirmTitle": "Konaklama planını sil",
+      "deleteConfirmMessage": "Bu planı silmek istediğinize emin misiniz? Plana bağlı katılımcı override kayıtları da kaldırılır."
+    },
+    "warnings": {
+      "roomCapacityMismatch": "Oda {roomNo} için kişi sayısı uyuşmuyor. Tanımlı: {declaredCount}, atanan: {assignedCount}."
+    },
+    "validation": {
+      "overrideRequired": "Override konaklama seçilmelidir.",
         "segmentAccommodationRequired": "Plan için bir varsayılan konaklama seçin.",
         "segmentDatesRequired": "Plan için başlangıç ve bitiş tarihi zorunludur.",
         "segmentDateRange": "Bitiş tarihi başlangıç tarihinde veya sonrasında olmalıdır."
@@ -1551,6 +1554,34 @@
       "edit": "Programı düzenle",
       "checkInEnabled": "Check-in açık",
       "openMealReport": "Menü"
+    },
+    "accommodation": {
+      "nav": "Konaklama",
+      "title": "Konaklama",
+      "subtitle": "Seçili plan için katılımcı konaklamalarını görüntüle.",
+      "loading": "Konaklama planları yükleniyor...",
+      "loadError": "Konaklama verileri yüklenemedi.",
+      "empty": "Bu etkinlik için henüz konaklama planı yok.",
+      "emptyParticipants": "Seçili plan için katılımcı bulunamadı.",
+      "searchPlaceholder": "Ad, TC veya oda no ara",
+      "filters": {
+        "search": "Ara",
+        "accommodation": "Konaklama",
+        "accommodationAll": "Tüm konaklamalar"
+      },
+      "total": "Toplam {count} katılımcı",
+      "defaultAccommodation": "Varsayılan otel",
+      "dateRange": "Tarih aralığı",
+      "overrideBadge": "Override",
+      "columns": {
+        "participant": "Katılımcı",
+        "accommodation": "Konaklama",
+        "roomNo": "Oda no",
+        "roomType": "Oda tipi",
+        "boardType": "Pansiyon",
+        "personNo": "Kişi no",
+        "roommates": "Oda arkadaşları"
+      }
     }
   },
   "mealReport": {
@@ -1662,6 +1693,7 @@
       "roomNo": "Oda no",
       "roomType": "Oda tipi",
       "boardType": "Pansiyon",
+      "personNo": "Kişi no",
       "checkIn": "Giriş",
       "checkOut": "Çıkış",
       "airline": "Havayolu",
@@ -1690,9 +1722,9 @@
       "stayDurationNights": "{count} gece",
       "checkInNote": "Giriş notu",
       "checkOutNote": "Çıkış notu",
-      "currentStay": "Şu Anki Konaklama",
-      "nextStay": "Sonraki",
-      "previousStay": "Önceki",
+      "currentStay": "Şu anki konaklama",
+      "nextStay": "Yaklaşan konaklama",
+      "previousStay": "Önceki konaklama",
       "roommates": "Oda Arkadaşları",
       "empty": "Henüz belge yok.",
       "board": {

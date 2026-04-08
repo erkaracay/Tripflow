@@ -466,6 +466,13 @@ watch(selectedItemId, () => {
         >
           {{ t('admin.eventDetail.openProgram') }}
         </RouterLink>
+        <RouterLink
+          :to="`/guide/events/${eventId}/accommodation`"
+          active-class="bg-slate-100 border-slate-300 font-medium text-slate-900"
+          class="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+        >
+          {{ t('guide.accommodation.nav') }}
+        </RouterLink>
       </nav>
       <h1 class="mt-4 text-2xl font-semibold text-slate-900">{{ event?.name ?? t('equipment.title') }}</h1>
       <p v-if="event" class="mt-1 text-sm text-slate-500">

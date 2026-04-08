@@ -10,6 +10,7 @@ import type {
   BulkApplyParticipantRoomsResponse,
   BulkApplyFlightSegmentsRequest,
   BulkApplyFlightSegmentsResponse,
+  GuideAccommodationParticipantResponse,
   ParticipantAccommodationStay,
   UpsertParticipantAccommodationStayRequest,
   PortalLoginResponse,
@@ -230,6 +231,18 @@ export const bulkApplyAccommodationSegmentParticipants = async (
   apiPost<BulkApplyAccommodationSegmentParticipantsResponse>(
     `/api/events/${eventId}/accommodation-segments/${segmentId}/participants/bulk-apply`,
     payload
+  )
+
+export const guideGetAccommodationSegments = async (eventId: string): Promise<AccommodationSegment[]> =>
+  apiGet<AccommodationSegment[]>(`/api/guide/events/${eventId}/accommodation-segments`)
+
+export const guideGetAccommodationSegmentParticipants = async (
+  eventId: string,
+  segmentId: string,
+  params: URLSearchParams
+): Promise<GuideAccommodationParticipantResponse> =>
+  apiGet<GuideAccommodationParticipantResponse>(
+    `/api/guide/events/${eventId}/accommodation-segments/${segmentId}/participants?${params.toString()}`
   )
 
 export const apiPostWithPayload = async <T>(path: string, body: unknown): Promise<T> => {

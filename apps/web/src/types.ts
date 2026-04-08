@@ -347,6 +347,14 @@ export type AccommodationSegmentParticipantTableItem = {
   roomType?: string | null
   boardType?: string | null
   personNo?: string | null
+  warnings: AccommodationSegmentParticipantWarning[]
+}
+
+export type AccommodationSegmentParticipantWarning = {
+  code: string
+  roomNo?: string | null
+  assignedCount: number
+  declaredCount: number
 }
 
 export type AccommodationSegmentParticipantTableResponse = {
@@ -354,6 +362,33 @@ export type AccommodationSegmentParticipantTableResponse = {
   pageSize: number
   total: number
   items: AccommodationSegmentParticipantTableItem[]
+}
+
+export type GuideAccommodationOption = {
+  id: string
+  title: string
+}
+
+export type GuideAccommodationParticipant = {
+  participantId: string
+  fullName: string
+  tcNo: string
+  effectiveAccommodationDocTabId: string
+  effectiveAccommodationTitle: string
+  usesOverride: boolean
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+  roommates: string[]
+}
+
+export type GuideAccommodationParticipantResponse = {
+  page: number
+  pageSize: number
+  total: number
+  items: GuideAccommodationParticipant[]
+  availableAccommodations: GuideAccommodationOption[]
 }
 
 export type AccommodationSegmentParticipantRowUpdate = {
@@ -946,6 +981,24 @@ export type ParticipantAccommodationStay = {
   roommates: string[]
 }
 
+export type PortalAccommodationSegment = {
+  segmentId: string
+  startDate: string
+  endDate: string
+  accommodationDocTabId: string
+  accommodationTitle: string
+  accommodationContent?: unknown | null
+  roomNo?: string | null
+  roomType?: string | null
+  boardType?: string | null
+  personNo?: string | null
+  usesOverride: boolean
+  nightCount?: number | null
+  isCurrent: boolean
+  isUpcoming: boolean
+  roommates: string[]
+}
+
 export type UpsertParticipantAccommodationStayRequest = {
   eventAccommodationId?: string | null
   roomNo?: string | null
@@ -977,6 +1030,7 @@ export type PortalMeResponse = {
   portal: EventPortalInfo
   schedule: EventSchedule
   docs: PortalDocsResponse
+  accommodationSegments: PortalAccommodationSegment[]
   stays: ParticipantAccommodationStay[]
 }
 
