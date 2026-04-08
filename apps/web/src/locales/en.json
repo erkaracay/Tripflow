@@ -863,7 +863,7 @@
       "bulk": {
         "title": "Bulk apply",
         "subtitle": "Apply the same override or room details to the selected participants.",
-        "selectedCount": "{count} selected",
+        "selectedCount": "Selected: {count}",
         "accommodation": "Override accommodation",
         "overwriteMode": "Overwrite mode",
         "overwriteAlways": "Always overwrite",
@@ -873,7 +873,7 @@
         "fieldClear": "Clear",
         "accommodationModeLabel": "Accommodation action",
         "accommodationModeKeep": "Keep current",
-        "accommodationModeDefault": "Reset to segment default",
+        "accommodationModeDefault": "Use default hotel",
         "accommodationModeOverride": "Set hotel override",
         "applyToSelected": "Apply to {count} selected",
         "selectRowsFirst": "Select at least one participant first.",
@@ -920,8 +920,8 @@
       },
       "validation": {
         "overrideRequired": "An override accommodation must be selected.",
-        "segmentAccommodationRequired": "Select a default accommodation for the segment.",
-        "segmentDatesRequired": "Start date and end date are required.",
+        "segmentAccommodationRequired": "Select a default accommodation for the plan.",
+        "segmentDatesRequired": "Start date and end date are required for the plan.",
         "segmentDateRange": "End date must be on or after start date."
       }
     },

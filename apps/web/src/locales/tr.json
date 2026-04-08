@@ -855,7 +855,7 @@
       "bulk": {
         "title": "Toplu uygula",
         "subtitle": "Seçili katılımcılara aynı override veya oda detaylarını uygula.",
-        "selectedCount": "{count} kişi seçildi",
+        "selectedCount": "Seçili: {count} kişi",
         "accommodation": "Override konaklama",
         "overwriteMode": "Yazma modu",
         "overwriteAlways": "Üzerine yaz",
@@ -865,7 +865,7 @@
         "fieldClear": "Temizle",
         "accommodationModeLabel": "Konaklama işlemi",
         "accommodationModeKeep": "Aynen bırak",
-        "accommodationModeDefault": "Etap varsayılanına dön",
+        "accommodationModeDefault": "Varsayılan otele dön",
         "accommodationModeOverride": "Override otel ata",
         "applyToSelected": "Seçili {count} kişiye uygula",
         "selectRowsFirst": "Önce en az bir katılımcı seç.",
@@ -912,8 +912,8 @@
       },
       "validation": {
         "overrideRequired": "Override konaklama seçilmelidir.",
-        "segmentAccommodationRequired": "Etap için bir varsayılan konaklama seçin.",
-        "segmentDatesRequired": "Başlangıç ve bitiş tarihi zorunludur.",
+        "segmentAccommodationRequired": "Plan için bir varsayılan konaklama seçin.",
+        "segmentDatesRequired": "Plan için başlangıç ve bitiş tarihi zorunludur.",
         "segmentDateRange": "Bitiş tarihi başlangıç tarihinde veya sonrasında olmalıdır."
       }
     },

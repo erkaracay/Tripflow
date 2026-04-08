@@ -18,6 +18,7 @@ import ErrorState from '../../components/ui/ErrorState.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
+import { formatDateRange } from '../../lib/formatters'
 import type {
   AccommodationSegment,
   AccommodationSegmentParticipantRowUpdate,
@@ -215,7 +216,7 @@ const segmentSummaryLabel = computed(() => {
     return ''
   }
 
-  return `${selectedSegment.value.startDate} - ${selectedSegment.value.endDate}`
+  return formatDateRange(selectedSegment.value.startDate, selectedSegment.value.endDate)
 })
 
 const createDraftFromRow = (row: AccommodationSegmentParticipantTableItem): RowDraft => ({
@@ -832,7 +833,7 @@ onMounted(async () => {
                   <div class="min-w-0">
                     <div class="text-sm font-semibold leading-5">{{ segment.defaultAccommodationTitle }}</div>
                     <div class="mt-2 text-xs leading-5" :class="segment.id === selectedSegmentId ? 'text-slate-200' : 'text-slate-500'">
-                      {{ segment.startDate }} - {{ segment.endDate }}
+                      {{ formatDateRange(segment.startDate, segment.endDate) }}
                     </div>
                   </div>
                 </button>
@@ -950,17 +951,17 @@ onMounted(async () => {
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-              <div class="flex items-start justify-between gap-3">
+              <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 class="text-sm font-semibold text-slate-900">{{ t('admin.roomOps.bulk.title') }}</h3>
                   <p class="mt-1 text-xs text-slate-500">{{ t('admin.roomOps.bulk.subtitle') }}</p>
                 </div>
-                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                <span class="text-xs font-medium text-slate-500">
                   {{ t('admin.roomOps.bulk.selectedCount', { count: selectedIds.length }) }}
                 </span>
               </div>
 
-              <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <div class="mt-4 grid gap-3 xl:grid-cols-2">
                 <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.roomOps.bulk.overwriteMode') }}</span>
                   <AppCombobox
