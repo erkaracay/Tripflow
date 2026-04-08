@@ -28,6 +28,8 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<OrganizationGuideEntity> OrganizationGuides => Set<OrganizationGuideEntity>();
     public DbSet<ParticipantActivityWillNotAttendEntity> ParticipantActivityWillNotAttend => Set<ParticipantActivityWillNotAttendEntity>();
     public DbSet<ParticipantAccommodationStayEntity> ParticipantAccommodationStays => Set<ParticipantAccommodationStayEntity>();
+    public DbSet<EventAccommodationSegmentEntity> EventAccommodationSegments => Set<EventAccommodationSegmentEntity>();
+    public DbSet<ParticipantAccommodationAssignmentEntity> ParticipantAccommodationAssignments => Set<ParticipantAccommodationAssignmentEntity>();
 
     public TripflowDbContext(DbContextOptions<TripflowDbContext> options) : base(options) { }
 
@@ -135,6 +137,11 @@ public sealed class TripflowDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             b.HasMany(x => x.Participants)
+                .WithOne(x => x.Event)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.AccommodationSegments)
                 .WithOne(x => x.Event)
                 .HasForeignKey(x => x.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -274,6 +281,11 @@ public sealed class TripflowDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             b.HasMany(x => x.MealSelections)
+                .WithOne(x => x.Participant)
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(x => x.AccommodationAssignments)
                 .WithOne(x => x.Participant)
                 .HasForeignKey(x => x.ParticipantId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -794,6 +806,75 @@ public sealed class TripflowDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ActivityId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EventAccommodationSegmentEntity>(b =>
+        {
+            b.ToTable("event_accommodation_segments", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_event_accommodation_segments_date_range",
+                    "\"EndDate\" >= \"StartDate\"");
+            });
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.DefaultAccommodationDocTabId).IsRequired();
+            b.Property(x => x.StartDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.EndDate).HasColumnType("date").IsRequired();
+            b.Property(x => x.SortOrder).IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+            b.Property(x => x.UpdatedAt).IsRequired();
+
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.StartDate, x.SortOrder });
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.DefaultAccommodationDocTabId });
+
+            b.HasOne(x => x.Event)
+                .WithMany(x => x.AccommodationSegments)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.DefaultAccommodationDocTab)
+                .WithMany()
+                .HasForeignKey(x => x.DefaultAccommodationDocTabId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ParticipantAccommodationAssignmentEntity>(b =>
+        {
+            b.ToTable("participant_accommodation_assignments");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.OrganizationId).IsRequired();
+            b.Property(x => x.EventId).IsRequired();
+            b.Property(x => x.ParticipantId).IsRequired();
+            b.Property(x => x.SegmentId).IsRequired();
+            b.Property(x => x.RoomNo).HasMaxLength(50);
+            b.Property(x => x.RoomType).HasMaxLength(50);
+            b.Property(x => x.BoardType).HasMaxLength(50);
+            b.Property(x => x.PersonNo).HasMaxLength(50);
+            b.Property(x => x.CreatedAt).IsRequired();
+            b.Property(x => x.UpdatedAt).IsRequired();
+
+            b.HasIndex(x => new { x.ParticipantId, x.SegmentId }).IsUnique();
+            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.SegmentId });
+            b.HasIndex(x => x.OverrideAccommodationDocTabId);
+
+            b.HasOne(x => x.Participant)
+                .WithMany(x => x.AccommodationAssignments)
+                .HasForeignKey(x => x.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Segment)
+                .WithMany(x => x.ParticipantAssignments)
+                .HasForeignKey(x => x.SegmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.OverrideAccommodationDocTab)
+                .WithMany()
+                .HasForeignKey(x => x.OverrideAccommodationDocTabId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ParticipantAccommodationStayEntity>(b =>

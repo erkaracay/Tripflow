@@ -79,6 +79,20 @@ public static class GuideEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/events/{eventId}/accommodation-segments", GuideHandlers.GetAccommodationSegments)
+            .WithSummary("Guide accommodation segments")
+            .WithDescription("Returns accommodation plans for a guide event.")
+            .Produces<AccommodationSegmentDto[]>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/events/{eventId}/accommodation-segments/{segmentId:guid}/participants", GuideHandlers.GetAccommodationSegmentParticipants)
+            .WithSummary("Guide accommodation segment participants")
+            .WithDescription("Returns effective accommodation data for participants in the selected plan.")
+            .Produces<GuideAccommodationParticipantResponseDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/events/{eventId}/days", GuideHandlers.GetEventDays)
             .WithSummary("Guide event days")
             .WithDescription("Returns schedule days for the event (same as admin).")

@@ -18,7 +18,7 @@ import { clearPortalHeader, setPortalHeader } from '../../lib/portalHeader'
 import { formatPhoneDisplay } from '../../lib/normalize'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import { useHorizontalSwipeTabs } from '../../composables/useHorizontalSwipeTabs'
-import type { EventPortalInfo, ParticipantAccommodationStay, PortalMeResponse } from '../../types'
+import type { EventPortalInfo, PortalAccommodationSegment, PortalMeResponse } from '../../types'
 
 type TabKey = 'days' | 'docs' | 'qr' | 'info'
 
@@ -37,7 +37,7 @@ const participant = ref<PortalParticipant | null>(null)
 const portal = ref<EventPortalInfo | null>(null)
 const schedule = ref<PortalMeResponse['schedule'] | null>(null)
 const docs = ref<PortalMeResponse['docs'] | null>(null)
-const stays = ref<ParticipantAccommodationStay[]>([])
+const accommodationSegments = ref<PortalAccommodationSegment[]>([])
 const loading = ref(true)
 const errorKey = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
@@ -549,7 +549,7 @@ const loadPortal = async () => {
     portal.value = response.portal
     schedule.value = response.schedule
     docs.value = response.docs
-    stays.value = response.stays ?? []
+    accommodationSegments.value = response.accommodationSegments ?? []
     checkInCode.value = response.participant.checkInCode
     hasLoadedOnce.value = true
     clearNetworkError()
@@ -1023,7 +1023,7 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <PortalInfoTabs :docs="docs" :stays="stays" :participant-name="participant?.fullName" />
+            <PortalInfoTabs :docs="docs" :accommodation-segments="accommodationSegments" :participant-name="participant?.fullName" />
 
             <button
               class="inline-flex sm:hidden w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"

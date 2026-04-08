@@ -303,6 +303,83 @@ internal static class ParticipantImportHandlers
         "8 kg + backpack"
     ];
 
+    private static readonly string[] AccommodationSegmentRequiredHeaders =
+    [
+        "segment_key",
+        "accommodation",
+        "start_date",
+        "end_date"
+    ];
+
+    private static readonly string[] AccommodationAssignmentRequiredHeaders =
+    [
+        "tc_no",
+        "segment_key"
+    ];
+
+    private static readonly string[] AccommodationAssignmentOptionalHeaders =
+    [
+        "accommodation_override",
+        "room_no",
+        "room_type",
+        "board_type",
+        "person_no"
+    ];
+
+    private static readonly string[] AccommodationAssignmentCanonicalHeaders =
+    [
+        ..AccommodationAssignmentRequiredHeaders,
+        ..AccommodationAssignmentOptionalHeaders
+    ];
+
+    private static readonly string[] AccommodationSegmentExampleRow1 =
+    [
+        "ANTALYA",
+        "Antalya X Hotel",
+        "2026-03-10",
+        "2026-03-12"
+    ];
+
+    private static readonly string[] AccommodationSegmentExampleRow2 =
+    [
+        "KAYSERI",
+        "Kayseri Y Hotel",
+        "2026-03-12",
+        "2026-03-14"
+    ];
+
+    private static readonly string[] AccommodationAssignmentExampleRow1 =
+    [
+        "12345678901",
+        "ANTALYA",
+        "",
+        "101",
+        "Double",
+        "HB",
+        "2"
+    ];
+
+    private static readonly string[] AccommodationAssignmentExampleRow2 =
+    [
+        "10987654321",
+        "KAYSERI",
+        "Kayseri Z Hotel",
+        "220",
+        "Single",
+        "BB",
+        "1"
+    ];
+
+    private static readonly string[] LegacyParticipantAccommodationHeaders =
+    [
+        "room_no",
+        "room_type",
+        "board_type",
+        "person_no",
+        "hotel_check_in_date",
+        "hotel_check_out_date"
+    ];
+
     private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd.MM.yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yy"];
     private static readonly string[] TimeFormats = ["HH:mm", "HH:mm:ss", "HH.mm", "H:mm"];
 
@@ -315,6 +392,8 @@ internal static class ParticipantImportHandlers
         "insurance_end_date",
         "arrival_flight_date",
         "return_flight_date",
+        "start_date",
+        "end_date",
         "departure_date",
         "arrival_date"
     };
@@ -438,7 +517,12 @@ internal static class ParticipantImportHandlers
             }
         }
 
-        if (payload.Rows.Count > MaxRows)
+        var totalImportRows = payload.Rows.Count
+            + payload.FlightSegmentRows.Count
+            + payload.AccommodationSegmentRows.Count
+            + payload.AccommodationAssignmentRows.Count;
+
+        if (totalImportRows > MaxRows)
         {
             return EventsHelpers.BadRequest($"Max {MaxRows} rows allowed.");
         }
@@ -500,6 +584,38 @@ internal static class ParticipantImportHandlers
             return Results.BadRequest(missingColumnsReport);
         }
 
+        if (payload.HasAccommodationSegmentsSheet && payload.MissingAccommodationSegmentRequiredColumns.Length > 0)
+        {
+            errors.Add(new ParticipantImportError(
+                1,
+                null,
+                $"accommodation_segments sheet missing required columns: {string.Join(", ", payload.MissingAccommodationSegmentRequiredColumns)}",
+                payload.MissingAccommodationSegmentRequiredColumns)
+            {
+                Code = "missing_required_columns",
+                Field = "accommodation_segments"
+            });
+
+            var missingColumnsReport = BuildReport(payload, 0, 0, 0, errors, warnings, previewRows);
+            return Results.BadRequest(missingColumnsReport);
+        }
+
+        if (payload.HasAccommodationAssignmentsSheet && payload.MissingAccommodationAssignmentRequiredColumns.Length > 0)
+        {
+            errors.Add(new ParticipantImportError(
+                1,
+                null,
+                $"accommodation_assignments sheet missing required columns: {string.Join(", ", payload.MissingAccommodationAssignmentRequiredColumns)}",
+                payload.MissingAccommodationAssignmentRequiredColumns)
+            {
+                Code = "missing_required_columns",
+                Field = "accommodation_assignments"
+            });
+
+            var missingColumnsReport = BuildReport(payload, 0, 0, 0, errors, warnings, previewRows);
+            return Results.BadRequest(missingColumnsReport);
+        }
+
         var fileTcRows = BuildFileTcRowMap(payload.Rows);
         var duplicateTcInFile = fileTcRows
             .Where(x => x.Value.Count > 1)
@@ -546,6 +662,13 @@ internal static class ParticipantImportHandlers
         var imported = 0;
         var created = 0;
         var updated = 0;
+        var accommodationSegmentsImported = 0;
+        var accommodationSegmentsCreated = 0;
+        var accommodationSegmentsUpdated = 0;
+        var accommodationAssignmentsImported = 0;
+        var accommodationAssignmentsCreated = 0;
+        var accommodationAssignmentsUpdated = 0;
+        var accommodationAssignmentsDeleted = 0;
         var now = DateTime.UtcNow;
         await using var transaction = importMode == ParticipantImportMode.Apply
             ? await db.Database.BeginTransactionAsync(ct)
@@ -553,6 +676,8 @@ internal static class ParticipantImportHandlers
 
         var hasFlightSegmentRows = payload.FlightSegmentRows.Count > 0;
         var ignoreLegacyParticipantFlights = hasFlightSegmentRows;
+        var hasAccommodationSheets = payload.HasAccommodationSegmentsSheet || payload.HasAccommodationAssignmentsSheet;
+        var ignoreLegacyParticipantAccommodation = hasAccommodationSheets;
 
         if (ignoreLegacyParticipantFlights && HasAnyLegacyParticipantFlightValue(payload.Rows))
         {
@@ -563,6 +688,18 @@ internal static class ParticipantImportHandlers
                 "participants_flight_columns_ignored_due_segments_sheet")
             {
                 Field = "flight_segments"
+            });
+        }
+
+        if (ignoreLegacyParticipantAccommodation && HasAnyLegacyParticipantAccommodationValue(payload.Rows))
+        {
+            warnings.Add(new ParticipantImportWarning(
+                1,
+                null,
+                "participants sheet legacy accommodation columns are ignored when accommodation_segments or accommodation_assignments sheet exists.",
+                "participants_accommodation_columns_ignored_due_segments_sheet")
+            {
+                Field = "accommodation_segments"
             });
         }
 
@@ -638,28 +775,33 @@ internal static class ParticipantImportHandlers
                     errorFields.Add("gender");
                 }
 
-                if (!TryParseOptionalDate(row.GetValue("hotel_check_in_date"), out var hotelCheckIn))
+                DateOnly? hotelCheckIn = null;
+                DateOnly? hotelCheckOut = null;
+                if (!ignoreLegacyParticipantAccommodation)
                 {
-                    warnings.Add(new ParticipantImportWarning(
-                        row.RowNumber,
-                        tcNoForIssues,
-                        "hotel_check_in_date invalid",
-                        "invalid_date")
+                    if (!TryParseOptionalDate(row.GetValue("hotel_check_in_date"), out hotelCheckIn))
                     {
-                        Field = "hotel_check_in_date"
-                    });
-                }
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "hotel_check_in_date invalid",
+                            "invalid_date")
+                        {
+                            Field = "hotel_check_in_date"
+                        });
+                    }
 
-                if (!TryParseOptionalDate(row.GetValue("hotel_check_out_date"), out var hotelCheckOut))
-                {
-                    warnings.Add(new ParticipantImportWarning(
-                        row.RowNumber,
-                        tcNoForIssues,
-                        "hotel_check_out_date invalid",
-                        "invalid_date")
+                    if (!TryParseOptionalDate(row.GetValue("hotel_check_out_date"), out hotelCheckOut))
                     {
-                        Field = "hotel_check_out_date"
-                    });
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            "hotel_check_out_date invalid",
+                            "invalid_date")
+                        {
+                            Field = "hotel_check_out_date"
+                        });
+                    }
                 }
 
                 if (!TryParseOptionalDate(row.GetValue("insurance_start_date"), out var insuranceStart))
@@ -1066,7 +1208,7 @@ internal static class ParticipantImportHandlers
                     continue;
                 }
 
-                var hasDetails = row.HasAnyDetails || hotelCheckIn is not null || hotelCheckOut is not null
+                var hasDetails = HasParticipantDetailValue(row, ignoreLegacyParticipantAccommodation) || hotelCheckIn is not null || hotelCheckOut is not null
                     || arrivalDepartureTime is not null || arrivalArrivalTime is not null
                     || returnDepartureTime is not null || returnArrivalTime is not null
                     || arrivalTransferPickupTime is not null || returnTransferPickupTime is not null;
@@ -1102,7 +1244,9 @@ internal static class ParticipantImportHandlers
                                 insuranceEnd, arrivalFlightDate, returnFlightDate, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime,
                                 returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
-                                arrivalTransferPickupTime, returnTransferPickupTime, !ignoreLegacyParticipantFlights);
+                                arrivalTransferPickupTime, returnTransferPickupTime,
+                                !ignoreLegacyParticipantAccommodation,
+                                !ignoreLegacyParticipantFlights);
                         }
                         else if (participant.Details is not null)
                         {
@@ -1141,7 +1285,9 @@ internal static class ParticipantImportHandlers
                             ApplyDetails(details, row, hotelCheckIn, hotelCheckOut, insuranceStart, insuranceEnd,
                                 arrivalFlightDate, returnFlightDate, arrivalDepartureTime, arrivalArrivalTime, returnDepartureTime, returnArrivalTime,
                                 arrivalBaggagePieces, arrivalBaggageTotalKg, returnBaggagePieces, returnBaggageTotalKg,
-                                arrivalTransferPickupTime, returnTransferPickupTime, !ignoreLegacyParticipantFlights);
+                                arrivalTransferPickupTime, returnTransferPickupTime,
+                                !ignoreLegacyParticipantAccommodation,
+                                !ignoreLegacyParticipantFlights);
                             newParticipant.Details = details;
                         }
 
@@ -1451,7 +1597,418 @@ internal static class ParticipantImportHandlers
 
             imported += parsedFlightSegmentRows.Count;
 
-            var report = BuildReport(payload, imported, created, updated, errors, warnings, previewRows);
+            var segmentContextByKey = new Dictionary<string, ImportedAccommodationSegmentContext>(StringComparer.OrdinalIgnoreCase);
+            if (payload.HasAccommodationSegmentsSheet || payload.HasAccommodationAssignmentsSheet)
+            {
+                var hotelTabs = await db.EventDocTabs
+                    .Where(x =>
+                        x.EventId == id
+                        && x.OrganizationId == orgId
+                        && x.Type != null
+                        && x.Type.ToLower() == "hotel")
+                    .Select(x => new AccommodationHotelTab(x.Id, x.Title))
+                    .ToListAsync(ct);
+
+                var exactSegmentLookup = await db.EventAccommodationSegments
+                    .Where(x => x.EventId == id && x.OrganizationId == orgId)
+                    .ToDictionaryAsync(x => (x.StartDate, x.EndDate), ct);
+                var segmentWorkingSet = exactSegmentLookup.Values.ToList();
+
+                var seenSegmentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in payload.AccommodationSegmentRows)
+                {
+                    var segmentKey = NormalizeOptionalText(row.GetValue("segment_key"));
+                    var accommodationInput = NormalizeOptionalText(row.GetValue("accommodation"));
+                    var rowErrors = new List<string>();
+                    var rowFields = new List<string>();
+
+                    if (string.IsNullOrWhiteSpace(segmentKey))
+                    {
+                        rowErrors.Add("segment_key required");
+                        rowFields.Add("segment_key");
+                    }
+
+                    if (!TryParseOptionalDate(row.GetValue("start_date"), out var startDate) || startDate is null)
+                    {
+                        rowErrors.Add("start_date invalid");
+                        rowFields.Add("start_date");
+                    }
+
+                    if (!TryParseOptionalDate(row.GetValue("end_date"), out var endDate) || endDate is null)
+                    {
+                        rowErrors.Add("end_date invalid");
+                        rowFields.Add("end_date");
+                    }
+
+                    if (startDate.HasValue && endDate.HasValue)
+                    {
+                        if (endDate.Value < startDate.Value)
+                        {
+                            rowErrors.Add("end_date must be on or after start_date");
+                            rowFields.Add("end_date");
+                        }
+
+                        if (startDate.Value < eventEntity.StartDate || endDate.Value > eventEntity.EndDate)
+                        {
+                            rowErrors.Add("segment dates must be within event date range");
+                            rowFields.Add("start_date");
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(segmentKey) && !seenSegmentKeys.Add(segmentKey))
+                    {
+                        rowErrors.Add("segment_key duplicated in file");
+                        rowFields.Add("segment_key");
+                    }
+
+                    var hotelMatch = ResolveAccommodationHotelInput(accommodationInput, hotelTabs);
+                    if (hotelMatch is null)
+                    {
+                        rowErrors.Add("accommodation could not be resolved");
+                        rowFields.Add("accommodation");
+                    }
+
+                    if (previewRows.Count < PreviewRowLimit)
+                    {
+                        previewRows.Add(new ParticipantImportPreviewRow(
+                            row.RowNumber,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "accommodation_segment",
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            segmentKey,
+                            hotelMatch?.Title ?? accommodationInput,
+                            startDate?.ToString("yyyy-MM-dd"),
+                            endDate?.ToString("yyyy-MM-dd")));
+                    }
+
+                    if (rowErrors.Count > 0)
+                    {
+                        errors.Add(new ParticipantImportError(
+                            row.RowNumber,
+                            null,
+                            string.Join("; ", rowErrors),
+                            rowFields.Distinct(StringComparer.OrdinalIgnoreCase).ToArray())
+                        {
+                            Field = rowFields.Count == 1 ? rowFields[0] : "accommodation_segments",
+                            Code = "invalid_accommodation_segment_row"
+                        });
+                        continue;
+                    }
+
+                    var key = (startDate!.Value, endDate!.Value);
+                    if (!exactSegmentLookup.TryGetValue(key, out var segmentEntity))
+                    {
+                        var overlapping = segmentWorkingSet.Any(x =>
+                            x.StartDate <= endDate.Value
+                            && x.EndDate >= startDate.Value);
+                        if (overlapping)
+                        {
+                            errors.Add(new ParticipantImportError(
+                                row.RowNumber,
+                                null,
+                                "segment date range overlaps an existing accommodation segment",
+                                ["start_date", "end_date"])
+                            {
+                                Field = "start_date",
+                                Code = "segment_overlap"
+                            });
+                            continue;
+                        }
+
+                        accommodationSegmentsCreated++;
+                        segmentEntity = new EventAccommodationSegmentEntity
+                        {
+                            Id = Guid.NewGuid(),
+                            OrganizationId = orgId,
+                            EventId = id,
+                            DefaultAccommodationDocTabId = hotelMatch!.Id,
+                            StartDate = startDate.Value,
+                            EndDate = endDate.Value,
+                            SortOrder = segmentWorkingSet.Count == 0 ? 1 : segmentWorkingSet.Max(x => x.SortOrder) + 1,
+                            CreatedAt = now,
+                            UpdatedAt = now
+                        };
+                        exactSegmentLookup[key] = segmentEntity;
+                        segmentWorkingSet.Add(segmentEntity);
+
+                        if (importMode == ParticipantImportMode.Apply)
+                        {
+                            db.EventAccommodationSegments.Add(segmentEntity);
+                        }
+                    }
+                    else if (segmentEntity.DefaultAccommodationDocTabId != hotelMatch!.Id)
+                    {
+                        accommodationSegmentsUpdated++;
+                        segmentEntity.DefaultAccommodationDocTabId = hotelMatch.Id;
+                        segmentEntity.UpdatedAt = now;
+                    }
+
+                    accommodationSegmentsImported++;
+                    segmentContextByKey[segmentKey!] = new ImportedAccommodationSegmentContext(segmentEntity, hotelMatch!.Title);
+                }
+
+                var parsedAccommodationAssignments = new List<ParsedAccommodationAssignmentRow>();
+                foreach (var row in payload.AccommodationAssignmentRows)
+                {
+                    var tcNo = NormalizeTcNo(row.GetValue("tc_no"));
+                    var tcNoForIssues = string.IsNullOrWhiteSpace(tcNo) ? null : tcNo;
+                    var segmentKey = NormalizeOptionalText(row.GetValue("segment_key"));
+                    var rowErrors = new List<string>();
+                    var rowFields = new List<string>();
+
+                    if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
+                    {
+                        rowErrors.Add("tc_no must be 11 digits");
+                        rowFields.Add("tc_no");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(segmentKey))
+                    {
+                        rowErrors.Add("segment_key required");
+                        rowFields.Add("segment_key");
+                    }
+
+                    if (!existingByTc.TryGetValue(tcNo, out var matches) || matches.Count == 0)
+                    {
+                        rowErrors.Add("tc_no not found in this event.");
+                        rowFields.Add("tc_no");
+                    }
+                    else if (matches.Count > 1)
+                    {
+                        rowErrors.Add("tc_no matches multiple participants in this event.");
+                        rowFields.Add("tc_no");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(segmentKey) && !segmentContextByKey.TryGetValue(segmentKey, out _))
+                    {
+                        rowErrors.Add("segment_key could not be resolved from accommodation_segments sheet");
+                        rowFields.Add("segment_key");
+                    }
+
+                    var overrideInput = NormalizeOptionalText(row.GetValue("accommodation_override"));
+                    var overrideHotel = ResolveAccommodationHotelInput(overrideInput, hotelTabs);
+                    if (!string.IsNullOrWhiteSpace(overrideInput) && overrideHotel is null)
+                    {
+                        rowErrors.Add("accommodation_override could not be resolved");
+                        rowFields.Add("accommodation_override");
+                    }
+
+                    if (previewRows.Count < PreviewRowLimit)
+                    {
+                        var previewSegmentContext = !string.IsNullOrWhiteSpace(segmentKey)
+                            && segmentContextByKey.TryGetValue(segmentKey, out var segmentContextForPreview)
+                            ? segmentContextForPreview
+                            : null;
+                        var previewAccommodationTitle = overrideHotel?.Title;
+                        if (string.IsNullOrWhiteSpace(previewAccommodationTitle)
+                            && previewSegmentContext is not null)
+                        {
+                            previewAccommodationTitle = previewSegmentContext.DefaultAccommodationTitle;
+                        }
+
+                        previewRows.Add(new ParticipantImportPreviewRow(
+                            row.RowNumber,
+                            matches?.Count == 1 ? matches[0].FullName : null,
+                            null,
+                            null,
+                            string.IsNullOrWhiteSpace(tcNo) ? null : tcNo,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "accommodation_assignment",
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            segmentKey,
+                            previewAccommodationTitle,
+                            previewSegmentContext?.Segment.StartDate.ToString("yyyy-MM-dd"),
+                            previewSegmentContext?.Segment.EndDate.ToString("yyyy-MM-dd"),
+                            AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("room_no")),
+                            AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("room_type")),
+                            AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("board_type")),
+                            AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("person_no"))));
+                    }
+
+                    if (rowErrors.Count > 0)
+                    {
+                        errors.Add(new ParticipantImportError(
+                            row.RowNumber,
+                            tcNoForIssues,
+                            string.Join("; ", rowErrors),
+                            rowFields.Distinct(StringComparer.OrdinalIgnoreCase).ToArray())
+                        {
+                            Field = rowFields.Count == 1 ? rowFields[0] : "accommodation_assignments",
+                            Code = "invalid_accommodation_assignment_row"
+                        });
+                        continue;
+                    }
+
+                    var participant = existingByTc[tcNo][0];
+                    var segmentContext = segmentContextByKey[segmentKey!];
+                    parsedAccommodationAssignments.Add(new ParsedAccommodationAssignmentRow(
+                        row.RowNumber,
+                        participant.Id,
+                        tcNo,
+                        participant.FullName,
+                        segmentKey!,
+                        segmentContext.Segment.Id,
+                        segmentContext.DefaultAccommodationTitle,
+                        overrideHotel?.Id,
+                        overrideHotel?.Title,
+                        AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("room_no")),
+                        AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("room_type")),
+                        AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("board_type")),
+                        AccommodationSegmentAssignmentHelpers.NormalizeIncomingText(row.GetValue("person_no"))));
+                }
+
+                if (parsedAccommodationAssignments.Count > 0)
+                {
+                    var assignmentParticipantIds = parsedAccommodationAssignments.Select(x => x.ParticipantId).Distinct().ToArray();
+                    var assignmentSegmentIds = parsedAccommodationAssignments.Select(x => x.SegmentId).Distinct().ToArray();
+                    var existingAssignments = await db.ParticipantAccommodationAssignments
+                        .Where(x =>
+                            x.OrganizationId == orgId
+                            && x.EventId == id
+                            && assignmentParticipantIds.Contains(x.ParticipantId)
+                            && assignmentSegmentIds.Contains(x.SegmentId))
+                        .ToListAsync(ct);
+
+                    var assignmentLookup = existingAssignments.ToDictionary(x => (x.ParticipantId, x.SegmentId));
+                    foreach (var row in parsedAccommodationAssignments)
+                    {
+                        accommodationAssignmentsImported++;
+                        var key = (row.ParticipantId, row.SegmentId);
+                        assignmentLookup.TryGetValue(key, out var assignment);
+
+                        var emptyRow = AccommodationSegmentAssignmentHelpers.IsAssignmentEmpty(
+                            row.OverrideAccommodationDocTabId,
+                            row.RoomNo,
+                            row.RoomType,
+                            row.BoardType,
+                            row.PersonNo);
+
+                        if (assignment is null)
+                        {
+                            if (emptyRow)
+                            {
+                                continue;
+                            }
+
+                            accommodationAssignmentsCreated++;
+                            var newAssignment = new ParticipantAccommodationAssignmentEntity
+                            {
+                                Id = Guid.NewGuid(),
+                                OrganizationId = orgId,
+                                EventId = id,
+                                ParticipantId = row.ParticipantId,
+                                SegmentId = row.SegmentId,
+                                OverrideAccommodationDocTabId = row.OverrideAccommodationDocTabId,
+                                RoomNo = row.RoomNo,
+                                RoomType = row.RoomType,
+                                BoardType = row.BoardType,
+                                PersonNo = row.PersonNo,
+                                CreatedAt = now,
+                                UpdatedAt = now
+                            };
+
+                            assignmentLookup[key] = newAssignment;
+                            if (importMode == ParticipantImportMode.Apply)
+                            {
+                                db.ParticipantAccommodationAssignments.Add(newAssignment);
+                            }
+
+                            continue;
+                        }
+
+                        var changed =
+                            assignment.OverrideAccommodationDocTabId != row.OverrideAccommodationDocTabId
+                            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.RoomNo) != row.RoomNo
+                            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.RoomType) != row.RoomType
+                            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.BoardType) != row.BoardType
+                            || AccommodationSegmentAssignmentHelpers.NormalizeStoredText(assignment.PersonNo) != row.PersonNo;
+
+                        if (!changed)
+                        {
+                            continue;
+                        }
+
+                        if (emptyRow)
+                        {
+                            accommodationAssignmentsDeleted++;
+                            assignmentLookup.Remove(key);
+                            if (importMode == ParticipantImportMode.Apply)
+                            {
+                                db.ParticipantAccommodationAssignments.Remove(assignment);
+                            }
+                            continue;
+                        }
+
+                        accommodationAssignmentsUpdated++;
+                        assignment.OverrideAccommodationDocTabId = row.OverrideAccommodationDocTabId;
+                        assignment.RoomNo = row.RoomNo;
+                        assignment.RoomType = row.RoomType;
+                        assignment.BoardType = row.BoardType;
+                        assignment.PersonNo = row.PersonNo;
+                        assignment.UpdatedAt = now;
+                    }
+                }
+            }
+
+            imported += accommodationSegmentsImported + accommodationAssignmentsImported;
+
+            var report = BuildReport(
+                payload,
+                imported,
+                created,
+                updated,
+                errors,
+                warnings,
+                previewRows,
+                accommodationSegmentsImported,
+                accommodationSegmentsCreated,
+                accommodationSegmentsUpdated,
+                accommodationAssignmentsImported,
+                accommodationAssignmentsCreated,
+                accommodationAssignmentsUpdated,
+                accommodationAssignmentsDeleted);
 
             if (importMode == ParticipantImportMode.DryRun)
             {
@@ -1507,6 +2064,8 @@ internal static class ParticipantImportHandlers
         using var workbook = new XLWorkbook();
         var participantSheet = workbook.AddWorksheet("participants");
         var flightSegmentSheet = workbook.AddWorksheet("flight_segments");
+        var accommodationSegmentSheet = workbook.AddWorksheet("accommodation_segments");
+        var accommodationAssignmentSheet = workbook.AddWorksheet("accommodation_assignments");
 
         var dateHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1587,6 +2146,52 @@ internal static class ParticipantImportHandlers
         flightSegmentSheet.Row(1).Style.Font.Bold = true;
         flightSegmentSheet.Columns().AdjustToContents();
 
+        var accommodationSegmentTemplateRows = new[]
+        {
+            AccommodationSegmentExampleRow1,
+            AccommodationSegmentExampleRow2
+        };
+
+        for (var i = 0; i < AccommodationSegmentRequiredHeaders.Length; i++)
+        {
+            var header = AccommodationSegmentRequiredHeaders[i];
+            var headerCell = accommodationSegmentSheet.Cell(1, i + 1);
+
+            headerCell.Value = header;
+            for (var rowIndex = 0; rowIndex < accommodationSegmentTemplateRows.Length; rowIndex++)
+            {
+                var valueCell = accommodationSegmentSheet.Cell(rowIndex + 2, i + 1);
+                var example = accommodationSegmentTemplateRows[rowIndex][i];
+                WriteTemplateCell(valueCell, header, example, dateHeaders, timeHeaders);
+            }
+        }
+
+        accommodationSegmentSheet.Row(1).Style.Font.Bold = true;
+        accommodationSegmentSheet.Columns().AdjustToContents();
+
+        var accommodationAssignmentTemplateRows = new[]
+        {
+            AccommodationAssignmentExampleRow1,
+            AccommodationAssignmentExampleRow2
+        };
+
+        for (var i = 0; i < AccommodationAssignmentCanonicalHeaders.Length; i++)
+        {
+            var header = AccommodationAssignmentCanonicalHeaders[i];
+            var headerCell = accommodationAssignmentSheet.Cell(1, i + 1);
+
+            headerCell.Value = header;
+            for (var rowIndex = 0; rowIndex < accommodationAssignmentTemplateRows.Length; rowIndex++)
+            {
+                var valueCell = accommodationAssignmentSheet.Cell(rowIndex + 2, i + 1);
+                var example = accommodationAssignmentTemplateRows[rowIndex][i];
+                WriteTemplateCell(valueCell, header, example, dateHeaders, timeHeaders);
+            }
+        }
+
+        accommodationAssignmentSheet.Row(1).Style.Font.Bold = true;
+        accommodationAssignmentSheet.Columns().AdjustToContents();
+
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
@@ -1629,7 +2234,7 @@ internal static class ParticipantImportHandlers
 
         if (!csv.Read())
         {
-            return new ImportPayload([], [], false, [], false, [], [], [], false);
+            return new ImportPayload([], [], false, [], false, [], [], [], false, [], [], [], false, [], [], [], false);
         }
 
         csv.ReadHeader();
@@ -1672,6 +2277,14 @@ internal static class ParticipantImportHandlers
             [],
             [],
             [],
+            false,
+            [],
+            [],
+            [],
+            false,
+            [],
+            [],
+            [],
             false);
     }
 
@@ -1681,12 +2294,16 @@ internal static class ParticipantImportHandlers
         var participantWorksheet = FindWorksheet(workbook, "participants") ?? workbook.Worksheets.FirstOrDefault();
         if (participantWorksheet is null)
         {
-            return new ImportPayload([], [], false, [], false, [], [], [], false);
+            return new ImportPayload([], [], false, [], false, [], [], [], false, [], [], [], false, [], [], [], false);
         }
 
         var participantSheetData = ReadParticipantSheet(participantWorksheet);
         var flightSegmentsWorksheet = FindWorksheet(workbook, "flight_segments");
         var flightSegmentsSheetData = ReadFlightSegmentSheet(flightSegmentsWorksheet);
+        var accommodationSegmentsWorksheet = FindWorksheet(workbook, "accommodation_segments");
+        var accommodationSegmentsSheetData = ReadAccommodationSegmentSheet(accommodationSegmentsWorksheet);
+        var accommodationAssignmentsWorksheet = FindWorksheet(workbook, "accommodation_assignments");
+        var accommodationAssignmentsSheetData = ReadAccommodationAssignmentSheet(accommodationAssignmentsWorksheet);
 
         return new ImportPayload(
             participantSheetData.Rows,
@@ -1697,7 +2314,15 @@ internal static class ParticipantImportHandlers
             flightSegmentsSheetData.Rows,
             flightSegmentsSheetData.IgnoredColumns,
             flightSegmentsSheetData.MissingRequiredColumns,
-            flightSegmentsSheetData.LegacyHeadersDetected);
+            flightSegmentsSheetData.LegacyHeadersDetected,
+            accommodationSegmentsSheetData.Rows,
+            accommodationSegmentsSheetData.IgnoredColumns,
+            accommodationSegmentsSheetData.MissingRequiredColumns,
+            accommodationSegmentsWorksheet is not null,
+            accommodationAssignmentsSheetData.Rows,
+            accommodationAssignmentsSheetData.IgnoredColumns,
+            accommodationAssignmentsSheetData.MissingRequiredColumns,
+            accommodationAssignmentsWorksheet is not null);
     }
 
     private static ParticipantSheetData ReadParticipantSheet(IXLWorksheet worksheet)
@@ -1778,6 +2403,76 @@ internal static class ParticipantImportHandlers
             headerMap.IgnoredColumns,
             headerMap.MissingRequiredColumns,
             headerMap.LegacyHeadersDetected);
+    }
+
+    private static AccommodationSegmentSheetData ReadAccommodationSegmentSheet(IXLWorksheet? worksheet)
+    {
+        if (worksheet is null)
+        {
+            return new AccommodationSegmentSheetData([], [], []);
+        }
+
+        var headers = ReadWorksheetHeaders(worksheet, out var lastColumn);
+        if (lastColumn == 0)
+        {
+            return new AccommodationSegmentSheetData([], [], []);
+        }
+
+        var headerMap = BuildAccommodationSegmentHeaderMap(headers);
+        var rows = new List<AccommodationSegmentImportRow>();
+        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+        for (var row = 2; row <= lastRow; row++)
+        {
+            var rowValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in headerMap.CanonicalIndexes)
+            {
+                rowValues[pair.Key] = ReadCellValue(worksheet.Cell(row, pair.Value + 1), pair.Key);
+            }
+
+            if (rowValues.Values.All(string.IsNullOrWhiteSpace))
+            {
+                continue;
+            }
+
+            rows.Add(new AccommodationSegmentImportRow(row, rowValues));
+        }
+
+        return new AccommodationSegmentSheetData(rows, headerMap.IgnoredColumns, headerMap.MissingRequiredColumns);
+    }
+
+    private static AccommodationAssignmentSheetData ReadAccommodationAssignmentSheet(IXLWorksheet? worksheet)
+    {
+        if (worksheet is null)
+        {
+            return new AccommodationAssignmentSheetData([], [], []);
+        }
+
+        var headers = ReadWorksheetHeaders(worksheet, out var lastColumn);
+        if (lastColumn == 0)
+        {
+            return new AccommodationAssignmentSheetData([], [], []);
+        }
+
+        var headerMap = BuildAccommodationAssignmentHeaderMap(headers);
+        var rows = new List<AccommodationAssignmentImportRow>();
+        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+        for (var row = 2; row <= lastRow; row++)
+        {
+            var rowValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in headerMap.CanonicalIndexes)
+            {
+                rowValues[pair.Key] = ReadCellValue(worksheet.Cell(row, pair.Value + 1), pair.Key);
+            }
+
+            if (rowValues.Values.All(string.IsNullOrWhiteSpace))
+            {
+                continue;
+            }
+
+            rows.Add(new AccommodationAssignmentImportRow(row, rowValues));
+        }
+
+        return new AccommodationAssignmentSheetData(rows, headerMap.IgnoredColumns, headerMap.MissingRequiredColumns);
     }
 
     private static List<string> ReadWorksheetHeaders(IXLWorksheet worksheet, out int lastColumn)
@@ -1945,6 +2640,76 @@ internal static class ParticipantImportHandlers
             legacyHeadersDetected);
     }
 
+    private static SimpleHeaderMap BuildAccommodationSegmentHeaderMap(IReadOnlyList<string> headers)
+    {
+        var aliasMap = BuildAccommodationSegmentAliasMap();
+        var canonicalIndexes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var ignored = new List<string>();
+
+        for (var i = 0; i < headers.Count; i++)
+        {
+            var header = headers[i] ?? string.Empty;
+            var normalized = NormalizeHeader(header);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                ignored.Add(header);
+                continue;
+            }
+
+            if (!aliasMap.TryGetValue(normalized, out var canonical))
+            {
+                ignored.Add(header);
+                continue;
+            }
+
+            if (!canonicalIndexes.ContainsKey(canonical))
+            {
+                canonicalIndexes[canonical] = i;
+            }
+        }
+
+        var missingRequiredColumns = AccommodationSegmentRequiredHeaders
+            .Where(required => !canonicalIndexes.ContainsKey(required))
+            .ToArray();
+
+        return new SimpleHeaderMap(canonicalIndexes, ignored.ToArray(), missingRequiredColumns);
+    }
+
+    private static SimpleHeaderMap BuildAccommodationAssignmentHeaderMap(IReadOnlyList<string> headers)
+    {
+        var aliasMap = BuildAccommodationAssignmentAliasMap();
+        var canonicalIndexes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var ignored = new List<string>();
+
+        for (var i = 0; i < headers.Count; i++)
+        {
+            var header = headers[i] ?? string.Empty;
+            var normalized = NormalizeHeader(header);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                ignored.Add(header);
+                continue;
+            }
+
+            if (!aliasMap.TryGetValue(normalized, out var canonical))
+            {
+                ignored.Add(header);
+                continue;
+            }
+
+            if (!canonicalIndexes.ContainsKey(canonical))
+            {
+                canonicalIndexes[canonical] = i;
+            }
+        }
+
+        var missingRequiredColumns = AccommodationAssignmentRequiredHeaders
+            .Where(required => !canonicalIndexes.ContainsKey(required))
+            .ToArray();
+
+        return new SimpleHeaderMap(canonicalIndexes, ignored.ToArray(), missingRequiredColumns);
+    }
+
     private static Dictionary<string, string> BuildAliasMap()
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -2087,6 +2852,81 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("kabin bagajı")] = "cabin_baggage";
 
         return map;
+    }
+
+    private static Dictionary<string, string> BuildAccommodationSegmentAliasMap()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in AccommodationSegmentRequiredHeaders)
+        {
+            map[NormalizeHeader(header)] = header;
+        }
+
+        map[NormalizeHeader("segment key")] = "segment_key";
+        map[NormalizeHeader("segment")] = "segment_key";
+        map[NormalizeHeader("konaklama")] = "accommodation";
+        map[NormalizeHeader("hotel")] = "accommodation";
+        map[NormalizeHeader("otel")] = "accommodation";
+        map[NormalizeHeader("start")] = "start_date";
+        map[NormalizeHeader("giris")] = "start_date";
+        map[NormalizeHeader("başlangıç")] = "start_date";
+        map[NormalizeHeader("baslangic")] = "start_date";
+        map[NormalizeHeader("end")] = "end_date";
+        map[NormalizeHeader("cikis")] = "end_date";
+        map[NormalizeHeader("bitis")] = "end_date";
+        map[NormalizeHeader("bitiş")] = "end_date";
+
+        return map;
+    }
+
+    private static Dictionary<string, string> BuildAccommodationAssignmentAliasMap()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in AccommodationAssignmentCanonicalHeaders)
+        {
+            map[NormalizeHeader(header)] = header;
+        }
+
+        map[NormalizeHeader("tc kimlik no")] = "tc_no";
+        map[NormalizeHeader("segment key")] = "segment_key";
+        map[NormalizeHeader("accommodation")] = "accommodation_override";
+        map[NormalizeHeader("konaklama")] = "accommodation_override";
+        map[NormalizeHeader("hotel")] = "accommodation_override";
+        map[NormalizeHeader("otel")] = "accommodation_override";
+        map[NormalizeHeader("oda")] = "room_no";
+        map[NormalizeHeader("oda no")] = "room_no";
+        map[NormalizeHeader("odano")] = "room_no";
+        map[NormalizeHeader("roomno")] = "room_no";
+        map[NormalizeHeader("oda tipi")] = "room_type";
+        map[NormalizeHeader("odatipi")] = "room_type";
+        map[NormalizeHeader("roomtype")] = "room_type";
+        map[NormalizeHeader("pansiyon")] = "board_type";
+        map[NormalizeHeader("boardtype")] = "board_type";
+        map[NormalizeHeader("kisi no")] = "person_no";
+        map[NormalizeHeader("kişi no")] = "person_no";
+        map[NormalizeHeader("kisino")] = "person_no";
+        map[NormalizeHeader("personno")] = "person_no";
+
+        return map;
+    }
+
+    private static AccommodationHotelTab? ResolveAccommodationHotelInput(
+        string? input,
+        List<AccommodationHotelTab> hotelTabs)
+    {
+        var normalizedInput = NormalizeOptionalText(input);
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return null;
+        }
+
+        if (Guid.TryParse(normalizedInput, out var hotelTabId))
+        {
+            return hotelTabs.FirstOrDefault(x => x.Id == hotelTabId);
+        }
+
+        var normalizedKey = NormalizeHeader(normalizedInput);
+        return hotelTabs.FirstOrDefault(x => NormalizeHeader(x.Title) == normalizedKey);
     }
 
     private static string NormalizeHeader(string value)
@@ -2552,17 +3392,22 @@ internal static class ParticipantImportHandlers
         int? returnBaggageTotalKg,
         TimeOnly? arrivalTransferPickupTime,
         TimeOnly? returnTransferPickupTime,
+        bool includeAccommodationFields,
         bool includeLegacyFlightFields)
     {
-        details.RoomNo = row.GetValue("room_no");
-        details.RoomType = row.GetValue("room_type");
-        details.BoardType = row.GetValue("board_type");
-        details.PersonNo = row.GetValue("person_no");
+        if (includeAccommodationFields)
+        {
+            details.RoomNo = row.GetValue("room_no");
+            details.RoomType = row.GetValue("room_type");
+            details.BoardType = row.GetValue("board_type");
+            details.PersonNo = row.GetValue("person_no");
+            details.HotelCheckInDate = hotelCheckIn;
+            details.HotelCheckOutDate = hotelCheckOut;
+        }
+
         details.AgencyName = row.GetValue("agency_name");
         details.City = row.GetValue("city");
         details.FlightCity = row.GetValue("flight_city");
-        details.HotelCheckInDate = hotelCheckIn;
-        details.HotelCheckOutDate = hotelCheckOut;
         details.AttendanceStatus = row.GetValue("attendance_status");
         details.InsuranceCompanyName = row.GetValue("insurance_company_name");
         details.InsurancePolicyNo = row.GetValue("insurance_policy_no");
@@ -2622,11 +3467,62 @@ internal static class ParticipantImportHandlers
         details.ReturnTransferNote = row.GetValue("return_transfer_note");
     }
 
+    private static bool HasParticipantDetailValue(ImportRow row, bool ignoreAccommodationFields)
+    {
+        foreach (var pair in row.Values)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Value))
+            {
+                continue;
+            }
+
+            if (IsCoreParticipantColumn(pair.Key))
+            {
+                continue;
+            }
+
+            if (ignoreAccommodationFields && LegacyParticipantAccommodationHeaders.Contains(pair.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsCoreParticipantColumn(string key)
+        => key is "first_name"
+            or "last_name"
+            or "full_name"
+            or "phone"
+            or "email"
+            or "tc_no"
+            or "birth_date"
+            or "gender";
+
     private static bool HasAnyLegacyParticipantFlightValue(List<ImportRow> rows)
     {
         foreach (var row in rows)
         {
             foreach (var header in LegacyParticipantFlightHeaders)
+            {
+                if (!string.IsNullOrWhiteSpace(row.GetValue(header)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAnyLegacyParticipantAccommodationValue(List<ImportRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            foreach (var header in LegacyParticipantAccommodationHeaders)
             {
                 if (!string.IsNullOrWhiteSpace(row.GetValue(header)))
                 {
@@ -2712,14 +3608,26 @@ internal static class ParticipantImportHandlers
         int updated,
         List<ParticipantImportError> errors,
         List<ParticipantImportWarning> warnings,
-        List<ParticipantImportPreviewRow> previewRows)
+        List<ParticipantImportPreviewRow> previewRows,
+        int accommodationSegmentsImported = 0,
+        int accommodationSegmentsCreated = 0,
+        int accommodationSegmentsUpdated = 0,
+        int accommodationAssignmentsImported = 0,
+        int accommodationAssignmentsCreated = 0,
+        int accommodationAssignmentsUpdated = 0,
+        int accommodationAssignmentsDeleted = 0)
     {
-        var totalRows = payload.Rows.Count + payload.FlightSegmentRows.Count;
+        var totalRows = payload.Rows.Count
+            + payload.FlightSegmentRows.Count
+            + payload.AccommodationSegmentRows.Count
+            + payload.AccommodationAssignmentRows.Count;
         var validRows = Math.Max(totalRows - errors.Count, 0);
         var skipped = Math.Max(totalRows - imported, 0);
         var previewTruncated = totalRows > PreviewRowLimit;
         var ignoredColumns = payload.IgnoredColumns
             .Concat(payload.FlightSegmentIgnoredColumns.Select(x => $"flight_segments.{x}"))
+            .Concat(payload.AccommodationSegmentIgnoredColumns.Select(x => $"accommodation_segments.{x}"))
+            .Concat(payload.AccommodationAssignmentIgnoredColumns.Select(x => $"accommodation_assignments.{x}"))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -2737,7 +3645,14 @@ internal static class ParticipantImportHandlers
             ignoredColumns,
             errors.OrderBy(x => x.Row).ToArray(),
             warnings.OrderBy(x => x.Row).ToArray(),
-            previewRows.OrderBy(x => x.RowIndex).ToArray());
+            previewRows.OrderBy(x => x.RowIndex).ToArray(),
+            accommodationSegmentsImported,
+            accommodationSegmentsCreated,
+            accommodationSegmentsUpdated,
+            accommodationAssignmentsImported,
+            accommodationAssignmentsCreated,
+            accommodationAssignmentsUpdated,
+            accommodationAssignmentsDeleted);
     }
 
     private sealed record ImportPayload(
@@ -2749,7 +3664,15 @@ internal static class ParticipantImportHandlers
         List<FlightSegmentImportRow> FlightSegmentRows,
         string[] FlightSegmentIgnoredColumns,
         string[] MissingFlightSegmentRequiredColumns,
-        bool FlightSegmentLegacyHeadersDetected);
+        bool FlightSegmentLegacyHeadersDetected,
+        List<AccommodationSegmentImportRow> AccommodationSegmentRows,
+        string[] AccommodationSegmentIgnoredColumns,
+        string[] MissingAccommodationSegmentRequiredColumns,
+        bool HasAccommodationSegmentsSheet,
+        List<AccommodationAssignmentImportRow> AccommodationAssignmentRows,
+        string[] AccommodationAssignmentIgnoredColumns,
+        string[] MissingAccommodationAssignmentRequiredColumns,
+        bool HasAccommodationAssignmentsSheet);
     private sealed record ImportRow(int RowNumber, Dictionary<string, string?> Values, bool HasAnyDetails)
     {
         public string? GetValue(string key)
@@ -2757,6 +3680,18 @@ internal static class ParticipantImportHandlers
     }
 
     private sealed record FlightSegmentImportRow(int RowNumber, Dictionary<string, string?> Values)
+    {
+        public string? GetValue(string key)
+            => Values.TryGetValue(key, out var value) ? value : null;
+    }
+
+    private sealed record AccommodationSegmentImportRow(int RowNumber, Dictionary<string, string?> Values)
+    {
+        public string? GetValue(string key)
+            => Values.TryGetValue(key, out var value) ? value : null;
+    }
+
+    private sealed record AccommodationAssignmentImportRow(int RowNumber, Dictionary<string, string?> Values)
     {
         public string? GetValue(string key)
             => Values.TryGetValue(key, out var value) ? value : null;
@@ -2783,12 +3718,37 @@ internal static class ParticipantImportHandlers
         string? ParticipantNameReference,
         string TcNo);
 
+    private sealed record ParsedAccommodationAssignmentRow(
+        int RowNumber,
+        Guid ParticipantId,
+        string TcNo,
+        string? ParticipantName,
+        string SegmentKey,
+        Guid SegmentId,
+        string DefaultAccommodationTitle,
+        Guid? OverrideAccommodationDocTabId,
+        string? OverrideAccommodationTitle,
+        string? RoomNo,
+        string? RoomType,
+        string? BoardType,
+        string? PersonNo);
+
     private sealed record ParticipantSheetData(List<ImportRow> Rows, HeaderMap HeaderMap);
     private sealed record FlightSegmentSheetData(
         List<FlightSegmentImportRow> Rows,
         string[] IgnoredColumns,
         string[] MissingRequiredColumns,
         bool LegacyHeadersDetected);
+
+    private sealed record AccommodationSegmentSheetData(
+        List<AccommodationSegmentImportRow> Rows,
+        string[] IgnoredColumns,
+        string[] MissingRequiredColumns);
+
+    private sealed record AccommodationAssignmentSheetData(
+        List<AccommodationAssignmentImportRow> Rows,
+        string[] IgnoredColumns,
+        string[] MissingRequiredColumns);
 
     private sealed record HeaderMap(
         Dictionary<string, int> CanonicalIndexes,
@@ -2804,4 +3764,15 @@ internal static class ParticipantImportHandlers
         string[] IgnoredColumns,
         string[] MissingRequiredColumns,
         bool LegacyHeadersDetected);
+
+    private sealed record SimpleHeaderMap(
+        Dictionary<string, int> CanonicalIndexes,
+        string[] IgnoredColumns,
+        string[] MissingRequiredColumns);
+
+    private sealed record ImportedAccommodationSegmentContext(
+        EventAccommodationSegmentEntity Segment,
+        string DefaultAccommodationTitle);
+
+    private sealed record AccommodationHotelTab(Guid Id, string Title);
 }

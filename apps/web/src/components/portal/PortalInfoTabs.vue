@@ -7,7 +7,7 @@ import { useToast } from '../../lib/toast'
 import CopyIcon from '../icons/CopyIcon.vue'
 import type {
   FlightSegment,
-  ParticipantAccommodationStay,
+  PortalAccommodationSegment,
   PortalDocsResponse,
   PortalFlightInfo,
   PortalInsuranceInfo,
@@ -23,7 +23,7 @@ type TabItem = {
 
 const props = defineProps<{
   docs?: PortalDocsResponse | null
-  stays?: ParticipantAccommodationStay[] | null
+  accommodationSegments?: PortalAccommodationSegment[] | null
   printMode?: boolean
   participantName?: string | null
 }>()
@@ -105,6 +105,7 @@ const isFlightLikeTab = (tab: { title: string; type: string }) => {
 }
 
 const printCustomTabs = computed(() => customTabs.value.filter((tab) => !isFlightLikeTab(tab)))
+const hasAccommodationSegments = computed(() => (props.accommodationSegments?.length ?? 0) > 0)
 
 const tabs = computed<TabItem[]>(() => [
   { id: 'flight', label: t('portal.infoTabs.flight'), kind: 'flight' },
@@ -307,6 +308,29 @@ const contentPhone = (content: unknown) => {
     link: buildTelLink(raw),
   }
 }
+
+const accommodationStatusLabel = (segment: PortalAccommodationSegment) => {
+  if (segment.isCurrent) {
+    return t('portal.docs.currentStay')
+  }
+  if (segment.isUpcoming) {
+    return t('portal.docs.nextStay')
+  }
+  return t('portal.docs.previousStay')
+}
+
+const accommodationStatusClass = (segment: PortalAccommodationSegment) => {
+  if (segment.isCurrent) {
+    return 'border-blue-200 bg-blue-50'
+  }
+  if (segment.isUpcoming) {
+    return 'border-emerald-200 bg-emerald-50'
+  }
+  return 'border-slate-100'
+}
+
+const accommodationRangeLabel = (segment: PortalAccommodationSegment) =>
+  `${formatDate(segment.startDate)} – ${formatDate(segment.endDate)}`
 
 const hasAccommodationContent = (content: unknown) =>
   Boolean(
@@ -823,97 +847,171 @@ const formatCustomValue = (value: unknown): string => {
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
         <div class="print-title text-sm font-semibold text-slate-900">{{ t('portal.infoTabs.hotel') }}</div>
-        <div class="mt-3 space-y-3 text-sm">
-          <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500 print-row">
-            {{ t('portal.infoTabs.empty') }}
-          </div>
-          <div
-            v-for="(tab, index) in accommodationTabs"
-            :key="`print-accommodation-${tab.id}`"
-            class="space-y-2 rounded-xl border border-slate-100 p-3 print-row"
-          >
-            <div class="text-xs font-semibold text-slate-500">{{ accommodationListLabel(index, tab.displayTitle) }}</div>
-            <template v-if="hasAccommodationContent(tab.content)">
-              <div v-if="hasText(readContentString(tab.content, 'hotelName'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
-                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'hotelName') }}</span>
-              </div>
-              <div v-if="hasText(readContentString(tab.content, 'address'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+        <template v-if="hasAccommodationSegments">
+          <div class="mt-3 space-y-3 text-sm">
+            <div
+              v-for="segment in props.accommodationSegments"
+              :key="`print-accommodation-segment-${segment.segmentId}`"
+              class="space-y-2 rounded-xl border border-slate-100 p-3 print-row"
+            >
+              <div class="text-xs font-semibold text-slate-500">{{ accommodationStatusLabel(segment) }}</div>
+              <div class="font-semibold text-slate-800">{{ segment.accommodationTitle }}</div>
+              <div class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.checkIn') }} – {{ t('portal.docs.checkOut') }}</span>
                 <span class="text-right font-medium text-slate-800">
-                  <a
-                    v-if="buildMapsLink(readContentString(tab.content, 'address'))"
-                    :href="buildMapsLink(readContentString(tab.content, 'address'))"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="underline"
-                  >
-                    {{ readContentString(tab.content, 'address') }}
-                  </a>
-                  <span v-else>{{ contentValue(tab.content, 'address') }}</span>
+                  {{ accommodationRangeLabel(segment) }}
+                  <span v-if="segment.nightCount" class="ml-1 text-slate-400">
+                    ({{ t('portal.docs.stayDurationNights', { count: segment.nightCount }) }})
+                  </span>
                 </span>
               </div>
-              <div v-if="hasText(contentPhone(tab.content).raw)" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
-                <span class="text-right font-medium text-slate-800">
-                  <a
-                    v-if="contentPhone(tab.content).link"
-                    :href="contentPhone(tab.content).link"
-                    class="underline"
-                  >
-                    {{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}
-                  </a>
-                  <span v-else>{{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}</span>
-                </span>
+              <template v-if="segment.accommodationContent">
+                <div v-if="hasText(readContentString(segment.accommodationContent, 'address'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+                  <span class="text-right font-medium text-slate-800">
+                    <a
+                      v-if="buildMapsLink(readContentString(segment.accommodationContent, 'address'))"
+                      :href="buildMapsLink(readContentString(segment.accommodationContent, 'address'))"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="underline"
+                    >
+                      {{ readContentString(segment.accommodationContent, 'address') }}
+                    </a>
+                    <span v-else>{{ readContentString(segment.accommodationContent, 'address') }}</span>
+                  </span>
+                </div>
+                <div v-if="hasText(contentPhone(segment.accommodationContent).raw)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+                  <span class="text-right font-medium text-slate-800">
+                    <a
+                      v-if="contentPhone(segment.accommodationContent).link"
+                      :href="contentPhone(segment.accommodationContent).link"
+                      class="underline"
+                    >
+                      {{ contentPhone(segment.accommodationContent).display || contentPhone(segment.accommodationContent).raw }}
+                    </a>
+                    <span v-else>{{ contentPhone(segment.accommodationContent).display || contentPhone(segment.accommodationContent).raw }}</span>
+                  </span>
+                </div>
+              </template>
+              <div v-if="segment.roomNo" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.roomNo') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ segment.roomNo }}</span>
               </div>
-              <div v-if="hasText(readContentString(tab.content, 'checkInDate'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.checkInDate') }}</span>
-                <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkInDate')) }}</span>
+              <div v-if="segment.roomType" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.roomType') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ segment.roomType }}</span>
               </div>
-              <div v-if="hasText(readContentString(tab.content, 'checkOutDate'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.checkOutDate') }}</span>
-                <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkOutDate')) }}</span>
+              <div v-if="segment.boardType" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.boardType') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ formatBoard(segment.boardType) }}</span>
               </div>
-              <div v-if="getAccommodationStayNights(tab.content) !== null" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.stayDuration') }}</span>
-                <span class="text-right font-medium text-slate-800">
-                  {{ t('portal.docs.stayDurationNights', { count: getAccommodationStayNights(tab.content) }) }}
-                </span>
+              <div v-if="segment.personNo" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.personNo') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ segment.personNo }}</span>
               </div>
-              <div v-if="hasText(readContentString(tab.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
-                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkInNote') }}</span>
+              <div v-if="segment.roommates.length > 0" class="flex items-start justify-between gap-3">
+                <span class="text-slate-500">{{ t('portal.docs.roommates') }}</span>
+                <span class="text-right font-medium text-slate-800">{{ segment.roommates.join(', ') }}</span>
               </div>
-              <div v-if="hasText(readContentString(tab.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
-                <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkOutNote') }}</span>
-              </div>
-            </template>
-            <p v-else class="text-xs text-slate-500">{{ t('portal.infoTabs.empty') }}</p>
+            </div>
           </div>
-        </div>
-        <div class="mt-4 space-y-2 text-sm">
-          <div v-if="hasText(travel?.roomNo)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.roomNo') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.roomNo) }}</span>
+        </template>
+
+        <template v-else>
+          <div class="mt-3 space-y-3 text-sm">
+            <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500 print-row">
+              {{ t('portal.infoTabs.empty') }}
+            </div>
+            <div
+              v-for="(tab, index) in accommodationTabs"
+              :key="`print-accommodation-${tab.id}`"
+              class="space-y-2 rounded-xl border border-slate-100 p-3 print-row"
+            >
+              <div class="text-xs font-semibold text-slate-500">{{ accommodationListLabel(index, tab.displayTitle) }}</div>
+              <template v-if="hasAccommodationContent(tab.content)">
+                <div v-if="hasText(readContentString(tab.content, 'hotelName'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.hotelName') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'hotelName') }}</span>
+                </div>
+                <div v-if="hasText(readContentString(tab.content, 'address'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+                  <span class="text-right font-medium text-slate-800">
+                    <a
+                      v-if="buildMapsLink(readContentString(tab.content, 'address'))"
+                      :href="buildMapsLink(readContentString(tab.content, 'address'))"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="underline"
+                    >
+                      {{ readContentString(tab.content, 'address') }}
+                    </a>
+                    <span v-else>{{ contentValue(tab.content, 'address') }}</span>
+                  </span>
+                </div>
+                <div v-if="hasText(contentPhone(tab.content).raw)" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+                  <span class="text-right font-medium text-slate-800">
+                    <a
+                      v-if="contentPhone(tab.content).link"
+                      :href="contentPhone(tab.content).link"
+                      class="underline"
+                    >
+                      {{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}
+                    </a>
+                    <span v-else>{{ contentPhone(tab.content).display || contentPhone(tab.content).raw }}</span>
+                  </span>
+                </div>
+                <div v-if="hasText(readContentString(tab.content, 'checkInDate'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.checkInDate') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkInDate')) }}</span>
+                </div>
+                <div v-if="hasText(readContentString(tab.content, 'checkOutDate'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.checkOutDate') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ formatDate(readContentString(tab.content, 'checkOutDate')) }}</span>
+                </div>
+                <div v-if="getAccommodationStayNights(tab.content) !== null" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.stayDuration') }}</span>
+                  <span class="text-right font-medium text-slate-800">
+                    {{ t('portal.docs.stayDurationNights', { count: getAccommodationStayNights(tab.content) }) }}
+                  </span>
+                </div>
+                <div v-if="hasText(readContentString(tab.content, 'checkInNote'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.checkInNote') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkInNote') }}</span>
+                </div>
+                <div v-if="hasText(readContentString(tab.content, 'checkOutNote'))" class="flex items-start justify-between gap-3">
+                  <span class="text-slate-500">{{ t('portal.docs.checkOutNote') }}</span>
+                  <span class="text-right font-medium text-slate-800">{{ contentValue(tab.content, 'checkOutNote') }}</span>
+                </div>
+              </template>
+              <p v-else class="text-xs text-slate-500">{{ t('portal.infoTabs.empty') }}</p>
+            </div>
           </div>
-          <div v-if="hasText(travel?.roomType)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.roomType') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.roomType) }}</span>
+          <div class="mt-4 space-y-2 text-sm">
+            <div v-if="hasText(travel?.roomNo)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.roomNo') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.roomNo) }}</span>
+            </div>
+            <div v-if="hasText(travel?.roomType)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.roomType') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ valueOrDash(travel?.roomType) }}</span>
+            </div>
+            <div v-if="hasText(travel?.boardType)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.boardType') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatBoard(travel?.boardType) }}</span>
+            </div>
+            <div v-if="hasText(travel?.hotelCheckInDate)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.checkIn') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.hotelCheckInDate) }}</span>
+            </div>
+            <div v-if="hasText(travel?.hotelCheckOutDate)" class="flex items-start justify-between gap-3 print-row">
+              <span class="text-slate-500">{{ t('portal.docs.checkOut') }}</span>
+              <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.hotelCheckOutDate) }}</span>
+            </div>
           </div>
-          <div v-if="hasText(travel?.boardType)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.boardType') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatBoard(travel?.boardType) }}</span>
-          </div>
-          <div v-if="hasText(travel?.hotelCheckInDate)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.checkIn') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.hotelCheckInDate) }}</span>
-          </div>
-          <div v-if="hasText(travel?.hotelCheckOutDate)" class="flex items-start justify-between gap-3 print-row">
-            <span class="text-slate-500">{{ t('portal.docs.checkOut') }}</span>
-            <span class="text-right font-medium text-slate-800">{{ formatDate(travel?.hotelCheckOutDate) }}</span>
-          </div>
-        </div>
+        </template>
       </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print-card">
@@ -1372,68 +1470,72 @@ const formatCustomValue = (value: unknown): string => {
     <div v-else-if="activeTab?.kind === 'hotel'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="text-sm font-semibold text-slate-900">{{ t('portal.docs.accommodationCardTitle') }}</div>
 
-      <!-- New stays-based view -->
-      <template v-if="props.stays && props.stays.length > 0">
+      <template v-if="hasAccommodationSegments">
         <div class="mt-3 space-y-3">
           <div
-            v-for="stay in props.stays"
-            :key="stay.id"
-            :class="['rounded-xl border p-3 text-sm space-y-2', stay.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-slate-100']"
+            v-for="segment in props.accommodationSegments"
+            :key="segment.segmentId"
+            :class="['rounded-xl border p-3 text-sm space-y-2', accommodationStatusClass(segment)]"
           >
             <div class="text-xs font-semibold text-slate-500">
-              <span v-if="stay.isCurrent">{{ t('portal.docs.currentStay') }}</span>
-              <span v-else-if="stay.checkIn && stay.checkIn > new Date().toISOString().slice(0,10)">{{ t('portal.docs.nextStay') }}</span>
-              <span v-else>{{ t('portal.docs.previousStay') }}</span>
+              {{ accommodationStatusLabel(segment) }}
             </div>
-            <div v-if="stay.accommodationTitle" class="font-semibold text-slate-800">{{ stay.accommodationTitle }}</div>
-            <template v-if="stay.accommodationContent">
-              <div v-if="hasText(readContentString(stay.accommodationContent, 'address'))" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
-                <span class="text-right font-medium text-slate-800">
+            <div v-if="segment.accommodationTitle" class="font-semibold text-slate-800">{{ segment.accommodationTitle }}</div>
+            <template v-if="segment.accommodationContent">
+              <div v-if="hasText(readContentString(segment.accommodationContent, 'address'))" class="flex items-start justify-between gap-3">
+                <span class="shrink-0 text-slate-500">{{ t('portal.docs.hotelAddress') }}</span>
+                <span class="min-w-0 break-words text-right font-medium text-slate-800">
                   <a
-                    v-if="buildMapsLink(readContentString(stay.accommodationContent, 'address'))"
-                    :href="buildMapsLink(readContentString(stay.accommodationContent, 'address'))"
+                    v-if="buildMapsLink(readContentString(segment.accommodationContent, 'address'))"
+                    :href="buildMapsLink(readContentString(segment.accommodationContent, 'address'))"
                     target="_blank"
                     rel="noreferrer"
                     class="portal-inline-action text-slate-800"
-                  >{{ readContentString(stay.accommodationContent, 'address') }}</a>
-                  <span v-else>{{ readContentString(stay.accommodationContent, 'address') }}</span>
+                  >{{ readContentString(segment.accommodationContent, 'address') }}</a>
+                  <span v-else>{{ readContentString(segment.accommodationContent, 'address') }}</span>
                 </span>
               </div>
-              <div v-if="hasText(contentPhone(stay.accommodationContent).raw)" class="flex items-start justify-between gap-3">
-                <span class="text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
-                <span class="text-right font-medium text-slate-800">
-                  <a v-if="contentPhone(stay.accommodationContent).link" :href="contentPhone(stay.accommodationContent).link" class="portal-inline-action text-slate-800">
-                    {{ contentPhone(stay.accommodationContent).display || contentPhone(stay.accommodationContent).raw }}
+              <div v-if="hasText(contentPhone(segment.accommodationContent).raw)" class="flex items-start justify-between gap-3">
+                <span class="shrink-0 text-slate-500">{{ t('portal.docs.hotelPhone') }}</span>
+                <span class="min-w-0 break-words text-right font-medium text-slate-800">
+                  <a v-if="contentPhone(segment.accommodationContent).link" :href="contentPhone(segment.accommodationContent).link" class="portal-inline-action text-slate-800">
+                    {{ contentPhone(segment.accommodationContent).display || contentPhone(segment.accommodationContent).raw }}
                   </a>
-                  <span v-else>{{ contentPhone(stay.accommodationContent).display || contentPhone(stay.accommodationContent).raw }}</span>
+                  <span v-else>{{ contentPhone(segment.accommodationContent).display || contentPhone(segment.accommodationContent).raw }}</span>
                 </span>
               </div>
             </template>
-            <div v-if="stay.checkIn || stay.checkOut" class="flex items-start justify-between gap-3">
-              <span class="text-slate-500">{{ t('portal.docs.checkIn') }} – {{ t('portal.docs.checkOut') }}</span>
-              <span class="text-right font-medium text-slate-800">
-                {{ formatDate(stay.checkIn) }} – {{ formatDate(stay.checkOut) }}
-                <span v-if="stay.nightCount" class="ml-1 text-slate-400">({{ stay.nightCount }}n)</span>
+            <div class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.checkIn') }} – {{ t('portal.docs.checkOut') }}</span>
+              <span class="min-w-0 text-right font-medium text-slate-800">
+                {{ accommodationRangeLabel(segment) }}
+                <span v-if="segment.nightCount" class="ml-1 text-slate-400">({{ t('portal.docs.stayDurationNights', { count: segment.nightCount }) }})</span>
               </span>
             </div>
-            <div v-if="stay.roomNo" class="flex items-start justify-between gap-3">
-              <span class="text-slate-500">{{ t('portal.docs.roomNo') }}</span>
-              <span class="text-right font-medium text-slate-800">{{ stay.roomNo }}</span>
+            <div v-if="segment.roomNo" class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.roomNo') }}</span>
+              <span class="min-w-0 text-right font-medium text-slate-800">{{ segment.roomNo }}</span>
             </div>
-            <div v-if="stay.boardType" class="flex items-start justify-between gap-3">
-              <span class="text-slate-500">{{ t('portal.docs.boardType') }}</span>
-              <span class="text-right font-medium text-slate-800">{{ formatBoard(stay.boardType) }}</span>
+            <div v-if="segment.roomType" class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.roomType') }}</span>
+              <span class="min-w-0 text-right font-medium text-slate-800">{{ segment.roomType }}</span>
             </div>
-            <div v-if="stay.roommates && stay.roommates.length > 0" class="flex items-start justify-between gap-3">
-              <span class="text-slate-500">{{ t('portal.docs.roommates') }}</span>
-              <span class="text-right font-medium text-slate-800">{{ stay.roommates.join(', ') }}</span>
+            <div v-if="segment.boardType" class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.boardType') }}</span>
+              <span class="min-w-0 text-right font-medium text-slate-800">{{ formatBoard(segment.boardType) }}</span>
+            </div>
+            <div v-if="segment.personNo" class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.personNo') }}</span>
+              <span class="min-w-0 text-right font-medium text-slate-800">{{ segment.personNo }}</span>
+            </div>
+            <div v-if="segment.roommates && segment.roommates.length > 0" class="flex items-start justify-between gap-3">
+              <span class="shrink-0 text-slate-500">{{ t('portal.docs.roommates') }}</span>
+              <span class="min-w-0 break-words text-right font-medium text-slate-800">{{ segment.roommates.join(', ') }}</span>
             </div>
           </div>
         </div>
       </template>
 
-      <!-- Legacy flat view (fallback when stays not provided) -->
       <template v-else>
       <div class="mt-3 space-y-3 text-sm">
         <div v-if="accommodationTabs.length === 0" class="text-xs text-slate-500">

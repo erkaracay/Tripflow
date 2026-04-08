@@ -137,6 +137,12 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['Guide'] },
     },
     {
+      path: '/guide/events/:eventId/accommodation',
+      component: () => import('./pages/guide/GuideAccommodation.vue'),
+      props: true,
+      meta: { requiresAuth: true, roles: ['Guide'] },
+    },
+    {
       path: '/guide/events/:eventId/program/edit',
       component: () => import('./pages/guide/GuideEventProgramEditor.vue'),
       props: true,

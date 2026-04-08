@@ -19,7 +19,25 @@ public sealed record PortalMeResponse(
     EventPortalInfo Portal,
     EventScheduleDto Schedule,
     PortalDocsResponse Docs,
+    PortalAccommodationSegmentDto[] AccommodationSegments,
     ParticipantAccommodationStayDto[] Stays);
+
+public sealed record PortalAccommodationSegmentDto(
+    Guid SegmentId,
+    string StartDate,
+    string EndDate,
+    Guid AccommodationDocTabId,
+    string AccommodationTitle,
+    JsonElement? AccommodationContent,
+    string? RoomNo,
+    string? RoomType,
+    string? BoardType,
+    string? PersonNo,
+    bool UsesOverride,
+    int? NightCount,
+    bool IsCurrent,
+    bool IsUpcoming,
+    string[] Roommates);
 
 public sealed record PortalEventSummary(
     Guid Id,
