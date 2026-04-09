@@ -20,5 +20,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build /app/efbundle ./efbundle
-RUN chmod +x ./efbundle
+COPY ./render-predeploy.sh ./render-predeploy.sh
+RUN chmod +x ./efbundle ./render-predeploy.sh
 CMD ["sh", "-c", "dotnet Tripflow.Api.dll --urls http://0.0.0.0:${PORT:-8080}"]

@@ -147,7 +147,7 @@ API Docker image'i artık migration bundle üretebilir. Render'da mevcut `Connec
 
 1) API servisinde `Pre-Deploy Command` alanına şunu yaz:
 
-    /app/efbundle --connection "$ConnectionStrings__TripflowDb"
+    /app/render-predeploy.sh
 
 2) Deploy akışı şu olur:
 
@@ -158,6 +158,7 @@ API Docker image'i artık migration bundle üretebilir. Render'da mevcut `Connec
 
 Notlar:
 
+- Script önce `CONNECTION_STRING`, yoksa `ConnectionStrings__TripflowDb` env var'ını kullanır.
 - Render'daki `ConnectionStrings__TripflowDb` değeri local'de user-secrets ile verdiğin connection string'in prod karşılığıdır.
 - Migration başarısız olursa deploy durur ve mevcut release çalışmaya devam eder.
 - Destructive migration'ları (drop/rename/backfill) mümkün olduğunca ayrı ve kontrollü rollout et.
