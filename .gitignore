@@ -57,3 +57,6 @@ TestResults/
 docker-compose.override.yml
 
 .git-credentials
+
+# ---- AI Stuff ----
+.claude/*
