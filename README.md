@@ -140,3 +140,24 @@ API base URL için apps/web/.env.local (veya apps/web/.env) kullan:
 
 - appsettings.json içine secret koyulmuyor
 - Local'de user-secrets, prod/CI tarafında environment variables tercih edilir.
+
+## Production migration (Render)
+
+API Docker image'i artık migration bundle üretebilir. Render'da mevcut `ConnectionStrings__TripflowDb` environment variable'ını kullanıp migration'ı deploy öncesinde çalıştır:
+
+1) API servisinde `Pre-Deploy Command` alanına şunu yaz:
+
+    /app/efbundle --connection "$ConnectionStrings__TripflowDb"
+
+2) Deploy akışı şu olur:
+
+- main'e push
+- Render image build
+- pre-deploy migration
+- migration başarılıysa yeni release ayağa kalkar
+
+Notlar:
+
+- Render'daki `ConnectionStrings__TripflowDb` değeri local'de user-secrets ile verdiğin connection string'in prod karşılığıdır.
+- Migration başarısız olursa deploy durur ve mevcut release çalışmaya devam eder.
+- Destructive migration'ları (drop/rename/backfill) mümkün olduğunca ayrı ve kontrollü rollout et.
