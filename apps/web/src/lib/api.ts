@@ -11,8 +11,6 @@ import type {
   BulkApplyFlightSegmentsRequest,
   BulkApplyFlightSegmentsResponse,
   GuideAccommodationParticipantResponse,
-  ParticipantAccommodationStay,
-  UpsertParticipantAccommodationStayRequest,
   PortalLoginResponse,
   PortalMealResponse,
   PortalMealSelectionsUpsertRequest,
@@ -438,24 +436,3 @@ export const portalResolveEvent = async (eventAccessCode: string): Promise<Porta
 export const portalLogout = async (): Promise<void> => {
   await fetch(buildUrl('/api/portal/logout'), { method: 'POST', credentials: 'include' })
 }
-
-export const getParticipantStays = (eventId: string, participantId: string): Promise<ParticipantAccommodationStay[]> =>
-  apiGet<ParticipantAccommodationStay[]>(`/api/events/${eventId}/participants/${participantId}/stays`)
-
-export const createParticipantStay = (
-  eventId: string,
-  participantId: string,
-  request: UpsertParticipantAccommodationStayRequest
-): Promise<ParticipantAccommodationStay> =>
-  apiPost<ParticipantAccommodationStay>(`/api/events/${eventId}/participants/${participantId}/stays`, request)
-
-export const updateParticipantStay = (
-  eventId: string,
-  participantId: string,
-  stayId: string,
-  request: UpsertParticipantAccommodationStayRequest
-): Promise<ParticipantAccommodationStay> =>
-  apiPut<ParticipantAccommodationStay>(`/api/events/${eventId}/participants/${participantId}/stays/${stayId}`, request)
-
-export const deleteParticipantStay = (eventId: string, participantId: string, stayId: string): Promise<void> =>
-  apiDelete<void>(`/api/events/${eventId}/participants/${participantId}/stays/${stayId}`)

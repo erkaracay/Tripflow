@@ -928,21 +928,6 @@
         "segmentDateRange": "End date must be on or after start date."
       }
     },
-    "stays": {
-      "title": "Accommodation Stays",
-      "add": "Add stay",
-      "copyPrevious": "Copy previous stay",
-      "badge": "{count} stays",
-      "empty": "No stays recorded.",
-      "deleteConfirmTitle": "Delete stay",
-      "deleteConfirmMessage": "Are you sure you want to delete this accommodation stay? This action cannot be undone.",
-      "overlapError": "This date range overlaps with an existing stay.",
-      "checkOutBeforeCheckIn": "Check-out must be on or after check-in.",
-      "checkInOutOfRange": "Check-in date is outside the event date range.",
-      "checkOutOutOfRange": "Check-out date is outside the event date range.",
-      "accRequired": "Please select an accommodation.",
-      "nightsShort": "{count}n"
-    },
     "flightPanelHelper": {
       "title": "Bulk apply flights",
       "subtitle": "Apply the same flight segment template to selected participants or export an import-ready Excel workbook.",
@@ -1735,9 +1720,9 @@
       "stayDurationNights": "{count} night(s)",
       "checkInNote": "Check-in note",
       "checkOutNote": "Check-out note",
-      "currentStay": "Current accommodation",
-      "nextStay": "Upcoming accommodation",
-      "previousStay": "Previous accommodation",
+      "currentAccommodation": "Current accommodation",
+      "nextAccommodation": "Upcoming accommodation",
+      "previousAccommodation": "Previous accommodation",
       "roommates": "Roommates",
       "empty": "No documents yet.",
       "board": {
