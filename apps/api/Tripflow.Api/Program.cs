@@ -158,6 +158,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+var isRender = !string.IsNullOrWhiteSpace(app.Configuration["RENDER"]);
 
 // Swagger
 app.UseSwagger();
@@ -199,7 +200,7 @@ if (app.Environment.IsProduction())
 {
     app.UseForwardedHeaders();
 }
-if (!app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment() && !isRender)
 {
     app.UseHttpsRedirection();
 }
