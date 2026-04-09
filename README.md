@@ -143,13 +143,9 @@ API base URL için apps/web/.env.local (veya apps/web/.env) kullan:
 
 ## Production migration (Render)
 
-API Docker image'i artık migration bundle üretebilir. Render'da mevcut `ConnectionStrings__TripflowDb` environment variable'ını kullanıp migration'ı deploy öncesinde çalıştır:
-
-1) API servisinde `Pre-Deploy Command` alanına şunu yaz:
+Render'da migration'ı deploy öncesinde çalıştırmak için API servisinde `Pre-Deploy Command` alanına şunu yaz:
 
     /app/render-predeploy.sh
-
-2) Deploy akışı şu olur:
 
 - main'e push
 - Render image build
@@ -159,6 +155,5 @@ API Docker image'i artık migration bundle üretebilir. Render'da mevcut `Connec
 Notlar:
 
 - Script önce `CONNECTION_STRING`, yoksa `ConnectionStrings__TripflowDb` env var'ını kullanır.
-- Render'daki `ConnectionStrings__TripflowDb` değeri local'de user-secrets ile verdiğin connection string'in prod karşılığıdır.
 - Migration başarısız olursa deploy durur ve mevcut release çalışmaya devam eder.
 - Destructive migration'ları (drop/rename/backfill) mümkün olduğunca ayrı ve kontrollü rollout et.
