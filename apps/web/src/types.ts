@@ -965,22 +965,6 @@ export type EventDocTabDto = {
   content: unknown
 }
 
-export type ParticipantAccommodationStay = {
-  id: string
-  eventAccommodationId: string
-  accommodationTitle: string
-  accommodationContent: unknown
-  roomNo?: string | null
-  roomType?: string | null
-  boardType?: string | null
-  personNo?: string | null
-  checkIn?: string | null
-  checkOut?: string | null
-  nightCount?: number | null
-  isCurrent: boolean
-  roommates: string[]
-}
-
 export type PortalAccommodationSegment = {
   segmentId: string
   startDate: string
@@ -997,16 +981,6 @@ export type PortalAccommodationSegment = {
   isCurrent: boolean
   isUpcoming: boolean
   roommates: string[]
-}
-
-export type UpsertParticipantAccommodationStayRequest = {
-  eventAccommodationId?: string | null
-  roomNo?: string | null
-  roomType?: string | null
-  boardType?: string | null
-  personNo?: string | null
-  checkIn?: string | null
-  checkOut?: string | null
 }
 
 export type PortalMeResponse = {
@@ -1031,7 +1005,6 @@ export type PortalMeResponse = {
   schedule: EventSchedule
   docs: PortalDocsResponse
   accommodationSegments: PortalAccommodationSegment[]
-  stays: ParticipantAccommodationStay[]
 }
 
 export type EventAccessCodeResponse = {

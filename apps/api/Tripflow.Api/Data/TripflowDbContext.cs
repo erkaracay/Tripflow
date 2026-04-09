@@ -27,7 +27,6 @@ public sealed class TripflowDbContext : DbContext
     public DbSet<EventGuideEntity> EventGuides => Set<EventGuideEntity>();
     public DbSet<OrganizationGuideEntity> OrganizationGuides => Set<OrganizationGuideEntity>();
     public DbSet<ParticipantActivityWillNotAttendEntity> ParticipantActivityWillNotAttend => Set<ParticipantActivityWillNotAttendEntity>();
-    public DbSet<ParticipantAccommodationStayEntity> ParticipantAccommodationStays => Set<ParticipantAccommodationStayEntity>();
     public DbSet<EventAccommodationSegmentEntity> EventAccommodationSegments => Set<EventAccommodationSegmentEntity>();
     public DbSet<ParticipantAccommodationAssignmentEntity> ParticipantAccommodationAssignments => Set<ParticipantAccommodationAssignmentEntity>();
 
@@ -874,36 +873,6 @@ public sealed class TripflowDbContext : DbContext
             b.HasOne(x => x.OverrideAccommodationDocTab)
                 .WithMany()
                 .HasForeignKey(x => x.OverrideAccommodationDocTabId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<ParticipantAccommodationStayEntity>(b =>
-        {
-            b.ToTable("participant_accommodation_stays");
-            b.HasKey(x => x.Id);
-
-            b.Property(x => x.OrganizationId).IsRequired();
-            b.Property(x => x.EventId).IsRequired();
-            b.Property(x => x.RoomNo).HasMaxLength(50);
-            b.Property(x => x.RoomType).HasMaxLength(50);
-            b.Property(x => x.BoardType).HasMaxLength(50);
-            b.Property(x => x.PersonNo).HasMaxLength(50);
-            b.Property(x => x.CheckIn).HasColumnType("date");
-            b.Property(x => x.CheckOut).HasColumnType("date");
-            b.Property(x => x.CreatedAt).IsRequired();
-            b.Property(x => x.UpdatedAt).IsRequired();
-
-            b.HasIndex(x => new { x.ParticipantId, x.EventAccommodationId });
-            b.HasIndex(x => new { x.OrganizationId, x.EventId, x.ParticipantId });
-
-            b.HasOne(x => x.Participant)
-                .WithMany(x => x.AccommodationStays)
-                .HasForeignKey(x => x.ParticipantId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasOne(x => x.EventAccommodation)
-                .WithMany()
-                .HasForeignKey(x => x.EventAccommodationId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

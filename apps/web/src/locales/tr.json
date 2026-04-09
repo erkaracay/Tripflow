@@ -920,21 +920,6 @@
         "segmentDateRange": "Bitiş tarihi başlangıç tarihinde veya sonrasında olmalıdır."
       }
     },
-    "stays": {
-      "title": "Konaklama Kayıtları",
-      "add": "Konaklama ekle",
-      "copyPrevious": "Öncekini kopyala",
-      "badge": "{count} kayıt",
-      "empty": "Konaklama kaydı yok.",
-      "deleteConfirmTitle": "Konaklama kaydını sil",
-      "deleteConfirmMessage": "Bu konaklama kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
-      "overlapError": "Bu tarih aralığı mevcut bir kayıtla çakışıyor.",
-      "checkOutBeforeCheckIn": "Çıkış tarihi giriş tarihinde veya sonrasında olmalıdır.",
-      "checkInOutOfRange": "Giriş tarihi etkinlik tarih aralığının dışında.",
-      "checkOutOutOfRange": "Çıkış tarihi etkinlik tarih aralığının dışında.",
-      "accRequired": "Lütfen bir konaklama seçin.",
-      "nightsShort": "{count}g"
-    },
     "flightPanelHelper": {
       "title": "Toplu uçuş uygula",
       "subtitle": "Aynı uçuş segment şablonunu seçilen katılımcılara toplu uygula veya importa hazır Excel dışa aktar.",
@@ -1722,9 +1707,9 @@
       "stayDurationNights": "{count} gece",
       "checkInNote": "Giriş notu",
       "checkOutNote": "Çıkış notu",
-      "currentStay": "Şu anki konaklama",
-      "nextStay": "Yaklaşan konaklama",
-      "previousStay": "Önceki konaklama",
+      "currentAccommodation": "Şu anki konaklama",
+      "nextAccommodation": "Yaklaşan konaklama",
+      "previousAccommodation": "Önceki konaklama",
       "roommates": "Oda Arkadaşları",
       "empty": "Henüz belge yok.",
       "board": {

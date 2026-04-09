@@ -160,7 +160,6 @@ internal static class PortalLoginHandlers
         var schedule = await EventsHandlers.BuildScheduleAsync(eventEntity.Id, eventEntity.OrganizationId, db, ct);
         var docs = await BuildDocsAsync(db, eventEntity, participant, ct);
         var accommodationSegments = await BuildPortalAccommodationSegmentsAsync(db, participant.Id, eventEntity, ct);
-        var stays = await BuildPortalStaysAsync(db, participant.Id, eventEntity.Id, ct);
 
         var response = new PortalMeResponse(
             new PortalEventSummary(
@@ -181,8 +180,7 @@ internal static class PortalLoginHandlers
             portal,
             schedule,
             docs,
-            accommodationSegments,
-            stays);
+            accommodationSegments);
 
         return Results.Ok(response);
     }
@@ -519,124 +517,6 @@ internal static class PortalLoginHandlers
         }
 
         return portal;
-    }
-
-    private static async Task<ParticipantAccommodationStayDto[]> BuildPortalStaysAsync(
-        TripflowDbContext db,
-        Guid participantId,
-        Guid eventId,
-        CancellationToken ct)
-    {
-        var stays = await db.ParticipantAccommodationStays
-            .AsNoTracking()
-            .Where(x => x.ParticipantId == participantId)
-            .OrderBy(x => x.CheckIn == null)
-            .ThenBy(x => x.CheckIn)
-            .ToListAsync(ct);
-
-        if (stays.Count == 0)
-            return Array.Empty<ParticipantAccommodationStayDto>();
-
-        var tabIds = stays.Select(x => x.EventAccommodationId).Distinct().ToList();
-        var tabs = await db.EventDocTabs.AsNoTracking()
-            .Where(x => tabIds.Contains(x.Id))
-            .ToListAsync(ct);
-        var tabById = tabs.ToDictionary(x => x.Id);
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        // Build roommates lookup
-        var roomGroups = stays
-            .Where(x => !string.IsNullOrEmpty(x.RoomNo))
-            .Select(x => new { x.EventAccommodationId, x.RoomNo })
-            .Distinct()
-            .ToList();
-
-        var roommatesLookup = new Dictionary<(Guid, string?), string[]>();
-        if (roomGroups.Count > 0)
-        {
-            var accommodationIds = roomGroups.Select(g => g.EventAccommodationId).Distinct().ToList();
-            var roomNos = roomGroups.Select(g => g.RoomNo).Distinct().ToList();
-
-            var candidates = await db.ParticipantAccommodationStays
-                .AsNoTracking()
-                .Where(x =>
-                    x.EventId == eventId &&
-                    accommodationIds.Contains(x.EventAccommodationId) &&
-                    roomNos.Contains(x.RoomNo) &&
-                    x.ParticipantId != participantId &&
-                    x.RoomNo != null && x.RoomNo != "")
-                .Select(x => new { x.EventAccommodationId, x.RoomNo, x.ParticipantId })
-                .ToListAsync(ct);
-
-            var candidateParticipantIds = candidates.Select(x => x.ParticipantId).Distinct().ToList();
-            var nameById = await db.Participants.AsNoTracking()
-                .Where(x => candidateParticipantIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
-
-            foreach (var g in roomGroups)
-            {
-                var names = candidates
-                    .Where(x => x.EventAccommodationId == g.EventAccommodationId && x.RoomNo == g.RoomNo)
-                    .Take(10)
-                    .Select(x => nameById.TryGetValue(x.ParticipantId, out var n) ? n : null)
-                    .Where(n => n != null)
-                    .Select(n => n!)
-                    .ToArray();
-                roommatesLookup[(g.EventAccommodationId, g.RoomNo)] = names;
-            }
-        }
-
-        // Sort: isCurrent first, then CheckIn ASC
-        return stays
-            .Select(s => BuildPortalStayDto(s, tabById, today, roommatesLookup))
-            .OrderByDescending(d => d.IsCurrent)
-            .ThenBy(d => d.CheckIn)
-            .ToArray();
-    }
-
-    private static ParticipantAccommodationStayDto BuildPortalStayDto(
-        Tripflow.Api.Data.Entities.ParticipantAccommodationStayEntity stay,
-        Dictionary<Guid, Tripflow.Api.Data.Entities.EventDocTabEntity> tabById,
-        DateOnly today,
-        Dictionary<(Guid, string?), string[]> roommatesLookup)
-    {
-        tabById.TryGetValue(stay.EventAccommodationId, out var tab);
-        var title = tab?.Title ?? string.Empty;
-
-        JsonElement? content = null;
-        if (tab != null && !string.IsNullOrWhiteSpace(tab.ContentJson))
-        {
-            try { content = JsonSerializer.Deserialize<JsonElement>(tab.ContentJson); }
-            catch { }
-        }
-
-        var isCurrent = stay.CheckIn.HasValue && stay.CheckOut.HasValue &&
-                        today >= stay.CheckIn.Value && today <= stay.CheckOut.Value;
-
-        int? nightCount = null;
-        if (stay.CheckIn.HasValue && stay.CheckOut.HasValue)
-            nightCount = stay.CheckOut.Value.DayNumber - stay.CheckIn.Value.DayNumber;
-
-        var roommates = !string.IsNullOrEmpty(stay.RoomNo) &&
-                        roommatesLookup.TryGetValue((stay.EventAccommodationId, stay.RoomNo), out var rm)
-            ? rm
-            : Array.Empty<string>();
-
-        return new ParticipantAccommodationStayDto(
-            stay.Id,
-            stay.EventAccommodationId,
-            title,
-            content,
-            stay.RoomNo,
-            stay.RoomType,
-            stay.BoardType,
-            stay.PersonNo,
-            stay.CheckIn?.ToString("yyyy-MM-dd"),
-            stay.CheckOut?.ToString("yyyy-MM-dd"),
-            nightCount,
-            isCurrent,
-            roommates);
     }
 
     private static async Task<PortalAccommodationSegmentDto[]> BuildPortalAccommodationSegmentsAsync(

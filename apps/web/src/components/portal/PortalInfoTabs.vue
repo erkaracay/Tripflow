@@ -311,12 +311,12 @@ const contentPhone = (content: unknown) => {
 
 const accommodationStatusLabel = (segment: PortalAccommodationSegment) => {
   if (segment.isCurrent) {
-    return t('portal.docs.currentStay')
+    return t('portal.docs.currentAccommodation')
   }
   if (segment.isUpcoming) {
-    return t('portal.docs.nextStay')
+    return t('portal.docs.nextAccommodation')
   }
-  return t('portal.docs.previousStay')
+  return t('portal.docs.previousAccommodation')
 }
 
 const accommodationStatusClass = (segment: PortalAccommodationSegment) => {

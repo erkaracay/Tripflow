@@ -19,8 +19,7 @@ public sealed record PortalMeResponse(
     EventPortalInfo Portal,
     EventScheduleDto Schedule,
     PortalDocsResponse Docs,
-    PortalAccommodationSegmentDto[] AccommodationSegments,
-    ParticipantAccommodationStayDto[] Stays);
+    PortalAccommodationSegmentDto[] AccommodationSegments);
 
 public sealed record PortalAccommodationSegmentDto(
     Guid SegmentId,
