@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { apiGet } from '../../lib/api'
+import { apiGet, getAccommodationSegmentParticipants, getAccommodationSegments } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -11,12 +11,17 @@ import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsMo
 import FlightPanelHelperModal from '../../components/admin/FlightPanelHelperModal.vue'
 import { formatDate, localizeAttendanceStatus } from '../../lib/formatters'
 import {
+  ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS,
+  ACCOMMODATION_SEGMENTS_SHEET_HEADERS,
+  buildAccommodationAssignmentsSheetRows,
+  buildAccommodationSegmentsSheetRows,
   buildFlightSegmentsSheetRows,
   buildParticipantsSheetRows,
   FLIGHT_SEGMENTS_SHEET_HEADERS,
   PARTICIPANTS_SHEET_HEADERS,
 } from '../../lib/participantsExportWorkbook'
 import type {
+  AccommodationSegmentParticipantTableItem,
   AppComboboxOption,
   Event as EventDto,
   ParticipantProfile,
@@ -197,22 +202,78 @@ const fetchProfilesForExport = async (participantIds: string[]) => {
   return { profilesById, failedParticipantIds }
 }
 
+const fetchAccommodationDataForExport = async (participantIds: string[]) => {
+  const participantIdSet = new Set(participantIds)
+  const participantRowsBySegmentId = new Map<string, AccommodationSegmentParticipantTableItem[]>()
+  const failedSegmentIds: string[] = []
+
+  const segments = await getAccommodationSegments(eventId.value)
+  for (const segment of segments) {
+    const rows: AccommodationSegmentParticipantTableItem[] = []
+    let currentPage = 1
+    let totalPages = 1
+
+    try {
+      while (currentPage <= totalPages) {
+        const params = new URLSearchParams({
+          query: '',
+          status: 'all',
+          accommodationFilter: 'all',
+          page: String(currentPage),
+          pageSize: '200',
+          sort: 'fullName',
+          dir: 'asc',
+        })
+
+        const response = await getAccommodationSegmentParticipants(eventId.value, segment.id, params)
+        rows.push(...response.items.filter((item) => participantIdSet.has(item.participantId)))
+        totalPages = Math.max(Math.ceil(response.total / response.pageSize), 1)
+        currentPage += 1
+      }
+    } catch {
+      failedSegmentIds.push(segment.id)
+      continue
+    }
+
+    participantRowsBySegmentId.set(segment.id, rows)
+  }
+
+  return { segments, participantRowsBySegmentId, failedSegmentIds }
+}
+
 const exportExcel = async () => {
   if (tableItems.value.length === 0) return
 
   try {
     const participantIds = tableItems.value.map((row) => row.id)
     const { profilesById, failedParticipantIds } = await fetchProfilesForExport(participantIds)
+    const { segments, participantRowsBySegmentId, failedSegmentIds } = await fetchAccommodationDataForExport(participantIds)
     const participantRows = buildParticipantsSheetRows(tableItems.value)
     const flightSegmentRows = buildFlightSegmentsSheetRows(tableItems.value, profilesById)
+    const { rows: accommodationSegmentRows, segmentKeyById } = buildAccommodationSegmentsSheetRows(segments)
+    const accommodationAssignmentRows = buildAccommodationAssignmentsSheetRows(
+      tableItems.value,
+      participantRowsBySegmentId,
+      segmentKeyById
+    )
 
     const { utils, writeFile } = await import('xlsx')
     const workbook = utils.book_new()
     const participantsSheet = utils.aoa_to_sheet([PARTICIPANTS_SHEET_HEADERS, ...participantRows])
     const segmentsSheet = utils.aoa_to_sheet([FLIGHT_SEGMENTS_SHEET_HEADERS, ...flightSegmentRows])
+    const accommodationSegmentsSheet = utils.aoa_to_sheet([
+      ACCOMMODATION_SEGMENTS_SHEET_HEADERS,
+      ...accommodationSegmentRows,
+    ])
+    const accommodationAssignmentsSheet = utils.aoa_to_sheet([
+      ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS,
+      ...accommodationAssignmentRows,
+    ])
 
     utils.book_append_sheet(workbook, participantsSheet, 'participants')
     utils.book_append_sheet(workbook, segmentsSheet, 'flight_segments')
+    utils.book_append_sheet(workbook, accommodationSegmentsSheet, 'accommodation_segments')
+    utils.book_append_sheet(workbook, accommodationAssignmentsSheet, 'accommodation_assignments')
 
     const id = route.params.eventId ?? 'event'
     const timestamp = new Date()
@@ -223,6 +284,14 @@ const exportExcel = async () => {
       pushToast({
         key: 'admin.participantsTable.exportSegmentsPartial',
         params: { count: failedParticipantIds.length },
+        tone: 'info',
+      })
+    }
+
+    if (failedSegmentIds.length > 0) {
+      pushToast({
+        key: 'admin.participantsTable.exportAccommodationPartial',
+        params: { count: failedSegmentIds.length },
         tone: 'info',
       })
     }

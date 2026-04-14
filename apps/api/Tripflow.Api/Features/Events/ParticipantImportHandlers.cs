@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CsvHelper;
@@ -84,10 +85,6 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] ParticipantTemplateHeaders =
     [
-        "room_no",
-        "room_type",
-        "board_type",
-        "person_no",
         "agency_name",
         "city",
         "first_name",
@@ -98,8 +95,6 @@ internal static class ParticipantImportHandlers
         "phone",
         "email",
         "flight_city",
-        "hotel_check_in_date",
-        "hotel_check_out_date",
         "insurance_company_name",
         "insurance_policy_no",
         "insurance_start_date",
@@ -122,10 +117,6 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] ParticipantTemplateExampleRow =
     [
-        "101",
-        "Double",
-        "HB",
-        "2",
         "Sky Travel",
         "Istanbul",
         "Ayse",
@@ -136,8 +127,6 @@ internal static class ParticipantImportHandlers
         "+905301112233",
         "ayse@example.com",
         "Istanbul",
-        "2026-03-10",
-        "2026-03-12",
         "Acme Insurance",
         "POL-123",
         "2026-03-10",
@@ -334,16 +323,16 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] AccommodationSegmentExampleRow1 =
     [
-        "ANTALYA",
-        "Antalya X Hotel",
+        "PLAN_1",
+        "Konaklama 1",
         "2026-03-10",
         "2026-03-12"
     ];
 
     private static readonly string[] AccommodationSegmentExampleRow2 =
     [
-        "KAYSERI",
-        "Kayseri Y Hotel",
+        "PLAN_2",
+        "Konaklama 2",
         "2026-03-12",
         "2026-03-14"
     ];
@@ -351,7 +340,7 @@ internal static class ParticipantImportHandlers
     private static readonly string[] AccommodationAssignmentExampleRow1 =
     [
         "12345678901",
-        "ANTALYA",
+        "PLAN_1",
         "",
         "101",
         "Double",
@@ -362,8 +351,8 @@ internal static class ParticipantImportHandlers
     private static readonly string[] AccommodationAssignmentExampleRow2 =
     [
         "10987654321",
-        "KAYSERI",
-        "Kayseri Z Hotel",
+        "PLAN_2",
+        "Konaklama 3",
         "220",
         "Single",
         "BB",
@@ -1608,6 +1597,13 @@ internal static class ParticipantImportHandlers
                         && x.Type.ToLower() == "hotel")
                     .Select(x => new AccommodationHotelTab(x.Id, x.Title))
                     .ToListAsync(ct);
+                var createdHotelTabs = new Dictionary<string, AccommodationHotelTab>(StringComparer.OrdinalIgnoreCase);
+                var warnedCreatedHotelTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var nextDocTabSortOrder =
+                    (await db.EventDocTabs
+                        .Where(x => x.EventId == id && x.OrganizationId == orgId)
+                        .Select(x => (int?)x.SortOrder)
+                        .MaxAsync(ct) ?? 0) + 1;
 
                 var exactSegmentLookup = await db.EventAccommodationSegments
                     .Where(x => x.EventId == id && x.OrganizationId == orgId)
@@ -1661,11 +1657,33 @@ internal static class ParticipantImportHandlers
                         rowFields.Add("segment_key");
                     }
 
-                    var hotelMatch = ResolveAccommodationHotelInput(accommodationInput, hotelTabs);
+                    var hotelMatch = ResolveOrCreateAccommodationHotelInput(
+                        accommodationInput,
+                        hotelTabs,
+                        createdHotelTabs,
+                        orgId,
+                        id,
+                        now,
+                        importMode,
+                        db,
+                        ref nextDocTabSortOrder);
                     if (hotelMatch is null)
                     {
                         rowErrors.Add("accommodation could not be resolved");
                         rowFields.Add("accommodation");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(accommodationInput)
+                        && IsAutoCreatedAccommodation(hotelMatch, accommodationInput, createdHotelTabs)
+                        && warnedCreatedHotelTitles.Add(NormalizeHeader(accommodationInput)))
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            null,
+                            "accommodation not found; a new hotel doc tab will be created",
+                            "accommodation_auto_created")
+                        {
+                            Field = "accommodation"
+                        });
                     }
 
                     if (previewRows.Count < PreviewRowLimit)
@@ -1722,8 +1740,11 @@ internal static class ParticipantImportHandlers
                     if (!exactSegmentLookup.TryGetValue(key, out var segmentEntity))
                     {
                         var overlapping = segmentWorkingSet.Any(x =>
-                            x.StartDate <= endDate.Value
-                            && x.EndDate >= startDate.Value);
+                            AccommodationSegmentsHandlers.DoSegmentDateRangesOverlap(
+                                x.StartDate,
+                                x.EndDate,
+                                startDate.Value,
+                                endDate.Value));
                         if (overlapping)
                         {
                             errors.Add(new ParticipantImportError(
@@ -1809,11 +1830,36 @@ internal static class ParticipantImportHandlers
                     }
 
                     var overrideInput = NormalizeOptionalText(row.GetValue("accommodation_override"));
-                    var overrideHotel = ResolveAccommodationHotelInput(overrideInput, hotelTabs);
+                    var overrideHotel = ResolveOrCreateAccommodationHotelInput(
+                        overrideInput,
+                        hotelTabs,
+                        createdHotelTabs,
+                        orgId,
+                        id,
+                        now,
+                        importMode,
+                        db,
+                        ref nextDocTabSortOrder);
                     if (!string.IsNullOrWhiteSpace(overrideInput) && overrideHotel is null)
                     {
                         rowErrors.Add("accommodation_override could not be resolved");
                         rowFields.Add("accommodation_override");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(overrideInput)
+                        && overrideHotel is not null
+                        && IsAutoCreatedAccommodation(overrideHotel, overrideInput, createdHotelTabs))
+                    {
+                        if (warnedCreatedHotelTitles.Add(NormalizeHeader(overrideInput)))
+                        {
+                            warnings.Add(new ParticipantImportWarning(
+                                row.RowNumber,
+                                tcNoForIssues,
+                                "accommodation_override not found; a new hotel doc tab will be created",
+                                "accommodation_override_auto_created")
+                            {
+                                Field = "accommodation_override"
+                            });
+                        }
                     }
 
                     if (previewRows.Count < PreviewRowLimit)
@@ -2928,6 +2974,91 @@ internal static class ParticipantImportHandlers
         var normalizedKey = NormalizeHeader(normalizedInput);
         return hotelTabs.FirstOrDefault(x => NormalizeHeader(x.Title) == normalizedKey);
     }
+
+    private static AccommodationHotelTab? ResolveOrCreateAccommodationHotelInput(
+        string? input,
+        List<AccommodationHotelTab> hotelTabs,
+        Dictionary<string, AccommodationHotelTab> createdHotelTabs,
+        Guid organizationId,
+        Guid eventId,
+        DateTime now,
+        ParticipantImportMode importMode,
+        TripflowDbContext db,
+        ref int nextDocTabSortOrder)
+    {
+        var normalizedInput = NormalizeOptionalText(input);
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return null;
+        }
+
+        var existing = ResolveAccommodationHotelInput(normalizedInput, hotelTabs);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        if (Guid.TryParse(normalizedInput, out _))
+        {
+            return null;
+        }
+
+        var normalizedKey = NormalizeHeader(normalizedInput);
+        if (createdHotelTabs.TryGetValue(normalizedKey, out var created))
+        {
+            return created;
+        }
+
+        var newTab = new AccommodationHotelTab(Guid.NewGuid(), normalizedInput);
+        createdHotelTabs[normalizedKey] = newTab;
+        hotelTabs.Add(newTab);
+
+        if (importMode == ParticipantImportMode.Apply)
+        {
+            db.EventDocTabs.Add(new EventDocTabEntity
+            {
+                Id = newTab.Id,
+                OrganizationId = organizationId,
+                EventId = eventId,
+                Title = normalizedInput,
+                Type = "Hotel",
+                SortOrder = nextDocTabSortOrder++,
+                IsActive = true,
+                ContentJson = BuildImportedAccommodationContentJson(normalizedInput),
+                CreatedAt = now
+            });
+        }
+
+        return newTab;
+    }
+
+    private static bool IsAutoCreatedAccommodation(
+        AccommodationHotelTab hotelTab,
+        string input,
+        Dictionary<string, AccommodationHotelTab> createdHotelTabs)
+    {
+        var normalizedInput = NormalizeOptionalText(input);
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return false;
+        }
+
+        var normalizedKey = NormalizeHeader(normalizedInput);
+        return createdHotelTabs.TryGetValue(normalizedKey, out var created)
+            && created.Id == hotelTab.Id;
+    }
+
+    private static string BuildImportedAccommodationContentJson(string title)
+        => JsonSerializer.Serialize(new
+        {
+            hotelName = title,
+            address = string.Empty,
+            phone = string.Empty,
+            checkInDate = string.Empty,
+            checkOutDate = string.Empty,
+            checkInNote = string.Empty,
+            checkOutNote = string.Empty
+        });
 
     private static string NormalizeHeader(string value)
     {

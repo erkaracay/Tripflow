@@ -1,4 +1,10 @@
-import type { FlightSegment, ParticipantDetails, ParticipantProfile } from '../types'
+import type {
+  AccommodationSegment,
+  AccommodationSegmentParticipantTableItem,
+  FlightSegment,
+  ParticipantDetails,
+  ParticipantProfile,
+} from '../types'
 
 export type ParticipantExportSource = {
   id: string
@@ -185,10 +191,6 @@ const pushDirectionRows = (
 }
 
 export const PARTICIPANTS_SHEET_HEADERS = [
-  'room_no',
-  'room_type',
-  'board_type',
-  'person_no',
   'agency_name',
   'city',
   'first_name',
@@ -199,8 +201,6 @@ export const PARTICIPANTS_SHEET_HEADERS = [
   'phone',
   'email',
   'flight_city',
-  'hotel_check_in_date',
-  'hotel_check_out_date',
   'insurance_company_name',
   'insurance_policy_no',
   'insurance_start_date',
@@ -241,15 +241,28 @@ export const FLIGHT_SEGMENTS_SHEET_HEADERS = [
   'cabin_baggage',
 ]
 
+export const ACCOMMODATION_SEGMENTS_SHEET_HEADERS = [
+  'segment_key',
+  'accommodation',
+  'start_date',
+  'end_date',
+]
+
+export const ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS = [
+  'tc_no',
+  'segment_key',
+  'accommodation_override',
+  'room_no',
+  'room_type',
+  'board_type',
+  'person_no',
+]
+
 export const buildParticipantsSheetRows = (participants: ParticipantExportSource[]) =>
   participants.map((participant) => {
     const details = participant.details ?? {}
 
     return [
-      toText(details.roomNo),
-      toText(details.roomType),
-      toText(details.boardType),
-      toText(details.personNo),
       toText(details.agencyName),
       toText(details.city),
       toText(participant.firstName),
@@ -260,8 +273,6 @@ export const buildParticipantsSheetRows = (participants: ParticipantExportSource
       toText(participant.phone),
       toText(participant.email),
       toText(details.flightCity),
-      toText(details.hotelCheckInDate),
-      toText(details.hotelCheckOutDate),
       toText(details.insuranceCompanyName),
       toText(details.insurancePolicyNo),
       toText(details.insuranceStartDate),
@@ -296,6 +307,77 @@ export const buildFlightSegmentsSheetRows = (
     pushDirectionRows(rows, participant, 'Arrival', profile?.arrivalSegments, details)
     pushDirectionRows(rows, participant, 'Return', profile?.returnSegments, details)
   })
+
+  return rows
+}
+
+export const buildAccommodationSegmentsSheetRows = (segments: AccommodationSegment[]) => {
+  const orderedSegments = [...segments].sort((left, right) => {
+    if (left.startDate === right.startDate) {
+      return left.sortOrder - right.sortOrder
+    }
+
+    return left.startDate.localeCompare(right.startDate)
+  })
+
+  const segmentKeyById = new Map<string, string>()
+  const rows = orderedSegments.map((segment, index) => {
+    const key = `SEGMENT_${String(index + 1).padStart(2, '0')}`
+    segmentKeyById.set(segment.id, key)
+
+    return [key, toText(segment.defaultAccommodationTitle), toText(segment.startDate), toText(segment.endDate)]
+  })
+
+  return { rows, segmentKeyById }
+}
+
+export const buildAccommodationAssignmentsSheetRows = (
+  participants: ParticipantExportSource[],
+  participantRowsBySegmentId: Map<string, AccommodationSegmentParticipantTableItem[]>,
+  segmentKeyById: Map<string, string>
+) => {
+  const participantById = new Map(participants.map((participant) => [participant.id, participant]))
+  const rows: string[][] = []
+
+  for (const [segmentId, segmentKey] of segmentKeyById.entries()) {
+    const participantRows = [...(participantRowsBySegmentId.get(segmentId) ?? [])].sort((left, right) => {
+      const fullNameCompare = toText(left.fullName).localeCompare(toText(right.fullName), 'tr')
+      if (fullNameCompare !== 0) {
+        return fullNameCompare
+      }
+
+      return toText(left.tcNo).localeCompare(toText(right.tcNo))
+    })
+
+    for (const row of participantRows) {
+      const participant = participantById.get(row.participantId)
+      if (!participant) {
+        continue
+      }
+
+      const hasExplicitAssignment = Boolean(
+        row.usesOverride ||
+          toText(row.roomNo) ||
+          toText(row.roomType) ||
+          toText(row.boardType) ||
+          toText(row.personNo)
+      )
+
+      if (!hasExplicitAssignment) {
+        continue
+      }
+
+      rows.push([
+        toText(participant.tcNo),
+        segmentKey,
+        row.usesOverride ? toText(row.effectiveAccommodationTitle) : '',
+        toText(row.roomNo),
+        toText(row.roomType),
+        toText(row.boardType),
+        toText(row.personNo),
+      ])
+    }
+  }
 
   return rows
 }

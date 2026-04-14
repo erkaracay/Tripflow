@@ -45,6 +45,7 @@ const accommodationItems = [
   'admin.import.helper.accommodationAssignmentsRule',
   'admin.import.helper.accommodationSegmentKeyRule',
   'admin.import.helper.accommodationResolveRule',
+  'admin.import.helper.accommodationBoardCodesRule',
 ] as const
 
 const commonIssueItems = [
