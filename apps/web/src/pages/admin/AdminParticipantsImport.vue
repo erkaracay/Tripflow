@@ -593,6 +593,20 @@ const downloadTemplate = async () => {
   }
 }
 
+const downloadExample = async () => {
+  try {
+    const blob = await apiDownload(`/api/events/${eventId.value}/participants/import/example`)
+    const url = globalThis.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'participants_example.xlsx'
+    anchor.click()
+    globalThis.URL.revokeObjectURL(url)
+  } catch {
+    pushToast({ key: 'errors.generic', tone: 'error' })
+  }
+}
+
 const buildFormData = () => {
   const formData = new FormData()
   if (selectedFile.value) {
@@ -823,6 +837,12 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'participant_name_mismatch_for_tc_no') {
     return t('admin.import.messages.participantNameMismatchForTcNo')
   }
+  if (warning.code === 'accommodation_autocreate') {
+    return t('admin.import.messages.accommodationAutoCreate')
+  }
+  if (warning.code === 'accommodation_override_autocreate') {
+    return t('admin.import.messages.accommodationOverrideAutoCreate')
+  }
 
   return warning.message
 }
@@ -1003,12 +1023,22 @@ watch(summary, () => {
           <button
             class="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
             type="button"
+            @click="downloadExample"
+          >
+            {{ t('admin.import.downloadExample') }}
+          </button>
+          <button
+            class="rounded border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
+            type="button"
             @click="templateHelpOpen = true"
           >
             {{ t('admin.import.helper.openButton') }}
           </button>
           <span class="text-xs text-slate-500">
             {{ t('admin.import.autoDetectRecommended', { language: t(`admin.import.headerLang${headerLanguage.charAt(0).toUpperCase()}${headerLanguage.slice(1)}`) }) }}
+          </span>
+          <span class="text-xs text-slate-500">
+            {{ t('admin.import.exampleNote') }}
           </span>
         </div>
       </section>

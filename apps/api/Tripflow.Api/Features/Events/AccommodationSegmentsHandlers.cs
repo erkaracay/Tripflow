@@ -1023,8 +1023,8 @@ internal static class AccommodationSegmentsHandlers
                 x.EventId == eventId
                 && x.OrganizationId == organizationId
                 && (!excludeSegmentId.HasValue || x.Id != excludeSegmentId.Value)
-                && x.StartDate <= endDate
-                && x.EndDate >= startDate,
+                && x.StartDate < endDate
+                && x.EndDate > startDate,
                 ct);
 
     private sealed record ValidatedSharedMutation(

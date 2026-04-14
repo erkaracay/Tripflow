@@ -1200,6 +1200,10 @@ internal static class EventsHandlers
         db.EventActivities.RemoveRange(db.EventActivities.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventDays.RemoveRange(db.EventDays.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventPortals.RemoveRange(db.EventPortals.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.ParticipantAccommodationAssignments.RemoveRange(
+            db.ParticipantAccommodationAssignments.Where(x => x.EventId == id && x.OrganizationId == orgId));
+        db.EventAccommodationSegments.RemoveRange(
+            db.EventAccommodationSegments.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.EventDocTabs.RemoveRange(db.EventDocTabs.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Participants.RemoveRange(db.Participants.Where(x => x.EventId == id && x.OrganizationId == orgId));
         db.Events.RemoveRange(db.Events.Where(x => x.Id == id && x.OrganizationId == orgId));

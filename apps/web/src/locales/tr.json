@@ -1228,6 +1228,8 @@
       "templateNote": "Türkçe ve İngilizce başlıklar desteklenir. Otomatik eşleme önerilir.",
       "autoDetectRecommended": "Seçili başlık modu: {language}. İçe aktarma için otomatik algılama önerilir.",
       "downloadTemplate": "Şablonu indir",
+      "downloadExample": "Örnek dosya indir",
+      "exampleNote": "Örnek dosya, plan ve atama mantığını gösteren doldurulmuş bir XLSX indirir.",
       "dropzoneTitle": "Dosyayı buraya sürükleyin veya seçmek için tıklayın",
       "dropzoneHint": "Desteklenen formatlar: CSV ve XLSX",
       "fileTypeError": "Lütfen CSV veya XLSX dosyası yükleyin.",
@@ -1317,6 +1319,8 @@
         "baggageTotalKgInvalid": "Toplam bagaj ağırlığı geçersiz.",
         "baggageTotalKgRounded": "Toplam bagaj ağırlığı en yakın tam sayıya yuvarlandı.",
         "participantNameMismatchForTcNo": "Referans katılımcı adı, TC ile bulunan katılımcıyla uyuşmuyor.",
+        "accommodationAutoCreate": "Konaklama bulunamadı. İçe aktarma bu adla yeni bir konaklama sekmesi oluşturacak.",
+        "accommodationOverrideAutoCreate": "Override konaklama bulunamadı. İçe aktarma bu adla yeni bir konaklama sekmesi oluşturacak.",
         "dateInvalid": "Tarih formatı geçersiz.",
         "timeInvalid": "Saat formatı geçersiz."
       },

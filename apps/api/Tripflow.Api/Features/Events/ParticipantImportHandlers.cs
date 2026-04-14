@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CsvHelper;
@@ -84,10 +85,6 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] ParticipantTemplateHeaders =
     [
-        "room_no",
-        "room_type",
-        "board_type",
-        "person_no",
         "agency_name",
         "city",
         "first_name",
@@ -98,8 +95,6 @@ internal static class ParticipantImportHandlers
         "phone",
         "email",
         "flight_city",
-        "hotel_check_in_date",
-        "hotel_check_out_date",
         "insurance_company_name",
         "insurance_policy_no",
         "insurance_start_date",
@@ -122,39 +117,33 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] ParticipantTemplateExampleRow =
     [
-        "101",
-        "Double",
-        "HB",
-        "2",
-        "Sky Travel",
+        "Demo Travel",
         "Istanbul",
         "Ayse",
         "Demir",
         "1990-05-10",
         "12345678901",
         "Female",
-        "+905301112233",
+        "+9053010000000",
         "ayse@example.com",
         "Istanbul",
-        "2026-03-10",
-        "2026-03-12",
         "Acme Insurance",
         "POL-123",
-        "2026-03-10",
-        "2026-03-12",
+        "2026-04-15",
+        "2026-04-22",
         "07:30",
-        "Istanbul Airport",
+        "Airport",
         "Hotel Lobby",
         "Sprinter",
-        "34 TF 123",
-        "Driver Ali +90 555 222 33 44",
-        "Meeting at gate 5",
+        "34 TF 001",
+        "Driver Ayse",
+        "Meet at gate 5",
         "18:00",
         "Hotel Lobby",
-        "Istanbul Airport",
+        "Airport",
         "Vito",
-        "34 TF 987",
-        "Driver Ayse +90 555 666 77 88",
+        "34 RT 001",
+        "Return Driver Ayse",
         "Pickup 15 min earlier"
     ];
 
@@ -449,6 +438,37 @@ internal static class ParticipantImportHandlers
                 "participants_template.xlsx"),
             _ => EventsHelpers.BadRequest("Format must be csv or xlsx.")
         };
+    }
+
+    internal static async Task<IResult> DownloadImportExample(
+        string eventId,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventInfo = await db.Events.AsNoTracking()
+            .Where(x => x.Id == id && x.OrganizationId == orgId)
+            .Select(x => new { x.StartDate, x.EndDate })
+            .FirstOrDefaultAsync(ct);
+        if (eventInfo is null)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        return Results.File(
+            BuildXlsxExample(eventInfo.StartDate, eventInfo.EndDate),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "participants_example.xlsx");
     }
 
     internal static async Task<IResult> ImportParticipants(
@@ -1606,8 +1626,13 @@ internal static class ParticipantImportHandlers
                         && x.OrganizationId == orgId
                         && x.Type != null
                         && x.Type.ToLower() == "hotel")
-                    .Select(x => new AccommodationHotelTab(x.Id, x.Title))
+                    .Select(x => new AccommodationHotelTab(x.Id, x.Title, true))
                     .ToListAsync(ct);
+                var nextDocTabSortOrder = await db.EventDocTabs
+                    .Where(x => x.EventId == id && x.OrganizationId == orgId)
+                    .Select(x => (int?)x.SortOrder)
+                    .MaxAsync(ct) ?? 0;
+                var autoCreatedHotelWarningKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 var exactSegmentLookup = await db.EventAccommodationSegments
                     .Where(x => x.EventId == id && x.OrganizationId == orgId)
@@ -1626,6 +1651,12 @@ internal static class ParticipantImportHandlers
                     {
                         rowErrors.Add("segment_key required");
                         rowFields.Add("segment_key");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(accommodationInput))
+                    {
+                        rowErrors.Add("accommodation required");
+                        rowFields.Add("accommodation");
                     }
 
                     if (!TryParseOptionalDate(row.GetValue("start_date"), out var startDate) || startDate is null)
@@ -1661,12 +1692,14 @@ internal static class ParticipantImportHandlers
                         rowFields.Add("segment_key");
                     }
 
-                    var hotelMatch = ResolveAccommodationHotelInput(accommodationInput, hotelTabs);
-                    if (hotelMatch is null)
-                    {
-                        rowErrors.Add("accommodation could not be resolved");
-                        rowFields.Add("accommodation");
-                    }
+                    var hotelMatch = EnsureAccommodationHotelInput(
+                        accommodationInput,
+                        hotelTabs,
+                        autoCreatedHotelWarningKeys,
+                        warnings,
+                        row.RowNumber,
+                        null,
+                        "accommodation");
 
                     if (previewRows.Count < PreviewRowLimit)
                     {
@@ -1718,15 +1751,24 @@ internal static class ParticipantImportHandlers
                         continue;
                     }
 
+                    hotelMatch = EnsurePersistedAccommodationHotel(
+                        hotelMatch!,
+                        hotelTabs,
+                        id,
+                        orgId,
+                        now,
+                        ref nextDocTabSortOrder,
+                        importMode == ParticipantImportMode.Apply ? db : null);
+
                     var key = (startDate!.Value, endDate!.Value);
                     if (!exactSegmentLookup.TryGetValue(key, out var segmentEntity))
                     {
-                        var overlapping = segmentWorkingSet.Any(x =>
-                            x.StartDate <= endDate.Value
-                            && x.EndDate >= startDate.Value);
-                        if (overlapping)
-                        {
-                            errors.Add(new ParticipantImportError(
+                            var overlapping = segmentWorkingSet.Any(x =>
+                                x.StartDate < endDate.Value
+                                && x.EndDate > startDate.Value);
+                            if (overlapping)
+                            {
+                                errors.Add(new ParticipantImportError(
                                 row.RowNumber,
                                 null,
                                 "segment date range overlaps an existing accommodation segment",
@@ -1809,12 +1851,14 @@ internal static class ParticipantImportHandlers
                     }
 
                     var overrideInput = NormalizeOptionalText(row.GetValue("accommodation_override"));
-                    var overrideHotel = ResolveAccommodationHotelInput(overrideInput, hotelTabs);
-                    if (!string.IsNullOrWhiteSpace(overrideInput) && overrideHotel is null)
-                    {
-                        rowErrors.Add("accommodation_override could not be resolved");
-                        rowFields.Add("accommodation_override");
-                    }
+                    var overrideHotel = EnsureAccommodationHotelInput(
+                        overrideInput,
+                        hotelTabs,
+                        autoCreatedHotelWarningKeys,
+                        warnings,
+                        row.RowNumber,
+                        tcNoForIssues,
+                        "accommodation_override");
 
                     if (previewRows.Count < PreviewRowLimit)
                     {
@@ -1880,6 +1924,15 @@ internal static class ParticipantImportHandlers
                         });
                         continue;
                     }
+
+                    overrideHotel = EnsurePersistedAccommodationHotel(
+                        overrideHotel,
+                        hotelTabs,
+                        id,
+                        orgId,
+                        now,
+                        ref nextDocTabSortOrder,
+                        importMode == ParticipantImportMode.Apply ? db : null);
 
                     var participant = existingByTc[tcNo][0];
                     var segmentContext = segmentContextByKey[segmentKey!];
@@ -2067,29 +2120,8 @@ internal static class ParticipantImportHandlers
         var accommodationSegmentSheet = workbook.AddWorksheet("accommodation_segments");
         var accommodationAssignmentSheet = workbook.AddWorksheet("accommodation_assignments");
 
-        var dateHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "birth_date",
-            "hotel_check_in_date",
-            "hotel_check_out_date",
-            "insurance_start_date",
-            "insurance_end_date",
-            "arrival_flight_date",
-            "return_flight_date",
-            "departure_date",
-            "arrival_date"
-        };
-        var timeHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "arrival_departure_time",
-            "arrival_arrival_time",
-            "return_departure_time",
-            "return_arrival_time",
-            "arrival_transfer_pickup_time",
-            "return_transfer_pickup_time",
-            "departure_time",
-            "arrival_time"
-        };
+        var dateHeaders = BuildDateHeaders();
+        var timeHeaders = BuildTimeHeaders();
 
         for (var i = 0; i < ParticipantTemplateHeaders.Length; i++)
         {
@@ -2196,6 +2228,347 @@ internal static class ParticipantImportHandlers
         workbook.SaveAs(stream);
         return stream.ToArray();
     }
+
+    private static byte[] BuildXlsxExample(DateOnly eventStartDate, DateOnly eventEndDate)
+    {
+        using var workbook = new XLWorkbook();
+        var participantSheet = workbook.AddWorksheet("participants");
+        var flightSegmentSheet = workbook.AddWorksheet("flight_segments");
+        var accommodationSegmentSheet = workbook.AddWorksheet("accommodation_segments");
+        var accommodationAssignmentSheet = workbook.AddWorksheet("accommodation_assignments");
+
+        var dateHeaders = BuildDateHeaders();
+        var timeHeaders = BuildTimeHeaders();
+
+        var exampleParticipants = BuildExampleParticipants(eventStartDate, eventEndDate);
+        WriteSheetHeaderAndRows(
+            participantSheet,
+            ParticipantTemplateHeaders,
+            exampleParticipants.Select(BuildParticipantExampleRow),
+            dateHeaders,
+            timeHeaders);
+
+        var exampleFlightSegments = BuildExampleFlightSegments(eventStartDate, eventEndDate, exampleParticipants);
+        WriteSheetHeaderAndRows(
+            flightSegmentSheet,
+            FlightSegmentCanonicalHeaders,
+            exampleFlightSegments,
+            dateHeaders,
+            timeHeaders);
+
+        var exampleAccommodation = BuildExampleAccommodation(eventStartDate, eventEndDate, exampleParticipants);
+        WriteSheetHeaderAndRows(
+            accommodationSegmentSheet,
+            AccommodationSegmentRequiredHeaders,
+            exampleAccommodation.SegmentRows,
+            dateHeaders,
+            timeHeaders);
+        WriteSheetHeaderAndRows(
+            accommodationAssignmentSheet,
+            AccommodationAssignmentCanonicalHeaders,
+            exampleAccommodation.AssignmentRows,
+            dateHeaders,
+            timeHeaders);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    private static HashSet<string> BuildDateHeaders()
+        => new(StringComparer.OrdinalIgnoreCase)
+        {
+            "birth_date",
+            "hotel_check_in_date",
+            "hotel_check_out_date",
+            "insurance_start_date",
+            "insurance_end_date",
+            "arrival_flight_date",
+            "return_flight_date",
+            "departure_date",
+            "arrival_date",
+            "start_date",
+            "end_date"
+        };
+
+    private static HashSet<string> BuildTimeHeaders()
+        => new(StringComparer.OrdinalIgnoreCase)
+        {
+            "arrival_departure_time",
+            "arrival_arrival_time",
+            "return_departure_time",
+            "return_arrival_time",
+            "arrival_transfer_pickup_time",
+            "return_transfer_pickup_time",
+            "departure_time",
+            "arrival_time"
+        };
+
+    private static void WriteSheetHeaderAndRows(
+        IXLWorksheet sheet,
+        IReadOnlyList<string> headers,
+        IEnumerable<IReadOnlyList<string>> rows,
+        HashSet<string> dateHeaders,
+        HashSet<string> timeHeaders)
+    {
+        for (var i = 0; i < headers.Count; i++)
+        {
+            sheet.Cell(1, i + 1).Value = headers[i];
+        }
+
+        var rowIndex = 2;
+        foreach (var row in rows)
+        {
+            for (var i = 0; i < headers.Count && i < row.Count; i++)
+            {
+                WriteTemplateCell(sheet.Cell(rowIndex, i + 1), headers[i], row[i], dateHeaders, timeHeaders);
+            }
+
+            rowIndex++;
+        }
+
+        sheet.Row(1).Style.Font.Bold = true;
+        sheet.Columns().AdjustToContents();
+    }
+
+    private static List<ExampleParticipantRow> BuildExampleParticipants(DateOnly eventStartDate, DateOnly eventEndDate)
+    {
+        var firstNames = new[]
+        {
+            "Ayse", "Mehmet", "Zeynep", "Ali", "Elif", "Can", "Deniz", "Merve", "Burak", "Ceren",
+            "Emre", "Selin", "Kerem", "Derya", "Onur", "Seda", "Berk", "Naz", "Kaan", "Ece"
+        };
+        var lastNames = new[]
+        {
+            "Demir", "Kaya", "Yildiz", "Aydin", "Sahin", "Kilic", "Arslan", "Tas", "Cetin", "Koc",
+            "Acar", "Kurt", "Ozdemir", "Gunes", "Polat", "Tekin", "Yaman", "Bozkurt", "Akin", "Ertas"
+        };
+        var cities = new[] { "Istanbul", "Ankara", "Izmir", "Bursa", "Antalya" };
+        var flightCities = new[] { "Istanbul", "Ankara", "Izmir" };
+
+        var rows = new List<ExampleParticipantRow>();
+        for (var i = 0; i < 20; i++)
+        {
+            rows.Add(new ExampleParticipantRow(
+                firstNames[i],
+                lastNames[i],
+                $"{10000000001 + i}",
+                new DateOnly(1988 + (i % 10), (i % 12) + 1, (i % 27) + 1),
+                i % 2 == 0 ? "Female" : "Male",
+                $"+90530{1000000 + i:0000000}",
+                $"user{i + 1}@example.com",
+                cities[i % cities.Length],
+                flightCities[i % flightCities.Length],
+                eventStartDate,
+                eventEndDate,
+                i < 4));
+        }
+
+        return rows;
+    }
+
+    private static string[] BuildParticipantExampleRow(ExampleParticipantRow participant)
+        =>
+        [
+            "Demo Travel",
+            participant.City,
+            participant.FirstName,
+            participant.LastName,
+            participant.BirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            participant.TcNo,
+            participant.Gender,
+            participant.Phone,
+            participant.Email,
+            participant.FlightCity,
+            "Acme Insurance",
+            $"POL-{participant.TcNo[^4..]}",
+            participant.InsuranceStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            participant.InsuranceEndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            "07:30",
+            "Airport",
+            "Hotel Lobby",
+            "Sprinter",
+            $"34 TF {participant.TcNo[^3..]}",
+            $"Driver {participant.FirstName}",
+            "Meet at gate 5",
+            "18:00",
+            "Hotel Lobby",
+            "Airport",
+            "Vito",
+            $"34 RT {participant.TcNo[^3..]}",
+            $"Return Driver {participant.FirstName}",
+            "Pickup 15 min earlier"
+        ];
+
+    private static List<string[]> BuildExampleFlightSegments(
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        List<ExampleParticipantRow> participants)
+    {
+        var departureAirports = new[] { "IST", "ESB", "ADB" };
+        var rows = new List<string[]>();
+
+        for (var i = 0; i < participants.Count; i++)
+        {
+            var participant = participants[i];
+            var fullName = $"{participant.FirstName} {participant.LastName}";
+            var departureAirport = departureAirports[i % departureAirports.Length];
+            if (participant.ConnectingFlight)
+            {
+                rows.AddRange([
+                    BuildFlightSegmentRow(participant.TcNo, "Arrival", "1", departureAirport, "ADB", $"TK{2300 + i}", eventStartDate, "08:15", fullName, "Turkish Airlines", eventStartDate, "09:35", $"PNR-ARR-{i + 1}-1", $"TK-OUT-{i + 1}", "1", "23", "8 kg"),
+                    BuildFlightSegmentRow(participant.TcNo, "Arrival", "2", "ADB", "AYT", $"TK{2400 + i}", eventStartDate, "11:20", fullName, "Turkish Airlines", eventStartDate, "12:35", $"PNR-ARR-{i + 1}-2", $"TK-OUT-{i + 1}", "1", "23", "1 cabin suitcase"),
+                    BuildFlightSegmentRow(participant.TcNo, "Return", "1", "ASR", "ADB", $"TK{3300 + i}", eventEndDate, "16:10", fullName, "Turkish Airlines", eventEndDate, "17:25", $"PNR-RET-{i + 1}-1", $"TK-RET-{i + 1}", "1", "23", "8 kg"),
+                    BuildFlightSegmentRow(participant.TcNo, "Return", "2", "ADB", departureAirport, $"TK{3400 + i}", eventEndDate, "19:05", fullName, "Turkish Airlines", eventEndDate, "20:20", $"PNR-RET-{i + 1}-2", $"TK-RET-{i + 1}", "1", "23", "Backpack")
+                ]);
+            }
+            else
+            {
+                rows.Add(BuildFlightSegmentRow(participant.TcNo, "Arrival", "1", departureAirport, "AYT", $"TK{2300 + i}", eventStartDate, "08:15", fullName, "Turkish Airlines", eventStartDate, "09:35", $"PNR-ARR-{i + 1}", $"TK-OUT-{i + 1}", "1", "23", "8 kg"));
+                rows.Add(BuildFlightSegmentRow(participant.TcNo, "Return", "1", "ASR", departureAirport, $"TK{3300 + i}", eventEndDate, "16:10", fullName, "Turkish Airlines", eventEndDate, "17:25", $"PNR-RET-{i + 1}", $"TK-RET-{i + 1}", "1", "23", "8 kg"));
+            }
+        }
+
+        return rows;
+    }
+
+    private static string[] BuildFlightSegmentRow(
+        string tcNo,
+        string direction,
+        string segmentIndex,
+        string departureAirport,
+        string arrivalAirport,
+        string flightCode,
+        DateOnly departureDate,
+        string departureTime,
+        string participantName,
+        string airline,
+        DateOnly arrivalDate,
+        string arrivalTime,
+        string pnr,
+        string ticketNo,
+        string baggagePieces,
+        string baggageTotalKg,
+        string cabinBaggage)
+        =>
+        [
+            tcNo,
+            direction,
+            segmentIndex,
+            departureAirport,
+            arrivalAirport,
+            flightCode,
+            departureDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            departureTime,
+            participantName,
+            airline,
+            arrivalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            arrivalTime,
+            pnr,
+            ticketNo,
+            baggagePieces,
+            baggageTotalKg,
+            cabinBaggage
+        ];
+
+    private static ExampleAccommodationData BuildExampleAccommodation(
+        DateOnly eventStartDate,
+        DateOnly eventEndDate,
+        List<ExampleParticipantRow> participants)
+    {
+        var segmentRows = new List<string[]>();
+        var assignmentRows = new List<string[]>();
+
+        var totalDays = eventEndDate.DayNumber - eventStartDate.DayNumber;
+        List<ExampleSegment> segments;
+        if (totalDays >= 2)
+        {
+            var splitDate = eventStartDate.AddDays(Math.Max(1, totalDays / 2));
+            if (splitDate >= eventEndDate)
+            {
+                splitDate = eventStartDate.AddDays(1);
+            }
+
+            segments =
+            [
+                new ExampleSegment("PLAN_1", "Konaklama 1", eventStartDate, splitDate),
+                new ExampleSegment("PLAN_2", "Konaklama 2", splitDate, eventEndDate)
+            ];
+        }
+        else
+        {
+            segments = [new ExampleSegment("PLAN_1", "Konaklama 1", eventStartDate, eventEndDate)];
+        }
+
+        segmentRows.AddRange(segments.Select(segment => new[]
+        {
+            segment.Key,
+            segment.AccommodationTitle,
+            segment.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            segment.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        }));
+
+        for (var i = 0; i < participants.Count; i++)
+        {
+            var participant = participants[i];
+            foreach (var segment in segments)
+            {
+                string? overrideAccommodation = null;
+                if (segment.Key == "PLAN_2" && i < 3)
+                {
+                    overrideAccommodation = "Konaklama 3";
+                }
+
+                var roomBase = segment.Key == "PLAN_1" ? 100 : 200;
+                var roomNo = (roomBase + (i / 2)).ToString(CultureInfo.InvariantCulture);
+                var roomType = i % 2 == 0 ? "Twin" : "Double";
+                var boardType = (i % 3) switch
+                {
+                    0 => "AI",
+                    1 => "HB",
+                    _ => "BB"
+                };
+                var personNo = i >= 17 ? "1" : "2";
+
+                assignmentRows.Add(
+                [
+                    participant.TcNo,
+                    segment.Key,
+                    overrideAccommodation ?? string.Empty,
+                    roomNo,
+                    roomType,
+                    boardType,
+                    personNo
+                ]);
+            }
+        }
+
+        return new ExampleAccommodationData(segmentRows, assignmentRows);
+    }
+
+    private sealed record ExampleParticipantRow(
+        string FirstName,
+        string LastName,
+        string TcNo,
+        DateOnly BirthDate,
+        string Gender,
+        string Phone,
+        string Email,
+        string City,
+        string FlightCity,
+        DateOnly InsuranceStartDate,
+        DateOnly InsuranceEndDate,
+        bool ConnectingFlight);
+
+    private sealed record ExampleSegment(
+        string Key,
+        string AccommodationTitle,
+        DateOnly StartDate,
+        DateOnly EndDate);
+
+    private sealed record ExampleAccommodationData(
+        List<string[]> SegmentRows,
+        List<string[]> AssignmentRows);
 
     private static void WriteTemplateCell(
         IXLCell valueCell,
@@ -2928,6 +3301,99 @@ internal static class ParticipantImportHandlers
         var normalizedKey = NormalizeHeader(normalizedInput);
         return hotelTabs.FirstOrDefault(x => NormalizeHeader(x.Title) == normalizedKey);
     }
+
+    private static AccommodationHotelTab? EnsureAccommodationHotelInput(
+        string? input,
+        List<AccommodationHotelTab> hotelTabs,
+        HashSet<string> warningKeys,
+        List<ParticipantImportWarning> warnings,
+        int rowNumber,
+        string? tcNo,
+        string field)
+    {
+        var normalizedInput = NormalizeOptionalText(input);
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return null;
+        }
+
+        var existing = ResolveAccommodationHotelInput(normalizedInput, hotelTabs);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var warningKey = $"{field}:{NormalizeHeader(normalizedInput)}";
+        if (warningKeys.Add(warningKey))
+        {
+            warnings.Add(new ParticipantImportWarning(
+                rowNumber,
+                tcNo,
+                field.Equals("accommodation_override", StringComparison.OrdinalIgnoreCase)
+                    ? "accommodation_override not found; a new hotel doc tab will be created"
+                    : "accommodation not found; a new hotel doc tab will be created",
+                field.Equals("accommodation_override", StringComparison.OrdinalIgnoreCase)
+                    ? "accommodation_override_autocreate"
+                    : "accommodation_autocreate")
+            {
+                Field = field
+            });
+        }
+
+        var created = new AccommodationHotelTab(Guid.NewGuid(), normalizedInput);
+        hotelTabs.Add(created);
+
+        return created;
+    }
+
+    private static AccommodationHotelTab? EnsurePersistedAccommodationHotel(
+        AccommodationHotelTab? hotel,
+        List<AccommodationHotelTab> hotelTabs,
+        Guid eventId,
+        Guid organizationId,
+        DateTime now,
+        ref int nextSortOrder,
+        TripflowDbContext? db)
+    {
+        if (hotel is null || hotel.IsPersisted || db is null)
+        {
+            return hotel;
+        }
+
+        db.EventDocTabs.Add(new EventDocTabEntity
+        {
+            Id = hotel.Id,
+            OrganizationId = organizationId,
+            EventId = eventId,
+            Title = hotel.Title,
+            Type = "Hotel",
+            SortOrder = ++nextSortOrder,
+            IsActive = true,
+            ContentJson = BuildImportedAccommodationContentJson(hotel.Title),
+            CreatedAt = now
+        });
+
+        var persisted = hotel with { IsPersisted = true };
+        var index = hotelTabs.FindIndex(x => x.Id == hotel.Id);
+        if (index >= 0)
+        {
+            hotelTabs[index] = persisted;
+        }
+
+        return persisted;
+    }
+
+    private static string BuildImportedAccommodationContentJson(string title)
+        => JsonSerializer.Serialize(new
+        {
+            hotelName = title,
+            address = string.Empty,
+            phone = string.Empty,
+            checkInDate = string.Empty,
+            checkOutDate = string.Empty,
+            checkInNote = string.Empty,
+            checkOutNote = string.Empty
+        });
 
     private static string NormalizeHeader(string value)
     {
@@ -3774,5 +4240,5 @@ internal static class ParticipantImportHandlers
         EventAccommodationSegmentEntity Segment,
         string DefaultAccommodationTitle);
 
-    private sealed record AccommodationHotelTab(Guid Id, string Title);
+    private sealed record AccommodationHotelTab(Guid Id, string Title, bool IsPersisted = false);
 }

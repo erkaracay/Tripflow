@@ -1241,6 +1241,8 @@
       "templateNote": "Turkish and English headers are supported. Auto matching is recommended.",
       "autoDetectRecommended": "Selected header mode: {language}. Auto-detect is recommended for import.",
       "downloadTemplate": "Download template",
+      "downloadExample": "Download example file",
+      "exampleNote": "Downloads a filled XLSX that demonstrates plans and participant assignments.",
       "dropzoneTitle": "Drag and drop file here, or click to choose",
       "dropzoneHint": "Accepted formats: CSV and XLSX",
       "fileTypeError": "Please upload a CSV or XLSX file.",
@@ -1330,6 +1332,8 @@
         "baggageTotalKgInvalid": "Total baggage weight value is invalid.",
         "baggageTotalKgRounded": "Total baggage weight was rounded to the nearest whole number.",
         "participantNameMismatchForTcNo": "The reference participant name does not match the participant resolved by TC.",
+        "accommodationAutoCreate": "Accommodation was not found. Import will create a new accommodation tab with this name.",
+        "accommodationOverrideAutoCreate": "Override accommodation was not found. Import will create a new accommodation tab with this name.",
         "dateInvalid": "Date format is invalid.",
         "timeInvalid": "Time format is invalid."
       },
