@@ -155,19 +155,77 @@ const toVisibleTime = (value?: string | null) => {
   return formatted !== '—' ? formatted : null
 }
 
+const formatDateLikeText = (value?: string | null) => {
+  if (!value) {
+    return null
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const looksDateLike =
+    /^\d{4}[./-]\d{1,2}[./-]\d{1,2}(?:[T ].*)?$/.test(trimmed)
+    || /^\d{1,2}[./-]\d{1,2}[./-]\d{4}(?:[T ].*)?$/.test(trimmed)
+
+  if (!looksDateLike) {
+    return trimmed
+  }
+
+  const formatted = formatDate(trimmed)
+  return formatted !== '—' ? formatted : trimmed
+}
+
 const buildDateTime = (date?: string | null, time?: string | null) => {
   const parts = [toVisibleDate(date), toVisibleTime(time)].filter((part): part is string => Boolean(part))
   return parts.join(' ')
 }
 
-const buildTimeRange = (start?: string | null, end?: string | null) => {
-  const from = toVisibleTime(start)
-  const to = toVisibleTime(end)
+const buildDateRange = (start?: string | null, end?: string | null) => {
+  const from = toVisibleDate(start)
+  const to = toVisibleDate(end)
   if (!from && !to) {
     return null
   }
   return `${from ?? t('common.noData')} → ${to ?? t('common.noData')}`
 }
+
+const previewColumnLabels = computed(() => {
+  if (previewTypeFilter.value === 'participant') {
+    return {
+      main: t('admin.import.previewTable.participantPhone'),
+      route: t('admin.import.previewTable.participantBirthDate'),
+      schedule: t('admin.import.previewTable.participantGender'),
+      baggage: t('admin.import.previewTable.participantExtra'),
+    }
+  }
+
+  if (previewTypeFilter.value === 'flight') {
+    return {
+      main: t('admin.import.previewTable.flightMain'),
+      route: t('admin.import.previewTable.flightRoute'),
+      schedule: t('admin.import.previewTable.flightSchedule'),
+      baggage: t('admin.import.previewTable.flightBaggage'),
+    }
+  }
+
+  if (previewTypeFilter.value === 'accommodation') {
+    return {
+      main: t('admin.import.previewTable.accommodationMain'),
+      route: t('admin.import.previewTable.accommodationName'),
+      schedule: t('admin.import.previewTable.accommodationDate'),
+      baggage: t('admin.import.previewTable.accommodationRoomInfo'),
+    }
+  }
+
+  return {
+    main: t('admin.import.previewTable.allMain'),
+    route: t('admin.import.previewTable.allDetail'),
+    schedule: t('admin.import.previewTable.allDateTime'),
+    baggage: t('admin.import.previewTable.allExtra'),
+  }
+})
 
 const previewTypeLabel = (row: ParticipantImportPreviewRow) =>
   isFlightPreviewRow(row)
@@ -204,7 +262,7 @@ const previewMainText = (row: ParticipantImportPreviewRow) => {
     return row.segmentKey?.trim() || t('common.noData')
   }
 
-  return t('common.noData')
+  return row.phone?.trim() || t('common.noData')
 }
 
 const previewRouteText = (row: ParticipantImportPreviewRow) => {
@@ -217,10 +275,10 @@ const previewRouteText = (row: ParticipantImportPreviewRow) => {
   }
 
   if (isAccommodationPreviewRow(row)) {
-    return row.accommodationTitle?.trim() || t('common.noData')
+    return formatDateLikeText(row.accommodationTitle) || t('common.noData')
   }
 
-  return t('common.noData')
+  return toVisibleDate(row.birthDate) || t('common.noData')
 }
 
 const previewScheduleText = (row: ParticipantImportPreviewRow) => {
@@ -234,24 +292,10 @@ const previewScheduleText = (row: ParticipantImportPreviewRow) => {
   }
 
   if (isAccommodationPreviewRow(row)) {
-    const start = toVisibleDate(row.startDate)
-    const end = toVisibleDate(row.endDate)
-    if (!start && !end) {
-      return t('common.noData')
-    }
-    return `${start || t('common.noData')} → ${end || t('common.noData')}`
+    return buildDateRange(row.startDate, row.endDate) || t('common.noData')
   }
 
-  const arrivalRange = buildTimeRange(row.arrivalDepartureTime, row.arrivalArrivalTime)
-  const returnRange = buildTimeRange(row.returnDepartureTime, row.returnArrivalTime)
-  const parts: string[] = []
-  if (arrivalRange) {
-    parts.push(`${t('admin.participant.flights.tabs.arrival')}: ${arrivalRange}`)
-  }
-  if (returnRange) {
-    parts.push(`${t('admin.participant.flights.tabs.return')}: ${returnRange}`)
-  }
-  return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+  return row.gender?.trim() || t('common.noData')
 }
 
 const previewBaggageText = (row: ParticipantImportPreviewRow) => {
@@ -282,19 +326,13 @@ const previewBaggageText = (row: ParticipantImportPreviewRow) => {
   }
 
   if (isAccommodationSegmentPreviewRow(row)) {
-    return row.accommodationTitle?.trim() || t('common.noData')
+    return t('common.noData')
   }
 
-  const arrival = formatBaggage(row.arrivalBaggagePieces, row.arrivalBaggageTotalKg)
-  const ret = formatBaggage(row.returnBaggagePieces, row.returnBaggageTotalKg)
-  const parts: string[] = []
-  if (arrival !== '—') {
-    parts.push(`${t('admin.participant.flights.tabs.arrival')}: ${arrival}`)
-  }
-  if (ret !== '—') {
-    parts.push(`${t('admin.participant.flights.tabs.return')}: ${ret}`)
-  }
-  return parts.length > 0 ? parts.join(' | ') : t('common.noData')
+  const accommodationRange = buildDateRange(row.hotelCheckInDate, row.hotelCheckOutDate)
+  return accommodationRange
+    ? `${t('admin.import.previewTable.participantExtraAccommodation')}: ${accommodationRange}`
+    : t('common.noData')
 }
 
 const normalizeDirectionFilter = (direction?: string | null): PreviewDirectionFilter => {
@@ -367,8 +405,8 @@ const previewStats = computed(() => ({
   total: previewRows.value.length,
 }))
 
-const showExtendedPreviewColumns = computed(() => previewTypeFilter.value !== 'participant')
-const previewNoRowsColspan = computed(() => (showExtendedPreviewColumns.value ? 8 : 4))
+const showExtendedPreviewColumns = computed(() => true)
+const previewNoRowsColspan = computed(() => 8)
 
 const filteredIssueRows = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -1265,10 +1303,10 @@ watch(summary, () => {
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.type') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.tcNo') }}</th>
                       <th class="px-3 py-2">{{ t('admin.import.previewTable.participant') }}</th>
-                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.main') }}</th>
-                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.route') }}</th>
-                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.schedule') }}</th>
-                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ t('admin.import.previewTable.baggage') }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ previewColumnLabels.main }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ previewColumnLabels.route }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ previewColumnLabels.schedule }}</th>
+                      <th v-if="showExtendedPreviewColumns" class="px-3 py-2">{{ previewColumnLabels.baggage }}</th>
                     </tr>
                   </thead>
                   <tbody>
