@@ -395,6 +395,13 @@ const filteredIssueRows = computed(() => {
   })
 })
 
+const issueStats = computed(() => ({
+  shown: filteredIssueRows.value.length,
+  total: issueRows.value.length,
+  errors: issueRows.value.filter((row) => row.status === 'error').length,
+  warnings: issueRows.value.filter((row) => row.status === 'warn').length,
+}))
+
 const canPreview = computed(() => Boolean(selectedFile.value) && !previewLoading.value && retryAfterSeconds.value === 0)
 const canApply = computed(
   () => Boolean(selectedFile.value) && Boolean(report.value) && !applyLoading.value && retryAfterSeconds.value === 0
@@ -754,7 +761,7 @@ const mapWarningRow = (warning: ParticipantImportWarning): ImportIssueRow => ({
   row: warning.row,
   status: 'warn',
   tcNo: warning.tcNo ?? undefined,
-  participant: warning.tcNo ? `TC ${warning.tcNo}` : t('common.noData'),
+  participant: warning.tcNo ? `TC ${warning.tcNo}` : getIssueParticipantLabel(warning.field),
   message: translateImportWarning(warning),
 })
 
@@ -762,9 +769,21 @@ const mapErrorRow = (error: ParticipantImportError): ImportIssueRow => ({
   row: error.row,
   status: 'error',
   tcNo: error.tcNo ?? undefined,
-  participant: error.tcNo ? `TC ${error.tcNo}` : t('common.noData'),
+  participant: error.tcNo ? `TC ${error.tcNo}` : getIssueParticipantLabel(error.field),
   message: translateImportError(error),
 })
+
+const getIssueParticipantLabel = (field?: string | null) => {
+  if (field === 'accommodation' || field === 'accommodation_segments' || field === 'start_date' || field === 'end_date') {
+    return t('admin.import.previewTable.accommodationPlanRow')
+  }
+
+  if (field === 'accommodation_override' || field === 'accommodation_assignments' || field === 'segment_key') {
+    return t('admin.import.previewTable.accommodationAssignmentRow')
+  }
+
+  return t('common.noData')
+}
 
 const translateDateFieldError = (field?: string | null) => {
   if (field === 'birth_date') return t('admin.import.messages.birthDateInvalid')
@@ -823,6 +842,12 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'participant_name_mismatch_for_tc_no') {
     return t('admin.import.messages.participantNameMismatchForTcNo')
   }
+  if (warning.code === 'accommodation_auto_created') {
+    return t('admin.import.messages.accommodationAutoCreated')
+  }
+  if (warning.code === 'accommodation_override_auto_created') {
+    return t('admin.import.messages.accommodationOverrideAutoCreated')
+  }
 
   return warning.message
 }
@@ -835,6 +860,7 @@ const translateImportError = (error: ParticipantImportError) => {
   if (error.code === 'invalid_arrival_date') return t('admin.import.messages.arrivalDateInvalid')
   if (error.code === 'invalid_departure_time') return t('admin.import.messages.departureTimeInvalid')
   if (error.code === 'invalid_arrival_time') return t('admin.import.messages.arrivalTimeInvalid')
+  if (error.code === 'segment_overlap') return t('admin.import.messages.segmentOverlap')
 
   const message = error.message.toLowerCase()
   if (message.includes('duplicate tcno in file')) return t('admin.import.messages.duplicateTcNo')
@@ -849,6 +875,18 @@ const translateImportError = (error: ParticipantImportError) => {
   if (message.includes('tc_no must be 11 digits')) return t('admin.import.messages.tcNoInvalid')
   if (message.includes('birth_date invalid')) return t('admin.import.messages.birthDateInvalid')
   if (message.includes('gender invalid')) return t('admin.import.messages.genderInvalid')
+  if (message.includes('segment dates must be within event date range')) {
+    return t('admin.import.messages.segmentDatesOutOfEventRange')
+  }
+  if (message.includes('segment_key could not be resolved from accommodation_segments sheet')) {
+    return t('admin.import.messages.segmentKeyUnresolved')
+  }
+  if (message.includes('accommodation could not be resolved')) {
+    return t('admin.import.messages.accommodationResolveFailed')
+  }
+  if (message.includes('accommodation_override could not be resolved')) {
+    return t('admin.import.messages.accommodationOverrideResolveFailed')
+  }
   if (message.includes('hotel_check_in_date invalid')) return t('admin.import.messages.hotelCheckInInvalid')
   if (message.includes('hotel_check_out_date invalid')) return t('admin.import.messages.hotelCheckOutInvalid')
   if (message.includes('arrival_departure_time invalid')) return t('admin.import.messages.arrivalDepartureInvalid')
@@ -1097,6 +1135,9 @@ watch(summary, () => {
               :aria-label="t('admin.import.filters.all')"
               class-name="w-full sm:w-auto"
             />
+            <span class="text-xs text-slate-500">
+              {{ t('admin.import.previewFilters.shown', { shown: issueStats.shown, total: issueStats.total }) }}
+            </span>
             <input
               v-model.trim="search"
               class="ml-auto w-full max-w-xs rounded border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
@@ -1159,11 +1200,11 @@ watch(summary, () => {
               </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <label class="text-xs text-slate-600">{{ t('admin.import.previewFilters.typeLabel') }}</label>
-              <AppSegmentedControl
-                v-model="previewTypeFilter"
-                :options="previewTypeOptions"
+          <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <label class="text-xs text-slate-600">{{ t('admin.import.previewFilters.typeLabel') }}</label>
+            <AppSegmentedControl
+              v-model="previewTypeFilter"
+              :options="previewTypeOptions"
                 size="sm"
                 :aria-label="t('admin.import.previewFilters.typeLabel')"
                 class-name="w-full sm:w-auto"
@@ -1186,6 +1227,9 @@ watch(summary, () => {
                 :placeholder="t('admin.import.previewFilters.searchPlaceholder')"
                 type="text"
               />
+              <span class="text-xs text-slate-500">
+                {{ t('admin.import.previewFilters.shown', { shown: previewStats.shown, total: previewStats.total }) }}
+              </span>
             </div>
 
             <div class="overflow-hidden rounded-xl border border-slate-200">
