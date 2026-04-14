@@ -1023,9 +1023,24 @@ internal static class AccommodationSegmentsHandlers
                 x.EventId == eventId
                 && x.OrganizationId == organizationId
                 && (!excludeSegmentId.HasValue || x.Id != excludeSegmentId.Value)
-                && x.StartDate < endDate
-                && x.EndDate > startDate,
+                && DoSegmentDateRangesOverlap(x.StartDate, x.EndDate, startDate, endDate),
                 ct);
+
+    internal static bool DoSegmentDateRangesOverlap(
+        DateOnly leftStartDate,
+        DateOnly leftEndDate,
+        DateOnly rightStartDate,
+        DateOnly rightEndDate)
+    {
+        if (leftStartDate == rightStartDate && leftEndDate == rightEndDate)
+        {
+            return true;
+        }
+
+        // Segment dates represent check-in/check-out boundaries.
+        // Touching ranges like 08-09 and 09-10 are allowed.
+        return leftStartDate < rightEndDate && leftEndDate > rightStartDate;
+    }
 
     private sealed record ValidatedSharedMutation(
         string OverwriteMode,

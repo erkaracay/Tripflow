@@ -323,16 +323,16 @@ internal static class ParticipantImportHandlers
 
     private static readonly string[] AccommodationSegmentExampleRow1 =
     [
-        "ANTALYA",
-        "Antalya X Hotel",
+        "PLAN_1",
+        "Konaklama 1",
         "2026-03-10",
         "2026-03-12"
     ];
 
     private static readonly string[] AccommodationSegmentExampleRow2 =
     [
-        "KAYSERI",
-        "Kayseri Y Hotel",
+        "PLAN_2",
+        "Konaklama 2",
         "2026-03-12",
         "2026-03-14"
     ];
@@ -340,7 +340,7 @@ internal static class ParticipantImportHandlers
     private static readonly string[] AccommodationAssignmentExampleRow1 =
     [
         "12345678901",
-        "ANTALYA",
+        "PLAN_1",
         "",
         "101",
         "Double",
@@ -351,8 +351,8 @@ internal static class ParticipantImportHandlers
     private static readonly string[] AccommodationAssignmentExampleRow2 =
     [
         "10987654321",
-        "KAYSERI",
-        "Kayseri Z Hotel",
+        "PLAN_2",
+        "Konaklama 3",
         "220",
         "Single",
         "BB",
@@ -1632,7 +1632,8 @@ internal static class ParticipantImportHandlers
                     .Where(x => x.EventId == id && x.OrganizationId == orgId)
                     .Select(x => (int?)x.SortOrder)
                     .MaxAsync(ct) ?? 0;
-                var autoCreatedHotelWarningKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var createdHotelTabs = new Dictionary<string, AccommodationHotelTab>(StringComparer.OrdinalIgnoreCase);
+                var warnedCreatedHotelTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 var exactSegmentLookup = await db.EventAccommodationSegments
                     .Where(x => x.EventId == id && x.OrganizationId == orgId)
@@ -1692,14 +1693,28 @@ internal static class ParticipantImportHandlers
                         rowFields.Add("segment_key");
                     }
 
-                    var hotelMatch = EnsureAccommodationHotelInput(
+                    var hotelMatch = ResolveOrCreateAccommodationHotelInput(
                         accommodationInput,
                         hotelTabs,
-                        autoCreatedHotelWarningKeys,
-                        warnings,
-                        row.RowNumber,
-                        null,
-                        "accommodation");
+                        createdHotelTabs);
+                    if (hotelMatch is null)
+                    {
+                        rowErrors.Add("accommodation could not be resolved");
+                        rowFields.Add("accommodation");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(accommodationInput)
+                        && IsAutoCreatedAccommodation(hotelMatch, accommodationInput, createdHotelTabs)
+                        && warnedCreatedHotelTitles.Add(NormalizeHeader(accommodationInput)))
+                    {
+                        warnings.Add(new ParticipantImportWarning(
+                            row.RowNumber,
+                            null,
+                            "accommodation not found; a new hotel doc tab will be created",
+                            "accommodation_auto_created")
+                        {
+                            Field = "accommodation"
+                        });
+                    }
 
                     if (previewRows.Count < PreviewRowLimit)
                     {
@@ -1763,12 +1778,15 @@ internal static class ParticipantImportHandlers
                     var key = (startDate!.Value, endDate!.Value);
                     if (!exactSegmentLookup.TryGetValue(key, out var segmentEntity))
                     {
-                            var overlapping = segmentWorkingSet.Any(x =>
-                                x.StartDate < endDate.Value
-                                && x.EndDate > startDate.Value);
-                            if (overlapping)
-                            {
-                                errors.Add(new ParticipantImportError(
+                        var overlapping = segmentWorkingSet.Any(x =>
+                            AccommodationSegmentsHandlers.DoSegmentDateRangesOverlap(
+                                x.StartDate,
+                                x.EndDate,
+                                startDate.Value,
+                                endDate.Value));
+                        if (overlapping)
+                        {
+                            errors.Add(new ParticipantImportError(
                                 row.RowNumber,
                                 null,
                                 "segment date range overlaps an existing accommodation segment",
@@ -1851,14 +1869,31 @@ internal static class ParticipantImportHandlers
                     }
 
                     var overrideInput = NormalizeOptionalText(row.GetValue("accommodation_override"));
-                    var overrideHotel = EnsureAccommodationHotelInput(
+                    var overrideHotel = ResolveOrCreateAccommodationHotelInput(
                         overrideInput,
                         hotelTabs,
-                        autoCreatedHotelWarningKeys,
-                        warnings,
-                        row.RowNumber,
-                        tcNoForIssues,
-                        "accommodation_override");
+                        createdHotelTabs);
+                    if (!string.IsNullOrWhiteSpace(overrideInput) && overrideHotel is null)
+                    {
+                        rowErrors.Add("accommodation_override could not be resolved");
+                        rowFields.Add("accommodation_override");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(overrideInput)
+                        && overrideHotel is not null
+                        && IsAutoCreatedAccommodation(overrideHotel, overrideInput, createdHotelTabs))
+                    {
+                        if (warnedCreatedHotelTitles.Add(NormalizeHeader(overrideInput)))
+                        {
+                            warnings.Add(new ParticipantImportWarning(
+                                row.RowNumber,
+                                tcNoForIssues,
+                                "accommodation_override not found; a new hotel doc tab will be created",
+                                "accommodation_override_auto_created")
+                            {
+                                Field = "accommodation_override"
+                            });
+                        }
+                    }
 
                     if (previewRows.Count < PreviewRowLimit)
                     {
@@ -3302,14 +3337,10 @@ internal static class ParticipantImportHandlers
         return hotelTabs.FirstOrDefault(x => NormalizeHeader(x.Title) == normalizedKey);
     }
 
-    private static AccommodationHotelTab? EnsureAccommodationHotelInput(
+    private static AccommodationHotelTab? ResolveOrCreateAccommodationHotelInput(
         string? input,
         List<AccommodationHotelTab> hotelTabs,
-        HashSet<string> warningKeys,
-        List<ParticipantImportWarning> warnings,
-        int rowNumber,
-        string? tcNo,
-        string field)
+        Dictionary<string, AccommodationHotelTab> createdHotelTabs)
     {
         var normalizedInput = NormalizeOptionalText(input);
         if (string.IsNullOrWhiteSpace(normalizedInput))
@@ -3323,27 +3354,22 @@ internal static class ParticipantImportHandlers
             return existing;
         }
 
-        var warningKey = $"{field}:{NormalizeHeader(normalizedInput)}";
-        if (warningKeys.Add(warningKey))
+        if (Guid.TryParse(normalizedInput, out _))
         {
-            warnings.Add(new ParticipantImportWarning(
-                rowNumber,
-                tcNo,
-                field.Equals("accommodation_override", StringComparison.OrdinalIgnoreCase)
-                    ? "accommodation_override not found; a new hotel doc tab will be created"
-                    : "accommodation not found; a new hotel doc tab will be created",
-                field.Equals("accommodation_override", StringComparison.OrdinalIgnoreCase)
-                    ? "accommodation_override_autocreate"
-                    : "accommodation_autocreate")
-            {
-                Field = field
-            });
+            return null;
         }
 
-        var created = new AccommodationHotelTab(Guid.NewGuid(), normalizedInput);
-        hotelTabs.Add(created);
+        var normalizedKey = NormalizeHeader(normalizedInput);
+        if (createdHotelTabs.TryGetValue(normalizedKey, out var created))
+        {
+            return created;
+        }
 
-        return created;
+        var newTab = new AccommodationHotelTab(Guid.NewGuid(), normalizedInput);
+        createdHotelTabs[normalizedKey] = newTab;
+        hotelTabs.Add(newTab);
+
+        return newTab;
     }
 
     private static AccommodationHotelTab? EnsurePersistedAccommodationHotel(
@@ -3381,6 +3407,22 @@ internal static class ParticipantImportHandlers
         }
 
         return persisted;
+    }
+
+    private static bool IsAutoCreatedAccommodation(
+        AccommodationHotelTab hotelTab,
+        string input,
+        Dictionary<string, AccommodationHotelTab> createdHotelTabs)
+    {
+        var normalizedInput = NormalizeOptionalText(input);
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return false;
+        }
+
+        var normalizedKey = NormalizeHeader(normalizedInput);
+        return createdHotelTabs.TryGetValue(normalizedKey, out var created)
+            && created.Id == hotelTab.Id;
     }
 
     private static string BuildImportedAccommodationContentJson(string title)
