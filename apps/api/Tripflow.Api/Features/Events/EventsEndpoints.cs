@@ -468,6 +468,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapGet("/{eventId}/participants/import/example", ParticipantImportHandlers.DownloadImportExample)
+            .WithSummary("Download participant import example workbook")
+            .WithDescription("Downloads a filled XLSX example workbook for participant import.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{eventId}/participants/import", ParticipantImportHandlers.ImportParticipants)
             .WithSummary("Import participants")
             .WithDescription("Imports participants from CSV/XLSX. Use mode=apply or mode=dryrun.")

@@ -1243,6 +1243,8 @@
       "templateNote": "Turkish and English headers are supported. Auto matching is recommended.",
       "autoDetectRecommended": "Selected header mode: {language}. Auto-detect is recommended for import.",
       "downloadTemplate": "Download template",
+      "downloadExample": "Download example file",
+      "exampleNote": "Downloads a filled XLSX that demonstrates plans and participant assignments.",
       "dropzoneTitle": "Drag and drop file here, or click to choose",
       "dropzoneHint": "Accepted formats: CSV and XLSX",
       "fileTypeError": "Please upload a CSV or XLSX file.",

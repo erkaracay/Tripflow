@@ -1230,6 +1230,8 @@
       "templateNote": "Türkçe ve İngilizce başlıklar desteklenir. Otomatik eşleme önerilir.",
       "autoDetectRecommended": "Seçili başlık modu: {language}. İçe aktarma için otomatik algılama önerilir.",
       "downloadTemplate": "Şablonu indir",
+      "downloadExample": "Örnek dosya indir",
+      "exampleNote": "Örnek dosya, plan ve atama mantığını gösteren doldurulmuş bir XLSX indirir.",
       "dropzoneTitle": "Dosyayı buraya sürükleyin veya seçmek için tıklayın",
       "dropzoneHint": "Desteklenen formatlar: CSV ve XLSX",
       "fileTypeError": "Lütfen CSV veya XLSX dosyası yükleyin.",
