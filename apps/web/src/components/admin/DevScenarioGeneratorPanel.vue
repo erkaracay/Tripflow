@@ -42,6 +42,9 @@ const advancedOpen = ref(false)
 const submitting = ref(false)
 const initialized = ref(false)
 
+const numericInputClass =
+  'h-11 rounded border border-slate-200 bg-white px-3 py-2 text-sm [appearance:textfield] focus:border-slate-400 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
 const form = reactive({
   preset: 'balanced' as ScenarioPresetDto['id'],
   name: '',
@@ -109,21 +112,31 @@ const participantNamingOptions = computed(() => [
   { value: 'prefix', label: t('admin.devTools.scenario.namingOptions.prefix') },
 ])
 
-const resolveAccommodationCount = (raw: unknown, dayCountFallback: number) => {
-  const parsed = typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : Number.NaN
-  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 6) {
-    return parsed
+const resolveMaxAccommodationPlanCount = (dayCountRaw: unknown) => {
+  const parsed = typeof dayCountRaw === 'number' && Number.isFinite(dayCountRaw) ? Math.trunc(dayCountRaw) : Number.NaN
+  if (!Number.isFinite(parsed) || parsed <= 1) {
+    return 1
   }
 
-  return dayCountFallback >= 5 ? 3 : 2
+  return Math.max(1, Math.min(6, parsed - 1))
 }
 
-const ensureAccommodationCountDefault = () => {
-  if (Number.isFinite(form.accommodationCount) && form.accommodationCount >= 1 && form.accommodationCount <= 6) {
-    return
+const resolveAccommodationCount = (raw: unknown, dayCountFallback: number) => {
+  const maxCount = resolveMaxAccommodationPlanCount(dayCountFallback)
+  const parsed = typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : Number.NaN
+  if (Number.isFinite(parsed)) {
+    return Math.min(maxCount, Math.max(1, parsed))
   }
 
-  form.accommodationCount = resolveAccommodationCount(undefined, form.dayCount)
+  const defaultCount = dayCountFallback >= 5 ? 3 : dayCountFallback >= 3 ? 2 : 1
+  return Math.min(defaultCount, maxCount)
+}
+
+const maxAccommodationPlanCount = computed(() => resolveMaxAccommodationPlanCount(form.dayCount))
+const effectiveAccommodationPlanCount = computed(() => resolveAccommodationCount(form.accommodationCount, form.dayCount))
+
+const ensureAccommodationCountDefault = () => {
+  form.accommodationCount = resolveAccommodationCount(form.accommodationCount, form.dayCount)
 }
 
 const applyPreset = (presetId: ScenarioPresetDto['id']) => {
@@ -202,6 +215,13 @@ watch(
     ensureAccommodationCountDefault()
   },
   { immediate: true }
+)
+
+watch(
+  () => form.dayCount,
+  () => {
+    ensureAccommodationCountDefault()
+  }
 )
 
 const coverageCount = (total: number, percent: number) => Math.max(0, Math.min(total, Math.round(total * (percent / 100))))
@@ -452,12 +472,11 @@ function getTodayLocalDateString() {
             <p v-if="errors.timeZoneId" class="text-xs text-rose-600">{{ t(errors.timeZoneId) }}</p>
           </div>
 
-          <label class="grid gap-1 text-sm">
+          <label class="grid content-start self-start gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.dayCountLabel') }}</span>
             <input
               v-model.number="form.dayCount"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="errors.dayCount ? 'border-rose-400' : ''"
+              :class="[numericInputClass, errors.dayCount ? 'border-rose-400' : '']"
               min="1"
               max="14"
               step="1"
@@ -466,27 +485,30 @@ function getTodayLocalDateString() {
             <p v-if="errors.dayCount" class="text-xs text-rose-600">{{ t(errors.dayCount) }}</p>
           </label>
 
-          <label class="grid gap-1 text-sm">
+          <label class="grid content-start self-start gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.accommodationCountLabel') }}</span>
             <input
               v-model.number="form.accommodationCount"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="errors.accommodationCount ? 'border-rose-400' : ''"
+              :class="[numericInputClass, errors.accommodationCount ? 'border-rose-400' : '']"
               min="1"
-              max="6"
+              :max="maxAccommodationPlanCount"
               step="1"
               type="number"
               @blur="ensureAccommodationCountDefault"
             />
-            <p v-if="errors.accommodationCount" class="text-xs text-rose-600">{{ t(errors.accommodationCount) }}</p>
+            <div class="min-h-5">
+              <p v-if="errors.accommodationCount" class="text-xs text-rose-600">{{ t(errors.accommodationCount) }}</p>
+              <p v-else class="text-xs text-slate-500">
+                {{ t('admin.devTools.scenario.accommodationCountHelper', { max: maxAccommodationPlanCount }) }}
+              </p>
+            </div>
           </label>
 
-          <label class="grid gap-1 text-sm">
+          <label class="grid content-start self-start gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.participantCountLabel') }}</span>
             <input
               v-model.number="form.participantCount"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="errors.participantCount ? 'border-rose-400' : ''"
+              :class="[numericInputClass, errors.participantCount ? 'border-rose-400' : '']"
               min="0"
               max="500"
               step="1"
@@ -495,12 +517,11 @@ function getTodayLocalDateString() {
             <p v-if="errors.participantCount" class="text-xs text-rose-600">{{ t(errors.participantCount) }}</p>
           </label>
 
-          <label class="grid gap-1 text-sm">
+          <label class="grid content-start self-start gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.equipmentTypeCountLabel') }}</span>
             <input
               v-model.number="form.equipmentTypeCount"
-              class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              :class="errors.equipmentTypeCount ? 'border-rose-400' : ''"
+              :class="[numericInputClass, errors.equipmentTypeCount ? 'border-rose-400' : '']"
               min="0"
               max="10"
               step="1"
@@ -509,7 +530,7 @@ function getTodayLocalDateString() {
             <p v-if="errors.equipmentTypeCount" class="text-xs text-rose-600">{{ t(errors.equipmentTypeCount) }}</p>
           </label>
 
-          <label class="grid gap-1 text-sm">
+          <label class="grid content-start self-start gap-1 text-sm">
             <span class="text-slate-600">{{ t('admin.devTools.scenario.mealModeLabel') }}</span>
             <AppCombobox
               v-model="form.mealMode"
@@ -537,7 +558,7 @@ function getTodayLocalDateString() {
 
           <Transition name="app-section-reveal">
             <div v-if="advancedOpen" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-2 lg:grid-cols-2">
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.activityDensityLabel') }}</span>
                 <AppCombobox
                   v-model="form.activityDensity"
@@ -551,7 +572,7 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.flightLegModeLabel') }}</span>
                 <AppCombobox
                   v-model="form.flightLegMode"
@@ -566,7 +587,7 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.namingModeLabel') }}</span>
                 <AppCombobox
                   v-model="form.participantNamingMode"
@@ -580,12 +601,11 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.mealSelectionCoverageLabel') }}</span>
                 <input
                   v-model.number="form.mealSelectionCoveragePercent"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :class="errors.mealSelectionCoveragePercent ? 'border-rose-400' : ''"
+                  :class="[numericInputClass, errors.mealSelectionCoveragePercent ? 'border-rose-400' : '']"
                   min="0"
                   max="100"
                   step="1"
@@ -599,12 +619,11 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.eventCheckInCoverageLabel') }}</span>
                 <input
                   v-model.number="form.eventCheckInCoveragePercent"
-                  class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  :class="errors.eventCheckInCoveragePercent ? 'border-rose-400' : ''"
+                  :class="[numericInputClass, errors.eventCheckInCoveragePercent ? 'border-rose-400' : '']"
                   min="0"
                   max="100"
                   step="1"
@@ -618,7 +637,7 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.participantNamePrefixLabel') }}</span>
                 <input
                   v-model.trim="form.participantNamePrefix"
@@ -634,7 +653,7 @@ function getTodayLocalDateString() {
                 </div>
               </label>
 
-              <label class="grid gap-1 text-sm">
+              <label class="grid content-start self-start gap-1 text-sm">
                 <span class="text-slate-600">{{ t('admin.devTools.scenario.randomSeedLabel') }}</span>
                 <input
                   v-model="form.randomSeed"
@@ -656,7 +675,7 @@ function getTodayLocalDateString() {
             </div>
             <div class="space-y-1 text-sm text-slate-600">
               <p>{{ t('admin.devTools.scenario.summaryDays', { count: form.dayCount }) }}</p>
-              <p>{{ t('admin.devTools.scenario.summaryAccommodations', { count: form.accommodationCount }) }}</p>
+              <p>{{ t('admin.devTools.scenario.summaryAccommodations', { count: effectiveAccommodationPlanCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryActivities', { count: activityCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryMealActivities', { count: mealActivityCount }) }}</p>
               <p>{{ t('admin.devTools.scenario.summaryParticipants', { count: form.participantCount }) }}</p>
