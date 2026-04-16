@@ -66,6 +66,16 @@ internal static class ScenarioEventGenerator
         int? RandomSeed);
 
     private sealed record GeneratedParticipant(ParticipantEntity Participant, ParticipantDetailsEntity Details);
+    private sealed record AccommodationPlanBoundary(DateOnly StartDate, DateOnly EndDate);
+    private sealed record GeneratedAccommodationPlan(
+        EventDocTabEntity DefaultHotelTab,
+        DateOnly StartDate,
+        DateOnly EndDate,
+        int SortOrder);
+    private sealed record GeneratedAccommodationLayout(
+        List<EventDocTabEntity> Tabs,
+        List<GeneratedAccommodationPlan> Plans,
+        EventDocTabEntity OverrideHotelTab);
 
     private sealed record GeneratedMealConfig(
         int GroupCount,
@@ -139,7 +149,6 @@ internal static class ScenarioEventGenerator
 
     private static readonly string[] Cities = ["Istanbul", "Ankara", "Izmir", "Antalya", "Bursa", "Adana"];
     private static readonly string[] AgencyNames = ["Tripflow Travel", "Atlas Mice", "Mavi Rota", "Panorama Tours"];
-    private static readonly string[] RoomTypes = ["Single", "Double", "Twin", "Triple"];
     private static readonly string[] BoardTypes = ["BB", "HB", "AI", "RO"];
     private static readonly string[] Airports = ["IST", "SAW", "ESB", "ADB", "AYT", "ASR"];
     private static readonly string[] Airlines = ["THY", "Pegasus", "AJet", "SunExpress"];
@@ -189,6 +198,7 @@ internal static class ScenarioEventGenerator
             error = new ScenarioValidationError("invalid_accommodation_count", "accommodationCount", "accommodationCount must be between 1 and 6.");
             return false;
         }
+        accommodationCount = NormalizeAccommodationPlanCount(dayCount, accommodationCount);
 
         var participantCount = request.ParticipantCount ?? preset.ParticipantCount;
         if (participantCount is < 0 or > 500)
@@ -282,6 +292,22 @@ internal static class ScenarioEventGenerator
         return true;
     }
 
+    private static int NormalizeAccommodationPlanCount(int dayCount, int requestedCount)
+    {
+        var maxPlanCount = GetMaxAccommodationPlanCount(dayCount);
+        return Math.Clamp(requestedCount, 1, maxPlanCount);
+    }
+
+    private static int GetMaxAccommodationPlanCount(int dayCount)
+    {
+        if (dayCount <= 1)
+        {
+            return 1;
+        }
+
+        return Math.Max(1, Math.Min(6, dayCount - 1));
+    }
+
     internal static async Task<CreateScenarioEventResponse> GenerateAsync(
         TripflowDbContext db,
         Guid organizationId,
@@ -292,6 +318,7 @@ internal static class ScenarioEventGenerator
         var random = request.RandomSeed.HasValue ? new Random(request.RandomSeed.Value) : new Random();
         var eventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
         var endDate = request.StartDate.AddDays(request.DayCount - 1);
+        var effectiveAccommodationPlanCount = request.AccommodationCount;
         var guideUserId = await ResolveGuideUserIdAsync(db, organizationId, ct);
 
         var entity = new EventEntity
@@ -323,7 +350,8 @@ internal static class ScenarioEventGenerator
         }
 
         entity.Days.AddRange(EventsHelpers.CreateDefaultDays(entity));
-        entity.DocTabs.AddRange(CreateScenarioDocTabs(entity, now, request));
+        var accommodationLayout = CreateScenarioAccommodationLayout(entity, now, effectiveAccommodationPlanCount);
+        entity.DocTabs.AddRange(accommodationLayout.Tabs);
         entity.Items.AddRange(EventsHelpers.CreateDefaultEventItems(entity, request.EquipmentTypeCount));
 
         entity.Portal = new EventPortalEntity
@@ -339,6 +367,13 @@ internal static class ScenarioEventGenerator
         db.Events.Add(entity);
         await db.SaveChangesAsync(ct);
 
+        var accommodationSegments = CreateAccommodationSegments(entity, accommodationLayout.Plans, now);
+        if (accommodationSegments.Count > 0)
+        {
+            db.EventAccommodationSegments.AddRange(accommodationSegments);
+            await db.SaveChangesAsync(ct);
+        }
+
         var days = entity.Days.OrderBy(x => x.SortOrder).ToList();
         var activities = BuildActivities(entity, days, request);
         if (activities.Count > 0)
@@ -350,6 +385,21 @@ internal static class ScenarioEventGenerator
         var mealConfig = await CreateMealConfigurationAsync(db, entity, activities, now, ct);
         var participants = await CreateParticipantsAsync(db, entity, request, random, now, ct);
         var participantEntities = participants.Select(x => x.Participant).ToList();
+
+        var accommodationAssignments = CreateAccommodationAssignments(
+            entity,
+            accommodationSegments,
+            accommodationLayout.OverrideHotelTab,
+            participants,
+            now);
+        if (accommodationAssignments.Count > 0)
+        {
+            db.ParticipantAccommodationAssignments.AddRange(accommodationAssignments);
+            await db.SaveChangesAsync(ct);
+        }
+
+        MirrorLegacyAccommodationDetails(participants, accommodationSegments, accommodationAssignments);
+        await db.SaveChangesAsync(ct);
 
         var flightSegments = request.IncludeFlights
             ? CreateFlightSegments(entity, participants, random, request.FlightLegMode)
@@ -388,7 +438,7 @@ internal static class ScenarioEventGenerator
             entity.EventAccessCode,
             new ScenarioEventCountsDto(
                 days.Count,
-                request.AccommodationCount,
+                effectiveAccommodationPlanCount,
                 activities.Count,
                 activities.Count(x => IsMealActivity(x.Type)),
                 participantEntities.Count,
@@ -420,16 +470,12 @@ internal static class ScenarioEventGenerator
             .FirstOrDefaultAsync(ct);
     }
 
-    private static List<EventDocTabEntity> CreateScenarioDocTabs(
+    private static GeneratedAccommodationLayout CreateScenarioAccommodationLayout(
         EventEntity entity,
         DateTime createdAtUtc,
-        ResolvedScenarioEventRequest request)
+        int accommodationPlanCount)
     {
         var tabs = EventsHelpers.CreateDefaultDocTabs(entity, createdAtUtc);
-        var accommodationCount = request.AccommodationCount;
-        var hotelTabs = tabs
-            .Where(x => string.Equals(x.Type, "Hotel", StringComparison.Ordinal))
-            .ToList();
         var insuranceTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
         var transferTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));
 
@@ -437,39 +483,63 @@ internal static class ScenarioEventGenerator
         tabs.RemoveAll(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
         tabs.RemoveAll(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));
 
-        for (var index = 0; index < accommodationCount; index++)
+        var planBoundaries = BuildAccommodationPlanBoundaries(entity.StartDate, entity.EndDate, accommodationPlanCount);
+        var defaultPlans = new List<GeneratedAccommodationPlan>(planBoundaries.Count);
+        for (var index = 0; index < planBoundaries.Count; index++)
         {
-            var hotelTab = index < hotelTabs.Count
-                ? hotelTabs[index]
-                : new EventDocTabEntity
-                {
-                    Id = Guid.NewGuid(),
-                    OrganizationId = entity.OrganizationId,
-                    EventId = entity.Id,
-                    Type = "Hotel",
-                    IsActive = true,
-                    CreatedAt = createdAtUtc
-                };
+            var boundary = planBoundaries[index];
+            var hotelTab = new EventDocTabEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                Type = "Hotel",
+                IsActive = true,
+                CreatedAt = createdAtUtc
+            };
 
             hotelTab.Title = $"Konaklama {index + 1}";
             hotelTab.SortOrder = index + 1;
             hotelTab.ContentJson = BuildAccommodationContentJson(
                 hotelName: $"{entity.Name} Konaklama {index + 1}",
-                address: index == 0
-                    ? "Merkez Mah. 10. Sokak No:5"
-                    : "Sahil Cad. No:24",
-                phone: index == 0 ? "+90 212 555 0000" : "+90 242 555 0001",
-                checkInDate: BuildAccommodationBoundaryDate(entity.StartDate, entity.EndDate, accommodationCount, index, isCheckout: false),
-                checkOutDate: BuildAccommodationBoundaryDate(entity.StartDate, entity.EndDate, accommodationCount, index, isCheckout: true),
+                address: ResolveAccommodationAddress(index),
+                phone: ResolveAccommodationPhone(index),
+                checkInDate: boundary.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                checkOutDate: boundary.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 checkInNote: index == 0
                     ? "Giriş 14:00 itibarıyla"
-                    : "İkinci konaklama için giriş 15:00 itibarıyla",
+                    : $"Konaklama {index + 1} için giriş 15:00 itibarıyla",
                 checkOutNote: "Çıkış 12:00");
 
             tabs.Add(hotelTab);
+            defaultPlans.Add(new GeneratedAccommodationPlan(hotelTab, boundary.StartDate, boundary.EndDate, index + 1));
         }
 
-        var nextSortOrder = accommodationCount + 1;
+        var overrideBoundary = planBoundaries.Count > 0
+            ? planBoundaries[^1]
+            : new AccommodationPlanBoundary(entity.StartDate, entity.EndDate);
+        var overrideHotelTab = new EventDocTabEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = entity.OrganizationId,
+            EventId = entity.Id,
+            Type = "Hotel",
+            Title = "Konaklama Override",
+            SortOrder = defaultPlans.Count + 1,
+            IsActive = true,
+            CreatedAt = createdAtUtc,
+            ContentJson = BuildAccommodationContentJson(
+                hotelName: $"{entity.Name} Konaklama Override",
+                address: "Marina Cad. No:42",
+                phone: "+90 252 555 0019",
+                checkInDate: overrideBoundary.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                checkOutDate: overrideBoundary.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                checkInNote: "Override konaklama için giriş 15:00 itibarıyla",
+                checkOutNote: "Çıkış 11:30")
+        };
+        tabs.Add(overrideHotelTab);
+
+        var nextSortOrder = defaultPlans.Count + 2;
 
         if (insuranceTab is not null)
         {
@@ -497,9 +567,10 @@ internal static class ScenarioEventGenerator
             tabs.Add(transferTab);
         }
 
-        return tabs
-            .OrderBy(x => x.SortOrder)
-            .ToList();
+        return new GeneratedAccommodationLayout(
+            tabs.OrderBy(x => x.SortOrder).ToList(),
+            defaultPlans,
+            overrideHotelTab);
     }
 
     private static string BuildAccommodationContentJson(
@@ -523,34 +594,67 @@ internal static class ScenarioEventGenerator
         });
     }
 
-    private static string BuildAccommodationBoundaryDate(
+    private static List<AccommodationPlanBoundary> BuildAccommodationPlanBoundaries(
         DateOnly eventStartDate,
         DateOnly eventEndDate,
-        int accommodationCount,
-        int accommodationIndex,
-        bool isCheckout)
+        int accommodationPlanCount)
     {
         var totalNights = Math.Max(0, eventEndDate.DayNumber - eventStartDate.DayNumber);
         if (totalNights == 0)
         {
-            return eventStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return [new AccommodationPlanBoundary(eventStartDate, eventStartDate)];
         }
 
-        var safeCount = Math.Max(1, accommodationCount);
-        var index = Math.Clamp(accommodationIndex, 0, safeCount - 1);
-        var startOffset = (int)Math.Floor(index * totalNights / (double)safeCount);
-        if (!isCheckout)
+        var safeCount = Math.Max(1, accommodationPlanCount);
+        var boundaries = new List<AccommodationPlanBoundary>(safeCount);
+        for (var index = 0; index < safeCount; index++)
         {
-            return eventStartDate.AddDays(startOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var startOffset = (int)Math.Floor(index * totalNights / (double)safeCount);
+            var endOffset = (int)Math.Floor((index + 1) * totalNights / (double)safeCount);
+            if (endOffset <= startOffset)
+            {
+                endOffset = Math.Min(totalNights, startOffset + 1);
+            }
+
+            boundaries.Add(new AccommodationPlanBoundary(
+                eventStartDate.AddDays(startOffset),
+                eventStartDate.AddDays(endOffset)));
         }
 
-        var endOffset = (int)Math.Floor((index + 1) * totalNights / (double)safeCount);
-        if (endOffset <= startOffset)
+        return boundaries;
+    }
+
+    private static string ResolveAccommodationAddress(int index)
+        => index switch
         {
-            endOffset = Math.Min(totalNights, startOffset + 1);
-        }
+            0 => "Merkez Mah. 10. Sokak No:5",
+            1 => "Sahil Cad. No:24",
+            2 => "Kale Yolu No:18",
+            _ => $"Rota Bulvarı No:{30 + index}"
+        };
 
-        return eventStartDate.AddDays(endOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private static string ResolveAccommodationPhone(int index)
+        => $"+90 {(212 + (index % 4) * 10).ToString(CultureInfo.InvariantCulture)} 555 00{index + 1:00}";
+    
+    private static List<EventAccommodationSegmentEntity> CreateAccommodationSegments(
+        EventEntity entity,
+        IReadOnlyList<GeneratedAccommodationPlan> plans,
+        DateTime nowUtc)
+    {
+        return plans
+            .Select(plan => new EventAccommodationSegmentEntity
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = entity.OrganizationId,
+                EventId = entity.Id,
+                DefaultAccommodationDocTabId = plan.DefaultHotelTab.Id,
+                StartDate = plan.StartDate,
+                EndDate = plan.EndDate,
+                SortOrder = plan.SortOrder,
+                CreatedAt = nowUtc,
+                UpdatedAt = nowUtc
+            })
+            .ToList();
     }
 
     private static List<EventActivityEntity> BuildActivities(
@@ -870,20 +974,13 @@ internal static class ScenarioEventGenerator
         var returnArrivalTime = AddMinutes(returnDepartureTime, 95);
         var arrivalPieces = (index % 2) + 1;
         var returnPieces = ((index + 1) % 2) + 1;
-        var roomType = RoomTypes[index % RoomTypes.Length];
 
         return new ParticipantDetailsEntity
         {
             ParticipantId = participantId,
-            RoomNo = $"{100 + (index % 40)}",
-            RoomType = roomType,
-            BoardType = BoardTypes[index % BoardTypes.Length],
-            PersonNo = ((index % 3) + 1).ToString(CultureInfo.InvariantCulture),
             AgencyName = AgencyNames[index % AgencyNames.Length],
             City = Cities[index % Cities.Length],
             FlightCity = Cities[(index + 1) % Cities.Length],
-            HotelCheckInDate = entity.StartDate,
-            HotelCheckOutDate = entity.EndDate,
             TicketNo = $"TKT-{index:0000}",
             ArrivalTicketNo = $"TKT-{index:0000}-OUT",
             ReturnTicketNo = $"TKT-{index:0000}-RET",
@@ -929,6 +1026,212 @@ internal static class ScenarioEventGenerator
             ReturnTransferDriverInfo = $"Driver {index % 4 + 1} · +90 530 333 44 {index % 10}{index % 10}",
             ReturnTransferNote = random.Next(0, 4) == 0 ? "Allow extra time for security." : "Be in the lobby 15 minutes early."
         };
+    }
+
+    private static List<ParticipantAccommodationAssignmentEntity> CreateAccommodationAssignments(
+        EventEntity entity,
+        IReadOnlyList<EventAccommodationSegmentEntity> segments,
+        EventDocTabEntity overrideHotelTab,
+        IReadOnlyList<GeneratedParticipant> participants,
+        DateTime nowUtc)
+    {
+        if (segments.Count == 0 || participants.Count == 0)
+        {
+            return [];
+        }
+
+        var assignments = new List<ParticipantAccommodationAssignmentEntity>(segments.Count * participants.Count);
+        for (var segmentIndex = 0; segmentIndex < segments.Count; segmentIndex++)
+        {
+            var segment = segments[segmentIndex];
+            var overrideParticipantIds = segmentIndex == segments.Count - 1
+                ? SelectOverrideParticipantIds(participants, segmentIndex)
+                : [];
+
+            var defaultParticipants = participants
+                .Where(x => !overrideParticipantIds.Contains(x.Participant.Id))
+                .ToList();
+            var overrideParticipants = participants
+                .Where(x => overrideParticipantIds.Contains(x.Participant.Id))
+                .ToList();
+
+            assignments.AddRange(CreateAccommodationAssignmentsForGroup(
+                entity,
+                segment,
+                defaultParticipants,
+                overrideAccommodationDocTabId: null,
+                segmentIndex,
+                accommodationGroupOffset: 0,
+                nowUtc));
+
+            assignments.AddRange(CreateAccommodationAssignmentsForGroup(
+                entity,
+                segment,
+                overrideParticipants,
+                overrideHotelTab.Id,
+                segmentIndex,
+                accommodationGroupOffset: 1,
+                nowUtc));
+        }
+
+        return assignments;
+    }
+
+    private static List<ParticipantAccommodationAssignmentEntity> CreateAccommodationAssignmentsForGroup(
+        EventEntity entity,
+        EventAccommodationSegmentEntity segment,
+        IReadOnlyList<GeneratedParticipant> participants,
+        Guid? overrideAccommodationDocTabId,
+        int segmentIndex,
+        int accommodationGroupOffset,
+        DateTime nowUtc)
+    {
+        if (participants.Count == 0)
+        {
+            return [];
+        }
+
+        var assignments = new List<ParticipantAccommodationAssignmentEntity>(participants.Count);
+        var groupSizes = BuildRoomGroupSizes(participants.Count);
+        var participantOffset = 0;
+        var roomBase = ((segmentIndex + 1) * 100) + (accommodationGroupOffset * 50);
+
+        for (var groupIndex = 0; groupIndex < groupSizes.Count; groupIndex++)
+        {
+            var groupSize = groupSizes[groupIndex];
+            var roomNo = (roomBase + groupIndex + 1).ToString(CultureInfo.InvariantCulture);
+            var roomType = ResolveScenarioRoomType(groupSize, groupIndex + accommodationGroupOffset);
+            var boardType = BoardTypes[(segmentIndex + groupIndex + accommodationGroupOffset) % BoardTypes.Length];
+            var groupParticipants = participants.Skip(participantOffset).Take(groupSize).ToArray();
+
+            foreach (var generatedParticipant in groupParticipants)
+            {
+                assignments.Add(new ParticipantAccommodationAssignmentEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OrganizationId = entity.OrganizationId,
+                    EventId = entity.Id,
+                    ParticipantId = generatedParticipant.Participant.Id,
+                    SegmentId = segment.Id,
+                    OverrideAccommodationDocTabId = overrideAccommodationDocTabId,
+                    RoomNo = roomNo,
+                    RoomType = roomType,
+                    BoardType = boardType,
+                    PersonNo = groupSize.ToString(CultureInfo.InvariantCulture),
+                    CreatedAt = nowUtc,
+                    UpdatedAt = nowUtc
+                });
+            }
+
+            participantOffset += groupSize;
+        }
+
+        return assignments;
+    }
+
+    private static HashSet<Guid> SelectOverrideParticipantIds(
+        IReadOnlyList<GeneratedParticipant> participants,
+        int segmentIndex)
+    {
+        if (participants.Count == 0)
+        {
+            return [];
+        }
+
+        var targetCount = participants.Count >= 6
+            ? Math.Min(5, Math.Max(2, participants.Count / 8))
+            : 1;
+
+        var selected = participants
+            .Where((_, index) => ((index + segmentIndex) % 7) == 0)
+            .Take(targetCount)
+            .Select(x => x.Participant.Id)
+            .ToHashSet();
+
+        if (selected.Count >= targetCount)
+        {
+            return selected;
+        }
+
+        foreach (var participantId in participants.Select(x => x.Participant.Id))
+        {
+            selected.Add(participantId);
+            if (selected.Count >= targetCount)
+            {
+                break;
+            }
+        }
+
+        return selected;
+    }
+
+    private static List<int> BuildRoomGroupSizes(int participantCount)
+    {
+        var sizes = new List<int>();
+        var remaining = participantCount;
+        var groupIndex = 0;
+
+        while (remaining > 0)
+        {
+            var desired = groupIndex % 6 == 4
+                ? 1
+                : groupIndex % 5 == 2
+                    ? 3
+                    : 2;
+
+            desired = Math.Min(desired, remaining);
+            if (remaining - desired == 1 && remaining >= 3)
+            {
+                desired = desired == 3 ? 2 : 3;
+            }
+
+            sizes.Add(desired);
+            remaining -= desired;
+            groupIndex++;
+        }
+
+        return sizes;
+    }
+
+    private static string ResolveScenarioRoomType(int groupSize, int roomIndex)
+        => groupSize switch
+        {
+            <= 1 => "Single",
+            2 => roomIndex % 2 == 0 ? "Twin" : "Double",
+            _ => "Triple"
+        };
+
+    private static void MirrorLegacyAccommodationDetails(
+        IReadOnlyList<GeneratedParticipant> participants,
+        IReadOnlyList<EventAccommodationSegmentEntity> segments,
+        IReadOnlyList<ParticipantAccommodationAssignmentEntity> assignments)
+    {
+        var firstSegment = segments.OrderBy(x => x.SortOrder).FirstOrDefault();
+        if (firstSegment is null)
+        {
+            return;
+        }
+
+        var firstSegmentAssignments = assignments
+            .Where(x => x.SegmentId == firstSegment.Id)
+            .ToDictionary(x => x.ParticipantId);
+
+        foreach (var generatedParticipant in participants)
+        {
+            if (!firstSegmentAssignments.TryGetValue(generatedParticipant.Participant.Id, out var assignment))
+            {
+                continue;
+            }
+
+            generatedParticipant.Details.AccommodationDocTabId =
+                assignment.OverrideAccommodationDocTabId ?? firstSegment.DefaultAccommodationDocTabId;
+            generatedParticipant.Details.RoomNo = assignment.RoomNo;
+            generatedParticipant.Details.RoomType = assignment.RoomType;
+            generatedParticipant.Details.BoardType = assignment.BoardType;
+            generatedParticipant.Details.PersonNo = assignment.PersonNo;
+            generatedParticipant.Details.HotelCheckInDate = firstSegment.StartDate;
+            generatedParticipant.Details.HotelCheckOutDate = firstSegment.EndDate;
+        }
     }
 
     private static List<ParticipantFlightSegmentEntity> CreateFlightSegments(

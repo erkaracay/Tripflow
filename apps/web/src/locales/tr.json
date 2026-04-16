@@ -366,7 +366,7 @@
       "hide": "Kapat",
       "scenario": {
         "title": "Senaryo Etkinlik Oluşturucu",
-        "subtitle": "Tek bir demo etkinlik üretir. Program, portal, katılımcı, yemek, ekipman ve opsiyonel uçuş verilerini hazır şablon + detay ayarlarla oluşturur.",
+        "subtitle": "Tek bir demo etkinlik üretir. Program, portal, katılımcı, tarih aralıklı konaklama planları, yemek, ekipman ve opsiyonel uçuş verilerini hazır şablon + detay ayarlarla oluşturur.",
         "presetLabel": "Hazır şablon",
         "presets": {
           "minimal": "Minimal",
@@ -389,7 +389,8 @@
         "timeZoneEmpty": "Eşleşen saat dilimi bulunamadı.",
         "timeZoneHelper": "Bu senaryodaki tüm zamanlar bu saat dilimiyle üretilir. Güncel fark: {offset}",
         "dayCountLabel": "Gün sayısı",
-        "accommodationCountLabel": "Konaklama sayısı",
+        "accommodationCountLabel": "Konaklama planı sayısı",
+        "accommodationCountHelper": "Bu değer tarih aralıklı konaklama planı sayısını belirler. Bu etkinlik için en fazla {max} plan üretilebilir.",
         "participantCountLabel": "Katılımcı sayısı",
         "equipmentTypeCountLabel": "Ekipman tipi sayısı",
         "mealModeLabel": "Yemek modu",
@@ -408,7 +409,7 @@
         "randomSeedPlaceholder": "örn. 42",
         "summaryTitle": "Tahmini çıktı",
         "summaryDays": "{count} gün",
-        "summaryAccommodations": "{count} konaklama",
+        "summaryAccommodations": "{count} konaklama planı",
         "summaryActivities": "{count} aktivite",
         "summaryMealActivities": "{count} yemek aktivitesi",
         "summaryParticipants": "{count} katılımcı",
@@ -419,7 +420,7 @@
         "summaryFlightMix": "{direct} direkt yolcu · {layover} aktarmalı yolcu",
         "generate": "Senaryo etkinliği oluştur",
         "generating": "Oluşturuluyor...",
-        "helper": "Bu araç sadece geliştirme ortamında görünür ve tek çağrıda bir etkinlik üretir.",
+        "helper": "Bu araç sadece geliştirme ortamında görünür ve tek çağrıda bir etkinlik ile ona bağlı konaklama planlarını üretir.",
         "mealModeOptions": {
           "none": "Yemek aktivitesi yok",
           "breakfastOnly": "Sadece kahvaltı",

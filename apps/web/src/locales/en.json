@@ -366,7 +366,7 @@
       "hide": "Hide generator",
       "scenario": {
         "title": "Scenario Event Generator",
-        "subtitle": "Creates a single demo event with schedule, portal, participants, meal data, equipment, and optional flight data from preset + advanced settings.",
+        "subtitle": "Creates a single demo event with schedule, portal, participants, dated accommodation plans, meal data, equipment, and optional flight data from preset + advanced settings.",
         "presetLabel": "Preset",
         "presets": {
           "minimal": "Minimal",
@@ -389,7 +389,8 @@
         "timeZoneEmpty": "No matching time zone found.",
         "timeZoneHelper": "All scenario timing is generated in this event time zone. Current offset: {offset}",
         "dayCountLabel": "Day count",
-        "accommodationCountLabel": "Accommodation count",
+        "accommodationCountLabel": "Accommodation plan count",
+        "accommodationCountHelper": "This value controls the number of dated accommodation plans. This event can generate at most {max} plans.",
         "participantCountLabel": "Participant count",
         "equipmentTypeCountLabel": "Equipment type count",
         "mealModeLabel": "Meal mode",
@@ -408,7 +409,7 @@
         "randomSeedPlaceholder": "e.g. 42",
         "summaryTitle": "Estimated output",
         "summaryDays": "{count} days",
-        "summaryAccommodations": "{count} accommodations",
+        "summaryAccommodations": "{count} accommodation plans",
         "summaryActivities": "{count} activities",
         "summaryMealActivities": "{count} meal activities",
         "summaryParticipants": "{count} participants",
@@ -419,7 +420,7 @@
         "summaryFlightMix": "{direct} direct passengers · {layover} layover passengers",
         "generate": "Generate scenario event",
         "generating": "Generating...",
-        "helper": "This tool is visible only in development and creates a single event per request.",
+        "helper": "This tool is visible only in development and creates a single event together with its accommodation plans per request.",
         "mealModeOptions": {
           "none": "No meal activities",
           "breakfastOnly": "Breakfast only",
