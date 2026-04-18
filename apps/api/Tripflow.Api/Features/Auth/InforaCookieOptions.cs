@@ -17,24 +17,47 @@ public sealed record InforaCookieOptions(
     public static InforaCookieOptions FromConfiguration(IConfiguration configuration)
     {
         var domain = configuration["Cookie:Domain"]?.Trim();
-        var secureRaw = configuration["Cookie:Secure"];
-        var secure = string.IsNullOrEmpty(secureRaw) || string.Equals(secureRaw, "true", StringComparison.OrdinalIgnoreCase);
-        // In development (localhost), Secure cookies won't work over HTTP, so disable Secure
-        var isDevelopment = string.Equals(configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrEmpty(domain) || domain.Contains("localhost", StringComparison.OrdinalIgnoreCase);
-        if (isDevelopment && secure)
-        {
-            secure = false;
-        }
         var sameSiteRaw = configuration["Cookie:SameSite"]?.Trim();
-        var sameSite = sameSiteRaw switch
+        var environmentName = configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"];
+        var isDevelopment = string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase);
+        var secure = ResolveSecure(configuration["Cookie:Secure"], isDevelopment);
+        var sameSite = ParseSameSite(sameSiteRaw);
+
+        if (sameSite == SameSiteMode.None && !secure)
         {
-            "None" => SameSiteMode.None,
-            "Strict" => SameSiteMode.Strict,
-            _ => SameSiteMode.Lax
-        };
+            throw new InvalidOperationException("Cookie__SameSite=None requires Cookie__Secure=true.");
+        }
+
         return new InforaCookieOptions(string.IsNullOrEmpty(domain) ? null : domain, secure, sameSite);
     }
+
+    private static bool ResolveSecure(string? secureRaw, bool isDevelopment)
+    {
+        if (string.IsNullOrWhiteSpace(secureRaw))
+        {
+            return !isDevelopment;
+        }
+
+        if (!bool.TryParse(secureRaw.Trim(), out var secure))
+        {
+            throw new InvalidOperationException("Cookie__Secure must be set to 'true' or 'false' when provided.");
+        }
+
+        if (!isDevelopment && !secure)
+        {
+            throw new InvalidOperationException("Cookie__Secure=false is only supported when ASPNETCORE_ENVIRONMENT=Development.");
+        }
+
+        return secure;
+    }
+
+    private static SameSiteMode ParseSameSite(string? sameSiteRaw)
+        => sameSiteRaw?.Trim().ToLowerInvariant() switch
+        {
+            "none" => SameSiteMode.None,
+            "strict" => SameSiteMode.Strict,
+            _ => SameSiteMode.Lax
+        };
 
     public CookieOptions BuildCookieOptions(TimeSpan? maxAge = null, DateTime? expires = null)
     {

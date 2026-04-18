@@ -140,6 +140,8 @@ API base URL için apps/web/.env.local (veya apps/web/.env) kullan:
 
 - appsettings.json içine secret koyulmuyor
 - Local'de user-secrets, prod/CI tarafında environment variables tercih edilir.
+- `Cookie__Secure=false` yalnızca Development için kullanılmalı.
+- `Cookie__SameSite=None` kullanılıyorsa `Cookie__Secure=true` zorunludur.
 
 ## Production migration (Render)
 
@@ -155,5 +157,7 @@ Render'da migration'ı deploy öncesinde çalıştırmak için API servisinde `P
 Notlar:
 
 - Script önce `CONNECTION_STRING`, yoksa `ConnectionStrings__TripflowDb` env var'ını kullanır.
+- `render-predeploy.sh`, `JWT_*` env'leri eksikse migration için geçici dummy değerler üretir; bunlar runtime auth secret'ı değildir.
+- API runtime startup'ı için gerçek `JWT_ISSUER`, `JWT_AUDIENCE` ve `JWT_SECRET` env'lerini ayrıca set et.
 - Migration başarısız olursa deploy durur ve mevcut release çalışmaya devam eder.
 - Destructive migration'ları (drop/rename/backfill) mümkün olduğunca ayrı ve kontrollü rollout et.
