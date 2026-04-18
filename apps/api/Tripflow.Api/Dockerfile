@@ -5,10 +5,11 @@ COPY . .
 RUN dotnet tool install --global dotnet-ef --version 8.*
 RUN dotnet restore ./Tripflow.Api.csproj
 RUN dotnet publish ./Tripflow.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
-RUN ConnectionStrings__TripflowDb="Host=localhost;Port=5432;Database=tripflow_bundle;Username=tripflow;Password=tripflow" \
+RUN export ConnectionStrings__TripflowDb="Host=localhost;Port=5432;Database=tripflow_bundle;Username=tripflow;Password=tripflow" \
     JWT_ISSUER="tripflow-bundle" \
     JWT_AUDIENCE="tripflow-bundle" \
-    JWT_SECRET="tripflow-bundle-secret-key-tripflow-bundle-secret-key" \
+    JWT_SECRET="$(cat /proc/sys/kernel/random/uuid | tr -d '\n-')$(cat /proc/sys/kernel/random/uuid | tr -d '\n-')" && \
+    test -n "$JWT_SECRET" && \
     dotnet ef migrations bundle \
     --project ./Tripflow.Api.csproj \
     --startup-project ./Tripflow.Api.csproj \
