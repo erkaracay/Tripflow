@@ -6,7 +6,9 @@ import AdminParticipantRoomOps from '../../../src/pages/admin/AdminParticipantRo
 
 vi.mock('../../../src/lib/api', () => ({
   apiGet: vi.fn(),
-  bulkApplyParticipantRooms: vi.fn(),
+  getAccommodationSegments: vi.fn(),
+  getAccommodationSegmentParticipants: vi.fn(),
+  bulkApplyAccommodationSegmentParticipants: vi.fn(),
 }))
 
 vi.mock('../../../src/lib/toast', () => ({
@@ -23,9 +25,16 @@ const router = createRouter({
 
 describe('AdminParticipantRoomOps', () => {
   beforeEach(async () => {
-    const { apiGet, bulkApplyParticipantRooms } = await import('../../../src/lib/api')
+    const {
+      apiGet,
+      getAccommodationSegments,
+      getAccommodationSegmentParticipants,
+      bulkApplyAccommodationSegmentParticipants,
+    } = await import('../../../src/lib/api')
     vi.mocked(apiGet).mockReset()
-    vi.mocked(bulkApplyParticipantRooms).mockReset()
+    vi.mocked(getAccommodationSegments).mockReset()
+    vi.mocked(getAccommodationSegmentParticipants).mockReset()
+    vi.mocked(bulkApplyAccommodationSegmentParticipants).mockReset()
 
     vi.mocked(apiGet).mockImplementation(async (url: string) => {
       if (url === '/api/events/ev-1') {
@@ -51,43 +60,47 @@ describe('AdminParticipantRoomOps', () => {
           },
         ]
       }
-      if (url.startsWith('/api/events/ev-1/participants/table')) {
-        return {
-          page: 1,
-          pageSize: 200,
-          total: 1,
-          items: [
-            {
-              id: 'p-1',
-              firstName: 'Ayse',
-              lastName: 'Demir',
-              fullName: 'Ayse Demir',
-              phone: '555',
-              email: 'a@a.com',
-              tcNo: '10000000001',
-              birthDate: '1990-01-01',
-              gender: 'Female',
-              checkInCode: 'ABC12345',
-              arrived: false,
-              details: {
-                roomNo: '101',
-                roomType: 'Twin',
-                boardType: 'BB',
-                personNo: '1',
-                accommodationDocTabId: 'hotel-1',
-              },
-            },
-          ],
-        }
-      }
       throw new Error(`Unexpected url: ${url}`)
     })
 
-    vi.mocked(bulkApplyParticipantRooms).mockResolvedValue({
+    vi.mocked(getAccommodationSegments).mockResolvedValue([
+      {
+        id: 'segment-1',
+        defaultAccommodationDocTabId: 'hotel-1',
+        defaultAccommodationTitle: 'Konaklama 1',
+        startDate: '2026-03-01',
+        endDate: '2026-03-03',
+        sortOrder: 1,
+      },
+    ])
+
+    vi.mocked(getAccommodationSegmentParticipants).mockResolvedValue({
+      page: 1,
+      pageSize: 100,
+      total: 1,
+      items: [
+        {
+          participantId: 'p-1',
+          fullName: 'Ayse Demir',
+          tcNo: '10000000001',
+          effectiveAccommodationDocTabId: 'hotel-1',
+          effectiveAccommodationTitle: 'Konaklama 1',
+          usesOverride: false,
+          roomNo: '101',
+          roomType: 'Twin',
+          boardType: 'BB',
+          personNo: '1',
+          warnings: [],
+        },
+      ],
+    })
+
+    vi.mocked(bulkApplyAccommodationSegmentParticipants).mockResolvedValue({
       affectedCount: 1,
+      createdCount: 0,
       updatedCount: 1,
-      skippedCount: 0,
-      notFoundTcNoCount: 0,
+      deletedCount: 0,
+      unchangedCount: 0,
       errors: [],
     })
   })
@@ -121,18 +134,20 @@ describe('AdminParticipantRoomOps', () => {
     await applyButton!.trigger('click')
     await flushPromises()
 
-    const { bulkApplyParticipantRooms } = await import('../../../src/lib/api')
-    expect(vi.mocked(bulkApplyParticipantRooms)).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(bulkApplyParticipantRooms).mock.calls[0]?.[0]).toBe('ev-1')
-    expect(vi.mocked(bulkApplyParticipantRooms).mock.calls[0]?.[1]).toMatchObject({
-      overwriteMode: 'always',
+    const { bulkApplyAccommodationSegmentParticipants } = await import('../../../src/lib/api')
+    expect(vi.mocked(bulkApplyAccommodationSegmentParticipants)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(bulkApplyAccommodationSegmentParticipants).mock.calls[0]?.[0]).toBe('ev-1')
+    expect(vi.mocked(bulkApplyAccommodationSegmentParticipants).mock.calls[0]?.[1]).toBe('segment-1')
+    expect(vi.mocked(bulkApplyAccommodationSegmentParticipants).mock.calls[0]?.[2]).toMatchObject({
       rowUpdates: [
         {
           participantId: 'p-1',
-          tcNo: '10000000001',
-          patch: {
-            roomNo: '202',
-          },
+          accommodationMode: 'default',
+          overrideAccommodationDocTabId: null,
+          roomNo: '202',
+          roomType: 'Twin',
+          boardType: 'BB',
+          personNo: '1',
         },
       ],
     })

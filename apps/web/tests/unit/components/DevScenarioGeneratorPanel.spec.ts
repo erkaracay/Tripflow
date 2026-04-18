@@ -280,7 +280,7 @@ describe('DevScenarioGeneratorPanel', () => {
     await flightHeavyTab!.trigger('click')
 
     expect(wrapper.text()).toContain('3 days')
-    expect(wrapper.text()).toContain('2 accommodations')
+    expect(wrapper.text()).toContain('2 accommodation plans')
     expect(wrapper.text()).toContain('12 activities')
     expect(wrapper.text()).toContain('3 meal activities')
     expect(wrapper.text()).toContain('48 participants')
