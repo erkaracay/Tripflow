@@ -10,6 +10,7 @@ import AppCombobox from '../../components/ui/AppCombobox.vue'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import FlightPanelHelperModal from '../../components/admin/FlightPanelHelperModal.vue'
 import { formatDate, localizeAttendanceStatus } from '../../lib/formatters'
+import { exportWorkbook } from '../../lib/exportWorkbook'
 import {
   ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS,
   ACCOMMODATION_SEGMENTS_SHEET_HEADERS,
@@ -257,28 +258,24 @@ const exportExcel = async () => {
       segmentKeyById
     )
 
-    const { utils, writeFile } = await import('xlsx')
-    const workbook = utils.book_new()
-    const participantsSheet = utils.aoa_to_sheet([PARTICIPANTS_SHEET_HEADERS, ...participantRows])
-    const segmentsSheet = utils.aoa_to_sheet([FLIGHT_SEGMENTS_SHEET_HEADERS, ...flightSegmentRows])
-    const accommodationSegmentsSheet = utils.aoa_to_sheet([
-      ACCOMMODATION_SEGMENTS_SHEET_HEADERS,
-      ...accommodationSegmentRows,
-    ])
-    const accommodationAssignmentsSheet = utils.aoa_to_sheet([
-      ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS,
-      ...accommodationAssignmentRows,
-    ])
-
-    utils.book_append_sheet(workbook, participantsSheet, 'participants')
-    utils.book_append_sheet(workbook, segmentsSheet, 'flight_segments')
-    utils.book_append_sheet(workbook, accommodationSegmentsSheet, 'accommodation_segments')
-    utils.book_append_sheet(workbook, accommodationAssignmentsSheet, 'accommodation_assignments')
-
     const id = route.params.eventId ?? 'event'
     const timestamp = new Date()
     const stamp = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, '0')}${String(timestamp.getDate()).padStart(2, '0')}_${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}`
-    writeFile(workbook, `participants_${id}_${stamp}.xlsx`)
+    await exportWorkbook({
+      fileName: `participants_${id}_${stamp}.xlsx`,
+      sheets: [
+        { name: 'participants', rows: [PARTICIPANTS_SHEET_HEADERS, ...participantRows] },
+        { name: 'flight_segments', rows: [FLIGHT_SEGMENTS_SHEET_HEADERS, ...flightSegmentRows] },
+        {
+          name: 'accommodation_segments',
+          rows: [ACCOMMODATION_SEGMENTS_SHEET_HEADERS, ...accommodationSegmentRows],
+        },
+        {
+          name: 'accommodation_assignments',
+          rows: [ACCOMMODATION_ASSIGNMENTS_SHEET_HEADERS, ...accommodationAssignmentRows],
+        },
+      ],
+    })
 
     if (failedParticipantIds.length > 0) {
       pushToast({

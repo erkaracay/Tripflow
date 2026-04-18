@@ -5,6 +5,7 @@ import AppModalShell from '../ui/AppModalShell.vue'
 import AppSegmentedControl from '../ui/AppSegmentedControl.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import { apiGet, bulkApplyFlightSegments } from '../../lib/api'
+import { exportWorkbook as exportWorkbookFile } from '../../lib/exportWorkbook'
 import { useToast } from '../../lib/toast'
 import {
   buildBulkFlightTemplateSheetRows,
@@ -606,23 +607,23 @@ const exportWorkbook = async () => {
 
   exporting.value = true
   try {
-    const { utils, writeFile } = await import('xlsx')
-    const workbook = utils.book_new()
-    const participantsSheet = utils.aoa_to_sheet([
-      PARTICIPANTS_SHEET_HEADERS,
-      ...buildParticipantsSheetRows(selectedParticipants.value),
-    ])
     const segmentRows = buildBulkFlightTemplateSheetRows(
       selectedParticipants.value,
       arrivalTemplate.value,
       returnTemplate.value
     )
-    const segmentsSheet = utils.aoa_to_sheet([FLIGHT_SEGMENTS_SHEET_HEADERS, ...segmentRows])
-    utils.book_append_sheet(workbook, participantsSheet, 'participants')
-    utils.book_append_sheet(workbook, segmentsSheet, 'flight_segments')
     const timestamp = new Date()
     const stamp = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, '0')}${String(timestamp.getDate()).padStart(2, '0')}_${String(timestamp.getHours()).padStart(2, '0')}${String(timestamp.getMinutes()).padStart(2, '0')}`
-    writeFile(workbook, `flight_segments_${props.eventId}_${stamp}.xlsx`)
+    await exportWorkbookFile({
+      fileName: `flight_segments_${props.eventId}_${stamp}.xlsx`,
+      sheets: [
+        {
+          name: 'participants',
+          rows: [PARTICIPANTS_SHEET_HEADERS, ...buildParticipantsSheetRows(selectedParticipants.value)],
+        },
+        { name: 'flight_segments', rows: [FLIGHT_SEGMENTS_SHEET_HEADERS, ...segmentRows] },
+      ],
+    })
     pushToast({ key: 'admin.flightPanelHelper.exportSuccess', tone: 'success' })
   } catch (error) {
     pushToast(error instanceof Error ? error.message : t('errors.generic'), 'error')
