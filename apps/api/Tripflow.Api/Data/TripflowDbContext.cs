@@ -1,11 +1,13 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data.Entities;
 
 namespace Tripflow.Api.Data;
 
-public sealed class TripflowDbContext : DbContext
+public sealed class TripflowDbContext : DbContext, IDataProtectionKeyContext
 {
     public DbSet<AuditLogEntity> AuditLogs => Set<AuditLogEntity>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<OrganizationEntity> Organizations => Set<OrganizationEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
@@ -70,6 +72,16 @@ public sealed class TripflowDbContext : DbContext
             b.HasIndex(x => new { x.UserId, x.CreatedAt });
             b.HasIndex(x => new { x.Action, x.CreatedAt });
             b.HasIndex(x => new { x.TargetType, x.TargetId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<DataProtectionKey>(b =>
+        {
+            b.ToTable("data_protection_keys");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.FriendlyName).HasMaxLength(1024).IsRequired();
+            b.Property(x => x.Xml).IsRequired();
+
+            b.HasIndex(x => x.FriendlyName);
         });
 
         modelBuilder.Entity<UserEntity>(b =>
