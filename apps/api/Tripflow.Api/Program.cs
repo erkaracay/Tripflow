@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -74,6 +75,10 @@ if (string.IsNullOrWhiteSpace(connectionString))
 Action<DbContextOptionsBuilder> configureDb = opt => opt.UseNpgsql(connectionString);
 builder.Services.AddDbContext<TripflowDbContext>(configureDb);
 builder.Services.AddDbContextFactory<TripflowDbContext>(configureDb, ServiceLifetime.Scoped);
+var dataProtectionBuilder = builder.Services.AddDataProtection()
+    .SetApplicationName("Tripflow")
+    .PersistKeysToDbContext<TripflowDbContext>();
+DataProtectionCertificateLoader.Configure(dataProtectionBuilder, builder.Configuration, builder.Environment);
 
 var jwtOptions = JwtOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(jwtOptions);

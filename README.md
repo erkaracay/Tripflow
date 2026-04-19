@@ -142,6 +142,8 @@ API base URL için apps/web/.env.local (veya apps/web/.env) kullan:
 - Local'de user-secrets, prod/CI tarafında environment variables tercih edilir.
 - `Cookie__Secure=false` yalnızca Development için kullanılmalı.
 - `Cookie__SameSite=None` kullanılıyorsa `Cookie__Secure=true` zorunludur.
+- Data Protection key'leri artık container filesystem'inde değil, veritabanında tutulmalı; bu sayede deploy/restart sonrası cookie'ler key kaybı yüzünden düşmez.
+- Non-development ortamda Data Protection key ring'i için PFX certificate env'leri zorunludur: `DATA_PROTECTION_CERTIFICATE_PFX_BASE64` ve `DATA_PROTECTION_CERTIFICATE_PASSWORD`.
 
 ## Production migration (Render)
 
@@ -159,5 +161,16 @@ Notlar:
 - Script önce `CONNECTION_STRING`, yoksa `ConnectionStrings__TripflowDb` env var'ını kullanır.
 - `render-predeploy.sh`, `JWT_*` env'leri eksikse migration için geçici dummy değerler üretir; bunlar runtime auth secret'ı değildir.
 - API runtime startup'ı için gerçek `JWT_ISSUER`, `JWT_AUDIENCE` ve `JWT_SECRET` env'lerini ayrıca set et.
+- Data Protection key ring'i DB'de tutulduğu için ilk rollout çevresinde bazı mevcut session'lar düşebilir; sonrasında restart/deploy cookie stabilitesi düzelir.
+- Data Protection key XML'lerini DB'de plaintext tutmamak için production'da PFX cert env'lerini set et:
+  - `DATA_PROTECTION_CERTIFICATE_PFX_BASE64`
+  - `DATA_PROTECTION_CERTIFICATE_PASSWORD`
+  - opsiyonel rotation: `DATA_PROTECTION_LEGACY_CERTIFICATE_PFX_BASE64`, `DATA_PROTECTION_LEGACY_CERTIFICATE_PASSWORD`
+- Örnek self-signed cert üretimi:
+
+      openssl req -x509 -newkey rsa:2048 -keyout dp.key -out dp.crt -days 365 -nodes -subj "/CN=Tripflow Data Protection"
+      openssl pkcs12 -export -out dp.pfx -inkey dp.key -in dp.crt -password pass:changeit
+      base64 < dp.pfx | tr -d '\n'
+
 - Migration başarısız olursa deploy durur ve mevcut release çalışmaya devam eder.
 - Destructive migration'ları (drop/rename/backfill) mümkün olduğunca ayrı ve kontrollü rollout et.
