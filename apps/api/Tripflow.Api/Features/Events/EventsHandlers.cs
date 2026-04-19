@@ -1303,9 +1303,25 @@ internal static class EventsHandlers
     internal static async Task<IResult> VerifyCheckInCode(
         string eventId,
         VerifyCheckInCodeRequest request,
+        HttpContext httpContext,
         TripflowDbContext db,
         CancellationToken ct)
     {
+        // DoS guard only. Code space (8 chars × unknown event GUID) makes brute force infeasible.
+        // Per IP: 600 req/min — comfortably above any legitimate multi-guide scanning burst.
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var perIpKey = $"verify:ip:{ip}";
+        var ipWindow = TimeSpan.FromMinutes(1);
+
+        var (ipLimited, retryIp) = InMemoryRateLimiter.Default.CheckLimit(perIpKey, 600, ipWindow);
+        if (ipLimited)
+        {
+            return RateLimited(httpContext, retryIp);
+        }
+
+        // Throttle counts every request, not just failures.
+        InMemoryRateLimiter.Default.RegisterHit(perIpKey, ipWindow);
+
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
         {
             return error!;
@@ -1331,6 +1347,14 @@ internal static class EventsHandlers
             .AnyAsync(p => p.EventId == id && p.CheckInCode == normalized, ct);
 
         return Results.Ok(new VerifyCheckInCodeResponse(isValid, isValid ? normalized : null));
+    }
+
+    private static IResult RateLimited(HttpContext httpContext, int retryAfterSeconds)
+    {
+        httpContext.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
+        return Results.Json(
+            new { code = "rate_limited", retryAfterSeconds },
+            statusCode: StatusCodes.Status429TooManyRequests);
     }
 
     internal static async Task<IResult> SavePortal(

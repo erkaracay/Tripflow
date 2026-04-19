@@ -16,7 +16,8 @@ public static class AuthEndpoints
             .WithDescription("Returns a JWT access token for admin/guide users and sets auth cookie.")
             .Produces<LoginResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
         group.MapPost("/logout", AuthHandlers.Logout)
             .AllowAnonymous()

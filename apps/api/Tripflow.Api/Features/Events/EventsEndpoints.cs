@@ -315,6 +315,7 @@ public static class EventsEndpoints
             .WithSummary("Verify a participant check-in code for the event (public)")
             .Produces<VerifyCheckInCodeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous()
             .WithOpenApi();
 
