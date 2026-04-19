@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Dev;
 using Tripflow.Api.Data.Entities;
@@ -14,8 +17,18 @@ using Tripflow.Api.Features.Organizations;
 using Tripflow.Api.Features.Portal;
 using Tripflow.Api.Features.Events;
 using Tripflow.Api.Features.Users;
+using Tripflow.Api.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = false;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    options.UseUtcTimestamp = true;
+});
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 
 builder.Services.AddEndpointsApiExplorer();
 if (builder.Environment.IsDevelopment())
@@ -58,7 +71,9 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "Database connection string missing. Set 'ConnectionStrings:TripflowDb' via user-secrets or set CONNECTION_STRING env var.");
 }
 
-builder.Services.AddDbContext<TripflowDbContext>(opt => opt.UseNpgsql(connectionString));
+Action<DbContextOptionsBuilder> configureDb = opt => opt.UseNpgsql(connectionString);
+builder.Services.AddDbContext<TripflowDbContext>(configureDb);
+builder.Services.AddDbContextFactory<TripflowDbContext>(configureDb, ServiceLifetime.Scoped);
 
 var jwtOptions = JwtOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(jwtOptions);
@@ -67,6 +82,9 @@ var cookieOptions = InforaCookieOptions.FromConfiguration(builder.Configuration)
 builder.Services.AddSingleton(cookieOptions);
 
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseConnectivityHealthCheck>("db");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -240,26 +258,24 @@ if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
     }
 }
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseCors(WebCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health
-app.MapGet("/health", async (TripflowDbContext db) =>
+var healthOptions = new HealthCheckOptions
 {
-    var dbStatus = "ok";
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync("SELECT 1");
-    }
-    catch
-    {
-        dbStatus = "error";
-    }
+    ResponseWriter = WriteHealthResponse
+};
 
-    return Results.Ok(new { status = "ok", db = dbStatus });
-})
+app.MapHealthChecks("/health", healthOptions)
+   .AllowAnonymous()
    .WithName("Health")
+   .WithOpenApi();
+
+app.MapHealthChecks("/health/ready", healthOptions)
+   .AllowAnonymous()
+   .WithName("Readiness")
    .WithOpenApi();
 
 app.MapGet("/version", () =>
@@ -279,3 +295,26 @@ app.MapPortalLoginEndpoints();
 app.MapPortalMealEndpoints();
 
 app.Run();
+
+static Task WriteHealthResponse(HttpContext httpContext, HealthReport report)
+{
+    httpContext.Response.ContentType = "application/json";
+    httpContext.Response.StatusCode = report.Status == HealthStatus.Healthy
+        ? StatusCodes.Status200OK
+        : StatusCodes.Status503ServiceUnavailable;
+
+    var dbStatus = report.Entries.TryGetValue("db", out var dbEntry)
+        ? dbEntry.Status.ToString().ToLowerInvariant()
+        : "unhealthy";
+
+    var payload = new
+    {
+        status = report.Status.ToString().ToLowerInvariant(),
+        checks = new
+        {
+            db = dbStatus
+        }
+    };
+
+    return httpContext.Response.WriteAsync(JsonSerializer.Serialize(payload));
+}

@@ -68,6 +68,7 @@ internal static class EventsHandlers
         CreateEventRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -167,6 +168,18 @@ internal static class EventsHandlers
         }
 
         var dto = EventsHelpers.ToDto(entity);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.create",
+                TargetType: "event",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("changedFields", new[] { "name", "startDate", "endDate", "timeZoneId", "eventAccessCode" }),
+                    ("eventAccessCode", entity.EventAccessCode))),
+            ct);
         return Results.Created($"/api/events/{dto.Id}", dto);
     }
 
@@ -175,6 +188,7 @@ internal static class EventsHandlers
         UpdateEventRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -228,12 +242,32 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "name", entity.Name, name);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "startDate", entity.StartDate.ToString("yyyy-MM-dd"), startDate.ToString("yyyy-MM-dd"));
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "endDate", entity.EndDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"));
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "timeZoneId", entity.TimeZoneId, timeZoneId);
+
         entity.Name = name;
         entity.StartDate = startDate;
         entity.EndDate = endDate;
         entity.TimeZoneId = timeZoneId;
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event.update",
+                    TargetType: "event",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes)),
+                ct);
+        }
         return Results.Ok(EventsHelpers.ToDto(entity));
     }
 
@@ -268,6 +302,7 @@ internal static class EventsHandlers
         UpdateEventContactsRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -300,14 +335,41 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Event not found." });
         }
 
-        entity.GuideName = EventsHelpers.NormalizeContactText(request.GuideName);
-        entity.GuidePhone = EventsHelpers.NormalizeContactText(request.GuidePhone);
-        entity.LeaderName = EventsHelpers.NormalizeContactText(request.LeaderName);
-        entity.LeaderPhone = EventsHelpers.NormalizeContactText(request.LeaderPhone);
-        entity.EmergencyPhone = EventsHelpers.NormalizeContactText(request.EmergencyPhone);
+        var nextGuideName = EventsHelpers.NormalizeContactText(request.GuideName);
+        var nextGuidePhone = EventsHelpers.NormalizeContactText(request.GuidePhone);
+        var nextLeaderName = EventsHelpers.NormalizeContactText(request.LeaderName);
+        var nextLeaderPhone = EventsHelpers.NormalizeContactText(request.LeaderPhone);
+        var nextEmergencyPhone = EventsHelpers.NormalizeContactText(request.EmergencyPhone);
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "guideName", entity.GuideName, nextGuideName);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "guidePhone", entity.GuidePhone, nextGuidePhone);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "leaderName", entity.LeaderName, nextLeaderName);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "leaderPhone", entity.LeaderPhone, nextLeaderPhone);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "emergencyPhone", entity.EmergencyPhone, nextEmergencyPhone);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "whatsappGroupUrl", entity.WhatsappGroupUrl, normalizedWhatsappGroupUrl);
+
+        entity.GuideName = nextGuideName;
+        entity.GuidePhone = nextGuidePhone;
+        entity.LeaderName = nextLeaderName;
+        entity.LeaderPhone = nextLeaderPhone;
+        entity.EmergencyPhone = nextEmergencyPhone;
         entity.WhatsappGroupUrl = normalizedWhatsappGroupUrl;
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event.contacts.update",
+                    TargetType: "event",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes)),
+                ct);
+        }
         return Results.Ok(EventsHelpers.ToEventContactsDto(entity));
     }
 
@@ -363,6 +425,7 @@ internal static class EventsHandlers
         CreateEventDayRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -415,6 +478,17 @@ internal static class EventsHandlers
         db.EventDays.Add(entity);
         await db.SaveChangesAsync(ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_day.create",
+                TargetType: "event_day",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                    Extra: AuditLogHelpers.CreateExtra(("eventId", id))),
+            ct);
+
         return Results.Ok(new EventDayDto(
             entity.Id,
             entity.Date.ToString("yyyy-MM-dd"),
@@ -432,6 +506,7 @@ internal static class EventsHandlers
         UpdateEventDayRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
@@ -461,41 +536,72 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("Request body is required.");
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
         if (request.Date is not null)
         {
             if (!EventsHelpers.TryParseDate(request.Date, out var date))
             {
                 return EventsHelpers.BadRequest("Date must be in YYYY-MM-DD format.");
             }
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "date", entity.Date.ToString("yyyy-MM-dd"), date.ToString("yyyy-MM-dd"));
             entity.Date = date;
         }
 
         if (request.Title is not null)
         {
-            entity.Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim();
+            var nextTitle = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "title", entity.Title, nextTitle);
+            entity.Title = nextTitle;
         }
 
         if (request.Notes is not null)
         {
-            entity.Notes = RichTextSanitizer.Sanitize(request.Notes);
+            var nextNotes = RichTextSanitizer.Sanitize(request.Notes);
+            if (!string.Equals(entity.Notes, nextNotes, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "notes");
+            }
+            entity.Notes = nextNotes;
         }
 
         if (request.PlacesToVisit is not null)
         {
-            entity.PlacesToVisit = string.IsNullOrWhiteSpace(request.PlacesToVisit) ? null : request.PlacesToVisit.Trim();
+            var nextPlacesToVisit = string.IsNullOrWhiteSpace(request.PlacesToVisit) ? null : request.PlacesToVisit.Trim();
+            if (!string.Equals(entity.PlacesToVisit, nextPlacesToVisit, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "placesToVisit");
+            }
+            entity.PlacesToVisit = nextPlacesToVisit;
         }
 
         if (request.SortOrder.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "sortOrder", entity.SortOrder, request.SortOrder.Value);
             entity.SortOrder = request.SortOrder.Value;
         }
 
         if (request.IsActive.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "isActive", entity.IsActive, request.IsActive.Value);
             entity.IsActive = request.IsActive.Value;
         }
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event_day.update",
+                    TargetType: "event_day",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", eventGuid)))),
+                ct);
+        }
 
         var activityCount = await db.EventActivities.AsNoTracking()
             .CountAsync(x => x.EventDayId == entity.Id && x.OrganizationId == orgId, ct);
@@ -516,6 +622,7 @@ internal static class EventsHandlers
         string dayId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
@@ -542,6 +649,16 @@ internal static class EventsHandlers
 
         db.EventDays.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_day.delete",
+                TargetType: "event_day",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", eventGuid))),
+            ct);
 
         return Results.NoContent();
     }
@@ -616,6 +733,7 @@ internal static class EventsHandlers
         CreateEventActivityRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
@@ -688,6 +806,17 @@ internal static class EventsHandlers
         db.EventActivities.Add(entity);
         await db.SaveChangesAsync(ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_activity.create",
+                TargetType: "event_activity",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", eventGuid), ("eventDayId", dayGuid))),
+            ct);
+
         return Results.Ok(EventsHelpers.ToActivityDto(entity));
     }
 
@@ -697,6 +826,7 @@ internal static class EventsHandlers
         UpdateEventActivityRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
@@ -726,6 +856,9 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Activity not found." });
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
         if (request.Title is not null)
         {
             var title = request.Title.Trim();
@@ -733,6 +866,7 @@ internal static class EventsHandlers
             {
                 return EventsHelpers.BadRequest("Title is required.");
             }
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "title", entity.Title, title);
             entity.Title = title;
         }
 
@@ -749,6 +883,7 @@ internal static class EventsHandlers
                 }
             }
 
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "type", entity.Type, normalizedType);
             entity.Type = normalizedType;
         }
 
@@ -758,6 +893,7 @@ internal static class EventsHandlers
             {
                 return EventsHelpers.BadRequest("Start time is invalid.");
             }
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "startTime", entity.StartTime?.ToString(), startTime?.ToString());
             entity.StartTime = startTime;
         }
 
@@ -767,6 +903,7 @@ internal static class EventsHandlers
             {
                 return EventsHelpers.BadRequest("End time is invalid.");
             }
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "endTime", entity.EndTime?.ToString(), endTime?.ToString());
             entity.EndTime = endTime;
         }
 
@@ -774,55 +911,98 @@ internal static class EventsHandlers
 
         if (request.LocationName is not null)
         {
-            entity.LocationName = string.IsNullOrWhiteSpace(request.LocationName) ? null : request.LocationName.Trim();
+            var nextLocationName = string.IsNullOrWhiteSpace(request.LocationName) ? null : request.LocationName.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "locationName", entity.LocationName, nextLocationName);
+            entity.LocationName = nextLocationName;
         }
 
         if (request.Address is not null)
         {
-            entity.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+            var nextAddress = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "address", entity.Address, nextAddress);
+            entity.Address = nextAddress;
         }
 
         if (request.Directions is not null)
         {
-            entity.Directions = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim();
+            var nextDirections = string.IsNullOrWhiteSpace(request.Directions) ? null : request.Directions.Trim();
+            if (!string.Equals(entity.Directions, nextDirections, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "directions");
+            }
+            entity.Directions = nextDirections;
         }
 
         if (request.Notes is not null)
         {
-            entity.Notes = RichTextSanitizer.Sanitize(request.Notes);
+            var nextNotes = RichTextSanitizer.Sanitize(request.Notes);
+            if (!string.Equals(entity.Notes, nextNotes, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "notes");
+            }
+            entity.Notes = nextNotes;
         }
 
         if (request.CheckInEnabled.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "checkInEnabled", entity.CheckInEnabled, request.CheckInEnabled.Value);
             entity.CheckInEnabled = request.CheckInEnabled.Value;
         }
 
         if (request.RequiresCheckIn.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "requiresCheckIn", entity.RequiresCheckIn, request.RequiresCheckIn.Value);
             entity.RequiresCheckIn = request.RequiresCheckIn.Value;
         }
 
         if (request.CheckInMode is not null)
         {
-            entity.CheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim();
+            var nextCheckInMode = string.IsNullOrWhiteSpace(request.CheckInMode) ? "EntryOnly" : request.CheckInMode.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "checkInMode", entity.CheckInMode, nextCheckInMode);
+            entity.CheckInMode = nextCheckInMode;
         }
 
         if (request.MenuText is not null)
         {
-            entity.MenuText = RichTextSanitizer.Sanitize(request.MenuText);
+            var nextMenuText = RichTextSanitizer.Sanitize(request.MenuText);
+            if (!string.Equals(entity.MenuText, nextMenuText, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "menuText");
+            }
+            entity.MenuText = nextMenuText;
         }
 
         if (request.ProgramContent is not null)
         {
-            entity.ProgramContent = RichTextSanitizer.Sanitize(request.ProgramContent);
+            var nextProgramContent = RichTextSanitizer.Sanitize(request.ProgramContent);
+            if (!string.Equals(entity.ProgramContent, nextProgramContent, StringComparison.Ordinal))
+            {
+                AuditLogHelpers.AddChangedField(changedFields, "programContent");
+            }
+            entity.ProgramContent = nextProgramContent;
         }
 
         if (request.SurveyUrl is not null)
         {
-            entity.SurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim();
+            var nextSurveyUrl = string.IsNullOrWhiteSpace(request.SurveyUrl) ? null : request.SurveyUrl.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "surveyUrl", entity.SurveyUrl, nextSurveyUrl);
+            entity.SurveyUrl = nextSurveyUrl;
         }
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event_activity.update",
+                    TargetType: "event_activity",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", eventGuid), ("eventDayId", entity.EventDayId)))),
+                ct);
+        }
 
         return Results.Ok(EventsHelpers.ToActivityDto(entity));
     }
@@ -832,6 +1012,7 @@ internal static class EventsHandlers
         string activityId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var eventGuid, out var error))
@@ -858,6 +1039,16 @@ internal static class EventsHandlers
 
         db.EventActivities.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_activity.delete",
+                TargetType: "event_activity",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", eventGuid), ("eventDayId", entity.EventDayId))),
+            ct);
 
         return Results.NoContent();
     }
@@ -985,6 +1176,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1007,6 +1199,18 @@ internal static class EventsHandlers
         {
             entity.IsDeleted = true;
             await db.SaveChangesAsync(ct);
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event.archive",
+                    TargetType: "event",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(
+                        new[] { "isDeleted" },
+                        AuditLogHelpers.CreateExtra(("isDeleted", AuditLogHelpers.CreateExtra(("before", false), ("after", true)))))),
+                ct);
         }
 
         return Results.Ok(EventsHelpers.ToDto(entity));
@@ -1016,6 +1220,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1038,6 +1243,18 @@ internal static class EventsHandlers
         {
             entity.IsDeleted = false;
             await db.SaveChangesAsync(ct);
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event.restore",
+                    TargetType: "event",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(
+                        new[] { "isDeleted" },
+                        AuditLogHelpers.CreateExtra(("isDeleted", AuditLogHelpers.CreateExtra(("before", true), ("after", false)))))),
+                ct);
         }
 
         return Results.Ok(EventsHelpers.ToDto(entity));
@@ -1073,6 +1290,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1093,6 +1311,18 @@ internal static class EventsHandlers
 
         entity.EventAccessCode = await EventsHelpers.GenerateEventAccessCodeAsync(db, ct);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.access_code.update",
+                TargetType: "event",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.BuildMutationExtra(
+                    new[] { "eventAccessCode" },
+                    extra: AuditLogHelpers.CreateExtra(("mode", "regenerate")))),
+            ct);
 
         return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
     }
@@ -1102,6 +1332,7 @@ internal static class EventsHandlers
         UpdateEventAccessCodeRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1149,6 +1380,19 @@ internal static class EventsHandlers
             return Results.Conflict(new { code = "event_access_code_taken" });
         }
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.access_code.update",
+                TargetType: "event",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.BuildMutationExtra(
+                    new[] { "eventAccessCode" },
+                    extra: AuditLogHelpers.CreateExtra(("mode", "manual")))),
+            ct);
+
         return Results.Ok(new EventAccessCodeResponse(entity.Id, entity.EventAccessCode));
     }
 
@@ -1156,6 +1400,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1210,6 +1455,16 @@ internal static class EventsHandlers
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.purge",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("participantCount", participantIds.Count))),
+            ct);
 
         return Results.NoContent();
     }
@@ -1362,6 +1617,7 @@ internal static class EventsHandlers
         EventPortalInfo request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1397,6 +1653,7 @@ internal static class EventsHandlers
 
         var portalEntity = await db.EventPortals
             .FirstOrDefaultAsync(x => x.EventId == id && x.OrganizationId == orgId, ct);
+        var previousJson = portalEntity?.PortalJson;
         if (portalEntity is null)
         {
             portalEntity = new EventPortalEntity
@@ -1415,6 +1672,22 @@ internal static class EventsHandlers
         }
 
         await db.SaveChangesAsync(ct);
+        var changedFields = GetChangedJsonRootFields(previousJson, json);
+        if (changedFields.Count == 0)
+        {
+            changedFields.Add("portal");
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.portal.update",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.BuildMutationExtra(changedFields)),
+            ct);
         return Results.Ok(request);
     }
 
@@ -1675,6 +1948,7 @@ internal static class EventsHandlers
         AssignGuidesRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -1699,6 +1973,11 @@ internal static class EventsHandlers
         {
             return Results.NotFound(new { message = "Event not found." });
         }
+
+        var previousGuideIds = eventEntity.EventGuides
+            .Select(x => x.GuideUserId)
+            .OrderBy(x => x)
+            .ToArray();
 
         var guideIds = request.GuideUserIds.Where(g => g != Guid.Empty).Distinct().ToArray();
 
@@ -1732,6 +2011,18 @@ internal static class EventsHandlers
         }
 
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.guides.update",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.BuildMutationExtra(
+                    new[] { "guideUserIds" },
+                    AuditLogHelpers.CreateExtra(("guideUserIds", AuditLogHelpers.CreateExtra(("before", previousGuideIds), ("after", guideIds)))))),
+            ct);
 
         return Results.Ok(new { eventId = id, guideUserIds = guideIds });
     }
@@ -2190,6 +2481,7 @@ internal static class EventsHandlers
         BulkApplyParticipantRoomsRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (request is null)
@@ -2442,6 +2734,24 @@ internal static class EventsHandlers
             await db.SaveChangesAsync(ct);
         }
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.rooms.bulk_apply",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("overwriteMode", overwriteMode),
+                    ("affectedCount", affectedCount),
+                    ("updatedCount", updatedCount),
+                    ("skippedCount", skippedCount),
+                    ("notFoundTcNoCount", notFoundTcNoCount),
+                    ("errorCount", errors.Count),
+                    ("mode", hasRowUpdates ? "row_updates" : NormalizeRoomScope(request.Scope)))),
+            ct);
+
         return Results.Ok(new BulkApplyParticipantRoomsResponse(
             affectedCount,
             updatedCount,
@@ -2519,6 +2829,7 @@ internal static class EventsHandlers
         CreateParticipantRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -2618,6 +2929,17 @@ internal static class EventsHandlers
             return Results.Conflict(new { message = "Participant could not be created. Try again." });
         }
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.create",
+                TargetType: "participant",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", id))),
+            ct);
+
         return Results.Created($"/api/events/{id}/participants/{entity.Id}",
             new ParticipantDto(
                 entity.Id,
@@ -2641,6 +2963,7 @@ internal static class EventsHandlers
         UpdateParticipantRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -2680,6 +3003,8 @@ internal static class EventsHandlers
         {
             return Results.NotFound(new { message = "Participant not found." });
         }
+
+        var beforeDetailsJson = entity.Details is null ? null : JsonSerializer.Serialize(MapDetails(entity.Details));
 
         var firstName = NormalizeName(request.FirstName);
         if (string.IsNullOrWhiteSpace(firstName))
@@ -2729,6 +3054,17 @@ internal static class EventsHandlers
             }
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "firstName", entity.FirstName, firstName);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "lastName", entity.LastName, lastName);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "fullName", entity.FullName, fullName);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "phone", entity.Phone, phone);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "email", entity.Email, email);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "tcNo", entity.TcNo, tcNo);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "birthDate", entity.BirthDate.ToString("yyyy-MM-dd"), birthDate.ToString("yyyy-MM-dd"));
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "gender", entity.Gender.ToString(), gender.ToString());
+
         entity.FirstName = firstName;
         entity.LastName = lastName;
         entity.FullName = fullName;
@@ -2772,6 +3108,25 @@ internal static class EventsHandlers
         }
 
         await db.SaveChangesAsync(ct);
+        var afterDetailsJson = entity.Details is null ? null : JsonSerializer.Serialize(MapDetails(entity.Details));
+        if (!string.Equals(beforeDetailsJson, afterDetailsJson, StringComparison.Ordinal))
+        {
+            AuditLogHelpers.AddChangedField(changedFields, "details");
+        }
+
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "participant.update",
+                    TargetType: "participant",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", id)))),
+                ct);
+        }
 
         var arrived = await db.CheckIns.AsNoTracking()
             .AnyAsync(x => x.EventId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
@@ -2888,6 +3243,7 @@ internal static class EventsHandlers
         BulkApplyFlightSegmentsRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -3080,13 +3436,28 @@ internal static class EventsHandlers
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.flights.bulk_apply",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("participantCount", participantIds.Length),
+                    ("applyDirections", directions.Select(x => x.ToString()).ToArray()),
+                    ("arrivalSegmentCount", normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Arrival, out var arrivalApplied) ? arrivalApplied.Count : null),
+                    ("returnSegmentCount", normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Return, out var returnApplied) ? returnApplied.Count : null))),
+            ct);
+
         return Results.Ok(new BulkApplyFlightSegmentsResponse(
             participantIds.Length,
             new BulkApplyFlightSegmentsAppliedDto(
-                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Arrival, out var arrivalApplied)
+                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Arrival, out arrivalApplied)
                     ? arrivalApplied.Count
                     : null,
-                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Return, out var returnApplied)
+                normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Return, out returnApplied)
                     ? returnApplied.Count
                     : null)));
     }
@@ -3097,6 +3468,7 @@ internal static class EventsHandlers
         ParticipantWillNotAttendRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -3134,8 +3506,26 @@ internal static class EventsHandlers
             return Results.NotFound(new { message = "Participant not found." });
         }
 
+        var previousValue = entity.WillNotAttend;
+
         entity.WillNotAttend = request.WillNotAttend.Value;
         await db.SaveChangesAsync(ct);
+        if (previousValue != entity.WillNotAttend)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "participant.will_not_attend.set",
+                    TargetType: "participant",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(
+                        new[] { "willNotAttend" },
+                        AuditLogHelpers.CreateExtra(("willNotAttend", AuditLogHelpers.CreateExtra(("before", previousValue), ("after", entity.WillNotAttend)))),
+                        AuditLogHelpers.CreateExtra(("eventId", id)))),
+                ct);
+        }
 
         var arrived = await db.CheckIns.AsNoTracking()
             .AnyAsync(x => x.EventId == id && x.ParticipantId == entity.Id && x.OrganizationId == orgId, ct);
@@ -3165,6 +3555,7 @@ internal static class EventsHandlers
         string participantId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -3206,6 +3597,16 @@ internal static class EventsHandlers
 
         db.Participants.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.delete",
+                TargetType: "participant",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", id))),
+            ct);
 
         return Results.NoContent();
     }
@@ -3214,6 +3615,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -3262,6 +3664,16 @@ internal static class EventsHandlers
 
         db.Participants.RemoveRange(participants);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.delete_all",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("deletedCount", participants.Count))),
+            ct);
 
         return Results.NoContent();
     }
@@ -3271,6 +3683,7 @@ internal static class EventsHandlers
         CheckInRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -3288,7 +3701,7 @@ internal static class EventsHandlers
             userAgent = null;
         }
 
-        return await CheckInForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, db, ct);
+        return await CheckInForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> CheckInForOrg(
@@ -3299,6 +3712,8 @@ internal static class EventsHandlers
         string? actorRole,
         string? ipAddress,
         string? userAgent,
+        HttpContext httpContext,
+        AuditService auditService,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -3541,6 +3956,22 @@ internal static class EventsHandlers
 
         var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.checkin",
+                TargetType: "participant",
+                TargetId: participant!.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", id),
+                    ("direction", direction.ToString()),
+                    ("method", logMethod.ToString()),
+                    ("checkInResult", logResult),
+                    ("alreadyCheckedIn", alreadyCheckedIn))),
+            ct);
+
         return Results.Ok(new CheckInResponse(
             participant!.Id,
             participant.FullName,
@@ -3557,6 +3988,7 @@ internal static class EventsHandlers
         CheckInUndoRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -3564,13 +3996,15 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        return await UndoCheckInForOrg(orgId, eventId, request, db, ct);
+        return await UndoCheckInForOrg(orgId, eventId, request, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> UndoCheckInForOrg(
         Guid orgId,
         string eventId,
         CheckInUndoRequest request,
+        HttpContext httpContext,
+        AuditService auditService,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -3629,6 +4063,19 @@ internal static class EventsHandlers
             await db.SaveChangesAsync(ct);
         }
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.checkin.undo",
+                TargetType: "participant",
+                TargetId: participant.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", id),
+                    ("alreadyUndone", alreadyUndone))),
+            ct);
+
         var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
 
         return Results.Ok(new CheckInUndoResponse(participant.Id, alreadyUndone, arrivedCount, totalCount));
@@ -3638,6 +4085,7 @@ internal static class EventsHandlers
         string eventId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -3645,12 +4093,14 @@ internal static class EventsHandlers
             return orgError!;
         }
 
-        return await ResetAllCheckInsForOrg(orgId, eventId, db, ct);
+        return await ResetAllCheckInsForOrg(orgId, eventId, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> ResetAllCheckInsForOrg(
         Guid orgId,
         string eventId,
+        HttpContext httpContext,
+        AuditService auditService,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -3678,6 +4128,16 @@ internal static class EventsHandlers
         }
 
         var (arrivedCount, totalCount) = await GetCheckInCountsAsync(db, id, orgId, ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event.checkin.reset_all",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("removedCount", removedCount))),
+            ct);
         return Results.Ok(new ResetAllCheckInsResponse(removedCount, arrivedCount, totalCount));
     }
 
@@ -3686,6 +4146,7 @@ internal static class EventsHandlers
         CheckInCodeRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -3703,7 +4164,7 @@ internal static class EventsHandlers
             userAgent = null;
         }
 
-        return await CheckInByCodeForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, db, ct);
+        return await CheckInByCodeForOrg(orgId, eventId, request, actorUserId, actorRole, ipAddress, userAgent, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> CheckInByCodeForOrg(
@@ -3714,6 +4175,8 @@ internal static class EventsHandlers
         string? actorRole,
         string? ipAddress,
         string? userAgent,
+        HttpContext httpContext,
+        AuditService auditService,
         TripflowDbContext db,
         CancellationToken ct)
     {
@@ -3787,6 +4250,8 @@ internal static class EventsHandlers
             actorRole,
             ipAddress,
             userAgent,
+            httpContext,
+            auditService,
             db,
             ct);
     }
@@ -5413,6 +5878,58 @@ internal static class EventsHandlers
 
     private static string NormalizeTcNo(string? value)
         => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+
+    private static List<string> GetChangedJsonRootFields(string? beforeJson, string afterJson)
+    {
+        using var afterDocument = JsonDocument.Parse(afterJson);
+        if (afterDocument.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return ["portal"];
+        }
+
+        if (string.IsNullOrWhiteSpace(beforeJson))
+        {
+            return afterDocument.RootElement.EnumerateObject()
+                .Select(x => x.Name)
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        try
+        {
+            using var beforeDocument = JsonDocument.Parse(beforeJson);
+            if (beforeDocument.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return afterDocument.RootElement.EnumerateObject()
+                    .Select(x => x.Name)
+                    .OrderBy(x => x, StringComparer.Ordinal)
+                    .ToList();
+            }
+
+            var beforeProps = beforeDocument.RootElement.EnumerateObject()
+                .ToDictionary(x => x.Name, x => x.Value.GetRawText(), StringComparer.Ordinal);
+            var afterProps = afterDocument.RootElement.EnumerateObject()
+                .ToDictionary(x => x.Name, x => x.Value.GetRawText(), StringComparer.Ordinal);
+
+            return beforeProps.Keys
+                .Union(afterProps.Keys, StringComparer.Ordinal)
+                .Where(key =>
+                {
+                    beforeProps.TryGetValue(key, out var beforeValue);
+                    afterProps.TryGetValue(key, out var afterValue);
+                    return !string.Equals(beforeValue, afterValue, StringComparison.Ordinal);
+                })
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return afterDocument.RootElement.EnumerateObject()
+                .Select(x => x.Name)
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToList();
+        }
+    }
 
     internal static async Task<IResult> GenerateBadgesPdf(
         string eventId,

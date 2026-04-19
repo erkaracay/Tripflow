@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -51,6 +52,7 @@ internal static class EventItemsHandlers
         CreateEventItemRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -91,6 +93,17 @@ internal static class EventItemsHandlers
         db.EventItems.Add(entity);
         await db.SaveChangesAsync(ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_item.create",
+                TargetType: "event_item",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", evtId))),
+            ct);
+
         return Results.Created($"/api/events/{eventId}/items/{entity.Id}", new EventItemDto(entity.Id, entity.Type, entity.Title, entity.Name, entity.IsActive, entity.SortOrder));
     }
 
@@ -100,6 +113,7 @@ internal static class EventItemsHandlers
         UpdateEventItemRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -115,18 +129,53 @@ internal static class EventItemsHandlers
         if (entity is null)
             return Results.NotFound(new { message = "Item not found." });
 
-        if (request.Type is { } t && !string.IsNullOrWhiteSpace(t)) entity.Type = t.Trim().Length > 32 ? t.Trim()[..32] : t.Trim();
-        if (request.Title is { } tl && !string.IsNullOrWhiteSpace(tl)) entity.Title = tl.Trim().Length > 100 ? tl.Trim()[..100] : tl.Trim();
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        if (request.Type is { } t && !string.IsNullOrWhiteSpace(t))
+        {
+            var nextType = t.Trim().Length > 32 ? t.Trim()[..32] : t.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "type", entity.Type, nextType);
+            entity.Type = nextType;
+        }
+        if (request.Title is { } tl && !string.IsNullOrWhiteSpace(tl))
+        {
+            var nextTitle = tl.Trim().Length > 100 ? tl.Trim()[..100] : tl.Trim();
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "title", entity.Title, nextTitle);
+            entity.Title = nextTitle;
+        }
         if (request.Name is { } n)
         {
             var name = n.Trim();
             if (string.IsNullOrEmpty(name)) return EventsHelpers.BadRequest("Name cannot be empty.");
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "name", entity.Name, name.Length > 100 ? name[..100] : name);
             entity.Name = name.Length > 100 ? name[..100] : name;
         }
-        if (request.IsActive.HasValue) entity.IsActive = request.IsActive.Value;
-        if (request.SortOrder.HasValue) entity.SortOrder = request.SortOrder.Value;
+        if (request.IsActive.HasValue)
+        {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "isActive", entity.IsActive, request.IsActive.Value);
+            entity.IsActive = request.IsActive.Value;
+        }
+        if (request.SortOrder.HasValue)
+        {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "sortOrder", entity.SortOrder, request.SortOrder.Value);
+            entity.SortOrder = request.SortOrder.Value;
+        }
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "event_item.update",
+                    TargetType: "event_item",
+                    TargetId: entity.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", evtId)))),
+                ct);
+        }
         return Results.Ok(new EventItemDto(entity.Id, entity.Type, entity.Title, entity.Name, entity.IsActive, entity.SortOrder));
     }
 
@@ -135,6 +184,7 @@ internal static class EventItemsHandlers
         string itemId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -150,6 +200,16 @@ internal static class EventItemsHandlers
 
         db.EventItems.Remove(entity);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_item.delete",
+                TargetType: "event_item",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", evtId))),
+            ct);
         return Results.NoContent();
     }
 
@@ -159,6 +219,7 @@ internal static class EventItemsHandlers
         ItemActionRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -213,6 +274,21 @@ internal static class EventItemsHandlers
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "event_item.action",
+                TargetType: "event_item",
+                TargetId: itId.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", evtId),
+                    ("participantId", participant.Id),
+                    ("itemAction", action),
+                    ("method", method))),
+            ct);
 
         return Results.Ok(new ItemActionResponse(participant.Id, participant.FullName, ResultSuccess, action, method, createdAt));
     }

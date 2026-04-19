@@ -27,6 +27,7 @@ internal static class AuthHandlers
         LoginRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         IPasswordHasher<UserEntity> hasher,
         JwtOptions options,
         InforaCookieOptions cookieOptions,
@@ -34,6 +35,13 @@ internal static class AuthHandlers
     {
         if (request is null)
         {
+            await LogLoginAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                email: null,
+                reason: "validation_failed",
+                ct);
             return Results.BadRequest(new { message = "Request body is required." });
         }
 
@@ -42,6 +50,13 @@ internal static class AuthHandlers
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
+            await LogLoginAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                email: email,
+                reason: "validation_failed",
+                ct);
             return Results.BadRequest(new { message = "Email and password are required." });
         }
 
@@ -55,6 +70,13 @@ internal static class AuthHandlers
         var (emailLimited, retryEmail) = InMemoryRateLimiter.Default.CheckLimit(emailIpKey, 15, window);
         if (emailLimited)
         {
+            await LogLoginAttemptAsync(
+                auditService,
+                httpContext,
+                result: "blocked",
+                email: email,
+                reason: "rate_limited",
+                ct);
             return RateLimited(httpContext, retryEmail);
         }
 
@@ -62,6 +84,13 @@ internal static class AuthHandlers
         if (user is null)
         {
             InMemoryRateLimiter.Default.RegisterHit(emailIpKey, window);
+            await LogLoginAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                email: email,
+                reason: "invalid_credentials",
+                ct);
             return Results.Unauthorized();
         }
 
@@ -69,6 +98,13 @@ internal static class AuthHandlers
         if (verification == PasswordVerificationResult.Failed)
         {
             InMemoryRateLimiter.Default.RegisterHit(emailIpKey, window);
+            await LogLoginAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                email: email,
+                reason: "invalid_credentials",
+                ct);
             return Results.Unauthorized();
         }
 
@@ -104,11 +140,41 @@ internal static class AuthHandlers
         var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
         var cookieOpts = cookieOptions.BuildCookieOptions(maxAge: options.Lifetime);
         httpContext.Response.Cookies.Append(InforaCookieOptions.AuthCookieName, accessToken, cookieOpts);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "auth.login",
+                TargetType: "user",
+                TargetId: user.Id.ToString(),
+                Result: "success",
+                OrganizationId: user.OrganizationId,
+                UserId: user.Id,
+                Role: user.Role,
+                Extra: AuditLogHelpers.CreateExtra(("email", user.Email))),
+            ct);
         return Results.Ok(new LoginResponse(accessToken, user.Role, user.Id, user.FullName));
     }
 
-    internal static IResult Logout(HttpContext httpContext, InforaCookieOptions cookieOptions)
+    internal static async Task<IResult> Logout(
+        HttpContext httpContext,
+        AuditService auditService,
+        InforaCookieOptions cookieOptions,
+        CancellationToken ct)
     {
+        if (AuditLogHelpers.TryResolveUserId(httpContext.User, out var userId))
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "auth.logout",
+                    TargetType: "user",
+                    TargetId: userId.ToString(),
+                    Result: "success",
+                    UserId: userId,
+                    Role: AuditLogHelpers.ResolveRole(httpContext.User)),
+                ct);
+        }
+
         httpContext.Response.Cookies.Delete(InforaCookieOptions.AuthCookieName, cookieOptions.BuildClearCookieOptions());
         return Results.Ok();
     }
@@ -119,5 +185,27 @@ internal static class AuthHandlers
         return Results.Json(
             new { code = "rate_limited", retryAfterSeconds },
             statusCode: StatusCodes.Status429TooManyRequests);
+    }
+
+    private static Task LogLoginAttemptAsync(
+        AuditService auditService,
+        HttpContext httpContext,
+        string result,
+        string? email,
+        string reason,
+        CancellationToken ct)
+    {
+        return auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "auth.login",
+                TargetType: "user",
+                TargetId: null,
+                Result: result,
+                Role: "Anonymous",
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("attemptedEmail", AuditLogHelpers.NormalizeEmail(email)),
+                    ("reason", reason))),
+            ct);
     }
 }

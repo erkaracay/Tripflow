@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -142,6 +143,7 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
@@ -150,48 +152,7 @@ internal static class GuideHandlers
             return eventError;
         }
 
-        if (!Guid.TryParse(participantId, out var participantGuid))
-        {
-            return EventsHelpers.BadRequest("Invalid participant id.");
-        }
-
-        if (request is null || !request.WillNotAttend.HasValue)
-        {
-            return EventsHelpers.BadRequest("willNotAttend is required.");
-        }
-
-        var participant = await db.Participants
-            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
-
-        if (participant is null)
-        {
-            return Results.NotFound(new { message = "Participant not found." });
-        }
-
-        participant.WillNotAttend = request.WillNotAttend.Value;
-        await db.SaveChangesAsync(ct);
-
-        var arrived = await db.CheckIns.AsNoTracking()
-            .AnyAsync(x => x.EventId == id && x.ParticipantId == participant.Id && x.OrganizationId == orgId, ct);
-
-        var lastLog = await db.EventParticipantLogs.AsNoTracking()
-            .Where(x => x.OrganizationId == orgId
-                        && x.EventId == id
-                        && x.ParticipantId == participant.Id
-                        && (x.Result == "Success" || x.Result == "AlreadyArrived"))
-            .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ParticipantLastLogDto(
-                x.Direction.ToString(),
-                x.Method.ToString(),
-                x.Result,
-                x.CreatedAt))
-            .FirstOrDefaultAsync(ct);
-
-        return Results.Ok(new ParticipantWillNotAttendResponseDto(
-            participant.Id,
-            participant.WillNotAttend,
-            arrived,
-            lastLog));
+        return await EventsHandlers.SetParticipantWillNotAttend(eventId, participantId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> ResolveParticipantByCode(
@@ -412,6 +373,7 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!TryGetUserId(user, out var userId, out var error))
@@ -433,7 +395,7 @@ internal static class GuideHandlers
             userAgent = null;
         }
 
-        return await EventsHandlers.CheckInByCodeForOrg(orgId, eventId, request, userId, actorRole, ipAddress, userAgent, db, ct);
+        return await EventsHandlers.CheckInByCodeForOrg(orgId, eventId, request, userId, actorRole, ipAddress, userAgent, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> UndoCheckIn(
@@ -442,6 +404,7 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
@@ -450,7 +413,7 @@ internal static class GuideHandlers
             return eventError;
         }
 
-        return await EventsHandlers.UndoCheckInForOrg(orgId, eventId, request, db, ct);
+        return await EventsHandlers.UndoCheckInForOrg(orgId, eventId, request, httpContext, auditService, db, ct);
     }
 
     internal static async Task<IResult> ResetAllCheckIns(
@@ -458,6 +421,7 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
@@ -466,7 +430,7 @@ internal static class GuideHandlers
             return eventError;
         }
 
-        return await EventsHandlers.ResetAllCheckInsForOrg(orgId, eventId, db, ct);
+        return await EventsHandlers.ResetAllCheckInsForOrg(orgId, eventId, httpContext, auditService, db, ct);
     }
 
     private static bool TryGetUserId(ClaimsPrincipal user, out Guid userId, out IResult? error)
@@ -579,11 +543,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await ActivityCheckInHandlers.PostCheckIn(eventId, activityId, request, httpContext, db, ct);
+        return await ActivityCheckInHandlers.PostCheckIn(eventId, activityId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> GetActivityParticipantsTable(
@@ -638,11 +603,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.CreateMealGroupForRoute(eventId, activityId, request, "/api/guide/events", httpContext, db, ct);
+        return await MealMenuHandlers.CreateMealGroupForRoute(eventId, activityId, request, "/api/guide/events", httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> UpdateMealGroup(
@@ -652,11 +618,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.UpdateMealGroup(eventId, groupId, request, httpContext, db, ct);
+        return await MealMenuHandlers.UpdateMealGroup(eventId, groupId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> DeleteMealGroup(
@@ -665,11 +632,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.DeleteMealGroup(eventId, groupId, httpContext, db, ct);
+        return await MealMenuHandlers.DeleteMealGroup(eventId, groupId, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> CreateMealOption(
@@ -679,11 +647,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.CreateMealOptionForRoute(eventId, groupId, request, "/api/guide/events", httpContext, db, ct);
+        return await MealMenuHandlers.CreateMealOptionForRoute(eventId, groupId, request, "/api/guide/events", httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> UpdateMealOption(
@@ -693,11 +662,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.UpdateMealOption(eventId, optionId, request, httpContext, db, ct);
+        return await MealMenuHandlers.UpdateMealOption(eventId, optionId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> DeleteMealOption(
@@ -706,11 +676,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await MealMenuHandlers.DeleteMealOption(eventId, optionId, httpContext, db, ct);
+        return await MealMenuHandlers.DeleteMealOption(eventId, optionId, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> GetMealChoices(
@@ -739,13 +710,14 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null)
             return eventError;
 
-        return await ActivityCheckInHandlers.ResetAllActivityCheckIns(eventId, activityId, httpContext, db, ct);
+        return await ActivityCheckInHandlers.ResetAllActivityCheckIns(eventId, activityId, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> SetActivityParticipantWillNotAttend(
@@ -756,6 +728,7 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, id, orgId) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
@@ -764,76 +737,7 @@ internal static class GuideHandlers
             return eventError;
         }
 
-        if (!Guid.TryParse(activityId, out var activityGuid))
-        {
-            return EventsHelpers.BadRequest("Invalid activity id.");
-        }
-
-        if (!Guid.TryParse(participantId, out var participantGuid))
-        {
-            return EventsHelpers.BadRequest("Invalid participant id.");
-        }
-
-        if (request is null || !request.WillNotAttend.HasValue)
-        {
-            return EventsHelpers.BadRequest("willNotAttend is required.");
-        }
-
-        var activityExists = await db.EventActivities.AsNoTracking()
-            .AnyAsync(x => x.Id == activityGuid && x.EventId == id && x.OrganizationId == orgId, ct);
-        if (!activityExists)
-        {
-            return Results.NotFound(new { message = "Activity not found." });
-        }
-
-        var participant = await db.Participants.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
-        if (participant is null)
-        {
-            return Results.NotFound(new { message = "Participant not found." });
-        }
-
-        var entity = await db.ParticipantActivityWillNotAttend
-            .FirstOrDefaultAsync(x => x.ParticipantId == participantGuid && x.ActivityId == activityGuid, ct);
-
-        if (entity is null)
-        {
-            entity = new ParticipantActivityWillNotAttendEntity
-            {
-                Id = Guid.NewGuid(),
-                ParticipantId = participantGuid,
-                ActivityId = activityGuid,
-                WillNotAttend = request.WillNotAttend.Value,
-                CreatedAt = DateTime.UtcNow
-            };
-            db.ParticipantActivityWillNotAttend.Add(entity);
-        }
-        else
-        {
-            entity.WillNotAttend = request.WillNotAttend.Value;
-            entity.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await db.SaveChangesAsync(ct);
-
-        var lastLog = await db.ActivityParticipantLogs.AsNoTracking()
-            .Where(x => x.OrganizationId == orgId
-                        && x.EventId == id
-                        && x.ActivityId == activityGuid
-                        && x.ParticipantId == participantGuid
-                        && (x.Result == "Success" || x.Result == "AlreadyCheckedIn"))
-            .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ActivityLastLogDto(
-                x.Direction,
-                x.Method,
-                x.Result,
-                x.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture)))
-            .FirstOrDefaultAsync(ct);
-
-        var isCheckedIn = lastLog != null && lastLog.Direction == "Entry" && (lastLog.Result == "Success" || lastLog.Result == "AlreadyCheckedIn");
-        var activityState = new ActivityParticipantStateDto(isCheckedIn, entity.WillNotAttend, lastLog);
-
-        return Results.Ok(new ActivityParticipantWillNotAttendResponse(participantGuid, entity.WillNotAttend, activityState));
+        return await ActivityCheckInHandlers.SetActivityParticipantWillNotAttend(eventId, activityId, participantId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> GetEventItems(
@@ -855,11 +759,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await EventItemsHandlers.CreateItem(eventId, request, httpContext, db, ct);
+        return await EventItemsHandlers.CreateItem(eventId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> UpdateEventItem(
@@ -869,11 +774,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await EventItemsHandlers.UpdateItem(eventId, itemId, request, httpContext, db, ct);
+        return await EventItemsHandlers.UpdateItem(eventId, itemId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> DeleteEventItem(
@@ -882,11 +788,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await EventItemsHandlers.DeleteItem(eventId, itemId, httpContext, db, ct);
+        return await EventItemsHandlers.DeleteItem(eventId, itemId, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> PostItemAction(
@@ -896,11 +803,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (eventError, _, _) = await EnsureGuideEventAccess(eventId, httpContext, user, db, ct);
         if (eventError is not null) return eventError;
-        return await EventItemsHandlers.PostAction(eventId, itemId, request, httpContext, db, ct);
+        return await EventItemsHandlers.PostAction(eventId, itemId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> GetItemParticipantsTable(
@@ -1007,11 +915,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.CreateEventDay(eventId, request, httpContext, db, ct);
+        return await EventsHandlers.CreateEventDay(eventId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> UpdateEventDay(
@@ -1021,11 +930,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.UpdateEventDay(eventId, dayId, request, httpContext, db, ct);
+        return await EventsHandlers.UpdateEventDay(eventId, dayId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> DeleteEventDay(
@@ -1034,11 +944,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.DeleteEventDay(eventId, dayId, httpContext, db, ct);
+        return await EventsHandlers.DeleteEventDay(eventId, dayId, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> GetEventActivities(
@@ -1061,11 +972,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.CreateEventActivity(eventId, dayId, request, httpContext, db, ct);
+        return await EventsHandlers.CreateEventActivity(eventId, dayId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> UpdateEventActivity(
@@ -1075,11 +987,12 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.UpdateEventActivity(eventId, activityId, request, httpContext, db, ct);
+        return await EventsHandlers.UpdateEventActivity(eventId, activityId, request, httpContext, db, auditService, ct);
     }
 
     internal static async Task<IResult> DeleteEventActivity(
@@ -1088,10 +1001,11 @@ internal static class GuideHandlers
         HttpContext httpContext,
         ClaimsPrincipal user,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (err, _, _) = await EnsureGuideProgramEditAccess(eventId, httpContext, user, db, ct);
         if (err is not null) return err;
-        return await EventsHandlers.DeleteEventActivity(eventId, activityId, httpContext, db, ct);
+        return await EventsHandlers.DeleteEventActivity(eventId, activityId, httpContext, db, auditService, ct);
     }
 }

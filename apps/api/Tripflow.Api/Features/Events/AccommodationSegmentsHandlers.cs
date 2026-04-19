@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -42,6 +43,7 @@ internal static class AccommodationSegmentsHandlers
         UpsertAccommodationSegmentRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (request is null)
@@ -123,6 +125,17 @@ internal static class AccommodationSegmentsHandlers
         db.EventAccommodationSegments.Add(entity);
         await db.SaveChangesAsync(ct);
 
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "accommodation_segment.create",
+                TargetType: "accommodation_segment",
+                TargetId: entity.Id.ToString(),
+                Result: "success",
+                OrganizationId: eventContext.OrganizationId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", eventContext.EventId))),
+            ct);
+
         return Results.Created(
             $"/api/events/{eventId}/accommodation-segments/{entity.Id}",
             ToSegmentDto(entity, defaultAccommodation.Title!));
@@ -134,6 +147,7 @@ internal static class AccommodationSegmentsHandlers
         UpsertAccommodationSegmentRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (request is null)
@@ -204,6 +218,13 @@ internal static class AccommodationSegmentsHandlers
                 "Segment date range overlaps with an existing accommodation segment.");
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "defaultAccommodationDocTabId", segment.DefaultAccommodationDocTabId, defaultAccommodation.DocTabId!.Value);
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "startDate", segment.StartDate.ToString("yyyy-MM-dd"), startDate.ToString("yyyy-MM-dd"));
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "endDate", segment.EndDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"));
+        AuditLogHelpers.AddScalarChange(changedFields, changes, "sortOrder", segment.SortOrder, sortOrder);
+
         segment.DefaultAccommodationDocTabId = defaultAccommodation.DocTabId!.Value;
         segment.StartDate = startDate;
         segment.EndDate = endDate;
@@ -211,6 +232,19 @@ internal static class AccommodationSegmentsHandlers
         segment.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "accommodation_segment.update",
+                    TargetType: "accommodation_segment",
+                    TargetId: segment.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: eventContext.OrganizationId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", eventContext.EventId)))),
+                ct);
+        }
 
         return Results.Ok(ToSegmentDto(segment, defaultAccommodation.Title!));
     }
@@ -220,6 +254,7 @@ internal static class AccommodationSegmentsHandlers
         Guid segmentId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var eventContext = await ResolveEventContext(eventId, httpContext, db, ct);
@@ -241,6 +276,16 @@ internal static class AccommodationSegmentsHandlers
 
         db.EventAccommodationSegments.Remove(segment);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "accommodation_segment.delete",
+                TargetType: "accommodation_segment",
+                TargetId: segment.Id.ToString(),
+                Result: "success",
+                OrganizationId: eventContext.OrganizationId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", eventContext.EventId))),
+            ct);
         return Results.NoContent();
     }
 
@@ -392,6 +437,7 @@ internal static class AccommodationSegmentsHandlers
         BulkApplyAccommodationSegmentParticipantsRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (request is null)
@@ -544,6 +590,23 @@ internal static class AccommodationSegmentsHandlers
         {
             await db.SaveChangesAsync(ct);
         }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "accommodation_segment.participants.bulk_apply",
+                TargetType: "accommodation_segment",
+                TargetId: segmentContext.SegmentId.ToString(),
+                Result: "success",
+                OrganizationId: segmentContext.OrganizationId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", segmentContext.EventId),
+                    ("rowCount", targetedParticipantIds.Length),
+                    ("createdCount", createdCount),
+                    ("updatedCount", updatedCount),
+                    ("deletedCount", deletedCount),
+                    ("errorCount", errors.Count))),
+            ct);
 
         return Results.Ok(new BulkApplyAccommodationSegmentParticipantsResponse(
             targetedParticipantIds.Length,

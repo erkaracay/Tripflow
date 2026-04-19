@@ -18,11 +18,20 @@ internal static class PortalLoginHandlers
         PortalLoginRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         InforaCookieOptions cookieOptions,
         CancellationToken ct)
     {
         if (request is null)
         {
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: null,
+                tcNo: null,
+                reason: "validation_failed",
+                ct);
             return Results.BadRequest(new { message = "Request body is required." });
         }
 
@@ -33,6 +42,14 @@ internal static class PortalLoginHandlers
         var (limited, retryAfter) = InMemoryRateLimiter.Default.CheckLimit(attemptKey, MaxAttempts, Window);
         if (limited)
         {
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "blocked",
+                code: code,
+                tcNo: tcNo,
+                reason: "rate_limited",
+                ct);
             httpContext.Response.Headers["Retry-After"] = retryAfter.ToString();
             return Results.Json(new { code = "rate_limited", retryAfterSeconds = retryAfter }, statusCode: StatusCodes.Status429TooManyRequests);
         }
@@ -40,12 +57,28 @@ internal static class PortalLoginHandlers
         if (!EventsHelpers.IsValidEventCode(code))
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "invalid_access_code_format",
+                ct);
             return Results.BadRequest(new { code = "invalid_access_code_format" });
         }
 
         if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "invalid_tcno_format",
+                ct);
             return Results.BadRequest(new { code = "invalid_tcno_format" });
         }
 
@@ -56,12 +89,28 @@ internal static class PortalLoginHandlers
         if (matchingEvents.Count == 0)
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "invalid_event_access_code",
+                ct);
             return Results.BadRequest(new { code = "invalid_event_access_code" });
         }
 
         if (matchingEvents.Count > 1)
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "ambiguous_event_access_code",
+                ct);
             return Results.BadRequest(new { code = "ambiguous_event_access_code" });
         }
 
@@ -73,12 +122,28 @@ internal static class PortalLoginHandlers
         if (participants.Count == 0)
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "tcno_not_found",
+                ct);
             return Results.BadRequest(new { code = "tcno_not_found" });
         }
 
         if (participants.Count > 1)
         {
             InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
+            await LogPortalAttemptAsync(
+                auditService,
+                httpContext,
+                result: "fail",
+                code: code,
+                tcNo: tcNo,
+                reason: "ambiguous_tcno",
+                ct);
             return Results.Conflict(new { code = "ambiguous_tcno" });
         }
 
@@ -119,6 +184,19 @@ internal static class PortalLoginHandlers
 
         var cookieOpts = cookieOptions.BuildCookieOptions(expires: expiresAt);
         httpContext.Response.Cookies.Append(InforaCookieOptions.PortalCookieName, token, cookieOpts);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "portal.login",
+                TargetType: "participant",
+                TargetId: participant.Id.ToString(),
+                Result: "success",
+                OrganizationId: participant.OrganizationId,
+                Role: "PortalParticipant",
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", eventEntity.Id),
+                    ("eventAccessCode", eventEntity.EventAccessCode))),
+            ct);
         return Results.Ok(new PortalLoginResponse(token, expiresAt, eventEntity.Id, participant.Id));
     }
 
@@ -184,8 +262,29 @@ internal static class PortalLoginHandlers
         return Results.Ok(response);
     }
 
-    internal static IResult Logout(HttpContext httpContext, InforaCookieOptions cookieOptions)
+    internal static async Task<IResult> Logout(
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        InforaCookieOptions cookieOptions,
+        CancellationToken ct)
     {
+        var session = await PortalSessionHelpers.GetValidSessionAsync(httpContext, db, ct);
+        if (session is not null)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "portal.logout",
+                    TargetType: "participant",
+                    TargetId: session.ParticipantId.ToString(),
+                    Result: "success",
+                    OrganizationId: session.OrganizationId,
+                    Role: "PortalParticipant",
+                    Extra: AuditLogHelpers.CreateExtra(("eventId", session.EventId))),
+                ct);
+        }
+
         httpContext.Response.Cookies.Delete(InforaCookieOptions.PortalCookieName, cookieOptions.BuildClearCookieOptions());
         return Results.Ok();
     }
@@ -218,6 +317,30 @@ internal static class PortalLoginHandlers
 
     private static string GetClientIp(HttpContext httpContext)
         => httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private static Task LogPortalAttemptAsync(
+        AuditService auditService,
+        HttpContext httpContext,
+        string result,
+        string? code,
+        string? tcNo,
+        string reason,
+        CancellationToken ct)
+    {
+        return auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "portal.login",
+                TargetType: "participant",
+                TargetId: null,
+                Result: result,
+                Role: "Anonymous",
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventAccessCode", code),
+                    ("attemptedTcNoMasked", AuditLogHelpers.MaskTcNo(tcNo)),
+                    ("reason", reason))),
+            ct);
+    }
 
     private static async Task<PortalDocsResponse> BuildDocsAsync(
         TripflowDbContext db,

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -477,6 +478,7 @@ internal static class ParticipantImportHandlers
         IFormFile? file,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
@@ -2100,6 +2102,24 @@ internal static class ParticipantImportHandlers
 
             if (importMode == ParticipantImportMode.DryRun)
             {
+                await auditService.LogAsync(
+                    httpContext,
+                    new AuditLogWrite(
+                        Action: "participant.import",
+                        TargetType: "event",
+                        TargetId: id.ToString(),
+                        Result: "success",
+                        OrganizationId: orgId,
+                        Extra: AuditLogHelpers.CreateExtra(
+                            ("dryRun", true),
+                            ("fileType", extension),
+                            ("rowCount", totalImportRows),
+                            ("createdCount", created + accommodationSegmentsCreated + accommodationAssignmentsCreated),
+                            ("updatedCount", updated + accommodationSegmentsUpdated + accommodationAssignmentsUpdated),
+                            ("deletedCount", accommodationAssignmentsDeleted),
+                            ("warningCount", warnings.Count),
+                            ("errorCount", errors.Count))),
+                    ct);
                 return Results.Ok(report);
             }
 
@@ -2108,6 +2128,24 @@ internal static class ParticipantImportHandlers
             {
                 await transaction.CommitAsync(ct);
             }
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "participant.import",
+                    TargetType: "event",
+                    TargetId: id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.CreateExtra(
+                        ("dryRun", false),
+                        ("fileType", extension),
+                        ("rowCount", totalImportRows),
+                        ("createdCount", created + accommodationSegmentsCreated + accommodationAssignmentsCreated),
+                        ("updatedCount", updated + accommodationSegmentsUpdated + accommodationAssignmentsUpdated),
+                        ("deletedCount", accommodationAssignmentsDeleted),
+                        ("warningCount", warnings.Count),
+                        ("errorCount", errors.Count))),
+                ct);
             return Results.Ok(report);
         }
         catch (Exception)
