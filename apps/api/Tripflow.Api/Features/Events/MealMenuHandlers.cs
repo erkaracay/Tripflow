@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -38,8 +39,9 @@ internal static class MealMenuHandlers
         CreateMealGroupRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
-        => await CreateMealGroupForRoute(eventId, activityId, request, "/api/events", httpContext, db, ct);
+        => await CreateMealGroupForRoute(eventId, activityId, request, "/api/events", httpContext, db, auditService, ct);
 
     internal static async Task<IResult> CreateMealGroupForRoute(
         string eventId,
@@ -48,12 +50,29 @@ internal static class MealMenuHandlers
         string routeBase,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, group) = await CreateMealGroupCore(eventId, activityId, request, httpContext, db, ct);
         if (error is not null)
         {
             return error;
+        }
+
+        if (EventsHelpers.TryParseEventId(eventId, out var evtId, out _)
+            && Guid.TryParse(activityId, out var actId)
+            && AuditLogHelpers.TryResolveOrganizationId(httpContext, out var orgId))
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "meal_group.create",
+                    TargetType: "meal_group",
+                    TargetId: group!.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.CreateExtra(("eventId", evtId), ("activityId", actId))),
+                ct);
         }
 
         return Results.Created(
@@ -67,6 +86,7 @@ internal static class MealMenuHandlers
         UpdateMealGroupRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, context) = await ResolveMealGroupContext(eventId, groupId, httpContext, db, ct);
@@ -80,6 +100,9 @@ internal static class MealMenuHandlers
             return MealMenuHelpers.BadRequest("group_title_required", "Request body is required.");
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
         if (request.Title is not null)
         {
             var title = MealMenuHelpers.NormalizeTitle(request.Title);
@@ -88,6 +111,7 @@ internal static class MealMenuHandlers
                 return MealMenuHelpers.BadRequest("group_title_required", "Meal group title is required.");
             }
 
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "title", context!.Group.Title, title);
             context!.Group.Title = title;
         }
 
@@ -98,25 +122,42 @@ internal static class MealMenuHandlers
                 return MealMenuHelpers.BadRequest("invalid_sort_order", "sortOrder must be at least 1.");
             }
 
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "sortOrder", context!.Group.SortOrder, request.SortOrder.Value);
             context!.Group.SortOrder = request.SortOrder.Value;
         }
 
         if (request.AllowOther.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "allowOther", context!.Group.AllowOther, request.AllowOther.Value);
             context!.Group.AllowOther = request.AllowOther.Value;
         }
 
         if (request.AllowNote.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "allowNote", context!.Group.AllowNote, request.AllowNote.Value);
             context!.Group.AllowNote = request.AllowNote.Value;
         }
 
         if (request.IsActive.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "isActive", context!.Group.IsActive, request.IsActive.Value);
             context!.Group.IsActive = request.IsActive.Value;
         }
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "meal_group.update",
+                    TargetType: "meal_group",
+                    TargetId: context!.Group.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: context.OrganizationId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", context.EventId), ("activityId", context.Activity.Id)))),
+                ct);
+        }
 
         var updated = await db.ActivityMealGroups.AsNoTracking()
             .Include(x => x.Options)
@@ -130,6 +171,7 @@ internal static class MealMenuHandlers
         string groupId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, context) = await ResolveMealGroupContext(eventId, groupId, httpContext, db, ct);
@@ -147,6 +189,16 @@ internal static class MealMenuHandlers
 
         db.ActivityMealGroups.Remove(context!.Group);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "meal_group.delete",
+                TargetType: "meal_group",
+                TargetId: context.Group.Id.ToString(),
+                Result: "success",
+                OrganizationId: context.OrganizationId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", context.EventId), ("activityId", context.Activity.Id))),
+            ct);
         return Results.NoContent();
     }
 
@@ -156,8 +208,9 @@ internal static class MealMenuHandlers
         CreateMealOptionRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
-        => await CreateMealOptionForRoute(eventId, groupId, request, "/api/events", httpContext, db, ct);
+        => await CreateMealOptionForRoute(eventId, groupId, request, "/api/events", httpContext, db, auditService, ct);
 
     internal static async Task<IResult> CreateMealOptionForRoute(
         string eventId,
@@ -166,12 +219,28 @@ internal static class MealMenuHandlers
         string routeBase,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, option) = await CreateMealOptionCore(eventId, groupId, request, httpContext, db, ct);
         if (error is not null)
         {
             return error;
+        }
+
+        if (EventsHelpers.TryParseEventId(eventId, out var evtId, out _)
+            && AuditLogHelpers.TryResolveOrganizationId(httpContext, out var orgId))
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "meal_option.create",
+                    TargetType: "meal_option",
+                    TargetId: option!.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.CreateExtra(("eventId", evtId))),
+                ct);
         }
 
         return Results.Created(
@@ -185,6 +254,7 @@ internal static class MealMenuHandlers
         UpdateMealOptionRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, context) = await ResolveMealOptionContext(eventId, optionId, httpContext, db, ct);
@@ -198,6 +268,9 @@ internal static class MealMenuHandlers
             return MealMenuHelpers.BadRequest("option_label_required", "Request body is required.");
         }
 
+        var changedFields = new List<string>();
+        var changes = new Dictionary<string, object?>(StringComparer.Ordinal);
+
         if (request.Label is not null)
         {
             var label = MealMenuHelpers.NormalizeLabel(request.Label);
@@ -206,6 +279,7 @@ internal static class MealMenuHandlers
                 return MealMenuHelpers.BadRequest("option_label_required", "Meal option label is required.");
             }
 
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "label", context!.Option.Label, label);
             context!.Option.Label = label;
         }
 
@@ -216,15 +290,30 @@ internal static class MealMenuHandlers
                 return MealMenuHelpers.BadRequest("invalid_sort_order", "sortOrder must be at least 1.");
             }
 
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "sortOrder", context!.Option.SortOrder, request.SortOrder.Value);
             context!.Option.SortOrder = request.SortOrder.Value;
         }
 
         if (request.IsActive.HasValue)
         {
+            AuditLogHelpers.AddScalarChange(changedFields, changes, "isActive", context!.Option.IsActive, request.IsActive.Value);
             context!.Option.IsActive = request.IsActive.Value;
         }
 
         await db.SaveChangesAsync(ct);
+        if (changedFields.Count > 0)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "meal_option.update",
+                    TargetType: "meal_option",
+                    TargetId: context!.Option.Id.ToString(),
+                    Result: "success",
+                    OrganizationId: context.OrganizationId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(changedFields, changes, AuditLogHelpers.CreateExtra(("eventId", context.EventId), ("groupId", context.Group.Id)))),
+                ct);
+        }
         return Results.Ok(MealMenuHelpers.ToOptionDto(context!.Option));
     }
 
@@ -233,6 +322,7 @@ internal static class MealMenuHandlers
         string optionId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         var (error, context) = await ResolveMealOptionContext(eventId, optionId, httpContext, db, ct);
@@ -250,6 +340,16 @@ internal static class MealMenuHandlers
 
         db.ActivityMealOptions.Remove(context!.Option);
         await db.SaveChangesAsync(ct);
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "meal_option.delete",
+                TargetType: "meal_option",
+                TargetId: context.Option.Id.ToString(),
+                Result: "success",
+                OrganizationId: context.OrganizationId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", context.EventId), ("groupId", context.Group.Id))),
+            ct);
         return Results.NoContent();
     }
 

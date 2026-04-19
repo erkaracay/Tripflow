@@ -5,6 +5,7 @@ namespace Tripflow.Api.Data;
 
 public sealed class TripflowDbContext : DbContext
 {
+    public DbSet<AuditLogEntity> AuditLogs => Set<AuditLogEntity>();
     public DbSet<OrganizationEntity> Organizations => Set<OrganizationEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
@@ -47,6 +48,28 @@ public sealed class TripflowDbContext : DbContext
             b.Property(x => x.UpdatedAt).IsRequired();
 
             b.HasIndex(x => x.Slug).IsUnique();
+        });
+
+        modelBuilder.Entity<AuditLogEntity>(b =>
+        {
+            b.ToTable("audit_logs");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id).UseIdentityAlwaysColumn();
+            b.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            b.Property(x => x.Role).HasMaxLength(64);
+            b.Property(x => x.Action).HasMaxLength(128).IsRequired();
+            b.Property(x => x.TargetType).HasMaxLength(64).IsRequired();
+            b.Property(x => x.TargetId).HasMaxLength(128);
+            b.Property(x => x.IpAddress).HasMaxLength(64);
+            b.Property(x => x.Result).HasMaxLength(32).IsRequired();
+            b.Property(x => x.ExtraJson).HasColumnType("jsonb");
+
+            b.HasIndex(x => x.CreatedAt);
+            b.HasIndex(x => new { x.OrganizationId, x.CreatedAt });
+            b.HasIndex(x => new { x.UserId, x.CreatedAt });
+            b.HasIndex(x => new { x.Action, x.CreatedAt });
+            b.HasIndex(x => new { x.TargetType, x.TargetId, x.CreatedAt });
         });
 
         modelBuilder.Entity<UserEntity>(b =>

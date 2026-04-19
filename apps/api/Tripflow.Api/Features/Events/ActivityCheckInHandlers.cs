@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Organizations;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Events;
 
@@ -19,6 +20,7 @@ internal static class ActivityCheckInHandlers
         ActivityCheckInRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -91,6 +93,22 @@ internal static class ActivityCheckInHandlers
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "activity.checkin",
+                TargetType: "participant",
+                TargetId: participant.Id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("eventId", evtId),
+                    ("activityId", actId),
+                    ("direction", direction),
+                    ("method", method),
+                    ("checkInResult", result))),
+            ct);
 
         return Results.Ok(new ActivityCheckInResponse(
             participant.Id,
@@ -309,6 +327,7 @@ internal static class ActivityCheckInHandlers
         ActivityParticipantWillNotAttendRequest request,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -340,6 +359,7 @@ internal static class ActivityCheckInHandlers
 
         var entity = await db.ParticipantActivityWillNotAttend
             .FirstOrDefaultAsync(x => x.ParticipantId == participantGuid && x.ActivityId == activityGuid, ct);
+        var previousValue = entity?.WillNotAttend;
 
         if (entity is null)
         {
@@ -360,6 +380,22 @@ internal static class ActivityCheckInHandlers
         }
 
         await db.SaveChangesAsync(ct);
+        if (previousValue != entity.WillNotAttend)
+        {
+            await auditService.LogAsync(
+                httpContext,
+                new AuditLogWrite(
+                    Action: "activity_participant.will_not_attend.set",
+                    TargetType: "participant",
+                    TargetId: participantGuid.ToString(),
+                    Result: "success",
+                    OrganizationId: orgId,
+                    Extra: AuditLogHelpers.BuildMutationExtra(
+                        new[] { "willNotAttend" },
+                        AuditLogHelpers.CreateExtra(("willNotAttend", AuditLogHelpers.CreateExtra(("before", previousValue), ("after", entity.WillNotAttend)))),
+                        AuditLogHelpers.CreateExtra(("eventId", id), ("activityId", activityGuid)))),
+                ct);
+        }
 
         var lastLog = await db.ActivityParticipantLogs.AsNoTracking()
             .Where(x => x.OrganizationId == orgId
@@ -386,6 +422,7 @@ internal static class ActivityCheckInHandlers
         string activityId,
         HttpContext httpContext,
         TripflowDbContext db,
+        AuditService auditService,
         CancellationToken ct)
     {
         if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
@@ -414,6 +451,17 @@ internal static class ActivityCheckInHandlers
 
         var totalCount = await db.Participants.AsNoTracking()
             .CountAsync(x => x.EventId == evtId && x.OrganizationId == orgId, ct);
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "activity.checkin.reset_all",
+                TargetType: "event_activity",
+                TargetId: actId.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(("eventId", evtId), ("removedCount", removedCount))),
+            ct);
 
         return Results.Ok(new ResetAllActivityCheckInsResponse(removedCount, totalCount));
     }
