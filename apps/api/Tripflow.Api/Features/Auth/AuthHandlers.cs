@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Auth;
 
@@ -44,17 +45,35 @@ internal static class AuthHandlers
             return Results.BadRequest(new { message = "Email and password are required." });
         }
 
+        // Abuse control: per email+IP rolling-window lockout.
+        // 15 failures within 5 min → 429 until the oldest failure ages out.
+        // Cleared on successful auth so legitimate users aren't penalised for typos.
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var emailIpKey = $"login:email:{email}|{ip}";
+        var window = TimeSpan.FromMinutes(5);
+
+        var (emailLimited, retryEmail) = InMemoryRateLimiter.Default.CheckLimit(emailIpKey, 15, window);
+        if (emailLimited)
+        {
+            return RateLimited(httpContext, retryEmail);
+        }
+
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, ct);
         if (user is null)
         {
+            InMemoryRateLimiter.Default.RegisterHit(emailIpKey, window);
             return Results.Unauthorized();
         }
 
         var verification = hasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (verification == PasswordVerificationResult.Failed)
         {
+            InMemoryRateLimiter.Default.RegisterHit(emailIpKey, window);
             return Results.Unauthorized();
         }
+
+        // Successful auth: drop the email+IP failure counter.
+        InMemoryRateLimiter.Default.Clear(emailIpKey);
 
         var claims = new List<Claim>
         {
@@ -92,5 +111,13 @@ internal static class AuthHandlers
     {
         httpContext.Response.Cookies.Delete(InforaCookieOptions.AuthCookieName, cookieOptions.BuildClearCookieOptions());
         return Results.Ok();
+    }
+
+    private static IResult RateLimited(HttpContext httpContext, int retryAfterSeconds)
+    {
+        httpContext.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
+        return Results.Json(
+            new { code = "rate_limited", retryAfterSeconds },
+            statusCode: StatusCodes.Status429TooManyRequests);
     }
 }

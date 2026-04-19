@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -6,15 +5,14 @@ using Tripflow.Api.Data;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Auth;
 using Tripflow.Api.Features.Events;
+using Tripflow.Api.Helpers;
 
 namespace Tripflow.Api.Features.Portal;
 
 internal static class PortalLoginHandlers
 {
-    private const int MaxAttempts = 6;
+    private const int MaxAttempts = 15;
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
-
-    private static readonly ConcurrentDictionary<string, List<DateTime>> Attempts = new();
 
     internal static async Task<IResult> Login(
         PortalLoginRequest request,
@@ -31,8 +29,9 @@ internal static class PortalLoginHandlers
         var code = EventsHelpers.NormalizeEventCode(request.EventAccessCode);
         var tcNo = NormalizeTcNo(request.TcNo);
 
-        var attemptKey = $"{code}|{GetClientIp(httpContext)}";
-        if (IsRateLimited(attemptKey, out var retryAfter))
+        var attemptKey = $"portal:{code}|{GetClientIp(httpContext)}";
+        var (limited, retryAfter) = InMemoryRateLimiter.Default.CheckLimit(attemptKey, MaxAttempts, Window);
+        if (limited)
         {
             httpContext.Response.Headers["Retry-After"] = retryAfter.ToString();
             return Results.Json(new { code = "rate_limited", retryAfterSeconds = retryAfter }, statusCode: StatusCodes.Status429TooManyRequests);
@@ -40,13 +39,13 @@ internal static class PortalLoginHandlers
 
         if (!EventsHelpers.IsValidEventCode(code))
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.BadRequest(new { code = "invalid_access_code_format" });
         }
 
         if (string.IsNullOrWhiteSpace(tcNo) || tcNo.Length != 11)
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.BadRequest(new { code = "invalid_tcno_format" });
         }
 
@@ -56,13 +55,13 @@ internal static class PortalLoginHandlers
 
         if (matchingEvents.Count == 0)
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.BadRequest(new { code = "invalid_event_access_code" });
         }
 
         if (matchingEvents.Count > 1)
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.BadRequest(new { code = "ambiguous_event_access_code" });
         }
 
@@ -73,13 +72,13 @@ internal static class PortalLoginHandlers
 
         if (participants.Count == 0)
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.BadRequest(new { code = "tcno_not_found" });
         }
 
         if (participants.Count > 1)
         {
-            RegisterFailure(attemptKey);
+            InMemoryRateLimiter.Default.RegisterHit(attemptKey, Window);
             return Results.Conflict(new { code = "ambiguous_tcno" });
         }
 
@@ -438,36 +437,6 @@ internal static class PortalLoginHandlers
         }
 
         return prop.ToString();
-    }
-
-    private static bool IsRateLimited(string key, out int retryAfterSeconds)
-    {
-        retryAfterSeconds = 0;
-        var now = DateTime.UtcNow;
-        var list = Attempts.GetOrAdd(key, _ => new List<DateTime>());
-        lock (list)
-        {
-            list.RemoveAll(x => now - x > Window);
-            if (list.Count < MaxAttempts)
-            {
-                return false;
-            }
-
-            var oldest = list.Min();
-            retryAfterSeconds = (int)Math.Ceiling((Window - (now - oldest)).TotalSeconds);
-            return true;
-        }
-    }
-
-    private static void RegisterFailure(string key)
-    {
-        var now = DateTime.UtcNow;
-        var list = Attempts.GetOrAdd(key, _ => new List<DateTime>());
-        lock (list)
-        {
-            list.RemoveAll(x => now - x > Window);
-            list.Add(now);
-        }
     }
 
     private static async Task<EventPortalInfo?> GetPortalInfoAsync(
