@@ -18,34 +18,37 @@ using Tripflow.Api.Features.Users;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+if (builder.Environment.IsDevelopment())
 {
-    var scheme = new OpenApiSecurityScheme
+    builder.Services.AddSwaggerGen(options =>
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "JWT Authorization header using the Bearer scheme."
-    };
-
-    options.AddSecurityDefinition("Bearer", scheme);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        var scheme = new OpenApiSecurityScheme
         {
-            new OpenApiSecurityScheme
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "JWT Authorization header using the Bearer scheme."
+        };
+
+        options.AddSecurityDefinition("Bearer", scheme);
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
             {
-                Reference = new OpenApiReference
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
     });
-});
+}
 
 var connectionString = builder.Configuration.GetConnectionString("TripflowDb") ?? builder.Configuration["CONNECTION_STRING"];
 
@@ -125,17 +128,13 @@ builder.Services.AddCors(options =>
             {
                 var normalizedOrigin = origin.TrimEnd('/');
                 if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
-                {
                     return false;
-                }
 
-                if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase))
-                {
-                    return allowedOrigins.Contains(normalizedOrigin);
-                }
-
-                if (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                // Localhost bypass only in Development — never in Production/Staging.
+                if (builder.Environment.IsDevelopment()
+                    && string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)))
                 {
                     return true;
                 }
@@ -155,19 +154,55 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardLimit = 1;
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
+
+    // Trust only explicitly configured proxies / networks.
+    // Env var form: ReverseProxy__KnownProxies="10.0.0.1,10.0.0.2"
+    //               ReverseProxy__KnownNetworks="10.0.0.0/8"
+    var knownProxiesRaw = builder.Configuration["ReverseProxy:KnownProxies"];
+    if (!string.IsNullOrWhiteSpace(knownProxiesRaw))
+    {
+        foreach (var ip in knownProxiesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (System.Net.IPAddress.TryParse(ip, out var parsed))
+                options.KnownProxies.Add(parsed);
+        }
+    }
+
+    var knownNetworksRaw = builder.Configuration["ReverseProxy:KnownNetworks"];
+    if (!string.IsNullOrWhiteSpace(knownNetworksRaw))
+    {
+        foreach (var cidr in knownNetworksRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = cidr.Split('/');
+            if (parts.Length == 2
+                && System.Net.IPAddress.TryParse(parts[0], out var prefix)
+                && int.TryParse(parts[1], out var prefixLen))
+            {
+                options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLen));
+            }
+        }
+    }
 });
 
 var app = builder.Build();
 var isRender = !string.IsNullOrWhiteSpace(app.Configuration["RENDER"]);
 
-// Swagger
-app.UseSwagger();
-app.UseSwaggerUI();
+// Swagger — Development only
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapPost("/api/dev/seed", async (TripflowDbContext db, CancellationToken ct) =>
+    app.MapPost("/api/dev/seed", async (HttpContext httpContext, TripflowDbContext db, CancellationToken ct) =>
     {
+        // Second guard: only accept loopback connections even in Development.
+        var remoteIp = httpContext.Connection.RemoteIpAddress;
+        if (remoteIp is null || !System.Net.IPAddress.IsLoopback(remoteIp))
+            return Results.NotFound();
+
         var (seeded, message) = await DevSeed.SeedAsync(db, ct);
         return Results.Ok(new { seeded, message });
     })
@@ -196,13 +231,14 @@ if (app.Environment.IsDevelopment())
         .WithOpenApi();
 }
 
-if (app.Environment.IsProduction())
+if (!app.Environment.IsDevelopment())
 {
     app.UseForwardedHeaders();
-}
-if (!app.Environment.IsDevelopment() && !isRender)
-{
-    app.UseHttpsRedirection();
+    app.UseHsts();
+    if (!isRender)
+    {
+        app.UseHttpsRedirection();
+    }
 }
 app.UseCors(WebCorsPolicy);
 app.UseAuthentication();
