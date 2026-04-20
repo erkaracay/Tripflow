@@ -1052,6 +1052,8 @@
       "pagination": "Page {page} of {totalPages} · {total} total",
       "filters": {
         "action": "Category",
+        "event": "Event",
+        "allEvents": "All events",
         "result": "Result",
         "search": "Search",
         "searchPlaceholder": "Search target id or details",

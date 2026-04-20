@@ -94,6 +94,35 @@ public static class TestSeed
         return ev;
     }
 
+    public static async Task<EventDocTabEntity> CreateEventDocTabAsync(
+        TripflowApiFactory factory,
+        EventEntity eventEntity,
+        string title,
+        string type = "Hotel",
+        int sortOrder = 1,
+        CancellationToken ct = default)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TripflowDbContext>();
+
+        var tab = new EventDocTabEntity
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = eventEntity.OrganizationId,
+            EventId = eventEntity.Id,
+            Title = title,
+            Type = type,
+            SortOrder = sortOrder,
+            IsActive = true,
+            ContentJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        db.EventDocTabs.Add(tab);
+        await db.SaveChangesAsync(ct);
+        return tab;
+    }
+
     public static async Task<ParticipantEntity> CreateParticipantAsync(
         TripflowApiFactory factory,
         EventEntity eventEntity,

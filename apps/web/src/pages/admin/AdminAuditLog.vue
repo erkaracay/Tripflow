@@ -22,8 +22,8 @@ import {
   getAuditLogParticipantName,
   getAuditLogParticipantTcNoMasked,
 } from '../../lib/auditLogFormat'
-import { formatUtcDateTimeLocal } from '../../lib/formatters'
-import type { AppComboboxOption, AuditLogItem, AuditLogListResponse } from '../../types'
+import { formatDateRange, formatUtcDateTimeLocal } from '../../lib/formatters'
+import type { AppComboboxOption, AuditLogItem, AuditLogListResponse, EventListItem } from '../../types'
 
 const { t } = useI18n()
 
@@ -31,11 +31,13 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const items = ref<AuditLogItem[]>([])
 const total = ref(0)
+const events = ref<EventListItem[]>([])
 
 const page = ref(1)
 const pageSize = ref(50)
 const category = ref('all')
 const actionFilter = ref('')
+const selectedEventId = ref('all')
 const result = ref<'all' | 'success' | 'fail' | 'blocked'>('all')
 const from = ref('')
 const to = ref('')
@@ -60,6 +62,13 @@ const pageSizeOptions: AppComboboxOption[] = [
 ]
 
 const categoryOptions = computed(() => getAuditLogCategoryOptions(t))
+const eventOptions = computed<AppComboboxOption[]>(() => [
+  { value: 'all', label: t('admin.auditLog.filters.allEvents') },
+  ...events.value.map((event) => ({
+    value: event.id,
+    label: `${event.name} (${formatDateRange(event.startDate, event.endDate)})`,
+  })),
+])
 const totalPages = computed(() => Math.max(Math.ceil(total.value / pageSize.value), 1))
 const canPrev = computed(() => page.value > 1)
 const canNext = computed(() => page.value < totalPages.value)
@@ -95,6 +104,7 @@ const fetchLogs = async () => {
   try {
     const params = new URLSearchParams()
     if (actionFilter.value) params.set('action', actionFilter.value)
+    if (selectedEventId.value !== 'all') params.set('eventId', selectedEventId.value)
     if (result.value !== 'all') params.set('result', result.value)
     if (from.value) params.set('from', from.value)
     if (to.value) params.set('to', to.value)
@@ -116,9 +126,18 @@ const fetchLogs = async () => {
   }
 }
 
+const fetchEvents = async () => {
+  try {
+    events.value = await apiGet<EventListItem[]>('/api/events?includeArchived=true')
+  } catch {
+    events.value = []
+  }
+}
+
 const resetFilters = () => {
   category.value = 'all'
   actionFilter.value = ''
+  selectedEventId.value = 'all'
   result.value = 'all'
   searchInput.value = ''
   searchQuery.value = ''
@@ -221,6 +240,7 @@ const formatTarget = (item: AuditLogItem) => {
 
 onMounted(() => {
   applyLast7Days()
+  void fetchEvents()
   void fetchLogs()
 })
 </script>
@@ -260,7 +280,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="grid gap-3 lg:grid-cols-6">
+      <div class="grid gap-3 lg:grid-cols-7">
         <div class="lg:col-span-2">
           <label class="text-xs font-semibold text-slate-500">{{ t('admin.auditLog.filters.search') }}</label>
           <div class="mt-1 flex items-center gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
@@ -305,6 +325,19 @@ onMounted(() => {
             :placeholder="t('admin.auditLog.filters.result')"
             :aria-label="t('admin.auditLog.filters.result')"
             :searchable="false"
+            compact
+            @update:model-value="onManualFilterChange"
+          />
+        </div>
+
+        <div class="lg:col-span-2">
+          <label class="text-xs font-semibold text-slate-500">{{ t('admin.auditLog.filters.event') }}</label>
+          <AppCombobox
+            v-model="selectedEventId"
+            class="mt-1"
+            :options="eventOptions"
+            :placeholder="t('admin.auditLog.filters.event')"
+            :aria-label="t('admin.auditLog.filters.event')"
             compact
             @update:model-value="onManualFilterChange"
           />

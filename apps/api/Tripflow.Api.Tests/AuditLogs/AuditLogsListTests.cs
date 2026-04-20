@@ -226,6 +226,57 @@ public sealed class AuditLogsListTests : IntegrationTestBase
         response.Items[0].CreatedAt.Should().Be(new DateTime(2026, 4, 11, 8, 30, 0, DateTimeKind.Utc));
     }
 
+    [Fact]
+    public async Task GetAuditLogs_EventIdFilter_ReturnsMatchingEventRows()
+    {
+        var org = await TestSeed.CreateOrganizationAsync(Factory, slug: $"audit-event-{Guid.NewGuid():n}");
+        var user = await TestSeed.CreateUserAsync(
+            Factory,
+            $"audit-event-{Guid.NewGuid():n}@test.local",
+            "Passw0rd!",
+            role: "AgencyAdmin",
+            organizationId: org.Id,
+            fullName: "Audit Event");
+
+        var eventA = Guid.NewGuid();
+        var eventB = Guid.NewGuid();
+
+        await SeedAuditLogAsync(new AuditLogEntity
+        {
+            CreatedAt = DateTime.UtcNow.AddMinutes(-2),
+            UserId = user.Id,
+            OrganizationId = org.Id,
+            Role = "AgencyAdmin",
+            Action = "participant.import",
+            TargetType = "participant",
+            TargetId = Guid.NewGuid().ToString(),
+            Result = "success",
+            ExtraJson = $$"""{"eventId":"{{eventA}}","createdCount":12}"""
+        });
+        await SeedAuditLogAsync(new AuditLogEntity
+        {
+            CreatedAt = DateTime.UtcNow.AddMinutes(-1),
+            UserId = user.Id,
+            OrganizationId = org.Id,
+            Role = "AgencyAdmin",
+            Action = "event.update",
+            TargetType = "event",
+            TargetId = eventB.ToString(),
+            Result = "success"
+        });
+
+        var token = JwtTestTokenFactory.Create(GetJwtOptions(), user.Id, "AgencyAdmin", organizationId: org.Id, email: user.Email, fullName: user.FullName);
+        using var client = CreateClient().WithBearer(token);
+
+        var response = await client.GetFromJsonAsync<AuditLogListResponse>(
+            $"/api/audit-logs?eventId={eventA}&pageSize=10");
+
+        response.Should().NotBeNull();
+        response!.Total.Should().Be(1);
+        response.Items.Should().ContainSingle();
+        response.Items[0].Action.Should().Be("participant.import");
+    }
+
     private async Task SeedAuditLogAsync(AuditLogEntity entity, CancellationToken ct = default)
     {
         using var scope = Factory.Services.CreateScope();
