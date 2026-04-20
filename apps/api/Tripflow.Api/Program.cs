@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging.Console;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -13,6 +14,7 @@ using Tripflow.Api.Data;
 using Tripflow.Api.Data.Dev;
 using Tripflow.Api.Data.Entities;
 using Tripflow.Api.Features.Auth;
+using Tripflow.Api.Features.AuditLogs;
 using Tripflow.Api.Features.Dev;
 using Tripflow.Api.Features.Organizations;
 using Tripflow.Api.Features.Portal;
@@ -23,12 +25,25 @@ using Tripflow.Api.Helpers;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
-builder.Logging.AddJsonConsole(options =>
+if (builder.Environment.IsDevelopment())
 {
-    options.IncludeScopes = false;
-    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-    options.UseUtcTimestamp = true;
-});
+    builder.Logging.AddSimpleConsole(options =>
+    {
+        options.IncludeScopes = false;
+        options.SingleLine = true;
+        options.TimestampFormat = "HH:mm:ss ";
+        options.ColorBehavior = LoggerColorBehavior.Enabled;
+    });
+}
+else
+{
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = false;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        options.UseUtcTimestamp = true;
+    });
+}
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -301,6 +316,10 @@ app.MapGet("/version", () =>
    .WithOpenApi();
 
 app.MapAuthEndpoints();
+var auditLogs = app.MapGroup("/api/audit-logs")
+    .WithTags("Audit Logs")
+    .RequireAuthorization("AdminOnly");
+auditLogs.MapAuditLogs();
 app.MapOrganizationEndpoints();
 app.MapGuideEndpoints();
 app.MapUsersEndpoints();
@@ -334,4 +353,3 @@ static Task WriteHealthResponse(HttpContext httpContext, HealthReport report)
 }
 
 public partial class Program;
-

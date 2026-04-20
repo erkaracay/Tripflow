@@ -103,6 +103,11 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['SuperAdmin'] },
     },
     {
+      path: '/admin/audit-log',
+      component: () => import('./pages/admin/AdminAuditLog.vue'),
+      meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
+    },
+    {
       path: '/admin/guides',
       component: () => import('./pages/admin/AdminGuides.vue'),
       meta: { requiresAuth: true, roles: ['AgencyAdmin', 'SuperAdmin'] },
@@ -236,7 +241,7 @@ router.beforeEach((to) => {
       }
       if (role === 'SuperAdmin') {
         const hasOrg = Boolean(getSelectedOrgId())
-        if (!hasOrg && to.path.startsWith('/admin') && to.path !== '/admin/orgs') {
+        if (!hasOrg && to.path.startsWith('/admin') && to.path !== '/admin/orgs' && to.path !== '/admin/audit-log') {
           return { path: '/admin/orgs' }
         }
       }

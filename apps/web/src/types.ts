@@ -854,6 +854,29 @@ export type EventParticipantLogListResponse = {
   items: EventParticipantLogItem[]
 }
 
+export type AuditLogItem = {
+  id: number
+  createdAt: string
+  userId?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
+  role?: string | null
+  organizationId?: string | null
+  action: string
+  targetType: string
+  targetId?: string | null
+  ipAddress?: string | null
+  result: string
+  extraJson?: string | null
+}
+
+export type AuditLogListResponse = {
+  items: AuditLogItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export type ResetAllActivityCheckInsResponse = {
   removedCount: number
   totalCount: number
