@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-
+
+      - name: Restore
+        run: dotnet restore apps/api/Tripflow.Api.Tests/Tripflow.Api.Tests.csproj
+
+      - name: Build
+        run: dotnet build apps/api/Tripflow.Api.Tests/Tripflow.Api.Tests.csproj --no-restore --configuration Release
+
+      - name: Test
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          CONNECTION_STRING: "Host=ci-placeholder;Database=ci;Username=ci;Password=ci"
+          JWT_ISSUER: "tripflow-tests"
+          JWT_AUDIENCE: "tripflow-tests"
+          JWT_SECRET: "tripflow-tests-secret-key-must-be-at-least-32-characters-long"
+        run: dotnet test apps/api/Tripflow.Api.Tests/Tripflow.Api.Tests.csproj --no-build --configuration Release
+
+  frontend:
+    name: Frontend (typecheck + build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck:web
+
+      - name: Build
+        run: npm run build:web
+
+      - name: Test
+        run: npm --workspace apps/web run test:run
