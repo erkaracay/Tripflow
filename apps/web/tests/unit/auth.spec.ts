@@ -8,10 +8,7 @@ import {
 // Build a minimal JWT payload part (base64url) for testing
 function payloadPart(obj: Record<string, unknown>): string {
   const json = JSON.stringify(obj)
-  const base64 = typeof btoa !== 'undefined'
-    ? btoa(json)
-    : Buffer.from(json, 'utf-8').toString('base64')
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 function makeToken(payload: Record<string, unknown>): string {
