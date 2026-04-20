@@ -15,7 +15,7 @@ internal static class PortalLoginHandlers
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
 
     internal static async Task<IResult> Login(
-        PortalLoginRequest request,
+        PortalLoginRequest? request,
         HttpContext httpContext,
         TripflowDbContext db,
         AuditService auditService,

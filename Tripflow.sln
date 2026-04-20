@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{F550AA79-870
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tripflow.Api", "apps\api\Tripflow.Api\Tripflow.Api.csproj", "{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tripflow.Api.Tests", "apps\api\Tripflow.Api.Tests\Tripflow.Api.Tests.csproj", "{CDA03503-C63C-4AD8-8329-135B5B6A303E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -22,9 +24,14 @@ Global
 		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDA03503-C63C-4AD8-8329-135B5B6A303E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDA03503-C63C-4AD8-8329-135B5B6A303E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDA03503-C63C-4AD8-8329-135B5B6A303E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDA03503-C63C-4AD8-8329-135B5B6A303E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F550AA79-8709-4514-8F8B-D4D6ADFA8480} = {FFA44EB5-1D68-4F51-BA84-90323A9E5386}
 		{81BC9A3A-D2A7-420E-A0E7-C79A7ED71984} = {F550AA79-8709-4514-8F8B-D4D6ADFA8480}
+		{CDA03503-C63C-4AD8-8329-135B5B6A303E} = {F550AA79-8709-4514-8F8B-D4D6ADFA8480}
 	EndGlobalSection
 EndGlobal

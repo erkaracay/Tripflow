@@ -24,7 +24,7 @@ internal static class AuthHandlers
     }
 
     internal static async Task<IResult> Login(
-        LoginRequest request,
+        LoginRequest? request,
         HttpContext httpContext,
         TripflowDbContext db,
         AuditService auditService,
