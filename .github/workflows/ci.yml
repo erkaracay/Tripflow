@@ -30,6 +30,12 @@ jobs:
         run: dotnet build apps/api/Tripflow.Api.Tests/Tripflow.Api.Tests.csproj --no-restore --configuration Release
 
       - name: Test
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          CONNECTION_STRING: "Host=ci-placeholder;Database=ci;Username=ci;Password=ci"
+          JWT_ISSUER: "tripflow-tests"
+          JWT_AUDIENCE: "tripflow-tests"
+          JWT_SECRET: "tripflow-tests-secret-key-must-be-at-least-32-characters-long"
         run: dotnet test apps/api/Tripflow.Api.Tests/Tripflow.Api.Tests.csproj --no-build --configuration Release
 
   frontend:
