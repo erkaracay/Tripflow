@@ -1044,6 +1044,8 @@
       "pagination": "Sayfa {page} / {totalPages} · toplam {total}",
       "filters": {
         "action": "Kategori",
+        "event": "Etkinlik",
+        "allEvents": "Tüm etkinlikler",
         "result": "Sonuç",
         "search": "Ara",
         "searchPlaceholder": "Hedef kimliği veya detaylarda ara",

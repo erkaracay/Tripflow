@@ -14,6 +14,7 @@ public static class AuditLogsHandlers
         string? action = null,
         string? result = null,
         string? userId = null,
+        string? eventId = null,
         string? targetType = null,
         string? from = null,
         string? to = null,
@@ -62,6 +63,20 @@ public static class AuditLogsHandlers
             }
 
             logs = logs.Where(x => x.UserId == parsedUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(eventId))
+        {
+            if (!Guid.TryParse(eventId, out var parsedEventId))
+            {
+                return EventsHelpers.BadRequest("eventId must be a valid GUID.");
+            }
+
+            var eventIdText = parsedEventId.ToString();
+            var eventJsonFilter = $$"""{"eventId":"{{eventIdText}}"}""";
+            logs = logs.Where(x =>
+                (x.TargetType == "event" && x.TargetId == eventIdText)
+                || (x.ExtraJson != null && EF.Functions.JsonContains(x.ExtraJson, eventJsonFilter)));
         }
 
         var actionPrefixes = (action ?? string.Empty)
