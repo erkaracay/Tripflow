@@ -86,6 +86,8 @@ builder.Services.AddSingleton(jwtOptions);
 var cookieOptions = InforaCookieOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(cookieOptions);
 
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddHealthChecks()
@@ -252,6 +254,12 @@ if (app.Environment.IsDevelopment())
         .WithSummary("Delete scenario event")
         .WithDescription("Deletes a generated development scenario event in the current organization.")
         .WithOpenApi();
+
+    // Used by integration tests to verify the global exception handler.
+    // Dev-only so it cannot be exercised in production.
+    app.MapGet("/_dev/throw", () => { throw new InvalidOperationException("dev-throw"); })
+        .AllowAnonymous()
+        .ExcludeFromDescription();
 }
 
 if (!app.Environment.IsDevelopment())
@@ -263,8 +271,9 @@ if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
     }
 }
-app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseCors(WebCorsPolicy);
+app.UseExceptionHandler();
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -323,3 +332,6 @@ static Task WriteHealthResponse(HttpContext httpContext, HealthReport report)
 
     return httpContext.Response.WriteAsync(JsonSerializer.Serialize(payload));
 }
+
+public partial class Program;
+
