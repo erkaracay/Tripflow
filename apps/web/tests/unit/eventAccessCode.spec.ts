@@ -20,14 +20,15 @@ describe('sanitizeEventAccessCode', () => {
 })
 
 describe('isValidEventCodeLength', () => {
-  it('returns true for 6–10 characters', () => {
+  it('returns true for 5–10 characters', () => {
+    expect(isValidEventCodeLength('ABC12')).toBe(true)
     expect(isValidEventCodeLength('ABC123')).toBe(true)
     expect(isValidEventCodeLength('ABCDEFGH')).toBe(true)
     expect(isValidEventCodeLength('ABCDEFGHIJ')).toBe(true)
   })
-  it('returns false for fewer than 6', () => {
+  it('returns false for fewer than 5', () => {
     expect(isValidEventCodeLength('')).toBe(false)
-    expect(isValidEventCodeLength('ABC12')).toBe(false)
+    expect(isValidEventCodeLength('ABC1')).toBe(false)
   })
   it('returns false for more than 10', () => {
     expect(isValidEventCodeLength('ABCDEFGHIJK')).toBe(false)
