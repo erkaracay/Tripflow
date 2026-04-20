@@ -1086,7 +1086,10 @@ internal static class AccommodationSegmentsHandlers
                 x.EventId == eventId
                 && x.OrganizationId == organizationId
                 && (!excludeSegmentId.HasValue || x.Id != excludeSegmentId.Value)
-                && DoSegmentDateRangesOverlap(x.StartDate, x.EndDate, startDate, endDate),
+                && (
+                    (x.StartDate == startDate && x.EndDate == endDate)
+                    || (x.StartDate < endDate && x.EndDate > startDate)
+                ),
                 ct);
 
     internal static bool DoSegmentDateRangesOverlap(
