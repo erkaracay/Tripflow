@@ -736,7 +736,7 @@ onBeforeUnmount(() => {
                   :disabled="resolvingSelection"
                   @click="resolveFilteredSelection(false)"
                 >
-                  {{ t('admin.flightPanelHelper.selectFiltered') }}
+                  {{ t('admin.flightPanelHelper.selectFiltered', { count: total }) }}
                 </button>
                 <button
                   class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300"

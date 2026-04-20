@@ -345,6 +345,13 @@ public sealed record BulkApplyFlightSegmentsResponse(
     int AffectedCount,
     BulkApplyFlightSegmentsAppliedDto Applied);
 
+public sealed record ApplyTicketToMatchingFlightsRequest(
+    string? Airline,
+    string? TicketNo);
+
+public sealed record ApplyTicketToMatchingFlightsResponse(
+    int AffectedCount);
+
 public sealed record ParticipantFlightsResponse(
     FlightSegmentDto[] ArrivalSegments,
     FlightSegmentDto[] ReturnSegments);

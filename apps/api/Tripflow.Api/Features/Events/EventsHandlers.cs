@@ -97,13 +97,15 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
-        if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out var timeZoneId, out var timeZoneErrorCode))
+        const string defaultTimeZoneId = "Europe/Istanbul";
+        string timeZoneId;
+        if (string.IsNullOrWhiteSpace(request.TimeZoneId))
         {
-            return Results.BadRequest(new
-            {
-                code = timeZoneErrorCode,
-                message = "Time zone is required and must be a valid IANA identifier."
-            });
+            timeZoneId = defaultTimeZoneId;
+        }
+        else if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out timeZoneId, out _))
+        {
+            timeZoneId = defaultTimeZoneId;
         }
 
         string eventAccessCode;
@@ -227,19 +229,25 @@ internal static class EventsHandlers
             return EventsHelpers.BadRequest("End date must be on or after start date.");
         }
 
-        if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out var timeZoneId, out var timeZoneErrorCode))
-        {
-            return Results.BadRequest(new
-            {
-                code = timeZoneErrorCode,
-                message = "Time zone is required and must be a valid IANA identifier."
-            });
-        }
-
         var entity = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
         if (entity is null)
         {
             return Results.NotFound(new { message = "Event not found." });
+        }
+
+        const string defaultTimeZoneId = "Europe/Istanbul";
+        string timeZoneId;
+        if (request.TimeZoneId is null)
+        {
+            timeZoneId = string.IsNullOrWhiteSpace(entity.TimeZoneId) ? defaultTimeZoneId : entity.TimeZoneId;
+        }
+        else if (string.IsNullOrWhiteSpace(request.TimeZoneId))
+        {
+            timeZoneId = defaultTimeZoneId;
+        }
+        else if (!EventsHelpers.TryNormalizeTimeZoneId(request.TimeZoneId, out timeZoneId, out _))
+        {
+            timeZoneId = string.IsNullOrWhiteSpace(entity.TimeZoneId) ? defaultTimeZoneId : entity.TimeZoneId;
         }
 
         var changedFields = new List<string>();
@@ -3460,6 +3468,95 @@ internal static class EventsHandlers
                 normalizedByDirection.TryGetValue(ParticipantFlightSegmentDirection.Return, out returnApplied)
                     ? returnApplied.Count
                     : null)));
+    }
+
+    internal static async Task<IResult> ApplyTicketToMatchingFlights(
+        string eventId,
+        string participantId,
+        ApplyTicketToMatchingFlightsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!Guid.TryParse(participantId, out var participantGuid))
+        {
+            return EventsHelpers.BadRequest("Invalid participant id.");
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var participantExists = await db.Participants.AsNoTracking()
+            .AnyAsync(x => x.Id == participantGuid && x.EventId == id && x.OrganizationId == orgId, ct);
+        if (!participantExists)
+        {
+            return Results.NotFound(new { message = "Participant not found." });
+        }
+
+        var airline = NormalizeOptionalText(request.Airline);
+        if (string.IsNullOrWhiteSpace(airline))
+        {
+            return EventsHelpers.BadRequest(
+                "airline_required",
+                "airline",
+                "Airline is required.");
+        }
+
+        var ticketNo = NormalizeOptionalText(request.TicketNo);
+        if (string.IsNullOrWhiteSpace(ticketNo))
+        {
+            return EventsHelpers.BadRequest(
+                "ticket_no_required",
+                "ticketNo",
+                "Ticket number is required.");
+        }
+
+        var matchingSegments = await db.ParticipantFlightSegments
+            .Where(x => x.OrganizationId == orgId
+                        && x.EventId == id
+                        && x.ParticipantId == participantGuid
+                        && x.Airline != null
+                        && EF.Functions.ILike(x.Airline, airline))
+            .ToListAsync(ct);
+
+        if (matchingSegments.Count == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_matching_flights",
+                "airline",
+                $"No flights found with airline '{airline}' for this participant.");
+        }
+
+        foreach (var segment in matchingSegments)
+        {
+            segment.TicketNo = ticketNo;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.flights.apply_ticket",
+                TargetType: "participant",
+                TargetId: participantGuid.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("airline", airline),
+                    ("ticketNo", ticketNo),
+                    ("affectedCount", matchingSegments.Count))),
+            ct);
+
+        return Results.Ok(new ApplyTicketToMatchingFlightsResponse(matchingSegments.Count));
     }
 
     internal static async Task<IResult> SetParticipantWillNotAttend(

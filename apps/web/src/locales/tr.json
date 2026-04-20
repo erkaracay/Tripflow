@@ -13,6 +13,7 @@
     "save": "Kaydet",
     "saving": "Kaydediliyor...",
     "saved": "Kaydedildi.",
+    "applying": "Uygulanıyor...",
     "cancel": "İptal",
     "confirm": "Onayla",
     "newPassword": "Yeni parola",
@@ -929,7 +930,7 @@
       "subtitle": "Aynı uçuş segment şablonunu seçilen katılımcılara toplu uygula veya importa hazır Excel dışa aktar.",
       "open": "Toplu uçuş uygula",
       "searchPlaceholder": "Ad, TC, telefon, oda, acenta, giriş kodu ara",
-      "selectFiltered": "Filtreleneni seç",
+      "selectFiltered": "Hepsini seç ({count})",
       "clearSelection": "Seçimi temizle",
       "applyAllEvent": "Tüm etkinliğe uygula",
     "selectedCount": "{count} kişi seçildi",
@@ -1358,6 +1359,9 @@
         "emptyEditor": "Henüz segment yok. Başlamak için segment ekleyin.",
         "saveSuccess": "Uçuşlar güncellendi.",
         "saveError": "Uçuşlar güncellenemedi.",
+        "applyTicketSuccess": "Bilet numarası tüm uygun uçuşlara uygulandı.",
+        "applyTicketError": "Bilet numarası uygulanamadı.",
+        "applyTicketButton": "Tüm {airline} uçuşlarına uygula",
         "validation": {
           "baggagePieces": "{direction}: bagaj parçası 0'dan büyük tam sayı olmalıdır.",
           "baggageTotalKg": "{direction}: toplam bagaj kg 0'dan büyük tam sayı olmalıdır."

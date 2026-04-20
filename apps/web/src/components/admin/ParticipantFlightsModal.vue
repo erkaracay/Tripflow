@@ -44,11 +44,15 @@ const loading = ref(false)
 const loadError = ref<string | null>(null)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
+const applyingTicket = ref(false)
+const applyTicketError = ref<string | null>(null)
+const appliedTicketSegmentIndex = ref<number | null>(null)
 
 const arrivalSegments = ref<FlightSegment[]>([])
 const returnSegments = ref<FlightSegment[]>([])
 const draftArrivalSegments = ref<FlightSegment[]>([])
 const draftReturnSegments = ref<FlightSegment[]>([])
+const participantProfile = ref<ParticipantProfile | null>(null)
 const participantDetails = ref<ParticipantDetails | null>(null)
 
 const segmentHasValue = (segment?: FlightSegment | null) => {
@@ -222,14 +226,16 @@ const legacyVisibleFields = computed(() => getLegacyFields(activeTab.value))
 const loadParticipantFlights = async () => {
   loading.value = true
   loadError.value = null
+  participantProfile.value = null
   participantDetails.value = null
   try {
     const participant = await apiGet<ParticipantProfile>(
       `/api/events/${props.eventId}/participants/${props.participantId}`
     )
+    participantProfile.value = participant
     participantDetails.value = participant.details ?? null
-    arrivalSegments.value = sortSegments(participant.arrivalSegments)
-    returnSegments.value = sortSegments(participant.returnSegments)
+    arrivalSegments.value = sortSegments(participant.arrivalSegments ?? [])
+    returnSegments.value = sortSegments(participant.returnSegments ?? [])
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : t('errors.generic')
   } finally {
@@ -380,6 +386,52 @@ const saveFlights = async () => {
   }
 }
 
+const applyTicket = (segmentIndex: number) => {
+  const segments = activeTab.value === 'arrival' ? draftArrivalSegments.value : draftReturnSegments.value
+  const segment = segments[segmentIndex]
+
+  if (!segment?.airline?.trim() || !segment?.ticketNo?.trim()) {
+    return
+  }
+
+  applyingTicket.value = true
+  applyTicketError.value = null
+  appliedTicketSegmentIndex.value = segmentIndex
+
+  try {
+    const airline = segment.airline.trim()
+    const ticketNo = segment.ticketNo.trim()
+    let affectedCount = 0
+
+    // Apply to all matching segments in both arrival and return
+    for (const seg of draftArrivalSegments.value) {
+      if (seg.airline?.trim().toLowerCase() === airline.toLowerCase()) {
+        seg.ticketNo = ticketNo
+        affectedCount++
+      }
+    }
+    for (const seg of draftReturnSegments.value) {
+      if (seg.airline?.trim().toLowerCase() === airline.toLowerCase()) {
+        seg.ticketNo = ticketNo
+        affectedCount++
+      }
+    }
+
+    if (affectedCount === 0) {
+      applyTicketError.value = t('errors.generic')
+      pushToast({ key: 'admin.participant.flights.applyTicketError', tone: 'error' })
+    } else {
+      pushToast({ key: 'admin.participant.flights.applyTicketSuccess', tone: 'success' })
+    }
+  } catch (err) {
+    applyTicketError.value = err instanceof Error ? err.message : t('errors.generic')
+    pushToast({ key: 'admin.participant.flights.applyTicketError', tone: 'error' })
+  } finally {
+    applyingTicket.value = false
+    appliedTicketSegmentIndex.value = null
+  }
+}
+
 const activeShell = computed(() => (mode.value === 'view' ? AppDrawerShell : AppModalShell))
 const shellBindings = computed(() => {
   if (mode.value === 'view') {
@@ -426,7 +478,7 @@ const shellBindings = computed(() => {
         <div class="border-b border-slate-200 px-5 py-4">
           <h3 class="text-lg font-semibold text-slate-900">{{ t('admin.participant.flights.modalTitle') }}</h3>
           <p class="mt-1 text-sm text-slate-500">{{ t('admin.participant.flights.modalSubtitle') }}</p>
-          <p v-if="props.participantName" class="mt-1 text-xs text-slate-500">{{ props.participantName }}</p>
+          <p v-if="participantProfile" class="mt-2 text-sm font-medium text-slate-900">{{ participantProfile.fullName }} <span class="text-slate-600">({{ participantProfile.tcNo }})</span></p>
         </div>
 
           <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
@@ -633,10 +685,21 @@ const shellBindings = computed(() => {
                   <span class="text-slate-600">{{ t('admin.participant.flights.fields.arrivalTime') }}</span>
                   <input v-model="segment.arrivalTime" type="time" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving" />
                 </label>
-                <label class="grid gap-1 text-sm">
+                <div class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participant.flights.fields.ticketNo') }}</span>
-                  <input v-model.trim="segment.ticketNo" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving" />
-                </label>
+                  <div class="flex items-end gap-2">
+                    <input v-model.trim="segment.ticketNo" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm flex-1" :disabled="saving || applyingTicket" />
+                    <button
+                      v-if="segment.airline?.trim() && segment.ticketNo?.trim()"
+                      type="button"
+                      class="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-200 disabled:opacity-50 whitespace-nowrap"
+                      :disabled="saving || applyingTicket || appliedTicketSegmentIndex === index"
+                      @click="applyTicket(index)"
+                    >
+                      {{ applyingTicket && appliedTicketSegmentIndex === index ? t('common.applying') : t('admin.participant.flights.applyTicketButton', { airline: segment.airline }) }}
+                    </button>
+                  </div>
+                </div>
                 <label class="grid gap-1 text-sm">
                   <span class="text-slate-600">{{ t('admin.participant.flights.fields.pnr') }}</span>
                   <input v-model.trim="segment.pnr" type="text" class="rounded border border-slate-200 px-3 py-2 text-sm" :disabled="saving" />
