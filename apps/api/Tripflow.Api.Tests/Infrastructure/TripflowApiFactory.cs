@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Tripflow.Api.Data;
 
@@ -19,20 +18,12 @@ public sealed class TripflowApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Program.cs reads CONNECTION_STRING and JWT config before builder.Build() is called,
-        // so ConfigureAppConfiguration cannot override those eager reads.
-        // The env vars (set by CI or the developer's user-secrets) provide the startup values;
-        // ConfigureTestServices below replaces the DbContext with the Testcontainer connection.
+        // Program.cs reads CONNECTION_STRING, JWT config, and Cookie options before
+        // builder.Build() is called, so ConfigureAppConfiguration cannot override those
+        // eager reads. The env vars (set by CI or the developer's user-secrets) provide
+        // the startup values; ConfigureTestServices below replaces the DbContext with the
+        // Testcontainer connection so tests use an isolated database.
         builder.UseEnvironment("Development");
-
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Cookie:Secure"] = "false",
-                ["Cookie:SameSite"] = "Lax",
-            });
-        });
 
         builder.ConfigureTestServices(services =>
         {
