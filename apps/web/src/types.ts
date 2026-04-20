@@ -274,6 +274,15 @@ export type BulkApplyFlightSegmentsResponse = {
   }
 }
 
+export type ApplyTicketToMatchingFlightsRequest = {
+  airline: string
+  ticketNo: string
+}
+
+export type ApplyTicketToMatchingFlightsResponse = {
+  affectedCount: number
+}
+
 export type ParticipantRoomFilters = {
   query?: string | null
   status?: 'all' | 'arrived' | 'not_arrived' | null

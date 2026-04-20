@@ -51,7 +51,7 @@ public static class EventsEndpoints
 
         admin.MapPut("/{eventId}/access-code", EventsHandlers.UpdateEventAccessCode)
             .WithSummary("Update event access code")
-            .WithDescription("Sets the event access code (6–10 chars, A–Z/0–9, global unique).")
+            .WithDescription("Sets the event access code (5–10 chars, A–Z/0–9, global unique).")
             .Produces<EventAccessCodeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
@@ -459,6 +459,13 @@ public static class EventsEndpoints
             .WithSummary("Bulk apply flight segments")
             .WithDescription("Replaces selected participant flight segments for the requested directions using a shared template.")
             .Produces<BulkApplyFlightSegmentsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/participants/{participantId}/flights/apply-ticket", EventsHandlers.ApplyTicketToMatchingFlights)
+            .WithSummary("Apply ticket number to matching flights")
+            .WithDescription("Applies a ticket number to all flights with matching airline for a participant.")
+            .Produces<ApplyTicketToMatchingFlightsResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 

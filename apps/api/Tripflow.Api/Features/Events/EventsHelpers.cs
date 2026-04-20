@@ -152,7 +152,7 @@ internal static class EventsHelpers
         return true;
     }
 
-    private static readonly Regex ValidEventCodeRegex = new("^[A-Z0-9]{6,10}$", RegexOptions.Compiled);
+    private static readonly Regex ValidEventCodeRegex = new("^[A-Z0-9]{5,10}$", RegexOptions.Compiled);
 
     internal static string NormalizeEventCode(string? value)
     {

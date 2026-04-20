@@ -6,16 +6,10 @@ import { apiGet, apiPost } from '../../lib/api'
 import { getAuthRole } from '../../lib/auth'
 import { sanitizeEventAccessCode, isValidEventCodeLength } from '../../lib/eventAccessCode'
 import { formatDateRange } from '../../lib/formatters'
-import {
-  formatTimeZoneOffsetPreview,
-  getAllTimeZoneOptions,
-  getBrowserTimeZone,
-  getRecommendedTimeZoneValues,
-} from '../../lib/timezones'
+import { getBrowserTimeZone } from '../../lib/timezones'
 import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import AppCombobox from '../../components/ui/AppCombobox.vue'
 import DevScenarioGeneratorPanel from '../../components/admin/DevScenarioGeneratorPanel.vue'
 import type { CreateScenarioEventResponse, DevToolsCapabilities, Event as EventDto, EventListItem } from '../../types'
 
@@ -39,8 +33,6 @@ const devTools = ref<DevToolsCapabilities | null>(null)
 
 const EVENT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const browserTimeZone = getBrowserTimeZone()
-const allTimeZoneOptions = getAllTimeZoneOptions()
-const recommendedTimeZoneValues = getRecommendedTimeZoneValues(browserTimeZone)
 
 const form = reactive({
   name: '',
@@ -112,8 +104,6 @@ const loadDevTools = async () => {
 }
 
 const eventCodeErrorKey = ref<string | null>(null)
-const timeZoneErrorKey = ref<string | null>(null)
-const createTimeZonePreview = computed(() => formatTimeZoneOffsetPreview(form.timeZoneId))
 
 const generateRandomEventCode = () => {
   let code = ''
@@ -128,7 +118,6 @@ const createEvent = async () => {
   formErrorKey.value = null
   formErrorMessage.value = null
   eventCodeErrorKey.value = null
-  timeZoneErrorKey.value = null
 
   if (!form.name.trim()) {
     formErrorKey.value = 'validation.eventNameRequired'
@@ -144,12 +133,6 @@ const createEvent = async () => {
 
   if (form.endDate < form.startDate) {
     formErrorKey.value = 'validation.endAfterStart'
-    createOpen.value = true
-    return
-  }
-
-  if (!form.timeZoneId.trim()) {
-    timeZoneErrorKey.value = 'admin.events.form.timeZoneInvalid'
     createOpen.value = true
     return
   }
@@ -181,13 +164,6 @@ const createEvent = async () => {
       formErrorKey.value = null
       formErrorMessage.value = null
       eventCodeErrorKey.value = 'admin.events.form.eventCodeTaken'
-      createOpen.value = true
-      return
-    }
-    if (apiCode === 'invalid_time_zone_id') {
-      formErrorKey.value = null
-      formErrorMessage.value = null
-      timeZoneErrorKey.value = 'admin.events.form.timeZoneInvalid'
       createOpen.value = true
       return
     }
@@ -332,29 +308,6 @@ onMounted(() => {
                 :min="form.startDate || undefined"
               />
             </label>
-
-            <div class="grid gap-1 text-sm md:col-span-3">
-              <span class="text-slate-600">{{ t('admin.events.form.timeZoneLabel') }}</span>
-              <AppCombobox
-                v-model="form.timeZoneId"
-                :options="allTimeZoneOptions"
-                :recommended-values="recommendedTimeZoneValues"
-                :placeholder="t('admin.events.form.timeZonePlaceholder')"
-                :search-placeholder="t('admin.events.form.timeZoneSearchPlaceholder')"
-                :recommended-label="t('admin.events.form.timeZoneRecommended')"
-                :all-label="t('admin.events.form.timeZoneAll')"
-                :browse-all-label="t('admin.events.form.timeZoneBrowseAll')"
-                :empty-label="t('admin.events.form.timeZoneEmpty')"
-                :invalid="Boolean(timeZoneErrorKey)"
-                :aria-label="t('admin.events.form.timeZoneLabel')"
-                :disabled="submitting"
-                @update:model-value="timeZoneErrorKey = null"
-              />
-              <p class="text-xs text-slate-500">
-                {{ t('admin.events.form.timeZoneHelper', { offset: createTimeZonePreview || '—' }) }}
-              </p>
-              <p v-if="timeZoneErrorKey" class="text-xs text-rose-600">{{ t(timeZoneErrorKey) }}</p>
-            </div>
 
             <label class="grid gap-1 text-sm md:col-span-3">
               <span class="text-slate-600">{{ t('admin.events.form.eventCodeLabel') }}</span>

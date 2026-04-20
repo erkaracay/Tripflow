@@ -2,8 +2,8 @@
 export const sanitizeEventAccessCode = (value: string): string =>
   value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10)
 
-/** Check if code length is valid (6–10 characters) for event access code */
+/** Check if code length is valid (5–10 characters) for event access code */
 export const isValidEventCodeLength = (code: string): boolean => {
   const len = code.length
-  return len >= 6 && len <= 10
+  return len >= 5 && len <= 10
 }

@@ -13,6 +13,7 @@
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved.",
+    "applying": "Applying...",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "newPassword": "New password",
@@ -937,7 +938,7 @@
       "subtitle": "Apply the same flight segment template to selected participants or export an import-ready Excel workbook.",
       "open": "Bulk apply flights",
       "searchPlaceholder": "Search name, TC, phone, room, agency, check-in code",
-      "selectFiltered": "Select filtered",
+      "selectFiltered": "Select all ({count})",
       "clearSelection": "Clear selection",
       "applyAllEvent": "Apply to all event participants",
     "selectedCount": "{count} selected",
@@ -1371,6 +1372,9 @@
         "emptyEditor": "No segments yet. Add one to start.",
         "saveSuccess": "Flights updated.",
         "saveError": "Flights could not be updated.",
+        "applyTicketSuccess": "Ticket number applied to all matching flights.",
+        "applyTicketError": "Failed to apply ticket number.",
+        "applyTicketButton": "Apply to all {airline} flights",
         "validation": {
           "baggagePieces": "{direction}: baggage pieces must be a whole number greater than 0.",
           "baggageTotalKg": "{direction}: baggage total kg must be a whole number greater than 0."
