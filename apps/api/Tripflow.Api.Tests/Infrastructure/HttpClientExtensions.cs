@@ -14,6 +14,13 @@ public static class HttpClientExtensions
         return client;
     }
 
+    public static HttpClient WithOrgScope(this HttpClient client, Guid organizationId)
+    {
+        client.DefaultRequestHeaders.Remove("X-Org-Id");
+        client.DefaultRequestHeaders.Add("X-Org-Id", organizationId.ToString());
+        return client;
+    }
+
     public static Task<HttpResponseMessage> PostJsonAsync<T>(this HttpClient client, string url, T body, CancellationToken ct = default)
         => client.PostAsJsonAsync(url, body, JsonOptions, ct);
 

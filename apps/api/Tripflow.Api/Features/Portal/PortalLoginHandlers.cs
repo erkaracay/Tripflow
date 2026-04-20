@@ -194,6 +194,8 @@ internal static class PortalLoginHandlers
                 OrganizationId: participant.OrganizationId,
                 Role: "PortalParticipant",
                 Extra: AuditLogHelpers.CreateExtra(
+                    ("participantName", participant.FullName),
+                    ("participantTcNoMasked", AuditLogHelpers.MaskTcNo(participant.TcNo)),
                     ("eventId", eventEntity.Id),
                     ("eventAccessCode", eventEntity.EventAccessCode))),
             ct);
@@ -281,7 +283,10 @@ internal static class PortalLoginHandlers
                     Result: "success",
                     OrganizationId: session.OrganizationId,
                     Role: "PortalParticipant",
-                    Extra: AuditLogHelpers.CreateExtra(("eventId", session.EventId))),
+                    Extra: AuditLogHelpers.CreateExtra(
+                        ("participantName", session.Participant?.FullName),
+                        ("participantTcNoMasked", AuditLogHelpers.MaskTcNo(session.Participant?.TcNo)),
+                        ("eventId", session.EventId))),
                 ct);
         }
 

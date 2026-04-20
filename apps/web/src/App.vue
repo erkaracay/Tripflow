@@ -24,6 +24,7 @@ const showOrgLink = computed(() => userRole.value === 'SuperAdmin')
 const showAuthActions = computed(() => Boolean(userRole.value))
 const showUsersLink = computed(() => userRole.value === 'SuperAdmin')
 const showGuidesLink = computed(() => userRole.value === 'AgencyAdmin')
+const showAuditLogLink = computed(() => userRole.value === 'SuperAdmin' || userRole.value === 'AgencyAdmin')
 const shellMaxWidthClass = computed(() => {
   if (route.path.startsWith('/admin') || route.path.startsWith('/guide')) {
     return 'max-w-5xl'
@@ -161,6 +162,17 @@ watch(
                             {{ t('nav.events') }}
                         </RouterLink>
 	                        <RouterLink
+	                            v-if="showAuditLogLink"
+	                            class="inline-flex w-[14ch] items-center justify-start gap-2 whitespace-nowrap transition-colors hover:text-slate-900"
+	                            to="/admin/audit-log"
+	                        >
+                            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 4.75h10.5A1.75 1.75 0 0 1 17 6.5v7A1.75 1.75 0 0 1 15.25 15.25H4.75A1.75 1.75 0 0 1 3 13.5v-7A1.75 1.75 0 0 1 4.75 4.75Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.5 8.25h7M6.5 11.5h4.5" />
+                            </svg>
+                            {{ t('nav.auditLog') }}
+                        </RouterLink>
+	                        <RouterLink
 	                            v-if="showUsersLink"
 	                            class="inline-flex w-[11ch] items-center justify-start gap-2 whitespace-nowrap transition-colors hover:text-slate-900"
 	                            to="/admin/users"
@@ -239,6 +251,17 @@ watch(
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 2.75v2.5M14 2.75v2.5M3 7.25h14M4.75 5h10.5A1.75 1.75 0 0 1 17 6.75v8.5A1.75 1.75 0 0 1 15.25 17H4.75A1.75 1.75 0 0 1 3 15.25v-8.5A1.75 1.75 0 0 1 4.75 5Z" />
                                 </svg>
                                 {{ t('nav.events') }}
+                            </RouterLink>
+                            <RouterLink
+                                v-if="showAuditLogLink"
+                                class="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-slate-50"
+                                to="/admin/audit-log"
+                            >
+                                <svg class="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 4.75h10.5A1.75 1.75 0 0 1 17 6.5v7A1.75 1.75 0 0 1 15.25 15.25H4.75A1.75 1.75 0 0 1 3 13.5v-7A1.75 1.75 0 0 1 4.75 4.75Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.5 8.25h7M6.5 11.5h4.5" />
+                                </svg>
+                                {{ t('nav.auditLog') }}
                             </RouterLink>
                             <RouterLink
                                 v-if="showUsersLink"

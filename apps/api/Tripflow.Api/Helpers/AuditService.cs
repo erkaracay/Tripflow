@@ -32,7 +32,8 @@ internal sealed class AuditService(
             await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
             var userId = entry.UserId;
-            if (!userId.HasValue && AuditLogHelpers.TryResolveUserId(httpContext.User, out var resolvedUserId))
+            var hasExplicitRole = !string.IsNullOrWhiteSpace(entry.Role);
+            if (!userId.HasValue && !hasExplicitRole && AuditLogHelpers.TryResolveUserId(httpContext.User, out var resolvedUserId))
             {
                 userId = resolvedUserId;
             }
