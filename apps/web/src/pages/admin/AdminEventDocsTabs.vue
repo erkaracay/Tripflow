@@ -6,10 +6,12 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../lib/api'
 import { useToast } from '../../lib/toast'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import EventDocPreviewDrawer from '../../components/docs/EventDocPreviewDrawer.vue'
+import DocTabInUseModal from '../../components/admin/DocTabInUseModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
-import type { Event as TripEvent, EventDocTabDto } from '../../types'
+import type { DocTabInUseResponse, DocTabInUseSegment, Event as TripEvent, EventDocTabDto } from '../../types'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -627,15 +629,65 @@ const toggleActive = async (tab: EventDocTabDto) => {
   }
 }
 
-const deleteTab = async (tab: EventDocTabDto) => {
-  const confirmed = window.confirm(t('admin.docs.deleteConfirm'))
-  if (!confirmed) return
+const inUseModalOpen = ref(false)
+const inUseModalTab = ref<EventDocTabDto | null>(null)
+const inUseModalSegments = ref<DocTabInUseSegment[]>([])
+
+const deleteConfirmOpen = ref(false)
+const deleteConfirmTab = ref<EventDocTabDto | null>(null)
+
+const extractInUseResponse = (err: unknown): DocTabInUseResponse | null => {
+  if (typeof err !== 'object' || err === null) return null
+  const e = err as { status?: number; payload?: unknown }
+  if (e.status !== 409) return null
+  const payload = e.payload
+  if (typeof payload !== 'object' || payload === null) return null
+  const body = payload as Partial<DocTabInUseResponse>
+  if (body.code !== 'doc_tab_in_use_by_accommodation_segments') return null
+  if (!Array.isArray(body.segments)) return null
+  return body as DocTabInUseResponse
+}
+
+const deleteTab = (tab: EventDocTabDto) => {
+  deleteConfirmTab.value = tab
+  deleteConfirmOpen.value = true
+}
+
+const handleDeleteCancel = () => {
+  deleteConfirmTab.value = null
+}
+
+const handleDeleteConfirm = async () => {
+  const tab = deleteConfirmTab.value
+  deleteConfirmTab.value = null
+  if (!tab) return
   try {
     await apiDelete(`/api/events/${eventId.value}/docs/tabs/${tab.id}`)
     pushToast({ key: 'common.saved', tone: 'success' })
     tabs.value = tabs.value.filter((item) => item.id !== tab.id)
   } catch (err) {
+    const inUse = extractInUseResponse(err)
+    if (inUse) {
+      inUseModalTab.value = tab
+      inUseModalSegments.value = inUse.segments
+      inUseModalOpen.value = true
+      return
+    }
     pushToast({ key: 'errors.generic', tone: 'error' })
+  }
+}
+
+const handleInUseModalClose = () => {
+  inUseModalOpen.value = false
+  inUseModalTab.value = null
+  inUseModalSegments.value = []
+}
+
+const handleInUseModalDeleted = () => {
+  const deletedId = inUseModalTab.value?.id
+  handleInUseModalClose()
+  if (deletedId) {
+    tabs.value = tabs.value.filter((item) => item.id !== deletedId)
   }
 }
 
@@ -1106,5 +1158,26 @@ onMounted(() => {
     :tab="previewTab"
     :event-title="event?.name ?? null"
     @close="closePreview"
+  />
+
+  <DocTabInUseModal
+    :open="inUseModalOpen"
+    :event-id="eventId"
+    :tab-id="inUseModalTab?.id ?? ''"
+    :tab-title="inUseModalTab?.title ?? ''"
+    :segments="inUseModalSegments"
+    @close="handleInUseModalClose"
+    @deleted="handleInUseModalDeleted"
+  />
+
+  <ConfirmDialog
+    v-model:open="deleteConfirmOpen"
+    :title="t('admin.docs.deleteConfirmTitle')"
+    :message="t('admin.docs.deleteConfirm')"
+    :confirm-label="t('common.delete')"
+    :cancel-label="t('common.cancel')"
+    tone="danger"
+    @confirm="handleDeleteConfirm"
+    @cancel="handleDeleteCancel"
   />
 </template>

@@ -198,10 +198,13 @@ const rowAccommodationOptions = computed<AppComboboxOption[]>(() => {
   const defaultLabel = t('admin.roomOps.segments.defaultAccommodationOption', {
     title: selectedSegment.value?.defaultAccommodationTitle ?? t('admin.roomOps.filters.accommodationUnknown'),
   })
+  const defaultTabId = selectedSegment.value?.defaultAccommodationDocTabId ?? ''
 
   return [
     { value: DEFAULT_ACCOMMODATION_VALUE, label: defaultLabel },
-    ...accommodationTabs.value.map((tab) => ({ value: tab.id, label: tab.title })),
+    ...accommodationTabs.value
+      .filter((tab) => tab.id !== defaultTabId)
+      .map((tab) => ({ value: tab.id, label: tab.title })),
   ]
 })
 

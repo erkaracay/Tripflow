@@ -1635,7 +1635,6 @@ internal static class ParticipantImportHandlers
                     .Select(x => (int?)x.SortOrder)
                     .MaxAsync(ct) ?? 0;
                 var createdHotelTabs = new Dictionary<string, AccommodationHotelTab>(StringComparer.OrdinalIgnoreCase);
-                var warnedCreatedHotelTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 var exactSegmentLookup = await db.EventAccommodationSegments
                     .Where(x => x.EventId == id && x.OrganizationId == orgId)
@@ -1703,19 +1702,6 @@ internal static class ParticipantImportHandlers
                     {
                         rowErrors.Add("accommodation could not be resolved");
                         rowFields.Add("accommodation");
-                    }
-                    else if (!string.IsNullOrWhiteSpace(accommodationInput)
-                        && IsAutoCreatedAccommodation(hotelMatch, accommodationInput, createdHotelTabs)
-                        && warnedCreatedHotelTitles.Add(NormalizeHeader(accommodationInput)))
-                    {
-                        warnings.Add(new ParticipantImportWarning(
-                            row.RowNumber,
-                            null,
-                            "accommodation not found; a new hotel doc tab will be created",
-                            "accommodation_auto_created")
-                        {
-                            Field = "accommodation"
-                        });
                     }
 
                     if (previewRows.Count < PreviewRowLimit)
@@ -1879,22 +1865,6 @@ internal static class ParticipantImportHandlers
                     {
                         rowErrors.Add("accommodation_override could not be resolved");
                         rowFields.Add("accommodation_override");
-                    }
-                    else if (!string.IsNullOrWhiteSpace(overrideInput)
-                        && overrideHotel is not null
-                        && IsAutoCreatedAccommodation(overrideHotel, overrideInput, createdHotelTabs))
-                    {
-                        if (warnedCreatedHotelTitles.Add(NormalizeHeader(overrideInput)))
-                        {
-                            warnings.Add(new ParticipantImportWarning(
-                                row.RowNumber,
-                                tcNoForIssues,
-                                "accommodation_override not found; a new hotel doc tab will be created",
-                                "accommodation_override_auto_created")
-                            {
-                                Field = "accommodation_override"
-                            });
-                        }
                     }
 
                     if (previewRows.Count < PreviewRowLimit)
@@ -3445,22 +3415,6 @@ internal static class ParticipantImportHandlers
         }
 
         return persisted;
-    }
-
-    private static bool IsAutoCreatedAccommodation(
-        AccommodationHotelTab hotelTab,
-        string input,
-        Dictionary<string, AccommodationHotelTab> createdHotelTabs)
-    {
-        var normalizedInput = NormalizeOptionalText(input);
-        if (string.IsNullOrWhiteSpace(normalizedInput))
-        {
-            return false;
-        }
-
-        var normalizedKey = NormalizeHeader(normalizedInput);
-        return createdHotelTabs.TryGetValue(normalizedKey, out var created)
-            && created.Id == hotelTab.Id;
     }
 
     private static string BuildImportedAccommodationContentJson(string title)

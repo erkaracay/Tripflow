@@ -1946,6 +1946,47 @@ internal static class EventsHandlers
             });
         }
 
+        if (IsAccommodationDocType(entity.Type))
+        {
+            var referencingSegments = await db.EventAccommodationSegments
+                .Where(x => x.OrganizationId == orgId
+                    && x.EventId == id
+                    && x.DefaultAccommodationDocTabId == docTabId)
+                .OrderBy(x => x.StartDate)
+                .ThenBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .Select(x => new DocTabInUseSegmentDto(
+                    x.Id,
+                    x.StartDate.ToString("yyyy-MM-dd"),
+                    x.EndDate.ToString("yyyy-MM-dd"),
+                    x.SortOrder,
+                    x.ParticipantAssignments.Count))
+                .ToArrayAsync(ct);
+
+            if (referencingSegments.Length > 0)
+            {
+                return Results.Conflict(new DocTabInUseResponse(
+                    "doc_tab_in_use_by_accommodation_segments",
+                    "This hotel tab is used by accommodation segments.",
+                    referencingSegments));
+            }
+
+            var overrideAssignments = await db.ParticipantAccommodationAssignments
+                .Where(x => x.OrganizationId == orgId
+                    && x.EventId == id
+                    && x.OverrideAccommodationDocTabId == docTabId)
+                .ToListAsync(ct);
+            if (overrideAssignments.Count > 0)
+            {
+                var now = DateTime.UtcNow;
+                foreach (var assignment in overrideAssignments)
+                {
+                    assignment.OverrideAccommodationDocTabId = null;
+                    assignment.UpdatedAt = now;
+                }
+            }
+        }
+
         db.EventDocTabs.Remove(entity);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();

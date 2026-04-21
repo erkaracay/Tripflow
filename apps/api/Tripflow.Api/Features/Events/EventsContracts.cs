@@ -423,6 +423,18 @@ public sealed record UpdateEventDocTabRequest(
     bool? IsActive,
     JsonElement? Content);
 
+public sealed record DocTabInUseSegmentDto(
+    Guid Id,
+    string StartDate,
+    string EndDate,
+    int SortOrder,
+    int ParticipantCount);
+
+public sealed record DocTabInUseResponse(
+    string Code,
+    string Message,
+    DocTabInUseSegmentDto[] Segments);
+
 public sealed record ParticipantWillNotAttendRequest(bool? WillNotAttend);
 public sealed record ParticipantWillNotAttendResponseDto(
     Guid Id,
