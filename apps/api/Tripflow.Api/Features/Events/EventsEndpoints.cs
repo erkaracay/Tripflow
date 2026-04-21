@@ -469,6 +469,20 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPost("/{eventId}/participants/insurance/bulk-apply-common", EventsHandlers.BulkApplyCommonInsurance)
+            .WithSummary("Bulk apply common insurance fields")
+            .WithDescription("Applies insurance company name and/or dates to all or a subset of event participants.")
+            .Produces<BulkApplyCommonInsuranceResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/participants/insurance/bulk-match-policy", EventsHandlers.BulkMatchInsurancePolicy)
+            .WithSummary("Bulk match insurance policy numbers by TC number")
+            .WithDescription("Applies policy numbers to participants by matching TC numbers; unmatched TC numbers are returned.")
+            .Produces<BulkMatchInsurancePolicyResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/participants/import/template", ParticipantImportHandlers.DownloadImportTemplate)
             .WithSummary("Download participant import template")
             .WithDescription("Downloads a CSV or XLSX import template for participants.")

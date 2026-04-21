@@ -494,6 +494,67 @@
         "copyLoginLink": "Giriş linkini kopyala",
         "manage": "Yönet",
         "openPortal": "Portal girişini aç"
+      },
+      "insuranceBulk": {
+        "toolbarButton": "Sigorta Yardımcıları",
+        "toolbarButtonCommon": "Ortak Sigorta Bilgileri",
+        "toolbarButtonPolicy": "Poliçe No Eşleştir",
+        "title": "Sigorta Yardımcıları",
+        "description": "Ortak sigorta bilgilerini toplu uygulayın veya TC numarasına göre poliçe no eşleştirin.",
+        "tabCommon": "Ortak Alanlar",
+        "tabPolicy": "Poliçe Eşleştirme",
+        "cancel": "Kapat"
+      },
+      "insuranceCommon": {
+        "toolbarButton": "Ortak Sigorta Bilgileri",
+        "title": "Ortak Sigorta Bilgileri",
+        "description": "Şirket adı ve tarihler gibi tüm katılımcılar için ortak olan sigorta alanlarını toplu uygular.",
+        "companyLabel": "Sigorta şirketi",
+        "companyPlaceholder": "Örn. Anadolu Sigorta",
+        "startLabel": "Başlangıç tarihi",
+        "endLabel": "Bitiş tarihi",
+        "fillFromEvent": "Etkinlik tarihlerini kullan",
+        "invalidDateRange": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+        "scopeLabel": "Kapsam",
+        "scopeMissing": "Poliçe no'su boş olan katılımcılara uygula",
+        "scopeAll": "Tüm katılımcılara uygula",
+        "overwriteLabel": "Üzerine yazma",
+        "overwriteOnlyEmpty": "Sadece boş alanlara yaz",
+        "overwriteAll": "Mevcut değerleri değiştir",
+        "submit": "Uygula",
+        "submitting": "Uygulanıyor...",
+        "cancel": "İptal",
+        "genericError": "Uygulanamadı. Lütfen tekrar deneyin.",
+        "successToast": "{count} katılımcı güncellendi."
+      },
+      "insurancePolicyMatch": {
+        "toolbarButton": "Poliçe No Eşleştir",
+        "title": "Poliçe No Eşleştir",
+        "description": "Sigorta şirketinden gelen Excel'den TC No ve Poliçe No sütunlarını birlikte kopyalayıp aşağıya yapıştırın. Sıralama önemli değil, TC numarasına göre eşleştireceğiz.",
+        "pairDescription": "Sigorta şirketinden gelen Excel'den TC No sütununu sol kutuya, Poliçe No sütununu sağ kutuya yapıştırın. Her satır sırasına göre eşleştirilir.",
+        "tcLabel": "TC Numaraları",
+        "tcPlaceholder": "12345678901\n98765432109\n...",
+        "policyLabel": "Poliçe Numaraları",
+        "policyPlaceholder": "POL-00234\nPOL-00235\n...",
+        "lengthMismatchWarning": "Satır sayıları farklı — {tc} TC vs {policy} poliçe. Sadece her iki listede de bulunan satırlar eşleştirilir.",
+        "pasteLabel": "Yapıştırma alanı",
+        "pastePlaceholder": "12345678901\tPOL-00234\n98765432109\tPOL-00235\n...",
+        "matchedCount": "{count} eşleşen",
+        "unmatchedCount": "{count} eşleşmeyen",
+        "unmatchedInvalidTc": "TC 11 hane değil",
+        "unmatchedEmptyPolicy": "Poliçe no boş",
+        "unmatchedNoParticipant": "TC bu etkinlikte yok",
+        "unmatchedDuplicateTc": "Yapıştırmada tekrarlayan TC",
+        "malformedRowsWarning": "Bazı satırlar okunamadı (2 sütun bekleniyor)",
+        "unmatchedWarning": "Bu satırlar uygulanamadı:",
+        "colParticipant": "Katılımcı",
+        "colCurrent": "Mevcut",
+        "colNew": "Yeni",
+        "submit": "{count} Kişiye Uygula",
+        "submitting": "Uygulanıyor...",
+        "cancel": "Kapat",
+        "genericError": "Uygulanamadı. Lütfen tekrar deneyin.",
+        "successToast": "{count} poliçe no güncellendi."
       }
     },
     "eventDetail": {
@@ -757,7 +818,12 @@
         "returnTransferVehicle": "Araç",
         "returnTransferPlate": "Plaka",
         "returnTransferDriverInfo": "Sürücü bilgileri",
-        "returnTransferNote": "Not"
+        "returnTransferNote": "Not",
+        "insuranceTitle": "Sigorta",
+        "insuranceCompanyName": "Sigorta şirketi",
+        "insurancePolicyNo": "Poliçe no",
+        "insuranceStartDate": "Başlangıç tarihi",
+        "insuranceEndDate": "Bitiş tarihi"
       }
     },
     "participantsTable": {
@@ -803,6 +869,10 @@
         "hotelCheckOutDate": "Konaklama çıkış tarihi",
         "ticketNo": "Bilet no (G/D)",
         "attendanceStatus": "Katılım durumu",
+        "insuranceCompanyName": "Sigorta şirketi",
+        "insurancePolicyNo": "Poliçe no",
+        "insuranceStartDate": "Sigorta başlangıç",
+        "insuranceEndDate": "Sigorta bitiş",
         "flights": "Uçuşlar",
         "arrivalAirline": "Geliş havayolu",
         "arrivalDepartureAirport": "Geliş kalkış havaalanı",
@@ -1294,6 +1364,7 @@
         "core": "Temel",
         "hotel": "Konaklama / Oda",
         "flights": "Uçuşlar",
+        "insurance": "Sigorta",
         "other": "Diğer"
       },
       "fields": {
@@ -1340,7 +1411,12 @@
         "city": "Şehir",
         "flightCity": "Uçuş şehri",
         "ticketNo": "Bilet no",
-        "attendanceStatus": "Katılım durumu"
+        "attendanceStatus": "Katılım durumu",
+        "insuranceTitle": "Sigorta",
+        "insuranceCompanyName": "Sigorta şirketi",
+        "insurancePolicyNo": "Poliçe no",
+        "insuranceStartDate": "Başlangıç tarihi",
+        "insuranceEndDate": "Bitiş tarihi"
       }
     },
     "participant": {
@@ -1390,6 +1466,10 @@
       "title": "Katılımcı İçe Aktar",
       "backToEvent": "Etkinliğe dön",
       "backToParticipants": "Katılımcı listesine dön",
+      "insuranceHelpers": {
+        "title": "Sigorta yardımcıları",
+        "description": "İçe aktarma sonrası sigorta bilgilerini toplu uygulamak veya şirketten gelen Excel'le poliçe no eşleştirmek için kullanın."
+      },
       "stepTemplate": "Adım A - Şablon",
       "stepUpload": "Adım B - Yükle",
       "stepPreview": "Adım C - Önizleme",

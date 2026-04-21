@@ -8,11 +8,13 @@ import { useToast } from '../../lib/toast'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ImportTemplateHelpModal from '../../components/admin/ImportTemplateHelpModal.vue'
+import InsuranceBulkModal from '../../components/admin/InsuranceBulkModal.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import type {
   AppComboboxOption,
   Event as EventDto,
+  Participant,
   ParticipantImportError,
   ParticipantImportPreviewRow,
   ParticipantImportReport,
@@ -809,6 +811,39 @@ const backToParticipants = async () => {
   })
 }
 
+const insuranceBulkModalOpen = ref(false)
+const insuranceBulkDefaultTab = ref<'common' | 'policy'>('common')
+const insuranceParticipants = ref<Participant[]>([])
+const insuranceParticipantsLoading = ref(false)
+
+const loadInsuranceParticipants = async () => {
+  if (insuranceParticipantsLoading.value || !eventId.value) {
+    return
+  }
+  insuranceParticipantsLoading.value = true
+  try {
+    insuranceParticipants.value = await apiGet<Participant[]>(
+      `/api/events/${eventId.value}/participants`
+    )
+  } catch {
+    insuranceParticipants.value = []
+  } finally {
+    insuranceParticipantsLoading.value = false
+  }
+}
+
+const openInsuranceBulkModal = async (tab: 'common' | 'policy') => {
+  insuranceBulkDefaultTab.value = tab
+  if (tab === 'policy') {
+    await loadInsuranceParticipants()
+  }
+  insuranceBulkModalOpen.value = true
+}
+
+const handleInsuranceApplied = async () => {
+  await loadInsuranceParticipants()
+}
+
 const mapWarningRow = (warning: ParticipantImportWarning): ImportIssueRow => ({
   row: warning.row,
   status: 'warn',
@@ -1367,16 +1402,53 @@ watch(summary, () => {
           {{ t('admin.import.applyDone') }}
         </div>
 
-        <div v-if="finalReport" class="mt-4">
+        <div v-if="finalReport" class="mt-4 flex flex-wrap items-center gap-2">
           <button class="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300" @click="backToParticipants">
             {{ t('admin.import.backToParticipants') }}
           </button>
+        </div>
+
+        <div v-if="finalReport" class="mt-5 rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-sky-800">
+            {{ t('admin.import.insuranceHelpers.title') }}
+          </p>
+          <p class="mt-1 text-xs text-sky-900/80">
+            {{ t('admin.import.insuranceHelpers.description') }}
+          </p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="openInsuranceBulkModal('common')"
+            >
+              {{ t('admin.events.insuranceBulk.toolbarButtonCommon') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="insuranceParticipantsLoading"
+              @click="openInsuranceBulkModal('policy')"
+            >
+              {{ t('admin.events.insuranceBulk.toolbarButtonPolicy') }}
+            </button>
+          </div>
         </div>
       </section>
 
       <ImportTemplateHelpModal
         :open="templateHelpOpen"
         @close="templateHelpOpen = false"
+      />
+
+      <InsuranceBulkModal
+        :open="insuranceBulkModalOpen"
+        :event-id="eventId"
+        :participants="insuranceParticipants"
+        :event-start-date="event?.startDate ?? null"
+        :event-end-date="event?.endDate ?? null"
+        :default-tab="insuranceBulkDefaultTab"
+        @close="insuranceBulkModalOpen = false"
+        @applied="handleInsuranceApplied"
       />
     </template>
   </div>

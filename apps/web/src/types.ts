@@ -283,6 +283,36 @@ export type ApplyTicketToMatchingFlightsResponse = {
   affectedCount: number
 }
 
+export type BulkApplyCommonInsuranceScope = 'all' | 'missing_policy'
+export type BulkApplyCommonInsuranceOverwriteMode = 'only_empty' | 'overwrite'
+
+export type BulkApplyCommonInsuranceRequest = {
+  companyName?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  scope: BulkApplyCommonInsuranceScope
+  overwriteMode: BulkApplyCommonInsuranceOverwriteMode
+}
+
+export type BulkApplyCommonInsuranceResponse = {
+  affectedCount: number
+  skippedCount: number
+}
+
+export type BulkMatchInsurancePolicyEntry = {
+  tcNo: string
+  policyNo: string
+}
+
+export type BulkMatchInsurancePolicyRequest = {
+  entries: BulkMatchInsurancePolicyEntry[]
+}
+
+export type BulkMatchInsurancePolicyResponse = {
+  appliedCount: number
+  unmatchedTcNos: string[]
+}
+
 export type ParticipantRoomFilters = {
   query?: string | null
   status?: 'all' | 'arrived' | 'not_arrived' | null

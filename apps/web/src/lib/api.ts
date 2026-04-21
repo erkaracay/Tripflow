@@ -10,6 +10,10 @@ import type {
   BulkApplyParticipantRoomsResponse,
   BulkApplyFlightSegmentsRequest,
   BulkApplyFlightSegmentsResponse,
+  BulkApplyCommonInsuranceRequest,
+  BulkApplyCommonInsuranceResponse,
+  BulkMatchInsurancePolicyRequest,
+  BulkMatchInsurancePolicyResponse,
   GuideAccommodationParticipantResponse,
   PortalLoginResponse,
   PortalMealResponse,
@@ -192,6 +196,24 @@ export const bulkApplyParticipantRooms = async (
   payload: BulkApplyParticipantRoomsRequest
 ): Promise<BulkApplyParticipantRoomsResponse> =>
   apiPost<BulkApplyParticipantRoomsResponse>(`/api/events/${eventId}/participants/rooms/bulk-apply`, payload)
+
+export const bulkApplyCommonInsurance = async (
+  eventId: string,
+  payload: BulkApplyCommonInsuranceRequest
+): Promise<BulkApplyCommonInsuranceResponse> =>
+  apiPost<BulkApplyCommonInsuranceResponse>(
+    `/api/events/${eventId}/participants/insurance/bulk-apply-common`,
+    payload
+  )
+
+export const bulkMatchInsurancePolicy = async (
+  eventId: string,
+  payload: BulkMatchInsurancePolicyRequest
+): Promise<BulkMatchInsurancePolicyResponse> =>
+  apiPost<BulkMatchInsurancePolicyResponse>(
+    `/api/events/${eventId}/participants/insurance/bulk-match-policy`,
+    payload
+  )
 
 export const getAccommodationSegments = async (eventId: string): Promise<AccommodationSegment[]> =>
   apiGet<AccommodationSegment[]>(`/api/events/${eventId}/accommodation-segments`)
