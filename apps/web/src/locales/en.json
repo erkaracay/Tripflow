@@ -494,6 +494,65 @@
         "copyLoginLink": "Copy login link",
         "manage": "Manage",
         "openPortal": "Open portal login"
+      },
+      "insuranceBulk": {
+        "toolbarButton": "Insurance helpers",
+        "toolbarButtonCommon": "Shared insurance fields",
+        "toolbarButtonPolicy": "Match policy numbers",
+        "title": "Insurance helpers",
+        "description": "Apply shared insurance details in bulk, or match policy numbers to participants by TC number.",
+        "tabCommon": "Shared fields",
+        "tabPolicy": "Match policies",
+        "cancel": "Close"
+      },
+      "insuranceCommon": {
+        "toolbarButton": "Shared insurance fields",
+        "title": "Shared insurance fields",
+        "description": "Bulk-applies insurance fields that are shared across participants, such as company name and dates.",
+        "companyLabel": "Insurance company",
+        "companyPlaceholder": "e.g. Anadolu Sigorta",
+        "startLabel": "Start date",
+        "endLabel": "End date",
+        "fillFromEvent": "Use event dates",
+        "invalidDateRange": "End date cannot be earlier than the start date.",
+        "scopeLabel": "Scope",
+        "scopeMissing": "Apply to participants with no policy number",
+        "scopeAll": "Apply to all participants",
+        "overwriteLabel": "Overwrite",
+        "overwriteOnlyEmpty": "Only fill empty fields",
+        "overwriteAll": "Replace existing values",
+        "submit": "Apply",
+        "submitting": "Applying...",
+        "cancel": "Cancel",
+        "genericError": "Could not apply. Please try again.",
+        "successToast": "Updated {count} participants."
+      },
+      "insurancePolicyMatch": {
+        "toolbarButton": "Match policy numbers",
+        "title": "Match policy numbers",
+        "description": "Copy the TC number and policy number columns together from the insurance provider's Excel and paste below. Order does not matter — we match by TC number.",
+        "pairDescription": "Paste the TC number and policy number columns from the same Excel file into the matching boxes below. Each row is paired line by line.",
+        "tcLabel": "TC numbers",
+        "tcPlaceholder": "12345678901\n98765432109\n...",
+        "policyLabel": "Policy numbers",
+        "policyPlaceholder": "POL-00234\nPOL-00235\n...",
+        "lengthMismatchWarning": "Line counts differ — {tc} TC numbers vs {policy} policy numbers. Only rows present in both lists will be matched.",
+        "matchedCount": "{count} matched",
+        "unmatchedCount": "{count} unmatched",
+        "unmatchedInvalidTc": "TC number is not 11 digits",
+        "unmatchedEmptyPolicy": "Policy number is empty",
+        "unmatchedNoParticipant": "TC not found in this event",
+        "unmatchedDuplicateTc": "Duplicate TC number in paste",
+        "malformedRowsWarning": "Some rows could not be read (expected 2 columns)",
+        "unmatchedWarning": "These rows could not be applied:",
+        "colParticipant": "Participant",
+        "colCurrent": "Current",
+        "colNew": "New",
+        "submit": "Apply to {count}",
+        "submitting": "Applying...",
+        "cancel": "Close",
+        "genericError": "Could not apply. Please try again.",
+        "successToast": "Updated {count} policy numbers."
       }
     },
     "eventDetail": {
@@ -765,7 +824,12 @@
         "returnTransferVehicle": "Vehicle",
         "returnTransferPlate": "Plate",
         "returnTransferDriverInfo": "Driver info",
-        "returnTransferNote": "Note"
+        "returnTransferNote": "Note",
+        "insuranceTitle": "Insurance",
+        "insuranceCompanyName": "Insurance company",
+        "insurancePolicyNo": "Policy number",
+        "insuranceStartDate": "Start date",
+        "insuranceEndDate": "End date"
       }
     },
     "participantsTable": {
@@ -811,6 +875,10 @@
         "hotelCheckOutDate": "Accommodation check-out date",
         "ticketNo": "Ticket no (O/R)",
         "attendanceStatus": "Attendance status",
+        "insuranceCompanyName": "Insurance company",
+        "insurancePolicyNo": "Policy number",
+        "insuranceStartDate": "Insurance start",
+        "insuranceEndDate": "Insurance end",
         "flights": "Flights",
         "arrivalAirline": "Arrival airline",
         "arrivalDepartureAirport": "Arrival departure airport",
@@ -1302,6 +1370,7 @@
         "core": "Core",
         "hotel": "Accommodation / Room",
         "flights": "Flights",
+        "insurance": "Insurance",
         "other": "Other"
       },
       "fields": {
@@ -1403,6 +1472,10 @@
       "title": "Participants Import",
       "backToEvent": "Back to event",
       "backToParticipants": "Back to participants list",
+      "insuranceHelpers": {
+        "title": "Insurance helpers",
+        "description": "Use these to bulk-apply shared insurance fields after import, or match policy numbers from the insurance provider's Excel."
+      },
       "stepTemplate": "Step A - Template",
       "stepUpload": "Step B - Upload",
       "stepPreview": "Step C - Preview",

@@ -3559,6 +3559,297 @@ internal static class EventsHandlers
         return Results.Ok(new ApplyTicketToMatchingFlightsResponse(matchingSegments.Count));
     }
 
+    internal static async Task<IResult> BulkApplyCommonInsurance(
+        string eventId,
+        BulkApplyCommonInsuranceRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var companyName = NormalizeOptionalText(request.CompanyName);
+
+        DateOnly? startDate = null;
+        if (!string.IsNullOrWhiteSpace(request.StartDate))
+        {
+            if (!EventsHelpers.TryParseDate(request.StartDate, out var parsedStart))
+            {
+                return EventsHelpers.BadRequest(
+                    "invalid_start_date",
+                    "startDate",
+                    "Insurance start date must be in YYYY-MM-DD format.");
+            }
+            startDate = parsedStart;
+        }
+
+        DateOnly? endDate = null;
+        if (!string.IsNullOrWhiteSpace(request.EndDate))
+        {
+            if (!EventsHelpers.TryParseDate(request.EndDate, out var parsedEnd))
+            {
+                return EventsHelpers.BadRequest(
+                    "invalid_end_date",
+                    "endDate",
+                    "Insurance end date must be in YYYY-MM-DD format.");
+            }
+            endDate = parsedEnd;
+        }
+
+        if (startDate is not null && endDate is not null && endDate < startDate)
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_date_range",
+                "endDate",
+                "Insurance end date must be on or after the start date.");
+        }
+
+        if (companyName is null && startDate is null && endDate is null)
+        {
+            return EventsHelpers.BadRequest(
+                "no_fields_provided",
+                "companyName",
+                "At least one of company name, start date, or end date must be provided.");
+        }
+
+        var scope = (request.Scope ?? "all").Trim().ToLowerInvariant();
+        if (scope != "all" && scope != "missing_policy")
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_scope",
+                "scope",
+                "Scope must be 'all' or 'missing_policy'.");
+        }
+
+        var overwriteMode = (request.OverwriteMode ?? "only_empty").Trim().ToLowerInvariant();
+        if (overwriteMode != "only_empty" && overwriteMode != "overwrite")
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_overwrite_mode",
+                "overwriteMode",
+                "Overwrite mode must be 'only_empty' or 'overwrite'.");
+        }
+
+        var participants = await db.Participants
+            .Include(x => x.Details)
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var affected = 0;
+        var skipped = 0;
+        var overwrite = overwriteMode == "overwrite";
+
+        foreach (var participant in participants)
+        {
+            participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+            var details = participant.Details;
+
+            if (scope == "missing_policy" && !string.IsNullOrWhiteSpace(details.InsurancePolicyNo))
+            {
+                skipped++;
+                continue;
+            }
+
+            var changed = false;
+
+            if (companyName is not null)
+            {
+                if (overwrite || string.IsNullOrWhiteSpace(details.InsuranceCompanyName))
+                {
+                    if (!string.Equals(details.InsuranceCompanyName, companyName, StringComparison.Ordinal))
+                    {
+                        details.InsuranceCompanyName = companyName;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (startDate is not null)
+            {
+                if (overwrite || details.InsuranceStartDate is null)
+                {
+                    if (details.InsuranceStartDate != startDate)
+                    {
+                        details.InsuranceStartDate = startDate;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (endDate is not null)
+            {
+                if (overwrite || details.InsuranceEndDate is null)
+                {
+                    if (details.InsuranceEndDate != endDate)
+                    {
+                        details.InsuranceEndDate = endDate;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed)
+            {
+                affected++;
+            }
+            else
+            {
+                skipped++;
+            }
+        }
+
+        if (affected > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.insurance.bulk_common",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("scope", scope),
+                    ("overwriteMode", overwriteMode),
+                    ("affectedCount", affected),
+                    ("skippedCount", skipped),
+                    ("hasCompanyName", companyName is not null),
+                    ("hasStartDate", startDate is not null),
+                    ("hasEndDate", endDate is not null))),
+            ct);
+
+        return Results.Ok(new BulkApplyCommonInsuranceResponse(affected, skipped));
+    }
+
+    internal static async Task<IResult> BulkMatchInsurancePolicy(
+        string eventId,
+        BulkMatchInsurancePolicyRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var entries = request.Entries ?? Array.Empty<BulkMatchInsurancePolicyEntry>();
+        if (entries.Length == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_entries",
+                "entries",
+                "At least one TC/policy entry is required.");
+        }
+
+        // Collapse duplicates: last value wins for the same TC.
+        var entriesByTcNo = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            var tcNo = NormalizeTcNo(entry?.TcNo);
+            var policyNo = NormalizeOptionalText(entry?.PolicyNo);
+            if (tcNo.Length != 11 || policyNo is null)
+            {
+                continue;
+            }
+            entriesByTcNo[tcNo] = policyNo;
+        }
+
+        if (entriesByTcNo.Count == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_valid_entries",
+                "entries",
+                "No entries with a valid 11-digit TC number and policy number were provided.");
+        }
+
+        var participants = await db.Participants
+            .Include(x => x.Details)
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var participantsByTcNo = participants
+            .Where(x => !string.IsNullOrWhiteSpace(x.TcNo))
+            .GroupBy(x => NormalizeTcNo(x.TcNo), StringComparer.Ordinal)
+            .Where(g => g.Key.Length == 11)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var applied = 0;
+        var unmatched = new List<string>();
+
+        foreach (var (tcNo, policyNo) in entriesByTcNo)
+        {
+            if (!participantsByTcNo.TryGetValue(tcNo, out var matches) || matches.Count != 1)
+            {
+                unmatched.Add(tcNo);
+                continue;
+            }
+
+            var participant = matches[0];
+            participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+
+            if (!string.Equals(participant.Details.InsurancePolicyNo, policyNo, StringComparison.Ordinal))
+            {
+                participant.Details.InsurancePolicyNo = policyNo;
+            }
+
+            applied++;
+        }
+
+        if (applied > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.insurance.bulk_policy_match",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("submittedCount", entriesByTcNo.Count),
+                    ("appliedCount", applied),
+                    ("unmatchedCount", unmatched.Count))),
+            ct);
+
+        return Results.Ok(new BulkMatchInsurancePolicyResponse(applied, unmatched.ToArray()));
+    }
+
     internal static async Task<IResult> SetParticipantWillNotAttend(
         string eventId,
         string participantId,

@@ -294,6 +294,38 @@ onMounted(loadProfile)
       </section>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <h2 class="text-lg font-semibold text-slate-900">{{ t('admin.participantProfile.sections.insurance') }}</h2>
+        <div class="mt-4 space-y-3 text-sm">
+          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.insuranceCompanyName') }}</span>
+            <span class="text-slate-900">{{ displayValue(details?.insuranceCompanyName ?? undefined) }}</span>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.insurancePolicyNo') }}</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-slate-900">{{ displayValue(details?.insurancePolicyNo ?? undefined) }}</span>
+              <button
+                class="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-slate-300"
+                type="button"
+                :disabled="!details?.insurancePolicyNo"
+                @click="copyValue(details?.insurancePolicyNo ?? undefined)"
+              >
+                {{ t('common.copy') }}
+              </button>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.insuranceStartDate') }}</span>
+            <span class="text-slate-900">{{ formatDate(details?.insuranceStartDate) }}</span>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-[170px_1fr]">
+            <span class="text-slate-500">{{ t('admin.participantProfile.fields.insuranceEndDate') }}</span>
+            <span class="text-slate-900">{{ formatDate(details?.insuranceEndDate) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 class="text-lg font-semibold text-slate-900">{{ t('admin.participantProfile.sections.other') }}</h2>
         <div class="mt-4 space-y-3 text-sm">
           <div class="grid gap-2 sm:grid-cols-[170px_1fr]">

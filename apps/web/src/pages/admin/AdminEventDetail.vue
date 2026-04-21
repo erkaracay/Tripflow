@@ -37,6 +37,7 @@ import {
   PARTICIPANTS_SHEET_HEADERS,
 } from '../../lib/participantsExportWorkbook'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
+import InsuranceBulkModal from '../../components/admin/InsuranceBulkModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
@@ -1366,6 +1367,27 @@ const fetchAccommodationDataForExport = async (participantIds: string[]) => {
   return { segments, participantRowsBySegmentId, failedSegmentIds }
 }
 
+const insuranceBulkModalOpen = ref(false)
+const insuranceBulkDefaultTab = ref<'common' | 'policy'>('common')
+
+const reloadParticipants = async () => {
+  try {
+    const data = await apiGet<Participant[]>(`/api/events/${eventId.value}/participants`)
+    participants.value = data
+  } catch {
+    // Silent — user will see stale data at worst; toast was already shown on success.
+  }
+}
+
+const openInsuranceBulkModal = (tab: 'common' | 'policy') => {
+  insuranceBulkDefaultTab.value = tab
+  insuranceBulkModalOpen.value = true
+}
+
+const handleInsuranceBulkApplied = async () => {
+  await reloadParticipants()
+}
+
 const downloadParticipantsExcel = async () => {
   if (participants.value.length === 0) {
     return
@@ -2145,6 +2167,14 @@ onMounted(loadEvent)
             >
               {{ t('admin.participants.roomOps') }}
             </RouterLink>
+            <button
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
+              type="button"
+              :disabled="participants.length === 0"
+              @click="openInsuranceBulkModal('common')"
+            >
+              {{ t('admin.events.insuranceBulk.toolbarButton') }}
+            </button>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button
               class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
@@ -2704,5 +2734,16 @@ onMounted(loadEvent)
     :cancel-label="t('common.cancel')"
     :tone="confirmTone"
     @confirm="handleConfirm"
+  />
+
+  <InsuranceBulkModal
+    :open="insuranceBulkModalOpen"
+    :event-id="eventId"
+    :participants="participants"
+    :event-start-date="eventForm.startDate || null"
+    :event-end-date="eventForm.endDate || null"
+    :default-tab="insuranceBulkDefaultTab"
+    @close="insuranceBulkModalOpen = false"
+    @applied="handleInsuranceBulkApplied"
   />
 </template>

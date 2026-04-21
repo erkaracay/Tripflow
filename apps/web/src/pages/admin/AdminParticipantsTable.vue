@@ -470,6 +470,10 @@ onMounted(loadEvent)
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.hotelCheckOutDate') }}</th>
               <th class="min-w-[96px] px-3 py-2">{{ t('admin.participantsTable.columns.ticketNo') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.attendanceStatus') }}</th>
+              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.insuranceCompanyName') }}</th>
+              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.insurancePolicyNo') }}</th>
+              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.insuranceStartDate') }}</th>
+              <th class="px-3 py-2">{{ t('admin.participantsTable.columns.insuranceEndDate') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.flights') }}</th>
               <th class="px-3 py-2">{{ t('admin.participantsTable.columns.actions') }}</th>
             </tr>
@@ -514,6 +518,10 @@ onMounted(loadEvent)
                 <span v-else>—</span>
               </td>
               <td class="px-3 py-2 text-xs text-slate-700">{{ localizeAttendanceStatus(row.details?.attendanceStatus) }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.insuranceCompanyName ?? '—' }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ row.details?.insurancePolicyNo ?? '—' }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.details?.insuranceStartDate) }}</td>
+              <td class="px-3 py-2 text-xs text-slate-700">{{ formatDate(row.details?.insuranceEndDate) }}</td>
               <td class="px-3 py-2 text-xs text-slate-700">
                 <ParticipantFlightsModal
                   :event-id="eventId"
@@ -533,7 +541,7 @@ onMounted(loadEvent)
               </td>
             </tr>
             <tr v-if="tableItems.length === 0 && !loading">
-              <td class="px-3 py-6 text-center text-sm text-slate-500" colspan="21">
+              <td class="px-3 py-6 text-center text-sm text-slate-500" colspan="25">
                 {{ t('admin.participantsTable.empty') }}
               </td>
             </tr>

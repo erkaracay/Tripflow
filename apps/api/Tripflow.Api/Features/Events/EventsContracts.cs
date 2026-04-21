@@ -352,6 +352,28 @@ public sealed record ApplyTicketToMatchingFlightsRequest(
 public sealed record ApplyTicketToMatchingFlightsResponse(
     int AffectedCount);
 
+public sealed record BulkApplyCommonInsuranceRequest(
+    string? CompanyName,
+    string? StartDate,
+    string? EndDate,
+    string? Scope,
+    string? OverwriteMode);
+
+public sealed record BulkApplyCommonInsuranceResponse(
+    int AffectedCount,
+    int SkippedCount);
+
+public sealed record BulkMatchInsurancePolicyEntry(
+    string? TcNo,
+    string? PolicyNo);
+
+public sealed record BulkMatchInsurancePolicyRequest(
+    BulkMatchInsurancePolicyEntry[]? Entries);
+
+public sealed record BulkMatchInsurancePolicyResponse(
+    int AppliedCount,
+    string[] UnmatchedTcNos);
+
 public sealed record ParticipantFlightsResponse(
     FlightSegmentDto[] ArrivalSegments,
     FlightSegmentDto[] ReturnSegments);
