@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { setLocale } from '../../i18n'
 import { checkPortalSession, portalLogin, portalResolveEvent } from '../../lib/api'
 import { sanitizeEventAccessCode } from '../../lib/eventAccessCode'
 import { resetViewportZoom } from '../../lib/viewport'
@@ -9,7 +10,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const accessCode = ref('')
 const tcNo = ref('')
@@ -100,7 +101,7 @@ const submitLogin = async () => {
   accessCode.value = normalizedCode
   tcNo.value = normalizedTcNo
 
-  if (normalizedCode.length < 6 || normalizedCode.length > 10) {
+  if (normalizedCode.length < 5 || normalizedCode.length > 10) {
     errorKey.value = 'portal.login.accessCodeRequired'
     await nextTick()
     accessCodeInput.value?.focus()
@@ -216,7 +217,7 @@ onMounted(() => {
   if (typeof rawCode === 'string') {
     const normalized = sanitizeEventAccessCode(rawCode)
     accessCode.value = normalized
-    if (normalized.length >= 6 && normalized.length <= 10) {
+    if (normalized.length >= 5 && normalized.length <= 10) {
       void tryReuseExistingSession(normalized)
     }
   }
@@ -227,9 +228,25 @@ onMounted(() => {
   <div class="space-y-6">
     <LoadingState v-if="checkingSession" message-key="portal.login.checkingSession" />
     <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div class="space-y-2">
-        <h1 class="text-2xl font-semibold">{{ t('portal.login.title') }}</h1>
-        <p class="text-sm text-slate-600">{{ t('portal.login.subtitle') }}</p>
+      <div class="flex items-start justify-between gap-4">
+        <div class="space-y-2">
+          <h1 class="text-2xl font-semibold">{{ t('portal.login.title') }}</h1>
+          <p class="text-sm text-slate-600">{{ t('portal.login.subtitle') }}</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 px-1 py-1 text-xs font-medium">
+          <button
+            type="button"
+            class="rounded-full px-2.5 py-1 transition-colors"
+            :class="locale === 'tr' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'"
+            @click="setLocale('tr')"
+          >TR</button>
+          <button
+            type="button"
+            class="rounded-full px-2.5 py-1 transition-colors"
+            :class="locale === 'en' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'"
+            @click="setLocale('en')"
+          >EN</button>
+        </div>
       </div>
       <form class="mt-6 grid gap-4" @submit.prevent="submitLogin">
         <label class="grid gap-1 text-sm" for="portal-access-code">
