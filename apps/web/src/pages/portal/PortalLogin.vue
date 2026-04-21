@@ -2,15 +2,20 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { setLocale } from '../../i18n'
+import { setLocale, type Locale } from '../../i18n'
 import { checkPortalSession, portalLogin, portalResolveEvent } from '../../lib/api'
 import { sanitizeEventAccessCode } from '../../lib/eventAccessCode'
 import { resetViewportZoom } from '../../lib/viewport'
 import LoadingState from '../../components/ui/LoadingState.vue'
+import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
+const localeOptions = [
+  { value: 'en', label: 'EN' },
+  { value: 'tr', label: 'TR' },
+]
 
 const accessCode = ref('')
 const tcNo = ref('')
@@ -233,20 +238,14 @@ onMounted(() => {
           <h1 class="text-2xl font-semibold">{{ t('portal.login.title') }}</h1>
           <p class="text-sm text-slate-600">{{ t('portal.login.subtitle') }}</p>
         </div>
-        <div class="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 px-1 py-1 text-xs font-medium">
-          <button
-            type="button"
-            class="rounded-full px-2.5 py-1 transition-colors"
-            :class="locale === 'tr' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'"
-            @click="setLocale('tr')"
-          >TR</button>
-          <button
-            type="button"
-            class="rounded-full px-2.5 py-1 transition-colors"
-            :class="locale === 'en' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'"
-            @click="setLocale('en')"
-          >EN</button>
-        </div>
+        <AppSegmentedControl
+          :model-value="locale"
+          :options="localeOptions"
+          size="sm"
+          aria-label="Locale"
+          class-name="text-[11px]"
+          @update:model-value="setLocale($event as Locale)"
+        />
       </div>
       <form class="mt-6 grid gap-4" @submit.prevent="submitLogin">
         <label class="grid gap-1 text-sm" for="portal-access-code">
