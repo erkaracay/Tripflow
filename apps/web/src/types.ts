@@ -1027,6 +1027,20 @@ export type EventDocTabDto = {
   content: unknown
 }
 
+export type DocTabInUseSegment = {
+  id: string
+  startDate: string
+  endDate: string
+  sortOrder: number
+  participantCount: number
+}
+
+export type DocTabInUseResponse = {
+  code: 'doc_tab_in_use_by_accommodation_segments'
+  message: string
+  segments: DocTabInUseSegment[]
+}
+
 export type PortalAccommodationSegment = {
   segmentId: string
   startDate: string

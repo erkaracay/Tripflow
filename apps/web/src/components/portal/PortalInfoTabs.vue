@@ -107,9 +107,37 @@ const isFlightLikeTab = (tab: { title: string; type: string }) => {
 const printCustomTabs = computed(() => customTabs.value.filter((tab) => !isFlightLikeTab(tab)))
 const hasAccommodationSegments = computed(() => (props.accommodationSegments?.length ?? 0) > 0)
 
+const ACCOMMODATION_CONTENT_KEYS = [
+  'hotelName',
+  'address',
+  'phone',
+  'checkInDate',
+  'checkOutDate',
+  'checkInNote',
+  'checkOutNote',
+] as const
+
+const hasMeaningfulAccommodationContent = (content: unknown) => {
+  if (!content || typeof content !== 'object') return false
+  const record = content as Record<string, unknown>
+  return ACCOMMODATION_CONTENT_KEYS.some((key) => {
+    const value = record[key]
+    return typeof value === 'string' && value.trim().length > 0
+  })
+}
+
+const hasAccommodationTabContent = computed(() =>
+  accommodationTabs.value.some((tab) => hasMeaningfulAccommodationContent(tab.content))
+)
+const showHotelTab = computed(() =>
+  hasAccommodationSegments.value || hasAccommodationTabContent.value
+)
+
 const tabs = computed<TabItem[]>(() => [
   { id: 'flight', label: t('portal.infoTabs.flight'), kind: 'flight' },
-  { id: 'hotel', label: t('portal.infoTabs.hotel'), kind: 'hotel' },
+  ...(showHotelTab.value
+    ? [{ id: 'hotel', label: t('portal.infoTabs.hotel'), kind: 'hotel' as const }]
+    : []),
   { id: 'insurance', label: t('portal.infoTabs.insurance'), kind: 'insurance' },
   ...transferTabs.value.map((tab) => ({
     id: tab.id,

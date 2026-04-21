@@ -1352,6 +1352,19 @@
       "customHint": "Enter a JSON object.",
       "defaultTab": "Default tab",
       "deleteConfirm": "Delete this tab?",
+      "deleteConfirmTitle": "Delete tab",
+      "deleteInUse": {
+        "title": "Cannot delete — accommodation segments use this hotel",
+        "description": "Delete the following accommodation segments before deleting this hotel tab. Deleting a segment also removes its participant room assignments.",
+        "segmentDeleteWarning": "{count} participant assignment(s) will also be removed.",
+        "segmentsRemaining": "{count} segment(s) remaining",
+        "allClear": "All segments cleared. You can now delete the hotel tab.",
+        "deleteSegment": "Delete plan",
+        "deleteTab": "Delete hotel tab",
+        "close": "Close",
+        "tabDeleted": "Hotel tab deleted.",
+        "segmentDeleted": "Plan deleted."
+      },
       "validation": {
         "titleRequired": "Title is required.",
         "typeRequired": "Type is required.",
@@ -1598,8 +1611,6 @@
         "baggageTotalKgInvalid": "Total baggage weight value is invalid.",
         "baggageTotalKgRounded": "Total baggage weight was rounded to the nearest whole number.",
         "participantNameMismatchForTcNo": "The reference participant name does not match the participant resolved by TC.",
-        "accommodationAutoCreated": "Accommodation was not found. Import will create a new accommodation tab with this name.",
-        "accommodationOverrideAutoCreated": "Override accommodation was not found. Import will create a new accommodation tab with this name.",
         "segmentOverlap": "This accommodation plan date range overlaps an existing plan.",
         "segmentDatesOutOfEventRange": "Accommodation plan dates must stay within the event date range.",
         "segmentKeyUnresolved": "The accommodation plan referenced by this assignment could not be found. Fix the accommodation_segments row first.",

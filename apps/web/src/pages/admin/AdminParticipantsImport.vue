@@ -929,12 +929,6 @@ const translateImportWarning = (warning: ParticipantImportWarning) => {
   if (warning.code === 'participant_name_mismatch_for_tc_no') {
     return t('admin.import.messages.participantNameMismatchForTcNo')
   }
-  if (warning.code === 'accommodation_auto_created') {
-    return t('admin.import.messages.accommodationAutoCreated')
-  }
-  if (warning.code === 'accommodation_override_auto_created') {
-    return t('admin.import.messages.accommodationOverrideAutoCreated')
-  }
 
   return warning.message
 }

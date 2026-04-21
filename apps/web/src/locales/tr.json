@@ -1346,6 +1346,19 @@
       "customHint": "JSON nesnesi girin.",
       "defaultTab": "Varsayılan sekme",
       "deleteConfirm": "Bu sekme silinsin mi?",
+      "deleteConfirmTitle": "Sekmeyi sil",
+      "deleteInUse": {
+        "title": "Silinemiyor — konaklama planları bu oteli kullanıyor",
+        "description": "Bu otel sekmesini silmeden önce aşağıdaki konaklama planlarını silin. Bir planı silmek katılımcı oda atamalarını da kaldırır.",
+        "segmentDeleteWarning": "{count} katılımcı ataması da silinecek.",
+        "segmentsRemaining": "{count} plan kaldı",
+        "allClear": "Tüm planlar temizlendi. Artık otel sekmesini silebilirsiniz.",
+        "deleteSegment": "Planı sil",
+        "deleteTab": "Otel sekmesini sil",
+        "close": "Kapat",
+        "tabDeleted": "Otel sekmesi silindi.",
+        "segmentDeleted": "Plan silindi."
+      },
       "validation": {
         "titleRequired": "Başlık gerekli.",
         "typeRequired": "Tip gerekli.",
@@ -1592,8 +1605,6 @@
         "baggageTotalKgInvalid": "Toplam bagaj ağırlığı geçersiz.",
         "baggageTotalKgRounded": "Toplam bagaj ağırlığı en yakın tam sayıya yuvarlandı.",
         "participantNameMismatchForTcNo": "Referans katılımcı adı, TC ile bulunan katılımcıyla uyuşmuyor.",
-        "accommodationAutoCreated": "Konaklama bulunamadı. İçe aktarma bu adla yeni bir konaklama sekmesi oluşturacak.",
-        "accommodationOverrideAutoCreated": "Override konaklama bulunamadı. İçe aktarma bu adla yeni bir konaklama sekmesi oluşturacak.",
         "segmentOverlap": "Bu konaklama planının tarih aralığı mevcut bir planla çakışıyor.",
         "segmentDatesOutOfEventRange": "Konaklama planı tarihleri etkinliğin tarih aralığında olmalıdır.",
         "segmentKeyUnresolved": "Bu atamanın bağlı olduğu konaklama planı bulunamadı. Önce accommodation_segments satırını düzeltin.",
