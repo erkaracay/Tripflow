@@ -31,6 +31,7 @@ const props = withDefaults(
     optionCountForInlineList?: number
     searchable?: boolean
     compact?: boolean
+    teleportPanel?: boolean
   }>(),
   {
     placeholder: '',
@@ -47,6 +48,7 @@ const props = withDefaults(
     optionCountForInlineList: 8,
     searchable: true,
     compact: false,
+    teleportPanel: false,
   }
 )
 
@@ -439,8 +441,13 @@ const handleOutsidePointer = (event: MouseEvent | TouchEvent) => {
   }
 
   const target = event.target
-  if (target instanceof Node && rootRef.value?.contains(target)) {
-    return
+  if (target instanceof Node) {
+    if (rootRef.value?.contains(target)) {
+      return
+    }
+    if (props.teleportPanel && desktopPanelRef.value?.contains(target)) {
+      return
+    }
   }
 
   closePanel(true)
@@ -459,6 +466,38 @@ const revealAllOptions = async () => {
   syncHighlightedIndex()
   await focusSearchInput()
   await scrollHighlightedIntoView()
+}
+
+const teleportPanelStyle = ref<Record<string, string>>({})
+
+const updateTeleportPanelPosition = () => {
+  if (!props.teleportPanel) return
+  const trigger = triggerRef.value
+  if (!trigger) return
+  const rect = trigger.getBoundingClientRect()
+  teleportPanelStyle.value = {
+    position: 'fixed',
+    left: `${rect.left}px`,
+    top: `${rect.bottom + 8}px`,
+    width: `${rect.width}px`,
+  }
+}
+
+watch(
+  () => desktopOpen.value,
+  async (isOpen) => {
+    if (!props.teleportPanel) return
+    if (isOpen) {
+      await nextTick()
+      updateTeleportPanelPosition()
+    }
+  }
+)
+
+const handleViewportChange = () => {
+  if (desktopOpen.value) {
+    updateTeleportPanelPosition()
+  }
 }
 
 watch(visibleOptions, () => {
@@ -487,12 +526,20 @@ onMounted(() => {
   document.addEventListener('mousedown', handleOutsidePointer)
   document.addEventListener('touchstart', handleOutsidePointer)
   document.addEventListener('keydown', handleDocumentKeydown)
+  if (props.teleportPanel) {
+    window.addEventListener('scroll', handleViewportChange, true)
+    window.addEventListener('resize', handleViewportChange)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleOutsidePointer)
   document.removeEventListener('touchstart', handleOutsidePointer)
   document.removeEventListener('keydown', handleDocumentKeydown)
+  if (props.teleportPanel) {
+    window.removeEventListener('scroll', handleViewportChange, true)
+    window.removeEventListener('resize', handleViewportChange)
+  }
 
   if (mediaQueryList && mediaQueryListener) {
     if (typeof mediaQueryList.removeEventListener === 'function') {
@@ -544,11 +591,16 @@ onUnmounted(() => {
       </svg>
     </button>
 
+    <Teleport to="body" :disabled="!teleportPanel">
     <Transition name="app-menu">
       <div
         v-if="desktopOpen"
         ref="desktopPanelRef"
-        class="app-combobox-panel absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30"
+        :class="[
+          'app-combobox-panel',
+          teleportPanel ? 'fixed z-[60]' : 'absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30',
+        ]"
+        :style="teleportPanel ? teleportPanelStyle : undefined"
       >
         <div v-if="searchable" class="border-b border-slate-100 px-3 py-3">
           <label class="relative block">
@@ -696,6 +748,7 @@ onUnmounted(() => {
         </div>
       </div>
     </Transition>
+    </Teleport>
 
     <AppDrawerShell
       :open="mobileOpen"

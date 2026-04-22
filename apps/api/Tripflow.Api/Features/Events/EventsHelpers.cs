@@ -353,17 +353,11 @@ internal static class EventsHelpers
 
     internal static List<EventDocTabEntity> CreateDefaultDocTabs(EventEntity entity, DateTime createdAtUtc)
     {
-        var hotelContent = JsonSerializer.Serialize(new
-        {
-            hotelName = string.Empty,
-            address = string.Empty,
-            phone = string.Empty,
-            checkInDate = string.Empty,
-            checkOutDate = string.Empty,
-            checkInNote = string.Empty,
-            checkOutNote = string.Empty
-        });
-
+        // Hotel tabs are lazy-created when the admin adds the first accommodation
+        // (via "Konaklama ekle" on the room-ops page or via participant import).
+        // Seeding an empty Hotel tab on every event created friction in the delete
+        // flow and visual noise in the participant portal; only system-required
+        // singletons (Insurance, Transfer) are seeded here.
         var insuranceContent = JsonSerializer.Serialize(new
         {
             companyName = string.Empty,
@@ -381,21 +375,9 @@ internal static class EventsHelpers
                 Id = Guid.NewGuid(),
                 OrganizationId = entity.OrganizationId,
                 EventId = entity.Id,
-                Title = "Accommodation",
-                Type = "Hotel",
-                SortOrder = 1,
-                IsActive = true,
-                ContentJson = hotelContent,
-                CreatedAt = createdAtUtc
-            },
-            new EventDocTabEntity
-            {
-                Id = Guid.NewGuid(),
-                OrganizationId = entity.OrganizationId,
-                EventId = entity.Id,
                 Title = "Insurance",
                 Type = "Insurance",
-                SortOrder = 2,
+                SortOrder = 1,
                 IsActive = true,
                 ContentJson = insuranceContent,
                 CreatedAt = createdAtUtc
@@ -407,7 +389,7 @@ internal static class EventsHelpers
                 EventId = entity.Id,
                 Title = "Transfer",
                 Type = "Transfer",
-                SortOrder = 3,
+                SortOrder = 2,
                 IsActive = true,
                 ContentJson = transferContent,
                 CreatedAt = createdAtUtc

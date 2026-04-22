@@ -132,7 +132,9 @@ const resettingAllCheckIns = ref(false)
 const confirmOpen = ref(false)
 const confirmTone = ref<'default' | 'danger'>('default')
 const confirmMessageKey = ref<string | null>(null)
-const confirmAction = ref<'resetCheckIns' | 'deleteAll' | null>(null)
+const confirmMessageOverride = ref<string | null>(null)
+const confirmAction = ref<'resetCheckIns' | 'deleteAll' | 'deleteScenarioEvent' | 'deleteParticipant' | null>(null)
+const confirmParticipant = ref<Participant | null>(null)
 const deletingAllParticipants = ref(false)
 const deletingScenarioEvent = ref(false)
 
@@ -606,13 +608,19 @@ const purgeEvent = async () => {
   }
 }
 
-const deleteScenarioEvent = async () => {
+const requestDeleteScenarioEvent = () => {
   if (!event.value || deletingScenarioEvent.value || !isGeneratedScenarioEvent.value) {
     return
   }
+  confirmAction.value = 'deleteScenarioEvent'
+  confirmTone.value = 'danger'
+  confirmMessageKey.value = 'admin.eventDetail.devDeleteConfirm'
+  confirmMessageOverride.value = null
+  confirmOpen.value = true
+}
 
-  const confirmed = globalThis.confirm?.(t('admin.eventDetail.devDeleteConfirm')) ?? false
-  if (!confirmed) {
+const deleteScenarioEvent = async () => {
+  if (!event.value || deletingScenarioEvent.value || !isGeneratedScenarioEvent.value) {
     return
   }
 
@@ -1071,14 +1079,18 @@ const saveParticipant = async (participant: Participant) => {
   }
 }
 
-const deleteParticipant = async (participant: Participant) => {
-  const confirmed = globalThis.confirm?.(
-    t('admin.participants.deleteConfirm', { name: participantDisplayName(participant) })
-  )
-  if (!confirmed) {
-    return
-  }
+const requestDeleteParticipant = (participant: Participant) => {
+  confirmAction.value = 'deleteParticipant'
+  confirmTone.value = 'danger'
+  confirmMessageKey.value = null
+  confirmMessageOverride.value = t('admin.participants.deleteConfirm', {
+    name: participantDisplayName(participant),
+  })
+  confirmParticipant.value = participant
+  confirmOpen.value = true
+}
 
+const deleteParticipant = async (participant: Participant) => {
   try {
     await apiDelete(`/api/events/${eventId.value}/participants/${participant.id}`)
     participants.value = participants.value.filter((item) => item.id !== participant.id)
@@ -1141,8 +1153,14 @@ const handleConfirm = async () => {
     await resetAllCheckIns()
   } else if (confirmAction.value === 'deleteAll') {
     await deleteAllParticipants()
+  } else if (confirmAction.value === 'deleteScenarioEvent') {
+    await deleteScenarioEvent()
+  } else if (confirmAction.value === 'deleteParticipant' && confirmParticipant.value) {
+    await deleteParticipant(confirmParticipant.value)
   }
   confirmAction.value = null
+  confirmParticipant.value = null
+  confirmMessageOverride.value = null
 }
 
 const copyToClipboard = async (value: string, successKey: string, errorKey: string) => {
@@ -2611,7 +2629,7 @@ onMounted(loadEvent)
                 <button
                   class="rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:border-rose-300"
                   type="button"
-                  @click="deleteParticipant(participant)"
+                  @click="requestDeleteParticipant(participant)"
                 >
                   {{ t('common.delete') }}
                 </button>
@@ -2640,7 +2658,7 @@ onMounted(loadEvent)
             class="rounded border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="deletingScenarioEvent"
             type="button"
-            @click="deleteScenarioEvent"
+            @click="requestDeleteScenarioEvent"
           >
             {{ deletingScenarioEvent ? t('common.saving') : t('admin.eventDetail.devDelete') }}
           </button>
@@ -2729,7 +2747,7 @@ onMounted(loadEvent)
   <ConfirmDialog
     v-model:open="confirmOpen"
     :title="t('common.confirm')"
-    :message="confirmMessageKey ? t(confirmMessageKey) : ''"
+    :message="confirmMessageOverride ?? (confirmMessageKey ? t(confirmMessageKey) : '')"
     :confirm-label="confirmTone === 'danger' ? t('common.delete') : t('common.confirm')"
     :cancel-label="t('common.cancel')"
     :tone="confirmTone"
