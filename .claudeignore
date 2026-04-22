@@ -2,3 +2,16 @@ apps/web/node_modules/
 apps/web/dist/
 apps/api/**/bin/
 apps/api/**/obj/
+
+# Build / cache artifacts
+apps/web/.vite/
+apps/web/.vite-cache/
+*.tsbuildinfo
+coverage/
+apps/api/**/TestResults/
+
+# IDE / OS metadata
+.DS_Store
+.vs/
+.idea/
+.vscode/

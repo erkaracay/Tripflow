@@ -21,6 +21,7 @@ Secondary goal: maximize user experience and operational clarity while keeping c
 ## Repo Structure
 
 - Backend: `apps/api/Tripflow.Api`
+- Backend tests: `apps/api/Tripflow.Api.Tests` (xUnit + Testcontainers + FluentAssertions; real PostgreSQL via Docker; shared fixtures under `Infrastructure/`)
 - Frontend: `apps/web`
 - Existing API patterns:
   - feature code is separated into `Endpoints`, `Contracts`, `Handlers`, and sometimes `Helpers`
@@ -86,7 +87,7 @@ Secondary goal: maximize user experience and operational clarity while keeping c
 - Make the safe action the default:
   - safe defaults
   - reversible toggles
-  - clear confirmations for destructive actions
+  - clear confirmations for destructive actions — use the shared `ConfirmDialog` component; never use native `window.confirm`
 - Mobile-first:
   - avoid button overflow
   - keep the primary action visible
@@ -96,6 +97,8 @@ Secondary goal: maximize user experience and operational clarity while keeping c
   - good targets: modals, drawers, tabs, accordions, segmented controls
   - avoid heavy motion on large tables and operational lists
   - prefer short ease-out transitions
+  - for tabs, accordions, and drawers, prefer directional transitions over abrupt content swaps
+  - do not animate entire pages when only a panel changed
   - respect reduced-motion preferences
 - Reuse shared primitives where available, especially `AppModalShell` and `AppSegmentedControl`.
 - Swipe gestures should stay limited to safe surfaces and must not fight normal vertical scrolling.
@@ -115,14 +118,10 @@ Secondary goal: maximize user experience and operational clarity while keeping c
   - prevent double submit
   - focus the first invalid input on validation error when practical
   - disable inputs and buttons during submit
-  - keep mobile layouts readable
 - Lists:
   - search should be debounced when appropriate
   - pagination should preserve user context and avoid unexpected scroll jumps
   - empty states should explain what to do next
-- Tabs, accordions, and drawers:
-  - prefer directional transitions over abrupt content swaps
-  - do not animate entire pages when only a panel changed
 - Print and PDF views:
   - avoid awkward page breaks
   - avoid printing raw URLs
@@ -171,6 +170,9 @@ Secondary goal: maximize user experience and operational clarity while keeping c
   - `dotnet build`
   - `dotnet run`
   - `dotnet ef database update`
+  - `cd apps/api/Tripflow.Api.Tests && dotnet test`
+- Backend tests use xUnit with Testcontainers (spins up a real PostgreSQL container), so Docker must be running. Shared fixtures like `PostgresFixture` and `IntegrationTestBase` live under `apps/api/Tripflow.Api.Tests/Infrastructure`.
+- Add or update backend tests when changing endpoint contracts, handler behavior, or entity-level business rules.
 - Ensure builds pass for the touched area when feasible.
 - If a change touches UX-critical flows such as login, check-in, or portal docs, do a quick mobile sanity check and verify that error states preserve useful prior data.
 
@@ -186,6 +188,7 @@ Secondary goal: maximize user experience and operational clarity while keeping c
 
 - Never run `git commit` or `git push` without explicit user instruction.
 - When changes are ready, show a summary and ask the user whether to commit and/or push.
+- Commit message style: title only, no description body, no `Co-Authored-By` footer. Keep titles short and imperative.
 
 ## Workflow
 
