@@ -479,6 +479,9 @@ internal static class ScenarioEventGenerator
         var insuranceTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
         var transferTab = tabs.FirstOrDefault(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));
 
+        // Scenario generator builds its own hotel tabs below; clear the seed output
+        // so sort orders are controlled locally. (CreateDefaultDocTabs no longer
+        // seeds Hotel, but keeping a defensive sweep is cheap.)
         tabs.RemoveAll(x => string.Equals(x.Type, "Hotel", StringComparison.Ordinal));
         tabs.RemoveAll(x => string.Equals(x.Type, "Insurance", StringComparison.Ordinal));
         tabs.RemoveAll(x => string.Equals(x.Type, "Transfer", StringComparison.Ordinal));

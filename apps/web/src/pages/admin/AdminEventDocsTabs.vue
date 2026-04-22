@@ -633,6 +633,10 @@ const inUseModalOpen = ref(false)
 const inUseModalTab = ref<EventDocTabDto | null>(null)
 const inUseModalSegments = ref<DocTabInUseSegment[]>([])
 
+const inUseModalCandidateHotels = computed(() =>
+  accommodationTabs.value.filter((tab) => tab.id !== inUseModalTab.value?.id)
+)
+
 const deleteConfirmOpen = ref(false)
 const deleteConfirmTab = ref<EventDocTabDto | null>(null)
 
@@ -1166,6 +1170,7 @@ onMounted(() => {
     :tab-id="inUseModalTab?.id ?? ''"
     :tab-title="inUseModalTab?.title ?? ''"
     :segments="inUseModalSegments"
+    :candidate-hotels="inUseModalCandidateHotels"
     @close="handleInUseModalClose"
     @deleted="handleInUseModalDeleted"
   />

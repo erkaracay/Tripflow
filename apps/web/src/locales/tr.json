@@ -1349,7 +1349,7 @@
       "deleteConfirmTitle": "Sekmeyi sil",
       "deleteInUse": {
         "title": "Silinemiyor — konaklama planları bu oteli kullanıyor",
-        "description": "Bu otel sekmesini silmeden önce aşağıdaki konaklama planlarını silin. Bir planı silmek katılımcı oda atamalarını da kaldırır.",
+        "description": "Bu otel sekmesini silmeden önce aşağıdaki konaklama planlarını silin veya başka otele taşıyın. Bir planı silmek katılımcı oda atamalarını da kaldırır.",
         "segmentDeleteWarning": "{count} katılımcı ataması da silinecek.",
         "segmentsRemaining": "{count} plan kaldı",
         "allClear": "Tüm planlar temizlendi. Artık otel sekmesini silebilirsiniz.",
@@ -1357,7 +1357,13 @@
         "deleteTab": "Otel sekmesini sil",
         "close": "Kapat",
         "tabDeleted": "Otel sekmesi silindi.",
-        "segmentDeleted": "Plan silindi."
+        "segmentDeleted": "Plan silindi.",
+        "reassignSegment": "Taşı",
+        "reassignPickHotel": "Hedef otel seç",
+        "reassignApply": "Uygula",
+        "reassignCancel": "Vazgeç",
+        "reassignSuccess": "Plan taşındı.",
+        "reassignNoCandidates": "Taşınacak başka otel yok"
       },
       "validation": {
         "titleRequired": "Başlık gerekli.",

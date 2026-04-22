@@ -1355,7 +1355,7 @@
       "deleteConfirmTitle": "Delete tab",
       "deleteInUse": {
         "title": "Cannot delete — accommodation segments use this hotel",
-        "description": "Delete the following accommodation segments before deleting this hotel tab. Deleting a segment also removes its participant room assignments.",
+        "description": "Delete or move the following accommodation segments to another hotel before deleting this hotel tab. Deleting a segment also removes its participant room assignments.",
         "segmentDeleteWarning": "{count} participant assignment(s) will also be removed.",
         "segmentsRemaining": "{count} segment(s) remaining",
         "allClear": "All segments cleared. You can now delete the hotel tab.",
@@ -1363,7 +1363,13 @@
         "deleteTab": "Delete hotel tab",
         "close": "Close",
         "tabDeleted": "Hotel tab deleted.",
-        "segmentDeleted": "Plan deleted."
+        "segmentDeleted": "Plan deleted.",
+        "reassignSegment": "Move",
+        "reassignPickHotel": "Pick target hotel",
+        "reassignApply": "Apply",
+        "reassignCancel": "Cancel",
+        "reassignSuccess": "Segment moved.",
+        "reassignNoCandidates": "No other hotel available"
       },
       "validation": {
         "titleRequired": "Title is required.",

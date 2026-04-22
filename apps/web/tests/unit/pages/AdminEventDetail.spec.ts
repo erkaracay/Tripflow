@@ -89,6 +89,24 @@ describe('AdminEventDetail', () => {
       .mockResolvedValueOnce([])
     vi.mocked(apiDelete).mockResolvedValue({ eventId: eventFixture.id, deleted: true })
 
+    const ConfirmDialogStub = defineComponent({
+      props: {
+        open: { type: Boolean, required: true },
+      },
+      emits: ['confirm', 'cancel', 'update:open'],
+      template: `
+        <div v-if="open" data-test="confirm-dialog">
+          <button
+            class="confirm-dialog-submit"
+            type="button"
+            @click="$emit('update:open', false); $emit('confirm')"
+          >
+            confirm
+          </button>
+        </div>
+      `,
+    })
+
     const router = createTestRouter()
     await router.push(`/admin/events/${eventFixture.id}`)
 
@@ -106,7 +124,7 @@ describe('AdminEventDetail', () => {
           },
           AppCombobox: true,
           AppMultiCombobox: true,
-          ConfirmDialog: true,
+          ConfirmDialog: ConfirmDialogStub,
           WhatsAppIcon: true,
           RichTextEditor: true,
         },
@@ -123,6 +141,11 @@ describe('AdminEventDetail', () => {
 
     expect(deleteButton).toBeDefined()
     await deleteButton!.trigger('click')
+    await flushPromises()
+
+    const confirmButton = wrapper.find('.confirm-dialog-submit')
+    expect(confirmButton.exists()).toBe(true)
+    await confirmButton.trigger('click')
     await flushPromises()
 
     expect(apiDelete).toHaveBeenCalledWith(`/api/dev/scenario-events/${eventFixture.id}`)
