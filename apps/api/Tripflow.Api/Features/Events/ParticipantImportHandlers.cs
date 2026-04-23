@@ -75,13 +75,17 @@ internal static class ParticipantImportHandlers
         "arrival_transfer_plate",
         "arrival_transfer_driver_info",
         "arrival_transfer_note",
+        "arrival_transfer_seat_no",
+        "arrival_transfer_compartment_no",
         "return_transfer_pickup_time",
         "return_transfer_pickup_place",
         "return_transfer_dropoff_place",
         "return_transfer_vehicle",
         "return_transfer_plate",
         "return_transfer_driver_info",
-        "return_transfer_note"
+        "return_transfer_note",
+        "return_transfer_seat_no",
+        "return_transfer_compartment_no"
     ];
 
     private static readonly string[] ParticipantTemplateHeaders =
@@ -107,13 +111,17 @@ internal static class ParticipantImportHandlers
         "arrival_transfer_plate",
         "arrival_transfer_driver_info",
         "arrival_transfer_note",
+        "arrival_transfer_seat_no",
+        "arrival_transfer_compartment_no",
         "return_transfer_pickup_time",
         "return_transfer_pickup_place",
         "return_transfer_dropoff_place",
         "return_transfer_vehicle",
         "return_transfer_plate",
         "return_transfer_driver_info",
-        "return_transfer_note"
+        "return_transfer_note",
+        "return_transfer_seat_no",
+        "return_transfer_compartment_no"
     ];
 
     private static readonly string[] ParticipantTemplateExampleRow =
@@ -139,13 +147,17 @@ internal static class ParticipantImportHandlers
         "34 TF 001",
         "Driver Ayse",
         "Meet at gate 5",
+        "",
+        "",
         "18:00",
         "Hotel Lobby",
         "Airport",
         "Vito",
         "34 RT 001",
         "Return Driver Ayse",
-        "Pickup 15 min earlier"
+        "Pickup 15 min earlier",
+        "",
+        ""
     ];
 
     private static readonly string[] FlightSegmentRequiredHeaders =
@@ -2434,13 +2446,17 @@ internal static class ParticipantImportHandlers
             $"34 TF {participant.TcNo[^3..]}",
             $"Driver {participant.FirstName}",
             "Meet at gate 5",
+            "",
+            "",
             "18:00",
             "Hotel Lobby",
             "Airport",
             "Vito",
             $"34 RT {participant.TcNo[^3..]}",
             $"Return Driver {participant.FirstName}",
-            "Pickup 15 min earlier"
+            "Pickup 15 min earlier",
+            "",
+            ""
         ];
 
     private static List<string[]> BuildExampleFlightSegments(
@@ -3214,6 +3230,8 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("gelis transfer surucu bilgileri")] = "arrival_transfer_driver_info";
         map[NormalizeHeader("gelis transfer sürücü bilgileri")] = "arrival_transfer_driver_info";
         map[NormalizeHeader("gelis transfer not")] = "arrival_transfer_note";
+        map[NormalizeHeader("gelis transfer koltuk no")] = "arrival_transfer_seat_no";
+        map[NormalizeHeader("gelis transfer kompartman no")] = "arrival_transfer_compartment_no";
 
         map[NormalizeHeader("donus transfer alinis saati")] = "return_transfer_pickup_time";
         map[NormalizeHeader("donus transfer alinis yeri")] = "return_transfer_pickup_place";
@@ -3225,6 +3243,8 @@ internal static class ParticipantImportHandlers
         map[NormalizeHeader("donus transfer surucu bilgileri")] = "return_transfer_driver_info";
         map[NormalizeHeader("donus transfer sürücü bilgileri")] = "return_transfer_driver_info";
         map[NormalizeHeader("donus transfer not")] = "return_transfer_note";
+        map[NormalizeHeader("donus transfer koltuk no")] = "return_transfer_seat_no";
+        map[NormalizeHeader("donus transfer kompartman no")] = "return_transfer_compartment_no";
 
         return map;
     }
@@ -3958,6 +3978,8 @@ internal static class ParticipantImportHandlers
         details.ArrivalTransferPlate = row.GetValue("arrival_transfer_plate");
         details.ArrivalTransferDriverInfo = row.GetValue("arrival_transfer_driver_info");
         details.ArrivalTransferNote = row.GetValue("arrival_transfer_note");
+        details.ArrivalTransferSeatNo = row.GetValue("arrival_transfer_seat_no");
+        details.ArrivalTransferCompartmentNo = row.GetValue("arrival_transfer_compartment_no");
         details.ReturnTransferPickupTime = returnTransferPickupTime;
         details.ReturnTransferPickupPlace = row.GetValue("return_transfer_pickup_place");
         details.ReturnTransferDropoffPlace = row.GetValue("return_transfer_dropoff_place");
@@ -3965,6 +3987,8 @@ internal static class ParticipantImportHandlers
         details.ReturnTransferPlate = row.GetValue("return_transfer_plate");
         details.ReturnTransferDriverInfo = row.GetValue("return_transfer_driver_info");
         details.ReturnTransferNote = row.GetValue("return_transfer_note");
+        details.ReturnTransferSeatNo = row.GetValue("return_transfer_seat_no");
+        details.ReturnTransferCompartmentNo = row.GetValue("return_transfer_compartment_no");
     }
 
     private static bool HasParticipantDetailValue(ImportRow row, bool ignoreAccommodationFields)

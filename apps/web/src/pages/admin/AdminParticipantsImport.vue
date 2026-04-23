@@ -9,6 +9,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import ImportTemplateHelpModal from '../../components/admin/ImportTemplateHelpModal.vue'
 import InsuranceBulkModal from '../../components/admin/InsuranceBulkModal.vue'
+import TransferBulkModal from '../../components/admin/TransferBulkModal.vue'
 import AppCombobox from '../../components/ui/AppCombobox.vue'
 import AppSegmentedControl from '../../components/ui/AppSegmentedControl.vue'
 import type {
@@ -815,6 +816,8 @@ const insuranceBulkModalOpen = ref(false)
 const insuranceBulkDefaultTab = ref<'common' | 'policy'>('common')
 const insuranceParticipants = ref<Participant[]>([])
 const insuranceParticipantsLoading = ref(false)
+const transferBulkModalOpen = ref(false)
+const transferBulkDefaultTab = ref<'common' | 'seats'>('common')
 
 const loadInsuranceParticipants = async () => {
   if (insuranceParticipantsLoading.value || !eventId.value) {
@@ -841,6 +844,18 @@ const openInsuranceBulkModal = async (tab: 'common' | 'policy') => {
 }
 
 const handleInsuranceApplied = async () => {
+  await loadInsuranceParticipants()
+}
+
+const openTransferBulkModal = async (tab: 'common' | 'seats') => {
+  transferBulkDefaultTab.value = tab
+  if (tab === 'seats') {
+    await loadInsuranceParticipants()
+  }
+  transferBulkModalOpen.value = true
+}
+
+const handleTransferApplied = async () => {
   await loadInsuranceParticipants()
 }
 
@@ -1425,6 +1440,21 @@ watch(summary, () => {
             >
               {{ t('admin.events.insuranceBulk.toolbarButtonPolicy') }}
             </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300"
+              type="button"
+              @click="openTransferBulkModal('common')"
+            >
+              {{ t('admin.events.transferBulk.toolbarButtonCommon') }}
+            </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="insuranceParticipantsLoading"
+              @click="openTransferBulkModal('seats')"
+            >
+              {{ t('admin.events.transferBulk.toolbarButtonSeats') }}
+            </button>
           </div>
         </div>
       </section>
@@ -1443,6 +1473,15 @@ watch(summary, () => {
         :default-tab="insuranceBulkDefaultTab"
         @close="insuranceBulkModalOpen = false"
         @applied="handleInsuranceApplied"
+      />
+
+      <TransferBulkModal
+        :open="transferBulkModalOpen"
+        :event-id="eventId"
+        :participants="insuranceParticipants"
+        :default-tab="transferBulkDefaultTab"
+        @close="transferBulkModalOpen = false"
+        @applied="handleTransferApplied"
       />
     </template>
   </div>

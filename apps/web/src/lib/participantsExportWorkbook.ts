@@ -211,6 +211,8 @@ export const PARTICIPANTS_SHEET_HEADERS = [
   'arrival_transfer_vehicle',
   'arrival_transfer_plate',
   'arrival_transfer_driver_info',
+  'arrival_transfer_seat_no',
+  'arrival_transfer_compartment_no',
   'arrival_transfer_note',
   'return_transfer_pickup_time',
   'return_transfer_pickup_place',
@@ -218,6 +220,8 @@ export const PARTICIPANTS_SHEET_HEADERS = [
   'return_transfer_vehicle',
   'return_transfer_plate',
   'return_transfer_driver_info',
+  'return_transfer_seat_no',
+  'return_transfer_compartment_no',
   'return_transfer_note',
 ]
 
@@ -283,6 +287,8 @@ export const buildParticipantsSheetRows = (participants: ParticipantExportSource
       toText(details.arrivalTransferVehicle),
       toText(details.arrivalTransferPlate),
       toText(details.arrivalTransferDriverInfo),
+      toText(details.arrivalTransferSeatNo),
+      toText(details.arrivalTransferCompartmentNo),
       toText(details.arrivalTransferNote),
       toText(details.returnTransferPickupTime),
       toText(details.returnTransferPickupPlace),
@@ -290,6 +296,8 @@ export const buildParticipantsSheetRows = (participants: ParticipantExportSource
       toText(details.returnTransferVehicle),
       toText(details.returnTransferPlate),
       toText(details.returnTransferDriverInfo),
+      toText(details.returnTransferSeatNo),
+      toText(details.returnTransferCompartmentNo),
       toText(details.returnTransferNote),
     ]
   })

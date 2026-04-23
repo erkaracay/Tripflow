@@ -14,6 +14,10 @@ import type {
   BulkApplyCommonInsuranceResponse,
   BulkMatchInsurancePolicyRequest,
   BulkMatchInsurancePolicyResponse,
+  BulkApplyCommonTransferRequest,
+  BulkApplyCommonTransferResponse,
+  BulkMatchTransferSeatsRequest,
+  BulkMatchTransferSeatsResponse,
   GuideAccommodationParticipantResponse,
   PortalLoginResponse,
   PortalMealResponse,
@@ -212,6 +216,24 @@ export const bulkMatchInsurancePolicy = async (
 ): Promise<BulkMatchInsurancePolicyResponse> =>
   apiPost<BulkMatchInsurancePolicyResponse>(
     `/api/events/${eventId}/participants/insurance/bulk-match-policy`,
+    payload
+  )
+
+export const bulkApplyCommonTransfer = async (
+  eventId: string,
+  payload: BulkApplyCommonTransferRequest
+): Promise<BulkApplyCommonTransferResponse> =>
+  apiPost<BulkApplyCommonTransferResponse>(
+    `/api/events/${eventId}/participants/transfers/bulk-apply-common`,
+    payload
+  )
+
+export const bulkMatchTransferSeats = async (
+  eventId: string,
+  payload: BulkMatchTransferSeatsRequest
+): Promise<BulkMatchTransferSeatsResponse> =>
+  apiPost<BulkMatchTransferSeatsResponse>(
+    `/api/events/${eventId}/participants/transfers/bulk-match-seats`,
     payload
   )
 

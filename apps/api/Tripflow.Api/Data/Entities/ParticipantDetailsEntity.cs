@@ -60,6 +60,8 @@ public sealed class ParticipantDetailsEntity
     public string? ArrivalTransferPlate { get; set; }
     public string? ArrivalTransferDriverInfo { get; set; }
     public string? ArrivalTransferNote { get; set; }
+    public string? ArrivalTransferSeatNo { get; set; }
+    public string? ArrivalTransferCompartmentNo { get; set; }
 
     public TimeOnly? ReturnTransferPickupTime { get; set; }
     public string? ReturnTransferPickupPlace { get; set; }
@@ -68,4 +70,6 @@ public sealed class ParticipantDetailsEntity
     public string? ReturnTransferPlate { get; set; }
     public string? ReturnTransferDriverInfo { get; set; }
     public string? ReturnTransferNote { get; set; }
+    public string? ReturnTransferSeatNo { get; set; }
+    public string? ReturnTransferCompartmentNo { get; set; }
 }

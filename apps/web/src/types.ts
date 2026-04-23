@@ -228,6 +228,8 @@ export type ParticipantDetails = {
   arrivalTransferPlate?: string | null
   arrivalTransferDriverInfo?: string | null
   arrivalTransferNote?: string | null
+  arrivalTransferSeatNo?: string | null
+  arrivalTransferCompartmentNo?: string | null
   returnTransferPickupTime?: string | null
   returnTransferPickupPlace?: string | null
   returnTransferDropoffPlace?: string | null
@@ -235,6 +237,8 @@ export type ParticipantDetails = {
   returnTransferPlate?: string | null
   returnTransferDriverInfo?: string | null
   returnTransferNote?: string | null
+  returnTransferSeatNo?: string | null
+  returnTransferCompartmentNo?: string | null
 }
 
 export type FlightSegment = {
@@ -309,6 +313,47 @@ export type BulkMatchInsurancePolicyRequest = {
 }
 
 export type BulkMatchInsurancePolicyResponse = {
+  appliedCount: number
+  unmatchedTcNos: string[]
+}
+
+export type BulkTransferCommonLeg = {
+  pickupTime?: string | null
+  pickupPlace?: string | null
+  dropoffPlace?: string | null
+  vehicle?: string | null
+  plate?: string | null
+  driverInfo?: string | null
+  note?: string | null
+}
+
+export type BulkApplyCommonTransferOverwriteMode = 'only_empty' | 'overwrite'
+
+export type BulkApplyCommonTransferRequest = {
+  arrival?: BulkTransferCommonLeg | null
+  return?: BulkTransferCommonLeg | null
+  scope?: 'all'
+  overwriteMode: BulkApplyCommonTransferOverwriteMode
+}
+
+export type BulkApplyCommonTransferResponse = {
+  affectedCount: number
+  skippedCount: number
+}
+
+export type BulkMatchTransferSeatsEntry = {
+  tcNo: string
+  arrivalSeatNo?: string | null
+  arrivalCompartmentNo?: string | null
+  returnSeatNo?: string | null
+  returnCompartmentNo?: string | null
+}
+
+export type BulkMatchTransferSeatsRequest = {
+  entries: BulkMatchTransferSeatsEntry[]
+}
+
+export type BulkMatchTransferSeatsResponse = {
   appliedCount: number
   unmatchedTcNos: string[]
 }
@@ -992,6 +1037,8 @@ export type PortalTransferInfo = {
   plate?: string | null
   driverInfo?: string | null
   note?: string | null
+  seatNo?: string | null
+  compartmentNo?: string | null
 }
 
 export type PortalParticipantTravel = {

@@ -2508,6 +2508,8 @@ internal static class EventsHandlers
                 row.details.ArrivalTransferPlate,
                 row.details.ArrivalTransferDriverInfo,
                 row.details.ArrivalTransferNote,
+                row.details.ArrivalTransferSeatNo,
+                row.details.ArrivalTransferCompartmentNo,
                 row.details.ReturnTransferPickupTime?.ToString("HH:mm"),
                 row.details.ReturnTransferPickupPlace,
                 row.details.ReturnTransferDropoffPlace,
@@ -2515,6 +2517,8 @@ internal static class EventsHandlers
                 row.details.ReturnTransferPlate,
                 row.details.ReturnTransferDriverInfo,
                 row.details.ReturnTransferNote,
+                row.details.ReturnTransferSeatNo,
+                row.details.ReturnTransferCompartmentNo,
                 row.details.AccommodationDocTabId)))
             .ToArray();
 
@@ -3891,6 +3895,410 @@ internal static class EventsHandlers
         return Results.Ok(new BulkMatchInsurancePolicyResponse(applied, unmatched.ToArray()));
     }
 
+    internal static async Task<IResult> BulkApplyCommonTransfer(
+        string eventId,
+        BulkApplyCommonTransferRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var arrival = NormalizeCommonLeg(request.Arrival);
+        var returnLeg = NormalizeCommonLeg(request.Return);
+
+        if (arrival is null && returnLeg is null)
+        {
+            return EventsHelpers.BadRequest(
+                "no_fields_provided",
+                "arrival",
+                "At least one arrival or return transfer field must be provided.");
+        }
+
+        TimeOnly? arrivalPickupTime = null;
+        if (arrival is not null && !string.IsNullOrWhiteSpace(arrival.PickupTime))
+        {
+            if (!TryParseTimeOnly(arrival.PickupTime, out arrivalPickupTime))
+            {
+                return EventsHelpers.BadRequest(
+                    "invalid_arrival_pickup_time",
+                    "arrival.pickupTime",
+                    "Arrival transfer pickup time must be in HH:mm format.");
+            }
+        }
+
+        TimeOnly? returnPickupTime = null;
+        if (returnLeg is not null && !string.IsNullOrWhiteSpace(returnLeg.PickupTime))
+        {
+            if (!TryParseTimeOnly(returnLeg.PickupTime, out returnPickupTime))
+            {
+                return EventsHelpers.BadRequest(
+                    "invalid_return_pickup_time",
+                    "return.pickupTime",
+                    "Return transfer pickup time must be in HH:mm format.");
+            }
+        }
+
+        var scope = (request.Scope ?? "all").Trim().ToLowerInvariant();
+        if (scope != "all")
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_scope",
+                "scope",
+                "Scope must be 'all'.");
+        }
+
+        var overwriteMode = (request.OverwriteMode ?? "only_empty").Trim().ToLowerInvariant();
+        if (overwriteMode != "only_empty" && overwriteMode != "overwrite")
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_overwrite_mode",
+                "overwriteMode",
+                "Overwrite mode must be 'only_empty' or 'overwrite'.");
+        }
+
+        var overwrite = overwriteMode == "overwrite";
+
+        var participants = await db.Participants
+            .Include(x => x.Details)
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var affected = 0;
+        var skipped = 0;
+
+        foreach (var participant in participants)
+        {
+            participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+            var details = participant.Details;
+            var changed = false;
+
+            if (arrival is not null)
+            {
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferPickupPlace,
+                    value => details.ArrivalTransferPickupPlace = value,
+                    arrival.PickupPlace,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferDropoffPlace,
+                    value => details.ArrivalTransferDropoffPlace = value,
+                    arrival.DropoffPlace,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferVehicle,
+                    value => details.ArrivalTransferVehicle = value,
+                    arrival.Vehicle,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferPlate,
+                    value => details.ArrivalTransferPlate = value,
+                    arrival.Plate,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferDriverInfo,
+                    value => details.ArrivalTransferDriverInfo = value,
+                    arrival.DriverInfo,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ArrivalTransferNote,
+                    value => details.ArrivalTransferNote = value,
+                    arrival.Note,
+                    overwrite);
+                if (arrivalPickupTime is not null
+                    && (overwrite || details.ArrivalTransferPickupTime is null)
+                    && details.ArrivalTransferPickupTime != arrivalPickupTime)
+                {
+                    details.ArrivalTransferPickupTime = arrivalPickupTime;
+                    changed = true;
+                }
+            }
+
+            if (returnLeg is not null)
+            {
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferPickupPlace,
+                    value => details.ReturnTransferPickupPlace = value,
+                    returnLeg.PickupPlace,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferDropoffPlace,
+                    value => details.ReturnTransferDropoffPlace = value,
+                    returnLeg.DropoffPlace,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferVehicle,
+                    value => details.ReturnTransferVehicle = value,
+                    returnLeg.Vehicle,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferPlate,
+                    value => details.ReturnTransferPlate = value,
+                    returnLeg.Plate,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferDriverInfo,
+                    value => details.ReturnTransferDriverInfo = value,
+                    returnLeg.DriverInfo,
+                    overwrite);
+                changed |= ApplyTextField(
+                    () => details.ReturnTransferNote,
+                    value => details.ReturnTransferNote = value,
+                    returnLeg.Note,
+                    overwrite);
+                if (returnPickupTime is not null
+                    && (overwrite || details.ReturnTransferPickupTime is null)
+                    && details.ReturnTransferPickupTime != returnPickupTime)
+                {
+                    details.ReturnTransferPickupTime = returnPickupTime;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                affected++;
+            }
+            else
+            {
+                skipped++;
+            }
+        }
+
+        if (affected > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.transfer.bulk_common",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("scope", scope),
+                    ("overwriteMode", overwriteMode),
+                    ("affectedCount", affected),
+                    ("skippedCount", skipped),
+                    ("hasArrival", arrival is not null),
+                    ("hasReturn", returnLeg is not null))),
+            ct);
+
+        return Results.Ok(new BulkApplyCommonTransferResponse(affected, skipped));
+    }
+
+    internal static async Task<IResult> BulkMatchTransferSeats(
+        string eventId,
+        BulkMatchTransferSeatsRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        var entries = request.Entries ?? Array.Empty<BulkMatchTransferSeatsEntry>();
+        if (entries.Length == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_entries",
+                "entries",
+                "At least one TC/seat entry is required.");
+        }
+
+        var entriesByTcNo = new Dictionary<string, BulkMatchTransferSeatsEntry>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            var tcNo = NormalizeTcNo(entry?.TcNo);
+            if (tcNo.Length != 11)
+            {
+                continue;
+            }
+            var arrivalSeat = NormalizeClearableText(entry!.ArrivalSeatNo);
+            var arrivalCompartment = NormalizeClearableText(entry.ArrivalCompartmentNo);
+            var returnSeat = NormalizeClearableText(entry.ReturnSeatNo);
+            var returnCompartment = NormalizeClearableText(entry.ReturnCompartmentNo);
+            if (arrivalSeat is null && arrivalCompartment is null && returnSeat is null && returnCompartment is null)
+            {
+                continue;
+            }
+            entriesByTcNo[tcNo] = new BulkMatchTransferSeatsEntry(
+                tcNo,
+                arrivalSeat,
+                arrivalCompartment,
+                returnSeat,
+                returnCompartment);
+        }
+
+        if (entriesByTcNo.Count == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_valid_entries",
+                "entries",
+                "No entries with a valid 11-digit TC number and at least one seat/compartment value were provided.");
+        }
+
+        var participants = await db.Participants
+            .Include(x => x.Details)
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .ToListAsync(ct);
+
+        var participantsByTcNo = participants
+            .Where(x => !string.IsNullOrWhiteSpace(x.TcNo))
+            .GroupBy(x => NormalizeTcNo(x.TcNo), StringComparer.Ordinal)
+            .Where(g => g.Key.Length == 11)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var applied = 0;
+        var unmatched = new List<string>();
+
+        foreach (var (tcNo, entry) in entriesByTcNo)
+        {
+            if (!participantsByTcNo.TryGetValue(tcNo, out var matches) || matches.Count != 1)
+            {
+                unmatched.Add(tcNo);
+                continue;
+            }
+
+            var participant = matches[0];
+            participant.Details ??= new ParticipantDetailsEntity { ParticipantId = participant.Id };
+            var details = participant.Details;
+
+            if (entry.ArrivalSeatNo is not null)
+            {
+                details.ArrivalTransferSeatNo = string.IsNullOrWhiteSpace(entry.ArrivalSeatNo) ? null : entry.ArrivalSeatNo;
+            }
+            if (entry.ArrivalCompartmentNo is not null)
+            {
+                details.ArrivalTransferCompartmentNo = string.IsNullOrWhiteSpace(entry.ArrivalCompartmentNo) ? null : entry.ArrivalCompartmentNo;
+            }
+            if (entry.ReturnSeatNo is not null)
+            {
+                details.ReturnTransferSeatNo = string.IsNullOrWhiteSpace(entry.ReturnSeatNo) ? null : entry.ReturnSeatNo;
+            }
+            if (entry.ReturnCompartmentNo is not null)
+            {
+                details.ReturnTransferCompartmentNo = string.IsNullOrWhiteSpace(entry.ReturnCompartmentNo) ? null : entry.ReturnCompartmentNo;
+            }
+
+            applied++;
+        }
+
+        if (applied > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.transfer.bulk_seat_match",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("submittedCount", entriesByTcNo.Count),
+                    ("appliedCount", applied),
+                    ("unmatchedCount", unmatched.Count))),
+            ct);
+
+        return Results.Ok(new BulkMatchTransferSeatsResponse(applied, unmatched.ToArray()));
+    }
+
+    private static BulkTransferCommonLeg? NormalizeCommonLeg(BulkTransferCommonLeg? leg)
+    {
+        if (leg is null)
+        {
+            return null;
+        }
+
+        var pickupTime = NormalizeOptionalText(leg.PickupTime);
+        var pickupPlace = NormalizeOptionalText(leg.PickupPlace);
+        var dropoffPlace = NormalizeOptionalText(leg.DropoffPlace);
+        var vehicle = NormalizeOptionalText(leg.Vehicle);
+        var plate = NormalizeOptionalText(leg.Plate);
+        var driverInfo = NormalizeOptionalText(leg.DriverInfo);
+        var note = NormalizeOptionalText(leg.Note);
+
+        if (pickupTime is null
+            && pickupPlace is null
+            && dropoffPlace is null
+            && vehicle is null
+            && plate is null
+            && driverInfo is null
+            && note is null)
+        {
+            return null;
+        }
+
+        return new BulkTransferCommonLeg(
+            pickupTime,
+            pickupPlace,
+            dropoffPlace,
+            vehicle,
+            plate,
+            driverInfo,
+            note);
+    }
+
+    private static bool ApplyTextField(
+        Func<string?> getter,
+        Action<string?> setter,
+        string? incoming,
+        bool overwrite)
+    {
+        if (incoming is null)
+        {
+            return false;
+        }
+        var current = getter();
+        if (!overwrite && !string.IsNullOrWhiteSpace(current))
+        {
+            return false;
+        }
+        if (string.Equals(current, incoming, StringComparison.Ordinal))
+        {
+            return false;
+        }
+        setter(incoming);
+        return true;
+    }
+
     internal static async Task<IResult> SetParticipantWillNotAttend(
         string eventId,
         string participantId,
@@ -4740,6 +5148,17 @@ internal static class EventsHandlers
 
         var trimmed = value.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    // Distinguishes "not provided" (null) from "explicit clear" (empty string).
+    // Used by endpoints that diff client-side and send only changed fields.
+    private static string? NormalizeClearableText(string? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+        return value.Trim();
     }
 
     private static bool IsUniqueViolation(DbUpdateException exception)
@@ -5759,6 +6178,8 @@ internal static class EventsHandlers
             details.ArrivalTransferPlate,
             details.ArrivalTransferDriverInfo,
             details.ArrivalTransferNote,
+            details.ArrivalTransferSeatNo,
+            details.ArrivalTransferCompartmentNo,
             details.ReturnTransferPickupTime?.ToString("HH:mm"),
             details.ReturnTransferPickupPlace,
             details.ReturnTransferDropoffPlace,
@@ -5766,6 +6187,8 @@ internal static class EventsHandlers
             details.ReturnTransferPlate,
             details.ReturnTransferDriverInfo,
             details.ReturnTransferNote,
+            details.ReturnTransferSeatNo,
+            details.ReturnTransferCompartmentNo,
             details.AccommodationDocTabId);
     }
 
@@ -6215,6 +6638,8 @@ internal static class EventsHandlers
         details.ArrivalTransferPlate = request.ArrivalTransferPlate;
         details.ArrivalTransferDriverInfo = request.ArrivalTransferDriverInfo;
         details.ArrivalTransferNote = request.ArrivalTransferNote;
+        details.ArrivalTransferSeatNo = NormalizeOptionalText(request.ArrivalTransferSeatNo);
+        details.ArrivalTransferCompartmentNo = NormalizeOptionalText(request.ArrivalTransferCompartmentNo);
         details.ReturnTransferPickupTime = returnTransferPickupTime;
         details.ReturnTransferPickupPlace = request.ReturnTransferPickupPlace;
         details.ReturnTransferDropoffPlace = request.ReturnTransferDropoffPlace;
@@ -6222,6 +6647,8 @@ internal static class EventsHandlers
         details.ReturnTransferPlate = request.ReturnTransferPlate;
         details.ReturnTransferDriverInfo = request.ReturnTransferDriverInfo;
         details.ReturnTransferNote = request.ReturnTransferNote;
+        details.ReturnTransferSeatNo = NormalizeOptionalText(request.ReturnTransferSeatNo);
+        details.ReturnTransferCompartmentNo = NormalizeOptionalText(request.ReturnTransferCompartmentNo);
         error = string.Empty;
         return true;
     }

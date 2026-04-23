@@ -126,4 +126,6 @@ public sealed record PortalTransferInfo(
     string? Vehicle,
     string? Plate,
     string? DriverInfo,
-    string? Note);
+    string? Note,
+    string? SeatNo,
+    string? CompartmentNo);

@@ -483,6 +483,20 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPost("/{eventId}/participants/transfers/bulk-apply-common", EventsHandlers.BulkApplyCommonTransfer)
+            .WithSummary("Bulk apply common transfer fields")
+            .WithDescription("Applies arrival and/or return transfer fields to all event participants.")
+            .Produces<BulkApplyCommonTransferResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        admin.MapPost("/{eventId}/participants/transfers/bulk-match-seats", EventsHandlers.BulkMatchTransferSeats)
+            .WithSummary("Bulk match transfer seat/compartment by TC number")
+            .WithDescription("Applies seat and compartment numbers to participants by matching TC numbers; unmatched TC numbers are returned.")
+            .Produces<BulkMatchTransferSeatsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapGet("/{eventId}/participants/import/template", ParticipantImportHandlers.DownloadImportTemplate)
             .WithSummary("Download participant import template")
             .WithDescription("Downloads a CSV or XLSX import template for participants.")
