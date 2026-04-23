@@ -381,7 +381,9 @@ internal static class PortalLoginHandlers
             details?.ArrivalTransferVehicle,
             details?.ArrivalTransferPlate,
             details?.ArrivalTransferDriverInfo,
-            details?.ArrivalTransferNote);
+            details?.ArrivalTransferNote,
+            details?.ArrivalTransferSeatNo,
+            details?.ArrivalTransferCompartmentNo);
 
         var transferReturn = BuildTransferInfo(
             details?.ReturnTransferPickupTime,
@@ -390,7 +392,9 @@ internal static class PortalLoginHandlers
             details?.ReturnTransferVehicle,
             details?.ReturnTransferPlate,
             details?.ReturnTransferDriverInfo,
-            details?.ReturnTransferNote);
+            details?.ReturnTransferNote,
+            details?.ReturnTransferSeatNo,
+            details?.ReturnTransferCompartmentNo);
 
         var travel = new PortalParticipantTravel(
             details?.RoomNo,
@@ -507,7 +511,9 @@ internal static class PortalLoginHandlers
         string? vehicle,
         string? plate,
         string? driverInfo,
-        string? note)
+        string? note,
+        string? seatNo,
+        string? compartmentNo)
     {
         if (pickupTime is null
             && string.IsNullOrWhiteSpace(pickupPlace)
@@ -515,7 +521,9 @@ internal static class PortalLoginHandlers
             && string.IsNullOrWhiteSpace(vehicle)
             && string.IsNullOrWhiteSpace(plate)
             && string.IsNullOrWhiteSpace(driverInfo)
-            && string.IsNullOrWhiteSpace(note))
+            && string.IsNullOrWhiteSpace(note)
+            && string.IsNullOrWhiteSpace(seatNo)
+            && string.IsNullOrWhiteSpace(compartmentNo))
         {
             return null;
         }
@@ -527,7 +535,9 @@ internal static class PortalLoginHandlers
             vehicle,
             plate,
             driverInfo,
-            note);
+            note,
+            SeatNo: seatNo,
+            CompartmentNo: compartmentNo);
     }
 
     private static JsonElement ParseContentJson(string? json)

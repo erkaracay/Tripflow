@@ -514,6 +514,8 @@ internal static class GuideHandlers
             details.ArrivalTransferPlate,
             details.ArrivalTransferDriverInfo,
             details.ArrivalTransferNote,
+            details.ArrivalTransferSeatNo,
+            details.ArrivalTransferCompartmentNo,
             details.ReturnTransferPickupTime?.ToString("HH:mm"),
             details.ReturnTransferPickupPlace,
             details.ReturnTransferDropoffPlace,
@@ -521,6 +523,8 @@ internal static class GuideHandlers
             details.ReturnTransferPlate,
             details.ReturnTransferDriverInfo,
             details.ReturnTransferNote,
+            details.ReturnTransferSeatNo,
+            details.ReturnTransferCompartmentNo,
             details.AccommodationDocTabId);
     }
 

@@ -200,6 +200,8 @@ public sealed record ParticipantDetailsRequest(
     string? ArrivalTransferPlate,
     string? ArrivalTransferDriverInfo,
     string? ArrivalTransferNote,
+    string? ArrivalTransferSeatNo,
+    string? ArrivalTransferCompartmentNo,
     string? ReturnTransferPickupTime,
     string? ReturnTransferPickupPlace,
     string? ReturnTransferDropoffPlace,
@@ -207,6 +209,8 @@ public sealed record ParticipantDetailsRequest(
     string? ReturnTransferPlate,
     string? ReturnTransferDriverInfo,
     string? ReturnTransferNote,
+    string? ReturnTransferSeatNo,
+    string? ReturnTransferCompartmentNo,
     Guid? AccommodationDocTabId = null);
 
 public sealed record ParticipantDetailsDto(
@@ -258,6 +262,8 @@ public sealed record ParticipantDetailsDto(
     string? ArrivalTransferPlate,
     string? ArrivalTransferDriverInfo,
     string? ArrivalTransferNote,
+    string? ArrivalTransferSeatNo,
+    string? ArrivalTransferCompartmentNo,
     string? ReturnTransferPickupTime,
     string? ReturnTransferPickupPlace,
     string? ReturnTransferDropoffPlace,
@@ -265,6 +271,8 @@ public sealed record ParticipantDetailsDto(
     string? ReturnTransferPlate,
     string? ReturnTransferDriverInfo,
     string? ReturnTransferNote,
+    string? ReturnTransferSeatNo,
+    string? ReturnTransferCompartmentNo,
     Guid? AccommodationDocTabId = null);
 
 public sealed record ParticipantRoomFiltersRequest(
@@ -371,6 +379,39 @@ public sealed record BulkMatchInsurancePolicyRequest(
     BulkMatchInsurancePolicyEntry[]? Entries);
 
 public sealed record BulkMatchInsurancePolicyResponse(
+    int AppliedCount,
+    string[] UnmatchedTcNos);
+
+public sealed record BulkTransferCommonLeg(
+    string? PickupTime,
+    string? PickupPlace,
+    string? DropoffPlace,
+    string? Vehicle,
+    string? Plate,
+    string? DriverInfo,
+    string? Note);
+
+public sealed record BulkApplyCommonTransferRequest(
+    BulkTransferCommonLeg? Arrival,
+    BulkTransferCommonLeg? Return,
+    string? Scope,
+    string? OverwriteMode);
+
+public sealed record BulkApplyCommonTransferResponse(
+    int AffectedCount,
+    int SkippedCount);
+
+public sealed record BulkMatchTransferSeatsEntry(
+    string? TcNo,
+    string? ArrivalSeatNo,
+    string? ArrivalCompartmentNo,
+    string? ReturnSeatNo,
+    string? ReturnCompartmentNo);
+
+public sealed record BulkMatchTransferSeatsRequest(
+    BulkMatchTransferSeatsEntry[]? Entries);
+
+public sealed record BulkMatchTransferSeatsResponse(
     int AppliedCount,
     string[] UnmatchedTcNos);
 

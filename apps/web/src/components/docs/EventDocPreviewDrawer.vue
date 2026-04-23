@@ -120,57 +120,6 @@ const contentPhone = computed(() => {
   }
 })
 
-const hasTransferValue = (transfer?: Record<string, string> | null) =>
-  Boolean(
-    transfer?.pickupTime ||
-      transfer?.pickupPlace ||
-      transfer?.dropoffPlace ||
-      transfer?.vehicle ||
-      transfer?.plate ||
-      transfer?.driverInfo ||
-      transfer?.note
-  )
-
-const parseTransferContent = (content: unknown) => {
-  const obj = toObject(content)
-  if (!obj) {
-    return { arrival: null as Record<string, string> | null, return: null as Record<string, string> | null }
-  }
-
-  const arrivalObj = toObject(obj.arrival)
-  const returnObj = toObject(obj.return)
-
-  const read = (section: Record<string, unknown> | null, key: string, fallbackKey: string) => {
-    const sectionValue = section?.[key]
-    if (typeof sectionValue === 'string' && sectionValue.trim()) {
-      return sectionValue.trim()
-    }
-    const fallbackValue = obj[fallbackKey]
-    return typeof fallbackValue === 'string' ? fallbackValue.trim() : ''
-  }
-
-  const build = (section: Record<string, unknown> | null, prefix: string) => {
-    const transfer = {
-      pickupTime: read(section, 'pickupTime', `${prefix}PickupTime`),
-      pickupPlace: read(section, 'pickupPlace', `${prefix}PickupPlace`),
-      dropoffPlace: read(section, 'dropoffPlace', `${prefix}DropoffPlace`),
-      vehicle: read(section, 'vehicle', `${prefix}Vehicle`),
-      plate: read(section, 'plate', `${prefix}Plate`),
-      driverInfo: read(section, 'driverInfo', `${prefix}DriverInfo`),
-      note: read(section, 'note', `${prefix}Note`),
-    }
-
-    return hasTransferValue(transfer) ? transfer : null
-  }
-
-  return {
-    arrival: build(arrivalObj, 'arrival'),
-    return: build(returnObj, 'return'),
-  }
-}
-
-const transferData = computed(() => parseTransferContent(props.tab?.content))
-
 const getCustomText = (content: unknown) => {
   const obj = toObject(content)
   if (!obj) return ''
@@ -243,7 +192,7 @@ const hasVisibleContent = computed(() => {
   }
 
   if (normalizedType.value === 'transfer') {
-    return Boolean(transferData.value.arrival || transferData.value.return)
+    return true
   }
 
   return Boolean(customText.value || customFields.value.length > 0)
@@ -344,69 +293,7 @@ const hasVisibleContent = computed(() => {
               </template>
 
               <template v-else-if="normalizedType === 'transfer'">
-                <div v-if="transferData.arrival" class="space-y-2 rounded-xl border border-slate-100 p-3">
-                  <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferOutboundTitle') }}</div>
-                  <div v-if="hasText(transferData.arrival.pickupTime)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.pickupTime }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.pickupPlace)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.pickupPlace }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.dropoffPlace)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.dropoffPlace }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.vehicle)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.vehicle }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.plate)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.plate }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.driverInfo)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.driverInfo }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.arrival.note)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.arrival.note }}</span>
-                  </div>
-                </div>
-
-                <div v-if="transferData.return" class="space-y-2 rounded-xl border border-slate-100 p-3">
-                  <div class="text-xs font-semibold text-slate-500">{{ t('portal.docs.transferReturnTitle') }}</div>
-                  <div v-if="hasText(transferData.return.pickupTime)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPickupTime') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.pickupTime }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.pickupPlace)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPickupPlace') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.pickupPlace }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.dropoffPlace)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferDropoffPlace') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.dropoffPlace }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.vehicle)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferVehicle') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.vehicle }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.plate)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferPlate') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.plate }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.driverInfo)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferDriver') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.driverInfo }}</span>
-                  </div>
-                  <div v-if="hasText(transferData.return.note)" class="flex items-start justify-between gap-3">
-                    <span class="text-slate-500">{{ t('portal.docs.transferNote') }}</span>
-                    <span class="text-right font-medium text-slate-800">{{ transferData.return.note }}</span>
-                  </div>
-                </div>
+                <p class="text-sm text-slate-600">{{ t('admin.docs.transferPersonalNote') }}</p>
               </template>
 
               <template v-else>

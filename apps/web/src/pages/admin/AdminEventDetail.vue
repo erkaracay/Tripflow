@@ -38,6 +38,7 @@ import {
 } from '../../lib/participantsExportWorkbook'
 import ParticipantFlightsModal from '../../components/admin/ParticipantFlightsModal.vue'
 import InsuranceBulkModal from '../../components/admin/InsuranceBulkModal.vue'
+import TransferBulkModal from '../../components/admin/TransferBulkModal.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import AppModalShell from '../../components/ui/AppModalShell.vue'
@@ -208,6 +209,8 @@ const editDetails = reactive({
   arrivalTransferPlate: '',
   arrivalTransferDriverInfo: '',
   arrivalTransferNote: '',
+  arrivalTransferSeatNo: '',
+  arrivalTransferCompartmentNo: '',
   returnTransferPickupTime: '',
   returnTransferPickupPlace: '',
   returnTransferDropoffPlace: '',
@@ -215,6 +218,8 @@ const editDetails = reactive({
   returnTransferPlate: '',
   returnTransferDriverInfo: '',
   returnTransferNote: '',
+  returnTransferSeatNo: '',
+  returnTransferCompartmentNo: '',
   insuranceCompanyName: '',
   insurancePolicyNo: '',
   insuranceStartDate: '',
@@ -900,6 +905,8 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.arrivalTransferPlate = participant.details?.arrivalTransferPlate ?? ''
   editDetails.arrivalTransferDriverInfo = participant.details?.arrivalTransferDriverInfo ?? ''
   editDetails.arrivalTransferNote = participant.details?.arrivalTransferNote ?? ''
+  editDetails.arrivalTransferSeatNo = participant.details?.arrivalTransferSeatNo ?? ''
+  editDetails.arrivalTransferCompartmentNo = participant.details?.arrivalTransferCompartmentNo ?? ''
   editDetails.returnTransferPickupTime = participant.details?.returnTransferPickupTime ?? ''
   editDetails.returnTransferPickupPlace = participant.details?.returnTransferPickupPlace ?? ''
   editDetails.returnTransferDropoffPlace = participant.details?.returnTransferDropoffPlace ?? ''
@@ -907,6 +914,8 @@ const startEditParticipant = (participant: Participant) => {
   editDetails.returnTransferPlate = participant.details?.returnTransferPlate ?? ''
   editDetails.returnTransferDriverInfo = participant.details?.returnTransferDriverInfo ?? ''
   editDetails.returnTransferNote = participant.details?.returnTransferNote ?? ''
+  editDetails.returnTransferSeatNo = participant.details?.returnTransferSeatNo ?? ''
+  editDetails.returnTransferCompartmentNo = participant.details?.returnTransferCompartmentNo ?? ''
   editDetails.insuranceCompanyName = participant.details?.insuranceCompanyName ?? ''
   editDetails.insurancePolicyNo = participant.details?.insurancePolicyNo ?? ''
   editDetails.insuranceStartDate = participant.details?.insuranceStartDate ?? ''
@@ -1036,6 +1045,8 @@ const saveParticipant = async (participant: Participant) => {
           arrivalTransferPlate: editDetails.arrivalTransferPlate || undefined,
           arrivalTransferDriverInfo: editDetails.arrivalTransferDriverInfo || undefined,
           arrivalTransferNote: editDetails.arrivalTransferNote || undefined,
+          arrivalTransferSeatNo: editDetails.arrivalTransferSeatNo || undefined,
+          arrivalTransferCompartmentNo: editDetails.arrivalTransferCompartmentNo || undefined,
           returnTransferPickupTime: editDetails.returnTransferPickupTime || undefined,
           returnTransferPickupPlace: editDetails.returnTransferPickupPlace || undefined,
           returnTransferDropoffPlace: editDetails.returnTransferDropoffPlace || undefined,
@@ -1043,6 +1054,8 @@ const saveParticipant = async (participant: Participant) => {
           returnTransferPlate: editDetails.returnTransferPlate || undefined,
           returnTransferDriverInfo: editDetails.returnTransferDriverInfo || undefined,
           returnTransferNote: editDetails.returnTransferNote || undefined,
+          returnTransferSeatNo: editDetails.returnTransferSeatNo || undefined,
+          returnTransferCompartmentNo: editDetails.returnTransferCompartmentNo || undefined,
           insuranceCompanyName: editDetails.insuranceCompanyName.trim(),
           insurancePolicyNo: editDetails.insurancePolicyNo.trim(),
           insuranceStartDate: editDetails.insuranceStartDate.trim(),
@@ -1387,6 +1400,8 @@ const fetchAccommodationDataForExport = async (participantIds: string[]) => {
 
 const insuranceBulkModalOpen = ref(false)
 const insuranceBulkDefaultTab = ref<'common' | 'policy'>('common')
+const transferBulkModalOpen = ref(false)
+const transferBulkDefaultTab = ref<'common' | 'seats'>('common')
 
 const reloadParticipants = async () => {
   try {
@@ -1403,6 +1418,15 @@ const openInsuranceBulkModal = (tab: 'common' | 'policy') => {
 }
 
 const handleInsuranceBulkApplied = async () => {
+  await reloadParticipants()
+}
+
+const openTransferBulkModal = (tab: 'common' | 'seats') => {
+  transferBulkDefaultTab.value = tab
+  transferBulkModalOpen.value = true
+}
+
+const handleTransferBulkApplied = async () => {
   await reloadParticipants()
 }
 
@@ -2193,6 +2217,14 @@ onMounted(loadEvent)
             >
               {{ t('admin.events.insuranceBulk.toolbarButton') }}
             </button>
+            <button
+              class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
+              type="button"
+              :disabled="participants.length === 0"
+              @click="openTransferBulkModal('common')"
+            >
+              {{ t('admin.events.transferBulk.toolbarButton') }}
+            </button>
             <span class="text-xs text-slate-500">{{ participants.length }} {{ t('common.total') }}</span>
             <button
               class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium leading-tight text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:py-1.5"
@@ -2507,6 +2539,14 @@ onMounted(loadEvent)
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferDriverInfo') }}</span>
                     <input v-model.trim="editDetails.arrivalTransferDriverInfo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferSeatNo') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferSeatNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferCompartmentNo') }}</span>
+                    <input v-model.trim="editDetails.arrivalTransferCompartmentNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
                   <label class="grid gap-1 text-sm md:col-span-3">
                     <span class="text-slate-600">{{ t('admin.participants.details.arrivalTransferNote') }}</span>
                     <input v-model.trim="editDetails.arrivalTransferNote" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
@@ -2537,6 +2577,14 @@ onMounted(loadEvent)
                   <label class="grid gap-1 text-sm">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnTransferDriverInfo') }}</span>
                     <input v-model.trim="editDetails.returnTransferDriverInfo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferSeatNo') }}</span>
+                    <input v-model.trim="editDetails.returnTransferSeatNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
+                  </label>
+                  <label class="grid gap-1 text-sm">
+                    <span class="text-slate-600">{{ t('admin.participants.details.returnTransferCompartmentNo') }}</span>
+                    <input v-model.trim="editDetails.returnTransferCompartmentNo" class="rounded border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" type="text" />
                   </label>
                   <label class="grid gap-1 text-sm md:col-span-3">
                     <span class="text-slate-600">{{ t('admin.participants.details.returnTransferNote') }}</span>
@@ -2763,5 +2811,14 @@ onMounted(loadEvent)
     :default-tab="insuranceBulkDefaultTab"
     @close="insuranceBulkModalOpen = false"
     @applied="handleInsuranceBulkApplied"
+  />
+
+  <TransferBulkModal
+    :open="transferBulkModalOpen"
+    :event-id="eventId"
+    :participants="participants"
+    :default-tab="transferBulkDefaultTab"
+    @close="transferBulkModalOpen = false"
+    @applied="handleTransferBulkApplied"
   />
 </template>
