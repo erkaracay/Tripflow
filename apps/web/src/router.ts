@@ -162,6 +162,15 @@ const router = createRouter({
     { path: '/e/login', component: () => import('./pages/portal/PortalLogin.vue') },
     { path: '/e/:eventId/docs/print', component: () => import('./pages/portal/PortalDocsPrint.vue'), props: true },
     { path: '/e/:eventId', component: () => import('./pages/portal/EventPortal.vue'), props: true },
+    ...(import.meta.env.DEV
+      ? [
+          {
+            path: '/design-system',
+            name: 'DesignSystem',
+            component: () => import('./pages/DesignSystem.vue'),
+          },
+        ]
+      : []),
   ],
 })
 
