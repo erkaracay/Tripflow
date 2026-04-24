@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────
+   Infora Design System — Faz 0 foundation tokens
+   Warm paper + ember accent. OKLCH, harmonious.
+   Non-destructive: additive only; does not override slate palette.
+   ───────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces — warm neutrals (hue ~75, very low chroma) */
+  --color-paper: oklch(98.6% 0.004 75);
+  --color-paper-soft: oklch(97% 0.006 75);
+  --color-paper-warm: oklch(95% 0.01 75);
+  --color-card: oklch(100% 0 0);
+  --color-line: oklch(91% 0.006 75);
+  --color-line-strong: oklch(85% 0.008 75);
+
+  /* Text */
+  --color-ink: oklch(22% 0.02 260);
+  --color-ink-soft: oklch(32% 0.02 260);
+  --color-mute: oklch(58% 0.01 75);
+  --color-mute-soft: oklch(70% 0.008 75);
+
+  /* Accent — ember (warm amber) */
+  --color-ember: oklch(66% 0.14 55);
+  --color-ember-deep: oklch(50% 0.14 55);
+  --color-ember-soft: oklch(93% 0.05 75);
+  --color-ember-line: oklch(82% 0.08 65);
+
+  /* Status — same chroma family, hue varies */
+  --color-sage: oklch(62% 0.09 160);
+  --color-sage-soft: oklch(94% 0.04 160);
+  --color-coral: oklch(62% 0.14 25);
+  --color-coral-soft: oklch(94% 0.04 25);
+  --color-sky: oklch(62% 0.09 235);
+  --color-sky-soft: oklch(94% 0.03 235);
+
+  /* Radii */
+  --radius-r1: 4px;
+  --radius-r2: 8px;
+  --radius-r3: 12px;
+  --radius-r4: 16px;
+  --radius-r5: 24px;
+
+  /* Typography — Sans direction (Fraunces intentionally absent) */
+  --font-body: "Inter", -apple-system, system-ui, sans-serif;
+  --font-display: "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* Motion system — purposeful, short, ease-out; respects reduced-motion */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 260ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Mobilde input odaklanınca tarayıcı zoom yapmasın (iOS: font-size >= 16px gerekli) */
 @layer base {
   @media (max-width: 768px) {
