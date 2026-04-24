@@ -469,6 +469,13 @@ public static class EventsEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        admin.MapPost("/{eventId}/flight-segments/bulk-match-ticket", EventsHandlers.BulkMatchFlightTicket)
+            .WithSummary("Bulk match flight ticket numbers by TC number")
+            .WithDescription("Applies ticket numbers to participants' flight segments in a direction by matching TC numbers; unmatched TC numbers and TCs without segments are returned.")
+            .Produces<BulkMatchFlightTicketResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         admin.MapPost("/{eventId}/participants/insurance/bulk-apply-common", EventsHandlers.BulkApplyCommonInsurance)
             .WithSummary("Bulk apply common insurance fields")
             .WithDescription("Applies insurance company name and/or dates to all or a subset of event participants.")

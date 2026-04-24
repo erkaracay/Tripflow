@@ -3895,6 +3895,179 @@ internal static class EventsHandlers
         return Results.Ok(new BulkMatchInsurancePolicyResponse(applied, unmatched.ToArray()));
     }
 
+    internal static async Task<IResult> BulkMatchFlightTicket(
+        string eventId,
+        BulkMatchFlightTicketRequest request,
+        HttpContext httpContext,
+        TripflowDbContext db,
+        AuditService auditService,
+        CancellationToken ct)
+    {
+        if (!EventsHelpers.TryParseEventId(eventId, out var id, out var error))
+        {
+            return error!;
+        }
+
+        if (!OrganizationHelpers.TryResolveOrganizationId(httpContext, out var orgId, out var orgError))
+        {
+            return orgError!;
+        }
+
+        var eventExists = await db.Events.AsNoTracking()
+            .AnyAsync(x => x.Id == id && x.OrganizationId == orgId, ct);
+        if (!eventExists)
+        {
+            return Results.NotFound(new { message = "Event not found." });
+        }
+
+        if (!Enum.TryParse<ParticipantFlightSegmentDirection>(request.Direction, ignoreCase: true, out var direction))
+        {
+            return EventsHelpers.BadRequest(
+                "invalid_direction",
+                "direction",
+                "Direction must be 'Arrival' or 'Return'.");
+        }
+
+        var overwriteMode = string.Equals(request.OverwriteMode, "only_empty", StringComparison.OrdinalIgnoreCase)
+            ? "only_empty"
+            : "overwrite";
+        var overwrite = overwriteMode == "overwrite";
+
+        var entries = request.Entries ?? Array.Empty<BulkMatchFlightTicketEntry>();
+        if (entries.Length == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_entries",
+                "entries",
+                "At least one TC/ticket entry is required.");
+        }
+
+        // Collapse duplicates: last value wins for the same TC.
+        var entriesByTcNo = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            var tcNo = NormalizeTcNo(entry?.TcNo);
+            var ticketNo = NormalizeOptionalText(entry?.TicketNo);
+            if (tcNo.Length != 11 || ticketNo is null)
+            {
+                continue;
+            }
+            entriesByTcNo[tcNo] = ticketNo;
+        }
+
+        if (entriesByTcNo.Count == 0)
+        {
+            return EventsHelpers.BadRequest(
+                "no_valid_entries",
+                "entries",
+                "No entries with a valid 11-digit TC number and ticket number were provided.");
+        }
+
+        var participants = await db.Participants
+            .Where(x => x.EventId == id && x.OrganizationId == orgId)
+            .Select(x => new { x.Id, x.TcNo })
+            .ToListAsync(ct);
+
+        var participantsByTcNo = participants
+            .Where(x => !string.IsNullOrWhiteSpace(x.TcNo))
+            .GroupBy(x => NormalizeTcNo(x.TcNo), StringComparer.Ordinal)
+            .Where(g => g.Key.Length == 11)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Id).ToList(), StringComparer.Ordinal);
+
+        var targets = new List<(string TcNo, Guid ParticipantId, string TicketNo)>();
+        var unmatched = new List<string>();
+
+        foreach (var (tcNo, ticketNo) in entriesByTcNo)
+        {
+            if (!participantsByTcNo.TryGetValue(tcNo, out var matches) || matches.Count != 1)
+            {
+                unmatched.Add(tcNo);
+                continue;
+            }
+            targets.Add((tcNo, matches[0], ticketNo));
+        }
+
+        var appliedParticipantCount = 0;
+        var appliedSegmentCount = 0;
+        var noSegments = new List<string>();
+
+        if (targets.Count > 0)
+        {
+            var participantIds = targets.Select(x => x.ParticipantId).ToArray();
+            var segments = await db.ParticipantFlightSegments
+                .Where(x => x.EventId == id
+                    && x.OrganizationId == orgId
+                    && x.Direction == direction
+                    && participantIds.Contains(x.ParticipantId))
+                .ToListAsync(ct);
+
+            var segmentsByParticipantId = segments
+                .GroupBy(x => x.ParticipantId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var (tcNo, participantId, ticketNo) in targets)
+            {
+                if (!segmentsByParticipantId.TryGetValue(participantId, out var participantSegments)
+                    || participantSegments.Count == 0)
+                {
+                    noSegments.Add(tcNo);
+                    continue;
+                }
+
+                var participantChanged = false;
+                foreach (var segment in participantSegments)
+                {
+                    var currentEmpty = string.IsNullOrWhiteSpace(segment.TicketNo);
+                    if (!overwrite && !currentEmpty)
+                    {
+                        continue;
+                    }
+                    if (string.Equals(segment.TicketNo, ticketNo, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    segment.TicketNo = ticketNo;
+                    appliedSegmentCount++;
+                    participantChanged = true;
+                }
+
+                if (participantChanged)
+                {
+                    appliedParticipantCount++;
+                }
+            }
+
+            if (appliedSegmentCount > 0)
+            {
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        await auditService.LogAsync(
+            httpContext,
+            new AuditLogWrite(
+                Action: "participant.flight.bulk_ticket_match",
+                TargetType: "event",
+                TargetId: id.ToString(),
+                Result: "success",
+                OrganizationId: orgId,
+                Extra: AuditLogHelpers.CreateExtra(
+                    ("direction", direction.ToString()),
+                    ("overwriteMode", overwriteMode),
+                    ("submittedCount", entriesByTcNo.Count),
+                    ("appliedParticipantCount", appliedParticipantCount),
+                    ("appliedSegmentCount", appliedSegmentCount),
+                    ("unmatchedCount", unmatched.Count),
+                    ("noSegmentsCount", noSegments.Count))),
+            ct);
+
+        return Results.Ok(new BulkMatchFlightTicketResponse(
+            appliedParticipantCount,
+            appliedSegmentCount,
+            unmatched.ToArray(),
+            noSegments.ToArray()));
+    }
+
     internal static async Task<IResult> BulkApplyCommonTransfer(
         string eventId,
         BulkApplyCommonTransferRequest request,
