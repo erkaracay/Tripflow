@@ -10,6 +10,8 @@ import type {
   BulkApplyParticipantRoomsResponse,
   BulkApplyFlightSegmentsRequest,
   BulkApplyFlightSegmentsResponse,
+  BulkMatchFlightTicketRequest,
+  BulkMatchFlightTicketResponse,
   BulkApplyCommonInsuranceRequest,
   BulkApplyCommonInsuranceResponse,
   BulkMatchInsurancePolicyRequest,
@@ -194,6 +196,15 @@ export const bulkApplyFlightSegments = async (
   payload: BulkApplyFlightSegmentsRequest
 ): Promise<BulkApplyFlightSegmentsResponse> =>
   apiPost<BulkApplyFlightSegmentsResponse>(`/api/events/${eventId}/flight-segments/bulk-apply`, payload)
+
+export const bulkMatchFlightTicket = async (
+  eventId: string,
+  payload: BulkMatchFlightTicketRequest
+): Promise<BulkMatchFlightTicketResponse> =>
+  apiPost<BulkMatchFlightTicketResponse>(
+    `/api/events/${eventId}/flight-segments/bulk-match-ticket`,
+    payload
+  )
 
 export const bulkApplyParticipantRooms = async (
   eventId: string,

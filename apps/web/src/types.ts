@@ -278,6 +278,27 @@ export type BulkApplyFlightSegmentsResponse = {
   }
 }
 
+export type BulkMatchFlightTicketDirection = 'Arrival' | 'Return'
+export type BulkMatchFlightTicketOverwriteMode = 'overwrite' | 'only_empty'
+
+export type BulkMatchFlightTicketEntry = {
+  tcNo: string
+  ticketNo: string
+}
+
+export type BulkMatchFlightTicketRequest = {
+  direction: BulkMatchFlightTicketDirection
+  overwriteMode: BulkMatchFlightTicketOverwriteMode
+  entries: BulkMatchFlightTicketEntry[]
+}
+
+export type BulkMatchFlightTicketResponse = {
+  appliedParticipantCount: number
+  appliedSegmentCount: number
+  unmatchedTcNos: string[]
+  noSegmentsTcNos: string[]
+}
+
 export type ApplyTicketToMatchingFlightsRequest = {
   airline: string
   ticketNo: string

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import AppModalShell from '../ui/AppModalShell.vue'
 import AppSegmentedControl from '../ui/AppSegmentedControl.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import FlightTicketBulkMatch from './FlightTicketBulkMatch.vue'
 import { apiGet, bulkApplyFlightSegments } from '../../lib/api'
 import { exportWorkbook as exportWorkbookFile } from '../../lib/exportWorkbook'
 import { useToast } from '../../lib/toast'
@@ -39,6 +40,7 @@ type SegmentTextField =
 type ConfirmAction =
   | { kind: 'allEvent' }
   | { kind: 'apply'; directions: FlightPanelHelperDirection[] }
+type HelperTab = 'apply' | 'ticketMatch'
 
 const props = withDefaults(
   defineProps<{
@@ -94,6 +96,9 @@ const arrivalSegments = ref<FlightSegment[]>([])
 const returnSegments = ref<FlightSegment[]>([])
 const confirmAction = ref<ConfirmAction | null>(null)
 const confirmOpen = ref(false)
+const activeTab = ref<HelperTab>('apply')
+const ticketMatchRef = ref<InstanceType<typeof FlightTicketBulkMatch> | null>(null)
+const ticketMatchSubmitting = computed(() => ticketMatchRef.value?.submitting ?? false)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 const selectedCount = computed(() => selectedIds.value.length)
@@ -123,7 +128,12 @@ const getRowsCreatedForDirections = (directions: FlightPanelHelperDirection[]) =
     return totalRows + returnRowsCreated.value
   }, 0)
 const hasBusyState = computed(
-  () => loadingParticipants.value || resolvingSelection.value || applying.value || exporting.value
+  () =>
+    loadingParticipants.value
+    || resolvingSelection.value
+    || applying.value
+    || exporting.value
+    || ticketMatchSubmitting.value
 )
 const buttonText = computed(() => props.buttonLabel || t('admin.flightPanelHelper.open'))
 const localDirectionError = computed(() => getDirectionTemplateError(activeDirection.value))
@@ -141,6 +151,21 @@ const flightFilterOptions = computed(() => [
   { value: 'no_arrival', label: t('admin.flightPanelHelper.flightFilters.noArrival') },
   { value: 'no_return', label: t('admin.flightPanelHelper.flightFilters.noReturn') },
 ])
+const helperTabOptions = computed(() => [
+  { value: 'apply', label: t('admin.flightPanelHelper.tabApply') },
+  { value: 'ticketMatch', label: t('admin.flightPanelHelper.tabTicketMatch') },
+])
+const handleHelperTabChange = (value: string) => {
+  if (value === 'apply' || value === 'ticketMatch') {
+    activeTab.value = value
+  }
+}
+const onTicketMatchApplied = () => {
+  emit('applied')
+}
+const onTicketMatchClose = () => {
+  closeModal()
+}
 
 const participantDisplayName = (participant: Pick<ParticipantTableItem, 'firstName' | 'lastName' | 'fullName'>) => {
   const first = participant.firstName?.trim() ?? ''
@@ -642,6 +667,7 @@ const resetModalState = () => {
   total.value = 0
   participantsError.value = null
   applyError.value = null
+  activeTab.value = 'apply'
   clearSelection()
   loadDraft()
 }
@@ -715,9 +741,19 @@ onBeforeUnmount(() => {
               {{ t('common.close') }}
             </button>
           </div>
+          <div class="mt-4">
+            <AppSegmentedControl
+              :model-value="activeTab"
+              :options="helperTabOptions"
+              size="sm"
+              full-width
+              :aria-label="t('admin.flightPanelHelper.title')"
+              @update:model-value="handleHelperTabChange"
+            />
+          </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <div v-if="activeTab === 'apply'" class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div class="flex flex-wrap items-end gap-3">
                 <div class="min-w-[220px] flex-1">
@@ -1090,7 +1126,16 @@ onBeforeUnmount(() => {
           </section>
         </div>
 
-        <div class="border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div v-else class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          <FlightTicketBulkMatch
+            ref="ticketMatchRef"
+            :event-id="eventId"
+            @applied="onTicketMatchApplied"
+            @close="onTicketMatchClose"
+          />
+        </div>
+
+        <div v-if="activeTab === 'apply'" class="border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
           <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="space-y-2 text-sm text-slate-700">

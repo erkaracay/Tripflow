@@ -26,7 +26,7 @@ const handleAction = (toast: { id: string; action?: { onClick: () => void } }) =
 </script>
 
 <template>
-  <div class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 sm:bottom-6">
+  <div class="pointer-events-none fixed inset-x-0 bottom-4 z-[100] flex justify-center px-4 sm:bottom-6">
     <div class="flex w-full max-w-sm flex-col gap-2">
       <div
         v-for="toast in stackedToasts"
